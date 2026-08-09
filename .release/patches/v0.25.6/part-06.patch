@@ -1,0 +1,76 @@
+diff --git a/a/RELEASE_NOTES.txt b/b/RELEASE_NOTES.txt
+index 7bcf87a..d099768 100644
+--- a/a/RELEASE_NOTES.txt
++++ b/b/RELEASE_NOTES.txt
+@@ -1,22 +1,21 @@
+-﻿Huymaier Console v0.25.4 — GitHub Self-Update Test
++Huymaier Console v0.25.6 — Settings Chooser + Windows Scale Stabilization
+ 
+-HUYMAIER CONSOLE UPDATE
+-- Adds Settings > Updates > Huymaier Console Update as its own native page.
+-- Automatically checks thermalkil/HuymaierConsole GitHub Releases when opened.
+-- Shows current/latest version and whether a newer release exists.
+-- Downloads the selected Release ZIP into Huymaier Console's update cache.
+-- Displays live downloaded/total bytes and percentage while the Console package downloads.
+-- Computes SHA-256 for the completed local package.
+-- Install closes Huymaier Console, runs a separate updater, invokes the packaged installer silently, and relaunches Console.
+-- A lightweight root-program-file rollback snapshot is restored if installation fails.
++Changes
++- Fixes the centered choice-popup system under PowerShell StrictMode by explicitly initializing popup state before first use.
++- Quick Access location now reliably opens a centered Bottom / Top / Left / Right chooser.
++- Keyboard Theme now opens a centered Huymaier / Light / High Contrast chooser instead of calling the old cycle action.
++- Button Prompts now use a centered Auto / Xbox / PlayStation / Nintendo / Steam / Keyboard chooser.
++- Music Theme now uses a centered chooser and only offers Custom when a custom music file is configured.
++- Adds Display -> Scale as a percentage-based Windows setting with a centered chooser.
++- Display Scale writes the Windows account DPI scale setting from 100%-500% and reports when Windows sign-out is required for the selected value to apply fully.
++- When a new scale is pending, Display offers a controller-friendly Sign out to apply display scale action with confirmation.
++- Preserves the v0.25.5 fresh-PC empty-collection startup fix and richer fatal startup diagnostics.
++- Preserves Epic/Legendary live download telemetry, 7-day/20-entry download history, GitHub self-update, Windows Update, Driver Updates, Steam population, RPCS3 users, and shared Shelf/Library artwork.
+ 
+-PRIVATE REPOSITORY TESTING
+-- Public GitHub Releases require no account configuration.
+-- While thermalkil/HuymaierConsole remains private, the PC must provide GH_TOKEN/GITHUB_TOKEN or be signed in with GitHub CLI (`gh auth login`) for Release discovery/download.
+-- If the repository has no published Release yet, the page reports that state instead of silently doing nothing.
+-
+-PRESERVED
+-- Epic/Legendary live transfer percentage, bytes, rate, and ETA from v0.25.3.
+-- Seven-day / 20-entry true download history.
+-- Dedicated Windows Update and Driver Updates pages.
+-- PS3 users, Steam library population, shared Shelf/Library artwork, strict Epic filtering, and native emulator direct entry.
++Testing focus
++1. Settings -> Huymaier Console -> Quick Access location: centered popup appears and all four locations are visible at once.
++2. Settings -> Huymaier Console -> Keyboard theme: centered popup appears; selection updates the native keyboard palette.
++3. Button Prompts and Music Theme use the same chooser behavior.
++4. Settings -> Display -> Scale: chooser opens, selected percentage is written, and the page reports current -> configured scale until Windows sign-out.
++5. Sign out action requires confirmation.
++6. Fresh/empty profile still boots without .Count failures.
+diff --git a/a/manifest.json b/b/manifest.json
+index 56b7597..d7a7b8e 100644
+--- a/a/manifest.json
++++ b/b/manifest.json
+@@ -1,15 +1,15 @@
+ {
+   "name": "Huymaier Console FSE Shell, Storefront & Artwork Integration",
+-  "version": "0.25.4",
+-  "baseVersion": "0.25.3",
+-  "build": "github-self-update-test",
+-  "builtFrom": "HC253.zip",
++  "version": "0.25.6",
++  "baseVersion": "0.25.5",
++  "build": "settings-choice-display-scale-stabilization",
++  "builtFrom": "HC255.zip",
+   "features": [
+-    "adds Settings > Updates > Huymaier Console Update as a dedicated native page",
+-    "checks thermalkil/HuymaierConsole GitHub Releases and compares versions",
+-    "downloads release ZIP assets with live byte/percentage state and optional private-repo authentication through GH_TOKEN/GITHUB_TOKEN or GitHub CLI",
+-    "hands off to an external self-updater so Console can close, install the downloaded build, rollback root program files on failure, and relaunch",
+-    "preserves v0.25.3 Epic live download telemetry and v0.25.2 Settings/input/download-history fixes"
++    "fixes centered Settings choice popup initialization under PowerShell StrictMode",
++    "uses centered choice popups for Quick Access location, keyboard theme, button prompts, and music theme",
++    "adds Settings > Display > Scale with percentage choices and Windows account DPI configuration",
++    "surfaces confirmed Windows sign-out when a newly configured display scale is pending",
++    "preserves the v0.25.5 fresh-PC startup fix, Epic live download telemetry, GitHub self-update, Windows/driver update pages, Steam population, RPCS3 users, and shared Shelf/Library artwork"
+   ],
+-  "description": "Updater-focused test build adding a native Huymaier Console GitHub Release check/download/install/relaunch page."
++  "description": "Settings chooser and Windows display-scale stabilization build."
+ }
