@@ -1,6 +1,6 @@
 {
-  "candidate": "v0.26.0-test-5",
+  "candidate": "v0.26.0-test-6",
   "base_release": "v0.25.8",
-  "requested_at": "2026-08-09T13:49:02Z",
-  "focus": "4K 150% DPI-correct centered Game Bar, user scale slider, direct modal popup controller commands, preserve fullscreen/maximized app state"
+  "requested_at": "2026-08-09T13:55:10Z",
+  "focus": "explicit popup visual selection feedback with moving marker and Huymaier-owned button template; retain test5 DPI/scale/modal input fixes"
 }
