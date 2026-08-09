@@ -1,5 +1,5 @@
 {
-  "batch": "gamebar-horizontal-nav-1",
-  "script": "apply_gamebar_horizontal_navigation.py",
+  "batch": "popup-navigate-feedback-1",
+  "script": "apply_popup_navigate_feedback.py",
   "attempt": 1
 }
