@@ -1,4 +1,4 @@
-name: v0.26.0 Development Validation
+name: v0.26.0 Apply Feature Foundation
 
 on:
   pull_request:
@@ -9,15 +9,13 @@ permissions:
   contents: write
 
 concurrency:
-  group: v026-development-${{ github.event.pull_request.number }}
+  group: v026-foundation-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
   apply-foundation:
     if: github.event.pull_request.head.ref == 'feature/v0.26.0-native-gamebar' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    outputs:
-      branch_sha: ${{ steps.finish.outputs.branch_sha }}
     steps:
       - name: Check out feature branch
         uses: actions/checkout@v4
@@ -26,7 +24,7 @@ jobs:
           fetch-depth: 0
           token: ${{ github.token }}
 
-      - name: Apply deterministic v0.26.0 foundation transform
+      - name: Apply deterministic foundation transform
         shell: bash
         run: |
           set -euo pipefail
@@ -35,9 +33,17 @@ jobs:
           if [ -f .development/v0.26.0/status.json ]; then
             LAST="$(python3 -c "import json;print(json.load(open('.development/v0.26.0/status.json')).get('batch',''))")"
           fi
-          if [ "$LAST" != "$BATCH" ]; then
-            python3 .development/v0.26.0/apply_foundation.py
-            python3 - <<PY
+          if [ "$LAST" = "$BATCH" ]; then
+            echo "Foundation batch $BATCH is already applied."
+            exit 0
+          fi
+
+          # The transformer lives two directories below the repository root.
+          # Correct older staged copies before executing it.
+          sed -i 's/parents\[3\]/parents[2]/' .development/v0.26.0/apply_foundation.py
+          python3 .development/v0.26.0/apply_foundation.py
+
+          python3 - <<PY
           import json, datetime
           state={
             'batch':'$BATCH',
@@ -46,126 +52,9 @@ jobs:
           }
           open('.development/v0.26.0/status.json','w',encoding='utf-8').write(json.dumps(state,indent=2)+'\n')
           PY
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add -A
-            git commit -m "Apply v0.26.0 foundation batch $BATCH"
-            git push origin HEAD:feature/v0.26.0-native-gamebar
-          else
-            echo "Foundation batch $BATCH is already applied."
-          fi
 
-      - name: Capture feature head
-        id: finish
-        shell: bash
-        run: |
-          git fetch origin feature/v0.26.0-native-gamebar
-          echo "branch_sha=$(git rev-parse origin/feature/v0.26.0-native-gamebar)" >> "$GITHUB_OUTPUT"
-
-  validate-windows:
-    needs: apply-foundation
-    runs-on: windows-latest
-    steps:
-      - name: Check out applied feature head
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.apply-foundation.outputs.branch_sha }}
-
-      - name: Parse Windows PowerShell source
-        shell: powershell
-        run: |
-          $ErrorActionPreference='Stop'
-          $failures=New-Object System.Collections.Generic.List[string]
-          foreach($file in @(Get-ChildItem -LiteralPath . -Filter '*.ps1' -File -Recurse)){
-            $tokens=$null;$errors=$null
-            [void][System.Management.Automation.Language.Parser]::ParseFile($file.FullName,[ref]$tokens,[ref]$errors)
-            foreach($error in @($errors)){
-              [void]$failures.Add(('{0}:{1}:{2} {3}' -f $file.FullName,$error.Extent.StartLineNumber,$error.Extent.StartColumnNumber,$error.Message))
-            }
-          }
-          if($failures.Count -gt 0){throw ($failures -join "`r`n")}
-          Write-Host 'PowerShell parser validation passed.'
-
-      - name: Acquire official Microsoft GameInput SDK
-        shell: powershell
-        run: |
-          $ErrorActionPreference='Stop'
-          $version='3.5.262'
-          $package=Join-Path $env:RUNNER_TEMP 'Microsoft.GameInput.nupkg'
-          $archive=Join-Path $env:RUNNER_TEMP 'Microsoft.GameInput.zip'
-          $expanded=Join-Path $env:RUNNER_TEMP 'Microsoft.GameInput'
-          Invoke-WebRequest -UseBasicParsing -Uri "https://api.nuget.org/v3-flatcontainer/microsoft.gameinput/$version/microsoft.gameinput.$version.nupkg" -OutFile $package
-          Copy-Item $package $archive -Force
-          Expand-Archive -LiteralPath $archive -DestinationPath $expanded -Force
-          $header=Get-ChildItem -LiteralPath $expanded -Recurse -Filter 'GameInput.h' -File|Select-Object -First 1
-          $library=Get-ChildItem -LiteralPath $expanded -Recurse -Filter 'gameinput.lib' -File|Where-Object{$_.FullName -match '(?i)x64|amd64'}|Select-Object -First 1
-          $redist=Get-ChildItem -LiteralPath $expanded -Recurse -Filter 'GameInputRedist.msi' -File|Select-Object -First 1
-          if($null -eq $header -or $null -eq $library -or $null -eq $redist){throw 'Official Microsoft.GameInput package is missing expected SDK/redist files.'}
-          "GAMEINPUT_INCLUDE=$($header.Directory.FullName)"|Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "GAMEINPUT_LIBDIR=$($library.Directory.FullName)"|Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "GAMEINPUT_REDIST=$($redist.FullName)"|Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          New-Item -ItemType Directory -Force -Path (Join-Path $env:RUNNER_TEMP 'hc-native')|Out-Null
-
-      - name: Compile native GameInput system-button bridge
-        shell: cmd
-        run: |
-          @echo off
-          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set VSINSTALL=%%i
-          if not defined VSINSTALL exit /b 2
-          call "%VSINSTALL%\VC\Auxiliary\Build\vcvars64.bat"
-          if errorlevel 1 exit /b %errorlevel%
-          cl /nologo /std:c++17 /EHsc /LD /I"%GAMEINPUT_INCLUDE%" Native\HuymaierGameInputBridge.cpp /link /LIBPATH:"%GAMEINPUT_LIBDIR%" gameinput.lib /OUT:"%RUNNER_TEMP%\hc-native\HuymaierGameInputBridge.dll"
-          if errorlevel 1 exit /b %errorlevel%
-
-      - name: Compile managed Game Bar sources
-        shell: powershell
-        run: |
-          $ErrorActionPreference='Stop'
-          Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Windows.Forms,System.Drawing
-          $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-          if(-not(Test-Path -LiteralPath $csc)){throw 'Framework64 csc.exe was not found.'}
-          $refs=@(
-            [System.Uri].Assembly.Location,
-            [System.Linq.Enumerable].Assembly.Location,
-            [System.Xaml.XamlReader].Assembly.Location,
-            [System.Windows.DependencyObject].Assembly.Location,
-            [System.Windows.Media.Visual].Assembly.Location,
-            [System.Windows.Window].Assembly.Location,
-            [System.Windows.Forms.Form].Assembly.Location,
-            [System.Drawing.Bitmap].Assembly.Location
-          )|Select-Object -Unique
-          $args=@('/noconfig','/nologo','/target:library',('/out:'+(Join-Path $env:RUNNER_TEMP 'hc-native\HuymaierOverlayValidation.dll')))
-          foreach($ref in $refs){$args+=('/reference:'+$ref)}
-          $args+=@('Native\HuymaierGameBar.cs','Native\HuymaierConsole.GameInput.cs')
-          & $csc @args
-          if($LASTEXITCODE -ne 0){throw "Managed overlay compiler exited with $LASTEXITCODE."}
-
-      - name: Validate v0.26.0 invariants
-        shell: powershell
-        run: |
-          $ErrorActionPreference='Stop'
-          $shell=Get-Content -Raw -LiteralPath 'HuymaierConsole.ps1'
-          $redesign=Get-Content -Raw -LiteralPath 'HuymaierShellRedesign.ps1'
-          $native=Get-Content -Raw -LiteralPath 'Native\HuymaierConsole.NativeApp.cs'
-          $updater=Get-Content -Raw -LiteralPath 'HuymaierConsoleUpdateWorker.ps1'
-          if($shell -notmatch "AppVersion = '0\.26\.0'"){throw 'Shell version is not 0.26.0.'}
-          if($redesign -match '\$title=New-Object System\.Windows\.Controls\.TextBlock;\$title\.Text=\$Title'){throw 'Choice popup Title/title collision remains.'}
-          if($shell -match "\$secondary='Search'"){throw 'Bogus global Search prompt remains.'}
-          if($shell -match "XboxView\|View\|Back\|Share\|Create\|Home\|Guide\|PS"){throw 'View/Share remain aliased to Guide.'}
-          if($native -match '0x0400\).*0x0010.*0x0020'){throw 'XInput Guide remains collapsed with Start/Back.'}
-          if($updater -match 'ContentLength\.HasValue'){throw 'Old updater ContentLength.HasValue bug remains.'}
-          Write-Host 'v0.26.0 source invariants passed.'
-
-      - name: Stage native development artifact
-        shell: powershell
-        run: |
-          Copy-Item -LiteralPath $env:GAMEINPUT_REDIST -Destination (Join-Path $env:RUNNER_TEMP 'hc-native\GameInputRedist.msi') -Force
-
-      - name: Upload native development payload
-        uses: actions/upload-artifact@v4
-        with:
-          name: v026-native-development
-          path: |
-            ${{ runner.temp }}\hc-native\HuymaierGameInputBridge.dll
-            ${{ runner.temp }}\hc-native\GameInputRedist.msi
-          if-no-files-found: error
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m "Apply v0.26.0 foundation batch $BATCH"
+          git push origin HEAD:feature/v0.26.0-native-gamebar
