@@ -1,0 +1,21 @@
+# Runtime/generated state
+*.log
+*.tmp
+*.bak
+bin/
+obj/
+
+# Large packaged presentation media is distributed through Releases, not source history.
+Assets/*.wav
+EmulatorPlatforms/*/Assets/*.mp4
+EmulatorPlatforms/*/Assets/*.wav
+EmulatorPlatforms/*/Assets/*.mp3
+EmulatorPlatforms/*/Assets/**/*.mp4
+EmulatorPlatforms/*/Assets/**/*.wav
+EmulatorPlatforms/*/Assets/**/*.mp3
+
+# Never commit locally discovered emulator firmware/user data.
+dev_flash/
+dev_hdd0/
+firmware/
+userdata/
