@@ -877,6 +877,8 @@ namespace HuymaierConsole.NativeApp
                     try
                     {
                         if (consoleWindow.WindowState == WindowState.Minimized) consoleWindow.WindowState = WindowState.Maximized;
+                        // Flush external-overlay edges before Console resumes ownership.
+                        try { NativeConsoleNavigation.Reset(); } catch { }
                         consoleWindow.Show(); consoleWindow.Activate(); consoleWindow.Topmost = true; consoleWindow.Topmost = false; consoleWindow.Focus();
                     }
                     catch { }
