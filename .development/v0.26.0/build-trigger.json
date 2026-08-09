@@ -1,6 +1,6 @@
 {
-  "candidate": "v0.26.0-test-3",
+  "candidate": "v0.26.0-test-4",
   "base_release": "v0.25.8",
-  "requested_at": "2026-08-09T13:18:21Z",
-  "focus": "full GameInput/Huymaier Game Bar validation after CI dependency and workflow-permission fixes"
+  "requested_at": "2026-08-09T13:32:15Z",
+  "focus": "compact lower-third Game Bar, constrained task switcher previews, preserve fullscreen/maximized app state, popup controller focus"
 }
