@@ -1,5 +1,5 @@
 {
-  "batch": "runtime-1",
-  "script": "apply_runtime.py",
+  "batch": "build-status-1",
+  "script": "apply_build_status.py",
   "attempt": 1
 }
