@@ -1,12 +1,20 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Threading;
+using Drawing = System.Drawing;
 using Forms = System.Windows.Forms;
+using HuymaierConsole.Native;
 
 namespace HuymaierConsole.NativeApp
 {
@@ -15,6 +23,7 @@ namespace HuymaierConsole.NativeApp
         internal IntPtr Handle;
         internal string Title;
         internal string ProcessName;
+        internal int ProcessId;
     }
 
     internal static class SystemWindowCatalog
@@ -31,7 +40,7 @@ namespace HuymaierConsole.NativeApp
         [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr hWnd);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowTextLength(IntPtr hWnd);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int maxCount);
-        [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+        [DllImport("user32.dll")] internal static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
         [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] private static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int index);
         [DllImport("user32.dll", EntryPoint = "GetWindowLongW")] private static extern int GetWindowLong32(IntPtr hWnd, int index);
         [DllImport("user32.dll")] private static extern IntPtr GetWindow(IntPtr hWnd, uint command);
@@ -59,7 +68,26 @@ namespace HuymaierConsole.NativeApp
             return false;
         }
 
-        internal static List<SystemWindowEntry> GetTaskWindows(IntPtr overlayHandle)
+        internal static string GetTitle(IntPtr hWnd)
+        {
+            try
+            {
+                int length = GetWindowTextLength(hWnd);
+                if (length <= 0 || length > 8192) return String.Empty;
+                StringBuilder buffer = new StringBuilder(length + 1);
+                GetWindowText(hWnd, buffer, buffer.Capacity);
+                return buffer.ToString().Trim();
+            }
+            catch { return String.Empty; }
+        }
+
+        internal static int GetProcessId(IntPtr hWnd)
+        {
+            try { uint pid; GetWindowThreadProcessId(hWnd, out pid); return (int)pid; }
+            catch { return 0; }
+        }
+
+        internal static List<SystemWindowEntry> GetTaskWindows(IntPtr overlayHandle, IntPtr preferredWindow)
         {
             List<SystemWindowEntry> result = new List<SystemWindowEntry>();
             int selfPid = Process.GetCurrentProcess().Id;
@@ -73,23 +101,25 @@ namespace HuymaierConsole.NativeApp
                     if ((GetExStyle(hWnd) & WS_EX_TOOLWINDOW) != 0) return true;
                     if (GetWindow(hWnd, GW_OWNER) != IntPtr.Zero) return true;
                     if (IsCloaked(hWnd)) return true;
-                    int length = GetWindowTextLength(hWnd);
-                    if (length <= 0 || length > 8192) return true;
-                    StringBuilder titleBuffer = new StringBuilder(length + 1);
-                    GetWindowText(hWnd, titleBuffer, titleBuffer.Capacity);
-                    string title = titleBuffer.ToString().Trim();
+                    string title = GetTitle(hWnd);
                     if (String.IsNullOrWhiteSpace(title)) return true;
-                    uint pid;
-                    GetWindowThreadProcessId(hWnd, out pid);
-                    if (pid == 0 || pid == (uint)selfPid) return true;
+                    int pid = GetProcessId(hWnd);
+                    if (pid <= 0 || pid == selfPid) return true;
                     string processName = String.Empty;
-                    try { processName = Process.GetProcessById((int)pid).ProcessName; } catch { }
-                    result.Add(new SystemWindowEntry { Handle = hWnd, Title = title, ProcessName = processName });
+                    try { processName = Process.GetProcessById(pid).ProcessName; } catch { }
+                    result.Add(new SystemWindowEntry { Handle = hWnd, Title = title, ProcessName = processName, ProcessId = pid });
                     seen.Add(hWnd);
                 }
                 catch { }
                 return true;
             }, IntPtr.Zero);
+
+            result.Sort(delegate(SystemWindowEntry a, SystemWindowEntry b)
+            {
+                if (a.Handle == preferredWindow && b.Handle != preferredWindow) return -1;
+                if (b.Handle == preferredWindow && a.Handle != preferredWindow) return 1;
+                return String.Compare(a.Title, b.Title, StringComparison.CurrentCultureIgnoreCase);
+            });
             return result;
         }
 
@@ -107,6 +137,301 @@ namespace HuymaierConsole.NativeApp
         }
     }
 
+    internal static class DwmTaskPreviewHost
+    {
+        private const uint DWM_TNP_RECTDESTINATION = 0x00000001;
+        private const uint DWM_TNP_OPACITY = 0x00000004;
+        private const uint DWM_TNP_VISIBLE = 0x00000008;
+        private const uint DWM_TNP_SOURCECLIENTAREAONLY = 0x00000010;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT { public int left, top, right, bottom; }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT { public int x, y; }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct DWM_THUMBNAIL_PROPERTIES
+        {
+            public uint dwFlags;
+            public RECT rcDestination;
+            public RECT rcSource;
+            public byte opacity;
+            [MarshalAs(UnmanagedType.Bool)] public bool fVisible;
+            [MarshalAs(UnmanagedType.Bool)] public bool fSourceClientAreaOnly;
+        }
+
+        [DllImport("dwmapi.dll")] private static extern int DwmRegisterThumbnail(IntPtr destination, IntPtr source, out IntPtr thumbnail);
+        [DllImport("dwmapi.dll")] private static extern int DwmUnregisterThumbnail(IntPtr thumbnail);
+        [DllImport("dwmapi.dll")] private static extern int DwmUpdateThumbnailProperties(IntPtr thumbnail, ref DWM_THUMBNAIL_PROPERTIES properties);
+        [DllImport("user32.dll")] private static extern bool ClientToScreen(IntPtr hWnd, ref POINT point);
+
+        internal sealed class Preview : IDisposable
+        {
+            private IntPtr thumbnail;
+            internal Preview(IntPtr handle) { thumbnail = handle; }
+            public void Dispose() { if (thumbnail != IntPtr.Zero) { try { DwmUnregisterThumbnail(thumbnail); } catch { } thumbnail = IntPtr.Zero; } }
+        }
+
+        internal static Preview Attach(Window destinationWindow, IntPtr sourceWindow, FrameworkElement destinationElement)
+        {
+            if (destinationWindow == null || sourceWindow == IntPtr.Zero || destinationElement == null || !destinationElement.IsVisible)
+                return null;
+            try
+            {
+                IntPtr destination = new WindowInteropHelper(destinationWindow).Handle;
+                if (destination == IntPtr.Zero) return null;
+                IntPtr thumbnail;
+                if (DwmRegisterThumbnail(destination, sourceWindow, out thumbnail) != 0 || thumbnail == IntPtr.Zero) return null;
+
+                System.Windows.Point screenPoint = destinationElement.PointToScreen(new System.Windows.Point(0, 0));
+                POINT clientOrigin = new POINT();
+                if (!ClientToScreen(destination, ref clientOrigin)) { DwmUnregisterThumbnail(thumbnail); return null; }
+                int left = (int)Math.Round(screenPoint.X) - clientOrigin.x;
+                int top = (int)Math.Round(screenPoint.Y) - clientOrigin.y;
+                int width = Math.Max(1, (int)Math.Round(destinationElement.ActualWidth));
+                int height = Math.Max(1, (int)Math.Round(destinationElement.ActualHeight));
+
+                DWM_THUMBNAIL_PROPERTIES properties = new DWM_THUMBNAIL_PROPERTIES();
+                properties.dwFlags = DWM_TNP_RECTDESTINATION | DWM_TNP_OPACITY | DWM_TNP_VISIBLE | DWM_TNP_SOURCECLIENTAREAONLY;
+                properties.rcDestination = new RECT { left = left, top = top, right = left + width, bottom = top + height };
+                properties.opacity = 255;
+                properties.fVisible = true;
+                properties.fSourceClientAreaOnly = false;
+                if (DwmUpdateThumbnailProperties(thumbnail, ref properties) != 0) { DwmUnregisterThumbnail(thumbnail); return null; }
+                return new Preview(thumbnail);
+            }
+            catch { return null; }
+        }
+    }
+
+    internal sealed class GameBarPerformanceSnapshot
+    {
+        internal double CpuPercent;
+        internal double GpuPercent;
+        internal bool HasGpu;
+        internal double MemoryPercent;
+        internal long UsedMemoryMb;
+        internal long TotalMemoryMb;
+        internal string ProcessName;
+        internal long ProcessWorkingSetMb;
+    }
+
+    internal static class GameBarPerformanceMonitor
+    {
+        [StructLayout(LayoutKind.Sequential)]
+        private struct FILETIME { public uint LowDateTime; public uint HighDateTime; }
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+        private class MEMORYSTATUSEX
+        {
+            public uint dwLength = (uint)Marshal.SizeOf(typeof(MEMORYSTATUSEX));
+            public uint dwMemoryLoad;
+            public ulong ullTotalPhys;
+            public ulong ullAvailPhys;
+            public ulong ullTotalPageFile;
+            public ulong ullAvailPageFile;
+            public ulong ullTotalVirtual;
+            public ulong ullAvailVirtual;
+            public ulong ullAvailExtendedVirtual;
+        }
+
+        [DllImport("kernel32.dll")] private static extern bool GetSystemTimes(out FILETIME idle, out FILETIME kernel, out FILETIME user);
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)] private static extern bool GlobalMemoryStatusEx([In, Out] MEMORYSTATUSEX buffer);
+        private static ulong lastIdle, lastKernel, lastUser;
+        private static readonly object Sync = new object();
+        private static readonly List<PerformanceCounter> gpuCounters = new List<PerformanceCounter>();
+        private static bool gpuInitialized;
+
+        private static ulong ToUInt64(FILETIME value) { return ((ulong)value.HighDateTime << 32) | value.LowDateTime; }
+
+        private static double GetCpuPercent()
+        {
+            lock (Sync)
+            {
+                FILETIME idleFt, kernelFt, userFt;
+                if (!GetSystemTimes(out idleFt, out kernelFt, out userFt)) return 0;
+                ulong idle = ToUInt64(idleFt), kernel = ToUInt64(kernelFt), user = ToUInt64(userFt);
+                if (lastKernel == 0 && lastUser == 0) { lastIdle = idle; lastKernel = kernel; lastUser = user; return 0; }
+                ulong idleDelta = idle - lastIdle;
+                ulong kernelDelta = kernel - lastKernel;
+                ulong userDelta = user - lastUser;
+                ulong total = kernelDelta + userDelta;
+                lastIdle = idle; lastKernel = kernel; lastUser = user;
+                if (total == 0) return 0;
+                return Math.Max(0, Math.Min(100, (1.0 - ((double)idleDelta / total)) * 100.0));
+            }
+        }
+
+        private static double GetGpuPercent(out bool available)
+        {
+            available = false;
+            try
+            {
+                lock (Sync)
+                {
+                    if (!gpuInitialized)
+                    {
+                        gpuInitialized = true;
+                        PerformanceCounterCategory category = new PerformanceCounterCategory("GPU Engine");
+                        foreach (string instance in category.GetInstanceNames())
+                        {
+                            if (instance.IndexOf("engtype_3D", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                            try { gpuCounters.Add(new PerformanceCounter("GPU Engine", "Utilization Percentage", instance, true)); } catch { }
+                        }
+                        foreach (PerformanceCounter counter in gpuCounters) { try { counter.NextValue(); } catch { } }
+                    }
+                    if (gpuCounters.Count == 0) return 0;
+                    double total = 0;
+                    int good = 0;
+                    foreach (PerformanceCounter counter in gpuCounters)
+                    {
+                        try { total += Math.Max(0, counter.NextValue()); good++; } catch { }
+                    }
+                    available = good > 0;
+                    return Math.Max(0, Math.Min(100, total));
+                }
+            }
+            catch { available = false; return 0; }
+        }
+
+        internal static GameBarPerformanceSnapshot Read(IntPtr targetWindow)
+        {
+            GameBarPerformanceSnapshot result = new GameBarPerformanceSnapshot();
+            result.CpuPercent = GetCpuPercent();
+            MEMORYSTATUSEX memory = new MEMORYSTATUSEX();
+            if (GlobalMemoryStatusEx(memory))
+            {
+                result.TotalMemoryMb = (long)(memory.ullTotalPhys / (1024UL * 1024UL));
+                result.UsedMemoryMb = (long)((memory.ullTotalPhys - memory.ullAvailPhys) / (1024UL * 1024UL));
+                result.MemoryPercent = memory.dwMemoryLoad;
+            }
+            result.GpuPercent = GetGpuPercent(out result.HasGpu);
+            int pid = SystemWindowCatalog.GetProcessId(targetWindow);
+            if (pid > 0)
+            {
+                try
+                {
+                    Process process = Process.GetProcessById(pid);
+                    result.ProcessName = process.ProcessName;
+                    result.ProcessWorkingSetMb = process.WorkingSet64 / (1024L * 1024L);
+                }
+                catch { }
+            }
+            if (String.IsNullOrWhiteSpace(result.ProcessName)) result.ProcessName = "Current app";
+            return result;
+        }
+    }
+
+    internal sealed class ControllerStatusEntry
+    {
+        internal string Name;
+        internal string Detail;
+    }
+
+    internal static class GameBarControllerCatalog
+    {
+        [StructLayout(LayoutKind.Sequential)]
+        private struct XINPUT_GAMEPAD { public ushort wButtons; public byte bLeftTrigger; public byte bRightTrigger; public short sThumbLX; public short sThumbLY; public short sThumbRX; public short sThumbRY; }
+        [StructLayout(LayoutKind.Sequential)]
+        private struct XINPUT_STATE { public uint dwPacketNumber; public XINPUT_GAMEPAD Gamepad; }
+        [StructLayout(LayoutKind.Sequential)]
+        private struct XINPUT_BATTERY_INFORMATION { public byte BatteryType; public byte BatteryLevel; }
+        [DllImport("xinput1_4.dll", EntryPoint = "XInputGetState")] private static extern uint XInputGetState14(uint index, out XINPUT_STATE state);
+        [DllImport("xinput9_1_0.dll", EntryPoint = "XInputGetState")] private static extern uint XInputGetState910(uint index, out XINPUT_STATE state);
+        [DllImport("xinput1_4.dll", EntryPoint = "XInputGetBatteryInformation")] private static extern uint XInputGetBatteryInformation14(uint index, byte deviceType, out XINPUT_BATTERY_INFORMATION battery);
+
+        private static bool TryGetState(uint index, out XINPUT_STATE state)
+        {
+            try { return XInputGetState14(index, out state) == 0; }
+            catch { try { return XInputGetState910(index, out state) == 0; } catch { state = new XINPUT_STATE(); return false; } }
+        }
+
+        private static string GetBattery(uint index)
+        {
+            try
+            {
+                XINPUT_BATTERY_INFORMATION battery;
+                if (XInputGetBatteryInformation14(index, 0, out battery) != 0) return "Battery unavailable";
+                if (battery.BatteryType == 0x01) return "Wired";
+                string level = battery.BatteryLevel == 0 ? "Empty" : battery.BatteryLevel == 1 ? "Low" : battery.BatteryLevel == 2 ? "Medium" : "Full";
+                return level + " battery";
+            }
+            catch { return "Battery unavailable"; }
+        }
+
+        internal static List<ControllerStatusEntry> GetEntries()
+        {
+            List<ControllerStatusEntry> result = new List<ControllerStatusEntry>();
+            for (uint i = 0; i < 4; i++)
+            {
+                XINPUT_STATE state;
+                if (!TryGetState(i, out state)) continue;
+                result.Add(new ControllerStatusEntry { Name = "Xbox / XInput Controller " + (i + 1).ToString(), Detail = GetBattery(i) });
+            }
+
+            try
+            {
+                Type rawType = Type.GetType("HuymaierConsole.Native.RawHidController");
+                if (rawType != null)
+                {
+                    MethodInfo method = rawType.GetMethod("GetSnapshots", BindingFlags.Public | BindingFlags.Static);
+                    Array snapshots = method == null ? null : method.Invoke(null, null) as Array;
+                    if (snapshots != null)
+                    {
+                        foreach (object snapshot in snapshots)
+                        {
+                            if (snapshot == null) continue;
+                            Type t = snapshot.GetType();
+                            string name = Convert.ToString(t.GetProperty("Name").GetValue(snapshot, null));
+                            string connection = Convert.ToString(t.GetProperty("Connection").GetValue(snapshot, null));
+                            if (String.IsNullOrWhiteSpace(name)) name = "PlayStation Controller";
+                            result.Add(new ControllerStatusEntry { Name = name, Detail = String.IsNullOrWhiteSpace(connection) ? "Sony HID" : connection });
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            if (result.Count == 0)
+                result.Add(new ControllerStatusEntry { Name = "No controller detected", Detail = "Press a button or reconnect a controller." });
+            return result;
+        }
+    }
+
+    internal static class GameBarCaptureService
+    {
+        internal static string CaptureDirectory
+        {
+            get
+            {
+                string root = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+                if (String.IsNullOrWhiteSpace(root)) root = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                return Path.Combine(root, "Huymaier Console", "Captures");
+            }
+        }
+
+        internal static string CaptureMonitor(IntPtr targetWindow)
+        {
+            Forms.Screen screen = targetWindow != IntPtr.Zero ? Forms.Screen.FromHandle(targetWindow) : Forms.Screen.PrimaryScreen;
+            Drawing.Rectangle bounds = screen.Bounds;
+            Directory.CreateDirectory(CaptureDirectory);
+            string path = Path.Combine(CaptureDirectory, "HuymaierCapture-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + ".png");
+            using (Drawing.Bitmap bitmap = new Drawing.Bitmap(bounds.Width, bounds.Height, Drawing.Imaging.PixelFormat.Format32bppArgb))
+            using (Drawing.Graphics graphics = Drawing.Graphics.FromImage(bitmap))
+            {
+                graphics.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, bounds.Size, Drawing.CopyPixelOperation.SourceCopy);
+                bitmap.Save(path, Drawing.Imaging.ImageFormat.Png);
+            }
+            return path;
+        }
+
+        internal static void OpenCaptureDirectory()
+        {
+            Directory.CreateDirectory(CaptureDirectory);
+            Process.Start(new ProcessStartInfo("explorer.exe", "\"" + CaptureDirectory + "\"") { UseShellExecute = true });
+        }
+    }
+
     public static class HuymaierGameBarHost
     {
         private static Window consoleWindow;
@@ -121,23 +446,45 @@ namespace HuymaierConsole.NativeApp
 
     internal sealed class HuymaierGameBarWindow : Window
     {
+        private const int PageHome = 0;
+        private const int PageSwitcher = 1;
+        private const int PageAudio = 2;
+        private const int PageCapture = 3;
+        private const int PagePerformance = 4;
+        private const int PageControllers = 5;
+        private const int PageCount = 6;
+
         private readonly Window consoleWindow;
         private readonly Grid root;
         private readonly TextBlock contextText;
+        private readonly TextBlock tabsText;
         private readonly TextBlock pageText;
+        private readonly ScrollViewer scroller;
         private readonly StackPanel itemPanel;
         private readonly TextBlock footerText;
+        private readonly TextBlock statusText;
         private readonly List<Border> itemCards;
         private readonly List<SystemWindowEntry> taskWindows;
+        private readonly List<FrameworkElement> taskPreviewTargets;
+        private readonly List<DwmTaskPreviewHost.Preview> taskPreviews;
+        private readonly DispatcherTimer telemetryTimer;
+        private AudioEndpointInfo[] audioEndpoints;
         private IntPtr targetWindow;
         private int page;
         private int selected;
+        private bool closeConfirmation;
+        private string lastStatus;
 
         internal HuymaierGameBarWindow(Window mainConsoleWindow)
         {
             consoleWindow = mainConsoleWindow;
             itemCards = new List<Border>();
             taskWindows = new List<SystemWindowEntry>();
+            taskPreviewTargets = new List<FrameworkElement>();
+            taskPreviews = new List<DwmTaskPreviewHost.Preview>();
+            audioEndpoints = new AudioEndpointInfo[0];
+            lastStatus = String.Empty;
+
             WindowStyle = WindowStyle.None;
             ResizeMode = ResizeMode.NoResize;
             ShowInTaskbar = false;
@@ -149,117 +496,391 @@ namespace HuymaierConsole.NativeApp
             WindowStartupLocation = WindowStartupLocation.Manual;
 
             root = new Grid();
-            root.Background = new SolidColorBrush(Color.FromArgb(190, 0, 0, 0));
+            root.Background = new SolidColorBrush(Color.FromArgb(180, 0, 0, 0));
             Border card = new Border();
-            card.Width = 1120;
-            card.MaxHeight = 720;
+            card.Width = 1180;
+            card.MaxHeight = 790;
             card.HorizontalAlignment = HorizontalAlignment.Center;
             card.VerticalAlignment = VerticalAlignment.Center;
             card.Background = new SolidColorBrush(Color.FromArgb(248, 8, 12, 18));
             card.BorderBrush = new SolidColorBrush(Color.FromRgb(69, 81, 99));
             card.BorderThickness = new Thickness(1.5);
             card.CornerRadius = new CornerRadius(22);
-            card.Padding = new Thickness(32, 26, 32, 24);
+            card.Padding = new Thickness(32, 25, 32, 23);
 
             Grid layout = new Grid();
             layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
             StackPanel header = new StackPanel(); header.Orientation = Orientation.Horizontal;
             TextBlock brand = new TextBlock(); brand.Text = "HUYMAIER GAME BAR"; brand.FontSize = 24; brand.FontWeight = FontWeights.Bold; brand.Foreground = new SolidColorBrush(Color.FromRgb(231, 196, 94)); header.Children.Add(brand);
             contextText = new TextBlock(); contextText.Margin = new Thickness(18, 7, 0, 0); contextText.FontSize = 13; contextText.Foreground = new SolidColorBrush(Color.FromRgb(164, 177, 196)); header.Children.Add(contextText);
             Grid.SetRow(header, 0); layout.Children.Add(header);
-            pageText = new TextBlock(); pageText.Margin = new Thickness(0, 18, 0, 16); pageText.FontSize = 31; pageText.FontWeight = FontWeights.SemiBold; Grid.SetRow(pageText, 1); layout.Children.Add(pageText);
-            ScrollViewer scroller = new ScrollViewer(); scroller.VerticalScrollBarVisibility = ScrollBarVisibility.Hidden; scroller.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled; itemPanel = new StackPanel(); scroller.Content = itemPanel; Grid.SetRow(scroller, 2); layout.Children.Add(scroller);
-            footerText = new TextBlock(); footerText.Margin = new Thickness(0, 18, 0, 0); footerText.FontSize = 13; footerText.Foreground = new SolidColorBrush(Color.FromRgb(155, 168, 188)); Grid.SetRow(footerText, 3); layout.Children.Add(footerText);
+
+            tabsText = new TextBlock(); tabsText.Margin = new Thickness(0, 15, 0, 0); tabsText.FontSize = 12; tabsText.FontWeight = FontWeights.SemiBold; tabsText.Foreground = new SolidColorBrush(Color.FromRgb(135, 151, 174)); Grid.SetRow(tabsText, 1); layout.Children.Add(tabsText);
+            pageText = new TextBlock(); pageText.Margin = new Thickness(0, 10, 0, 16); pageText.FontSize = 31; pageText.FontWeight = FontWeights.SemiBold; Grid.SetRow(pageText, 2); layout.Children.Add(pageText);
+
+            scroller = new ScrollViewer(); scroller.VerticalScrollBarVisibility = ScrollBarVisibility.Hidden; scroller.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled; itemPanel = new StackPanel(); scroller.Content = itemPanel; Grid.SetRow(scroller, 3); layout.Children.Add(scroller);
+            statusText = new TextBlock(); statusText.Margin = new Thickness(0, 12, 0, 0); statusText.FontSize = 12; statusText.Foreground = new SolidColorBrush(Color.FromRgb(231, 196, 94)); statusText.TextWrapping = TextWrapping.Wrap; Grid.SetRow(statusText, 4); layout.Children.Add(statusText);
+            footerText = new TextBlock(); footerText.Margin = new Thickness(0, 12, 0, 0); footerText.FontSize = 13; footerText.Foreground = new SolidColorBrush(Color.FromRgb(155, 168, 188)); Grid.SetRow(footerText, 5); layout.Children.Add(footerText);
             card.Child = layout; root.Children.Add(card); Content = root;
+
             PreviewKeyDown += delegate(object sender, System.Windows.Input.KeyEventArgs e) { if (e.Key == System.Windows.Input.Key.Escape) { HideBar(); e.Handled = true; } };
-            Deactivated += delegate { Topmost = true; };
+            Deactivated += delegate { if (IsVisible) Topmost = true; };
+            Closed += delegate { DisposeTaskPreviews(); telemetryTimer.Stop(); };
+
+            telemetryTimer = new DispatcherTimer();
+            telemetryTimer.Interval = TimeSpan.FromMilliseconds(850);
+            telemetryTimer.Tick += delegate { if (IsVisible && (page == PagePerformance || page == PageControllers)) Refresh(); };
         }
 
         internal void ShowForForegroundWindow()
         {
-            targetWindow = SystemWindowCatalog.GetForegroundWindow();
+            IntPtr foreground = SystemWindowCatalog.GetForegroundWindow();
+            IntPtr overlayHandle = IntPtr.Zero; try { overlayHandle = new WindowInteropHelper(this).Handle; } catch { }
+            IntPtr consoleHandle = IntPtr.Zero; try { consoleHandle = new WindowInteropHelper(consoleWindow).Handle; } catch { }
+            if (foreground != IntPtr.Zero && foreground != overlayHandle && foreground != consoleHandle) targetWindow = foreground;
             PositionOnTargetMonitor(targetWindow);
-            page = 0; selected = 0; Refresh();
+            page = PageHome; selected = 0; closeConfirmation = false; lastStatus = String.Empty; Refresh();
             if (!IsVisible) Show();
-            WindowState = WindowState.Normal; Activate(); Focus();
+            WindowState = WindowState.Normal; Activate(); Focus(); telemetryTimer.Start();
         }
 
         private void PositionOnTargetMonitor(IntPtr target)
         {
-            try { Forms.Screen screen = target != IntPtr.Zero ? Forms.Screen.FromHandle(target) : Forms.Screen.PrimaryScreen; System.Drawing.Rectangle bounds = screen.Bounds; Left = bounds.Left; Top = bounds.Top; Width = bounds.Width; Height = bounds.Height; }
+            try { Forms.Screen screen = target != IntPtr.Zero ? Forms.Screen.FromHandle(target) : Forms.Screen.PrimaryScreen; Drawing.Rectangle bounds = screen.Bounds; Left = bounds.Left; Top = bounds.Top; Width = bounds.Width; Height = bounds.Height; }
             catch { Left = SystemParameters.VirtualScreenLeft; Top = SystemParameters.VirtualScreenTop; Width = SystemParameters.PrimaryScreenWidth; Height = SystemParameters.PrimaryScreenHeight; }
         }
 
-        internal void HideBar() { try { Hide(); } catch { } if (targetWindow != IntPtr.Zero) SystemWindowCatalog.Activate(targetWindow); }
-        private void Refresh() { itemPanel.Children.Clear(); itemCards.Clear(); contextText.Text = GetTargetTitle(); if (page == 0) BuildHome(); else BuildSwitcher(); UpdateSelection(); }
-        private string GetTargetTitle() { if (targetWindow == IntPtr.Zero) return "External app"; List<SystemWindowEntry> windows = SystemWindowCatalog.GetTaskWindows(IntPtr.Zero); for (int i = 0; i < windows.Count; i++) if (windows[i].Handle == targetWindow) return windows[i].Title; return "External app"; }
+        internal void HideBar()
+        {
+            DisposeTaskPreviews(); telemetryTimer.Stop();
+            try { Hide(); } catch { }
+            if (targetWindow != IntPtr.Zero) SystemWindowCatalog.Activate(targetWindow);
+        }
+
+        private void DisposeTaskPreviews()
+        {
+            foreach (DwmTaskPreviewHost.Preview preview in taskPreviews) { if (preview != null) preview.Dispose(); }
+            taskPreviews.Clear(); taskPreviewTargets.Clear();
+        }
+
+        private string PageName(int value)
+        {
+            switch (value) { case PageSwitcher: return "SWITCH APPS"; case PageAudio: return "AUDIO"; case PageCapture: return "CAPTURE"; case PagePerformance: return "PERFORMANCE"; case PageControllers: return "CONTROLLERS"; default: return "HOME"; }
+        }
+
+        private void RefreshTabs()
+        {
+            string[] names = { "HOME", "SWITCH APPS", "AUDIO", "CAPTURE", "PERFORMANCE", "CONTROLLERS" };
+            StringBuilder builder = new StringBuilder();
+            for (int i = 0; i < names.Length; i++) { if (i > 0) builder.Append("     "); builder.Append(i == page ? "[ " + names[i] + " ]" : names[i]); }
+            tabsText.Text = builder.ToString();
+        }
+
+        private void Refresh()
+        {
+            DisposeTaskPreviews();
+            itemPanel.Children.Clear(); itemCards.Clear();
+            itemPanel.Orientation = page == PageSwitcher ? Orientation.Horizontal : Orientation.Vertical;
+            scroller.HorizontalScrollBarVisibility = page == PageSwitcher ? ScrollBarVisibility.Hidden : ScrollBarVisibility.Disabled;
+            scroller.VerticalScrollBarVisibility = page == PageSwitcher ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Hidden;
+            contextText.Text = GetTargetTitle(); RefreshTabs(); statusText.Text = lastStatus ?? String.Empty;
+            if (page == PageHome) BuildHome();
+            else if (page == PageSwitcher) BuildSwitcher();
+            else if (page == PageAudio) BuildAudio();
+            else if (page == PageCapture) BuildCapture();
+            else if (page == PagePerformance) BuildPerformance();
+            else BuildControllers();
+            UpdateSelection();
+            if (page == PageSwitcher) Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(AttachTaskPreviews));
+        }
+
+        private string GetTargetTitle()
+        {
+            string title = SystemWindowCatalog.GetTitle(targetWindow);
+            return String.IsNullOrWhiteSpace(title) ? "External game / app" : title;
+        }
 
         private void BuildHome()
         {
             pageText.Text = "Game Bar";
             AddItem("Resume", "Return to the current game or app.");
-            AddItem("Switch Apps", "Open the Huymaier native task switcher.");
-            AddItem("Return to Huymaier Console", "Bring the full-screen Console back to the foreground.");
-            AddItem("Close Current App", "Request a normal close of the current game or app.");
-            footerText.Text = "A  Select     B / GUIDE  Return     RB  Switch Apps";
+            AddItem("Switch Apps", "Native controller task switcher with live desktop previews.");
+            AddItem("Audio", "Master volume, mute, and output-device selection.");
+            AddItem("Capture", "Take a screenshot or open the Huymaier captures folder.");
+            AddItem("Performance", "Live CPU, GPU, memory, and current-app usage.");
+            AddItem("Controllers", "Connected controller and battery/connection status.");
+            AddItem("Return to Huymaier Console", "Bring the fullscreen Console back to the foreground.");
+            AddItem("Close Current App", closeConfirmation ? "Press A again to confirm a normal close request." : "Request a normal close of the current game or app.");
+            footerText.Text = closeConfirmation ? "A  Confirm Close     B  Cancel     GUIDE  Resume" : "A  Select     B / GUIDE  Resume     LB / RB  Pages";
         }
 
         private void BuildSwitcher()
         {
             pageText.Text = "Switch Apps";
             taskWindows.Clear();
-            IntPtr overlayHandle = IntPtr.Zero; try { overlayHandle = new System.Windows.Interop.WindowInteropHelper(this).Handle; } catch { }
-            taskWindows.AddRange(SystemWindowCatalog.GetTaskWindows(overlayHandle));
+            IntPtr overlayHandle = IntPtr.Zero; try { overlayHandle = new WindowInteropHelper(this).Handle; } catch { }
+            taskWindows.AddRange(SystemWindowCatalog.GetTaskWindows(overlayHandle, targetWindow));
             if (taskWindows.Count == 0) { AddItem("No other apps", "No switchable desktop windows are currently available."); selected = 0; }
-            else { if (selected >= taskWindows.Count) selected = taskWindows.Count - 1; for (int i = 0; i < taskWindows.Count; i++) { SystemWindowEntry entry = taskWindows[i]; AddItem(entry.Title, String.IsNullOrWhiteSpace(entry.ProcessName) ? "Desktop app" : entry.ProcessName); } }
-            footerText.Text = "A  Switch     B  Game Bar     GUIDE  Return to game     LB  Game Bar";
+            else
+            {
+                if (selected >= taskWindows.Count) selected = taskWindows.Count - 1;
+                for (int i = 0; i < taskWindows.Count; i++) AddTaskItem(taskWindows[i]);
+            }
+            footerText.Text = taskWindows.Count > 0 ? "A  Switch     X / Square  Close     B  Home     GUIDE  Resume     LB / RB  Pages" : "B  Home     GUIDE  Resume     LB / RB  Pages";
         }
 
-        private void AddItem(string title, string detail)
+        private void BuildAudio()
         {
-            Border border = new Border(); border.Height = 78; border.Margin = new Thickness(0, 0, 0, 9); border.Padding = new Thickness(18, 10, 18, 10); border.CornerRadius = new CornerRadius(13); border.BorderThickness = new Thickness(1);
+            pageText.Text = "Audio";
+            int volume = 0; bool muted = false;
+            try { volume = (int)Math.Round(AudioBridge.GetMasterVolume() * 100.0); muted = AudioBridge.GetMute(); } catch { }
+            try { audioEndpoints = AudioBridge.GetRenderEndpoints(); } catch { audioEndpoints = new AudioEndpointInfo[0]; }
+            string output = "No active output";
+            for (int i = 0; i < audioEndpoints.Length; i++) if (audioEndpoints[i].IsDefault) { output = audioEndpoints[i].Name; break; }
+            AddItem("Master Volume", volume.ToString() + "% — use Left / Right to adjust");
+            AddItem("Mute", muted ? "Muted — press A to unmute" : "On — press A to mute");
+            AddItem("Output Device", output + " — press A to choose next output");
+            footerText.Text = "A  Toggle / Change     Left / Right  Volume     B  Home     GUIDE  Resume     LB / RB  Pages";
+        }
+
+        private void BuildCapture()
+        {
+            pageText.Text = "Capture";
+            AddItem("Take Screenshot", "Captures the current display without leaving the game running.");
+            AddItem("Open Captures Folder", GameBarCaptureService.CaptureDirectory);
+            footerText.Text = "A  Select     B  Home     GUIDE  Resume     LB / RB  Pages";
+        }
+
+        private void BuildPerformance()
+        {
+            pageText.Text = "Performance";
+            GameBarPerformanceSnapshot perf = GameBarPerformanceMonitor.Read(targetWindow);
+            AddInfoItem("CPU", perf.CpuPercent.ToString("0") + "% system utilization");
+            AddInfoItem("GPU", perf.HasGpu ? perf.GpuPercent.ToString("0") + "% 3D engine utilization" : "GPU utilization counter unavailable");
+            AddInfoItem("Memory", String.Format("{0:0}% — {1:N0} MB of {2:N0} MB used", perf.MemoryPercent, perf.UsedMemoryMb, perf.TotalMemoryMb));
+            AddInfoItem(perf.ProcessName, String.Format("{0:N0} MB working set", perf.ProcessWorkingSetMb));
+            footerText.Text = "B  Home     GUIDE  Resume     LB / RB  Pages";
+        }
+
+        private void BuildControllers()
+        {
+            pageText.Text = "Controllers";
+            List<ControllerStatusEntry> controllers = GameBarControllerCatalog.GetEntries();
+            for (int i = 0; i < controllers.Count; i++) AddInfoItem(controllers[i].Name, controllers[i].Detail);
+            AddInfoItem("System Guide routing", HuymaierSystemButtonBridge.IsAvailable ? "Microsoft GameInput system-button bridge active" : "GameInput unavailable — Raw HID/XInput fallback active");
+            footerText.Text = "B  Home     GUIDE  Resume     LB / RB  Pages";
+        }
+
+        private void AddItem(string title, string detail) { AddStandardItem(title, detail, true); }
+        private void AddInfoItem(string title, string detail) { AddStandardItem(title, detail, false); }
+
+        private void AddStandardItem(string title, string detail, bool selectable)
+        {
+            Border border = new Border(); border.Height = 78; border.Margin = new Thickness(0, 0, 0, 9); border.Padding = new Thickness(18, 10, 18, 10); border.CornerRadius = new CornerRadius(13); border.BorderThickness = new Thickness(1); border.Tag = selectable;
             StackPanel stack = new StackPanel();
             TextBlock titleText = new TextBlock(); titleText.Text = title; titleText.FontSize = 19; titleText.FontWeight = FontWeights.SemiBold;
-            TextBlock detailText = new TextBlock(); detailText.Text = detail; detailText.FontSize = 12; detailText.Foreground = new SolidColorBrush(Color.FromRgb(153, 168, 190)); detailText.Margin = new Thickness(0, 5, 0, 0);
+            TextBlock detailText = new TextBlock(); detailText.Text = detail; detailText.FontSize = 12; detailText.Foreground = new SolidColorBrush(Color.FromRgb(153, 168, 190)); detailText.Margin = new Thickness(0, 5, 0, 0); detailText.TextTrimming = TextTrimming.CharacterEllipsis;
             stack.Children.Add(titleText); stack.Children.Add(detailText); border.Child = stack; itemPanel.Children.Add(border); itemCards.Add(border);
+        }
+
+        private void AddTaskItem(SystemWindowEntry entry)
+        {
+            Border border = new Border(); border.Width = 330; border.Height = 300; border.Margin = new Thickness(0, 0, 14, 0); border.Padding = new Thickness(12); border.CornerRadius = new CornerRadius(14); border.BorderThickness = new Thickness(1); border.Tag = true;
+            Grid grid = new Grid(); grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(190) }); grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            Border previewTarget = new Border(); previewTarget.Background = new SolidColorBrush(Color.FromRgb(3, 6, 10)); previewTarget.CornerRadius = new CornerRadius(9); previewTarget.ClipToBounds = true; Grid.SetRow(previewTarget, 0); grid.Children.Add(previewTarget);
+            TextBlock title = new TextBlock(); title.Text = entry.Title; title.FontSize = 17; title.FontWeight = FontWeights.SemiBold; title.Margin = new Thickness(3, 10, 3, 0); title.TextTrimming = TextTrimming.CharacterEllipsis; Grid.SetRow(title, 1); grid.Children.Add(title);
+            TextBlock process = new TextBlock(); process.Text = String.IsNullOrWhiteSpace(entry.ProcessName) ? "Desktop app" : entry.ProcessName; process.FontSize = 11; process.Foreground = new SolidColorBrush(Color.FromRgb(153, 168, 190)); process.Margin = new Thickness(3, 5, 3, 0); Grid.SetRow(process, 2); grid.Children.Add(process);
+            border.Child = grid; itemPanel.Children.Add(border); itemCards.Add(border); taskPreviewTargets.Add(previewTarget);
+        }
+
+        private void AttachTaskPreviews()
+        {
+            DisposeTaskPreviewsOnly();
+            int count = Math.Min(taskWindows.Count, taskPreviewTargets.Count);
+            for (int i = 0; i < count; i++)
+            {
+                DwmTaskPreviewHost.Preview preview = DwmTaskPreviewHost.Attach(this, taskWindows[i].Handle, taskPreviewTargets[i]);
+                if (preview != null) taskPreviews.Add(preview);
+            }
+        }
+
+        private void DisposeTaskPreviewsOnly()
+        {
+            foreach (DwmTaskPreviewHost.Preview preview in taskPreviews) if (preview != null) preview.Dispose();
+            taskPreviews.Clear();
+        }
+
+        private bool IsSelectable(int index)
+        {
+            if (index < 0 || index >= itemCards.Count) return false;
+            try { return itemCards[index].Tag is bool && (bool)itemCards[index].Tag; } catch { return false; }
         }
 
         private void UpdateSelection()
         {
             if (itemCards.Count == 0) return;
             if (selected < 0) selected = 0; if (selected >= itemCards.Count) selected = itemCards.Count - 1;
-            for (int i = 0; i < itemCards.Count; i++) { Border card = itemCards[i]; bool active = i == selected; card.Background = new SolidColorBrush(active ? Color.FromRgb(229, 199, 104) : Color.FromArgb(230, 17, 25, 38)); card.BorderBrush = new SolidColorBrush(active ? Color.FromRgb(255, 240, 160) : Color.FromRgb(57, 71, 91)); StackPanel stack = card.Child as StackPanel; TextBlock title = stack != null && stack.Children.Count > 0 ? stack.Children[0] as TextBlock : null; if (title != null) title.Foreground = new SolidColorBrush(active ? Color.FromRgb(15, 20, 28) : Colors.White); }
-            try { itemCards[selected].BringIntoView(); } catch { }
+            bool anySelectable = false; for (int i = 0; i < itemCards.Count; i++) if (IsSelectable(i)) { anySelectable = true; break; }
+            if (anySelectable && !IsSelectable(selected)) { for (int i = 0; i < itemCards.Count; i++) if (IsSelectable(i)) { selected = i; break; } }
+            for (int i = 0; i < itemCards.Count; i++)
+            {
+                Border card = itemCards[i]; bool active = anySelectable && i == selected;
+                card.Background = new SolidColorBrush(active ? Color.FromRgb(229, 199, 104) : Color.FromArgb(230, 17, 25, 38));
+                card.BorderBrush = new SolidColorBrush(active ? Color.FromRgb(255, 240, 160) : Color.FromRgb(57, 71, 91));
+                DependencyObject child = card.Child; TextBlock title = null;
+                StackPanel stack = child as StackPanel; if (stack != null && stack.Children.Count > 0) title = stack.Children[0] as TextBlock;
+                Grid grid = child as Grid; if (grid != null && grid.Children.Count > 1) title = grid.Children[1] as TextBlock;
+                if (title != null) title.Foreground = new SolidColorBrush(active ? Color.FromRgb(15, 20, 28) : Colors.White);
+            }
+            if (anySelectable) { try { itemCards[selected].BringIntoView(); } catch { } }
         }
 
         internal void ProcessControllerCommand(string command)
         {
             if (String.IsNullOrWhiteSpace(command)) return;
             if (command == "Guide") { HideBar(); return; }
-            if (command == "Back") { if (page == 1) { page = 0; selected = 0; Refresh(); } else HideBar(); return; }
-            if (command == "LeftShoulder") { if (page != 0) { page = 0; selected = 0; Refresh(); } return; }
-            if (command == "RightShoulder") { if (page != 1) { page = 1; selected = 0; Refresh(); } return; }
-            if (command == "Up") { Move(-1); return; }
-            if (command == "Down") { Move(1); return; }
+            if (command == "Back")
+            {
+                if (closeConfirmation) { closeConfirmation = false; lastStatus = String.Empty; Refresh(); return; }
+                if (page != PageHome) { page = PageHome; selected = 0; lastStatus = String.Empty; Refresh(); }
+                else HideBar();
+                return;
+            }
+            if (command == "LeftShoulder") { ChangePage(-1); return; }
+            if (command == "RightShoulder") { ChangePage(1); return; }
+            if (command == "Left") { if (page == PageAudio && selected == 0) { AdjustVolume(-5); return; } if (page == PageSwitcher) { Move(-1); return; } }
+            if (command == "Right") { if (page == PageAudio && selected == 0) { AdjustVolume(5); return; } if (page == PageSwitcher) { Move(1); return; } }
+            if (command == "Up") { if (page != PageSwitcher) Move(-1); return; }
+            if (command == "Down") { if (page != PageSwitcher) Move(1); return; }
+            if (command == "Secondary") { if (page == PageSwitcher) RequestCloseSelectedTask(); return; }
             if (command == "Confirm") { InvokeSelected(); return; }
         }
 
-        private void Move(int delta) { int count = itemCards.Count; if (count <= 0) return; selected = (selected + delta + count) % count; UpdateSelection(); }
+        private void ChangePage(int delta)
+        {
+            closeConfirmation = false; lastStatus = String.Empty;
+            page = (page + delta + PageCount) % PageCount; selected = 0; Refresh();
+        }
+
+        private void Move(int delta)
+        {
+            int count = itemCards.Count; if (count <= 0) return;
+            int start = selected;
+            do { selected = (selected + delta + count) % count; if (IsSelectable(selected)) break; } while (selected != start);
+            UpdateSelection();
+        }
+
         private void InvokeSelected()
         {
-            if (page == 1) { if (taskWindows.Count == 0 || selected < 0 || selected >= taskWindows.Count) return; IntPtr hWnd = taskWindows[selected].Handle; try { Hide(); } catch { } SystemWindowCatalog.Activate(hWnd); targetWindow = hWnd; return; }
+            if (page == PagePerformance || page == PageControllers) return;
+            if (page == PageSwitcher)
+            {
+                if (taskWindows.Count == 0 || selected < 0 || selected >= taskWindows.Count) return;
+                IntPtr hWnd = taskWindows[selected].Handle; DisposeTaskPreviews(); telemetryTimer.Stop(); try { Hide(); } catch { } SystemWindowCatalog.Activate(hWnd); targetWindow = hWnd; return;
+            }
+            if (page == PageAudio) { InvokeAudioSelected(); return; }
+            if (page == PageCapture) { InvokeCaptureSelected(); return; }
+
             switch (selected)
             {
                 case 0: HideBar(); break;
-                case 1: page = 1; selected = 0; Refresh(); break;
-                case 2:
-                    try { Hide(); } catch { }
-                    if (consoleWindow != null) consoleWindow.Dispatcher.BeginInvoke(new Action(delegate { try { if (consoleWindow.WindowState == WindowState.Minimized) consoleWindow.WindowState = WindowState.Maximized; consoleWindow.Show(); consoleWindow.Activate(); consoleWindow.Topmost = true; consoleWindow.Topmost = false; consoleWindow.Focus(); } catch { } }));
+                case 1: page = PageSwitcher; selected = 0; Refresh(); break;
+                case 2: page = PageAudio; selected = 0; Refresh(); break;
+                case 3: page = PageCapture; selected = 0; Refresh(); break;
+                case 4: page = PagePerformance; selected = 0; Refresh(); break;
+                case 5: page = PageControllers; selected = 0; Refresh(); break;
+                case 6: ReturnToConsole(); break;
+                case 7:
+                    if (!closeConfirmation) { closeConfirmation = true; lastStatus = "Close confirmation armed for " + GetTargetTitle() + "."; Refresh(); }
+                    else { if (targetWindow != IntPtr.Zero) SystemWindowCatalog.Close(targetWindow); try { Hide(); } catch { } }
                     break;
-                case 3: if (targetWindow != IntPtr.Zero) SystemWindowCatalog.Close(targetWindow); Hide(); break;
+            }
+        }
+
+        private void InvokeAudioSelected()
+        {
+            if (selected == 0) { AdjustVolume(5); return; }
+            if (selected == 1) { try { AudioBridge.SetMute(!AudioBridge.GetMute()); lastStatus = AudioBridge.GetMute() ? "Audio muted." : "Audio unmuted."; } catch { lastStatus = "Audio mute could not be changed."; } Refresh(); return; }
+            if (selected == 2)
+            {
+                try
+                {
+                    audioEndpoints = AudioBridge.GetRenderEndpoints();
+                    if (audioEndpoints.Length == 0) { lastStatus = "No active audio output was found."; Refresh(); return; }
+                    int current = -1; for (int i = 0; i < audioEndpoints.Length; i++) if (audioEndpoints[i].IsDefault) { current = i; break; }
+                    int next = (current + 1 + audioEndpoints.Length) % audioEndpoints.Length;
+                    bool changed = AudioBridge.SetDefaultEndpoint(audioEndpoints[next].Id);
+                    lastStatus = changed ? "Audio output changed to " + audioEndpoints[next].Name + "." : "Windows did not accept the audio-output change.";
+                }
+                catch { lastStatus = "Audio output could not be changed."; }
+                Refresh();
+            }
+        }
+
+        private void AdjustVolume(int delta)
+        {
+            try
+            {
+                float current = AudioBridge.GetMasterVolume();
+                float next = Math.Max(0f, Math.Min(1f, current + (delta / 100f)));
+                AudioBridge.SetMasterVolume(next); lastStatus = "Volume " + ((int)Math.Round(next * 100)).ToString() + "%";
+            }
+            catch { lastStatus = "Master volume could not be changed."; }
+            Refresh();
+        }
+
+        private void InvokeCaptureSelected()
+        {
+            if (selected == 1) { try { GameBarCaptureService.OpenCaptureDirectory(); lastStatus = String.Empty; } catch { lastStatus = "Captures folder could not be opened."; } return; }
+            if (selected != 0) return;
+            IntPtr captureTarget = targetWindow;
+            DisposeTaskPreviews(); telemetryTimer.Stop();
+            try { Hide(); } catch { }
+            Task.Factory.StartNew(delegate
+            {
+                Thread.Sleep(180);
+                try { return GameBarCaptureService.CaptureMonitor(captureTarget); }
+                catch { return String.Empty; }
+            }).ContinueWith(delegate(Task<string> task)
+            {
+                string path = task.Result;
+                Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    lastStatus = String.IsNullOrWhiteSpace(path) ? "Screenshot capture failed." : "Screenshot saved: " + path;
+                    if (captureTarget != IntPtr.Zero) SystemWindowCatalog.Activate(captureTarget);
+                }));
+            });
+        }
+
+        private void RequestCloseSelectedTask()
+        {
+            if (taskWindows.Count == 0 || selected < 0 || selected >= taskWindows.Count) return;
+            SystemWindowEntry entry = taskWindows[selected];
+            SystemWindowCatalog.Close(entry.Handle);
+            lastStatus = "Close requested for " + entry.Title + ".";
+            Refresh();
+        }
+
+        private void ReturnToConsole()
+        {
+            DisposeTaskPreviews(); telemetryTimer.Stop(); try { Hide(); } catch { }
+            if (consoleWindow != null)
+            {
+                consoleWindow.Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    try
+                    {
+                        if (consoleWindow.WindowState == WindowState.Minimized) consoleWindow.WindowState = WindowState.Maximized;
+                        consoleWindow.Show(); consoleWindow.Activate(); consoleWindow.Topmost = true; consoleWindow.Topmost = false; consoleWindow.Focus();
+                    }
+                    catch { }
+                }));
             }
         }
     }
