@@ -1,6 +1,6 @@
 {
-  "candidate": "v0.26.0-test-4",
+  "candidate": "v0.26.0-test-5",
   "base_release": "v0.25.8",
-  "requested_at": "2026-08-09T13:32:15Z",
-  "focus": "compact lower-third Game Bar, constrained task switcher previews, preserve fullscreen/maximized app state, popup controller focus"
+  "requested_at": "2026-08-09T13:49:02Z",
+  "focus": "4K 150% DPI-correct centered Game Bar, user scale slider, direct modal popup controller commands, preserve fullscreen/maximized app state"
 }
