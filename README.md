@@ -4,7 +4,7 @@ Huymaier Console is a controller-first Windows 11 full-screen console shell with
 
 ## Current baseline
 
-The repository baseline starts from **v0.25.3**.
+The current development baseline is **v0.25.4**.
 
 Confirmed behaviors carried forward include:
 
@@ -14,9 +14,10 @@ Confirmed behaviors carried forward include:
 - Native console interfaces for supported emulator platforms.
 - Storefront-aware Games page and application-only Apps page.
 - Controller-first Quick Access navigation.
-- Windows Update and driver-management pages.
+- Dedicated Windows Update and driver-management pages.
 - Epic/Legendary live download telemetry.
 - Seven-day / twenty-entry completed download history.
+- Native Huymaier Console update page backed by verified GitHub Releases.
 
 ## Repository vs release packages
 
@@ -26,7 +27,11 @@ The application must never rename, move, or modify a user's game/ROM files merel
 
 ## Updates
 
-Huymaier Console's native updater is designed to check this repository's GitHub Releases and install a newer release package without requiring the user to leave the full-screen shell. Public repositories can be checked anonymously; private repositories require authenticated GitHub access on the PC.
+Settings → Updates contains **Huymaier Console Update**, **Windows Update**, and **Driver Updates**.
+
+Huymaier Console Update checks this repository's latest GitHub Release, downloads the installable ZIP, requires a matching SHA-256 checksum asset, stages the update out of process, closes the running shell, applies the verified package, runs the installer, and relaunches Huymaier Console.
+
+Public repositories can be checked anonymously. While this repository is private, the Windows PC needs authenticated GitHub access through `HUYMAIER_GITHUB_TOKEN`, `GITHUB_TOKEN`, or `gh auth login`.
 
 ## Repository
 
