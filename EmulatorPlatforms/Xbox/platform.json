@@ -1,0 +1,17 @@
+﻿{
+  "id": "xbox",
+  "displayName": "Original Xbox",
+  "primaryBackend": "xemu",
+  "fallbackBackend": "Cxbx-Reloaded",
+  "version": "0.25.0",
+  "startupAsset": "Assets/Startup.mp4",
+  "shellReference": "TeamUIX / Theseus",
+  "dashboardRuntimeBundled": false,
+  "nativeSections": [
+    "games",
+    "memory",
+    "music",
+    "xbox live",
+    "settings"
+  ]
+}

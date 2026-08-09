@@ -1,0 +1,22 @@
+Huymaier Console v0.24.9
+PS2 Boot + Memory Browser + Controller Hot-Plug Compile Fix
+
+INSTALLER FIX
+- Fixes the Windows C# CS0121 compile failure in the v0.24.8 PS2 saved-data skyline renderer.
+- The skyline highlight alpha was stored as a byte while Math.Min also received an integer literal, leaving the compiler unable to choose between the byte and int overloads.
+- The expression is now explicitly evaluated through the integer overload before converting back to byte.
+- Adds a packaging regression check for this exact ambiguous expression.
+
+PRESERVED FROM v0.24.8
+- Global Xbox/controller hot-plug debouncing and safe delayed input-router rebuild.
+- Home-screen focus and navigation preservation during controller reconnects.
+- Skippable, audio-synchronized PlayStation 2 boot animation.
+- Solid shader-inspired saved-data skyline with fog, glow, depth and particle streaks.
+- Calmer saved-data skyline for the PS2 menu.
+- Native PS2 memory-card browser with textured, upright and animated save icons.
+- PCSX2 Big Picture launch, Cross/A/Enter-only game start, readable setting names and return-focus restoration.
+- PS2 startup/menu/game-selection audio and PS3 Home Menu ambience.
+
+PACKAGE
+- Short ZIP name and HC249 internal root avoid Windows Explorer path-length failures.
+- No Sony BIOS, firmware, copyrighted startup media or save icons are bundled.

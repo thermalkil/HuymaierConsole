@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 4,
+  "emulatorPath": "",
+  "fallbackEmulatorPath": "",
+  "gameFolders": [],
+  "startupEnabled": true,
+  "startupVolume": 1.0,
+  "ambienceEnabled": false,
+  "ambiencePath": "",
+  "ambienceVolume": 0.75,
+  "soundVolume": 1.0,
+  "dashboardStyle": "Original",
+  "fullscreen": true
+}

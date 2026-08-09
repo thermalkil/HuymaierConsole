@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 2,
+  "duckStationPath": "",
+  "dataRoot": "",
+  "gameFolders": [],
+  "bigPictureEnabled": true,
+  "slowBootEnabled": false,
+  "platformBootEnabled": true,
+  "startupAudioPath": "",
+  "ambienceAudioPath": "",
+  "musicVolume": 0.55,
+  "shellStyle": "Original"
+}

@@ -1,0 +1,17 @@
+﻿Huymaier Console v0.25.3 build validation
+
+- Source base: HC252.zip / v0.25.2.
+- Epic Legendary install/update path now uses a live process monitor rather than Start-Process -Wait followed by post-exit output parsing.
+- Live parser recognizes Legendary's documented/logged:
+  * Install size: <MiB>
+  * Download size: <MiB>
+  * Progress: <percent> ... ETA: HH:MM:SS
+  * Downloaded: <MiB>
+  * + Download - <MiB/s> (raw)
+- provider-state.json exposes DownloadedBytes, TotalBytes, InstallSizeBytes, DownloadSpeedBytesPerSec and EtaSeconds.
+- Downloads UI renders those values while retaining fallback ETA for providers without live telemetry.
+- JSON and XML syntax validated in the build environment.
+- 209 internal SHA-256 payload checks generated and verified (checksum manifest files excluded from self-hashing).
+- PowerShell/C# delimiter and lexical checks completed in the build environment.
+- Windows PowerShell/.NET Framework WPF and csc.exe are not available in this Linux build environment, so target-Windows parser preflight/native compilation remains required.
+- Treat v0.25.3 as a Windows test candidate until exercised on the target system.

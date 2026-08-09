@@ -1,0 +1,41 @@
+Huymaier Console v0.24.16
+Platform-Specific Shell Rebuild
+
+PLAYSTATION 1
+- Replaces the modern shared-panel PS1 shell with a full-screen BIOS-style presentation.
+- Adds two selectable interface styles under Options > Interface Style:
+  - Original: dark blue/orb background, paint-splash labels, MEMORY CARD and CD PLAYER main-menu presentation.
+  - Updated: gray tiled background, block-style MEMORY CARD/CD PLAYER tabs, card/disc glyphs and purple-era cursor treatment.
+- Rebuilds the PS1 Memory Card page around two visible card slots and a center command stack.
+- Rebuilds the selected-card view as a 15-slot save grid with Copy, Delete, Card Options and Exit controls.
+- Removes the clipped modern left navigation entirely.
+- Long DuckStation paths now receive a dedicated value column and safe left/right margins.
+- Guide/Home returns to the PS1 main menu; closing DuckStation also returns to that main menu in fullscreen.
+- Preserves DuckStation detection, BIOS management, multidisc grouping, cover reuse, native save parsing and save-state support.
+
+OTHER NEW CONSOLE SHELLS
+- Removes the one-size-fits-all Saves page from Nintendo 64, GameCube, Wii, Wii U, Switch, original Xbox and Xbox 360.
+- Nintendo 64 now uses GAME PAK / CONTROLLER PAK terminology and a note/pages-style Controller Pak screen.
+- GameCube now uses GAME PLAY / MEMORY CARD terminology and Slot A/Slot B card panels.
+- Wii now uses Wii Menu/Data Management wording with Wii and SD Card tabs and channel-style save tiles.
+- Wii U now uses Wii U Menu/Data Management wording with System Memory and USB storage panels.
+- Switch now uses All Software/Data Management wording and correctly treats saves as system/user data rather than a fake memory-card browser.
+- Original Xbox now uses Games/Memory/Settings with a green orb and hard-disk/memory-unit presentation.
+- Xbox 360 keeps selectable Blades, NXE and Metro shells, each with its own naming and storage presentation.
+- Platform settings keep a shared backend only; visible layouts, terminology, card shapes, storage pages and focus treatments are now platform-specific.
+
+LAYOUT AND AUDIO
+- Fixes the left-edge clipping shared by the first multi-console implementation.
+- Adds safe 16:9/4K margins and reduces selected-item scaling so focus animation cannot clip labels.
+- Raises migrated navigation sound levels to the full-volume default.
+- Keeps imported ambience at a stronger default while retaining separate ambience and navigation-volume controls.
+
+PRESERVED
+- User-supplied startup videos and their 4K H.264/AAC playback copies.
+- Cache-only platform opening; scans occur only after Add Game Folder or explicit Refresh Library.
+- Existing main-console shelf/artwork cache work from v0.24.13-v0.24.15.
+- Existing PS2/PS3 emulator integrations, PS2 memory-card work and PS3 XMB work.
+
+TEST PATH
+- Extract the short-path package to C:\HC2416.
+- Run Install-HuymaierConsole.cmd.

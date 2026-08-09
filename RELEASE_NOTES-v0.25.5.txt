@@ -1,0 +1,10 @@
+Huymaier Console v0.25.5
+
+Fresh-PC startup stabilization
+
+- Fixed a first-run crash under PowerShell StrictMode when Home rails were empty. Empty arrays could be unwrapped to $null at function parameter boundaries and then fail on .Count.
+- Home, game-hub, and provider rails now normalize zero/one/many item inputs into stable arrays before Count/index operations.
+- Persisted config list fields are normalized after loading so empty, scalar, and array JSON representations behave identically.
+- Home Random Picks now normalizes the installed-game Entries collection before Count/Get-Random.
+- Fatal startup logs now include InvocationInfo position and ScriptStackTrace when available, making future machine-specific startup failures line-addressable.
+- All v0.25.4 GitHub updater, Epic live telemetry, Downloads retention, Settings update pages, Quick Access, artwork, Steam and RPCS3 fixes are preserved.

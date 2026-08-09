@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 5,
+  "emulatorPath": "",
+  "fallbackEmulatorPath": "",
+  "gameFolders": [],
+  "startupEnabled": true,
+  "startupVolume": 1.0,
+  "ambienceEnabled": false,
+  "ambiencePath": "",
+  "ambienceVolume": 0.9,
+  "soundVolume": 1.0,
+  "dashboardStyle": "Blades",
+  "fullscreen": true
+}

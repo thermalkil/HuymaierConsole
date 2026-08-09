@@ -1,0 +1,21 @@
+Huymaier Console v0.24.15
+
+MULTI-CONSOLE NATIVE COMPILE FIX
+
+FIXED
+- Fixes the v0.24.14 native compilation failure where the PS2 and PS3 startup-video layout roots used Grid without importing System.Windows.Controls.
+- The fix is limited to the missing WPF namespace and does not remove or downgrade any v0.24.14 feature.
+
+PRESERVED FROM v0.24.14
+- User-supplied startup videos for PS1, PS2, PS3, Nintendo 64, GameCube, Wii, Wii U, Switch, original Xbox, and Xbox 360.
+- Native 4K H.264/AAC playback copies, untouched original source videos, and 1080p compatibility fallbacks where provided.
+- Existing DuckStation, PCSX2, and RPCS3 integrations.
+- Reworked PS1 presentation, PS2 PSBBN shell, PS3 XMB, louder PS2 ambience/navigation, and louder PS3 navigation tones.
+- Native first-pass shells for Nintendo 64, GameCube, Wii, Wii U, Switch, original Xbox, and Xbox 360.
+- Selectable Xbox 360 Blades, NXE, and Metro dashboard styles.
+- Persistent cache-only library startup, shared shelf/library artwork records, large portrait shelf covers, explicit-only provider/artwork refresh, and fullscreen return-to-shell behavior.
+
+INSTALL
+- Extract the short package to C:\HC2415 or another short path.
+- Run Install-HuymaierConsole.cmd.
+- The installer validates all PowerShell sources before compiling the native application.

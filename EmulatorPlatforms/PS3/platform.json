@@ -1,0 +1,21 @@
+﻿{
+  "id": "ps3",
+  "displayName": "PlayStation 3",
+  "backend": "RPCS3",
+  "interface": "native-in-process-xmb",
+  "nativeType": "HuymaierConsole.NativeApp.Ps3XmbWindow",
+  "settings": "settings.json",
+  "userData": "%LOCALAPPDATA%\\Huymaier Console\\EmulatorPlatforms\\PS3",
+  "regularDesktopGui": false,
+  "advancedDesktopGuiAvailable": true,
+  "externalInstallationPreferred": true,
+  "managedInstallationOptional": true,
+  "managedInstallationRequiresUserFolder": true,
+  "audioSequenceSupport": true,
+  "includedHomeMenuIntro": false,
+  "includedAmbientLoop": true,
+  "version": "0.25.0",
+  "startupAsset": "Assets/Startup.mp4",
+  "originalStartupVideo": true,
+  "startupAudioFromVideo": true
+}

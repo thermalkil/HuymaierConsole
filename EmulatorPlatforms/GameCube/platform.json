@@ -1,0 +1,8 @@
+﻿{
+  "id": "gamecube",
+  "displayName": "Nintendo GameCube",
+  "primaryBackend": "Dolphin",
+  "fallbackBackend": "Dolphin Development",
+  "version": "0.25.0",
+  "startupAsset": "Assets/Startup.mp4"
+}

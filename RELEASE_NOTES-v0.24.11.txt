@@ -1,0 +1,19 @@
+Huymaier Console v0.24.11
+PS2 Memory-Card Save Icon Front-Orientation Fix
+
+PS2 MEMORY-CARD SAVE ICONS
+- Rotates genuine PS2 save-icon models 180 degrees around the vertical axis before applying their normal idle animation.
+- Corrects textured icons that were upright but facing away from the user.
+- Preserves embedded textures, UV mapping, transparency, depth sorting, lighting and shape-key animation.
+- Keeps the existing fallback renderer for saves without a usable embedded model or texture.
+
+PRESERVED
+- Global Xbox/controller hot-plug stabilization.
+- PCSX2 Big Picture launch and Cross/A/Enter-only game launch.
+- Native PS2 memory-card browsing and save actions.
+- PS2 boot skyline and audio sequences.
+- True fullscreen restoration and PS2 main-menu return after PCSX2 closes.
+
+REFERENCE POLICY
+- Public PS2 icon-format documentation and PS2IODB were used as technical references only.
+- No third-party save icon database assets or Sony BIOS assets are bundled.

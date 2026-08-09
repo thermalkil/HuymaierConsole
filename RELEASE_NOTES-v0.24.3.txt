@@ -1,0 +1,17 @@
+Huymaier Console v0.24.3
+PSBBN Native Compile Fix
+
+FIXED
+- Fixes the Windows .NET Framework compiler error in the new PS2 saved-data geometry renderer.
+- Explicitly converts the byte alpha value to int for four Math.Min calls, removing the ambiguous byte/int overload selection reported by the v0.24.2 installer.
+- Adds package validation that rejects the four unsafe overload forms before a ZIP is created.
+
+PRESERVED
+- Keeps the complete v0.24.2 PSBBN interface rebuild.
+- Keeps saved-data-driven PS2 background geometry.
+- Keeps reuse of existing PCSX2 downloaded cover art and disc-serial recovery.
+- Keeps the v0.24.1 PS3 firmware-theme/custom-color work and stable v0.23.8 controller/GOG/shelf/save fixes.
+
+TESTING
+- JSON and XML parsing, PowerShell BOM checks, C# lexical delimiter validation, unsafe Math.Min regression scanning, package checksums, and ZIP integrity passed in the build environment.
+- The final WPF/.NET Framework compilation still runs on the target Windows 11 system during installation.

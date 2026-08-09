@@ -1,0 +1,27 @@
+Huymaier Console v0.23.8
+
+Controller reliability
+- Adds a native 250 Hz XInput sampler that latches button and direction edges before the UI consumes them.
+- Main Console controller consumption now runs at 60 Hz while XInput sampling remains off the PowerShell UI thread.
+- DualSense/DualShock Bluetooth arrival and removal immediately clears stale Raw Input handles and resets ownership.
+- The main Console Raw Input target is restored after closing the native PS3 XMB.
+- USB DualSense support and Swiftpoint Z2 filtering are preserved.
+
+Relaunch reliability
+- HuymaierConsole.exe forces its embedded PowerShell runspace to Bypass where local policy permits.
+- The installer removes Mark-of-the-Web from installed application files.
+- A controller-related crash should no longer leave HuymaierBootstrap.ps1 blocked as an unsigned downloaded script.
+
+Native PS3 save management
+- Game > Saved Data Utility (PS3) reads every RPCS3 user's savedata folder.
+- Displays PARAM.SFO titles/details, user, size, file count and modified date.
+- Supports timestamped Huymaier backups, export copies, restore, open-folder and recoverable Move to Save Trash.
+- Restore moves an existing destination save to Save Trash first. RPCS3 remains the owner of live save data.
+
+Preserved from v0.23.7
+- Working RPCS3 game launch path and PS3 deduplication.
+- Removable XMB library folders.
+- GOG Library stability and Shelf artwork fixes.
+- Native trophies, settings, Photos and firmware-asset selection.
+
+Windows compilation and physical Bluetooth/XInput testing are required on the target Windows 11 system.

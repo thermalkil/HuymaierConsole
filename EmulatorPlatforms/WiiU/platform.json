@@ -1,0 +1,8 @@
+﻿{
+  "id": "wiiu",
+  "displayName": "Nintendo Wii U",
+  "primaryBackend": "Cemu",
+  "fallbackBackend": "Cemu Portable",
+  "version": "0.25.0",
+  "startupAsset": "Assets/Startup.mp4"
+}

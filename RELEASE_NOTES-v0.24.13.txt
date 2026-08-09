@@ -1,0 +1,8 @@
+Huymaier Console v0.24.13
+
+STARTUP PARSER AND PACKAGE ENCODING FIX
+
+- Fixes the v0.24.12 startup failure in HuymaierGameExperience.ps1.
+- Restores UTF-8 BOM encoding for PowerShell source files so Windows PowerShell 5.1 does not reinterpret Unicode menu glyphs as quotation characters.
+- Adds installer-side PowerShell parser validation for every packaged .ps1 file before anything is copied or compiled. Future script syntax/encoding faults now stop during installation with an exact file, line, and column instead of producing a broken installed build.
+- Preserves the v0.24.12 persistent artwork/cache overhaul, large portrait shelf cards, fast Library rendering, and native PlayStation 1 platform implementation.

@@ -1,0 +1,35 @@
+Huymaier Console v0.25.0 third-party notices
+
+User-supplied console startup videos
+- The startup video files included under EmulatorPlatforms\*\Assets\Startup.mp4 were supplied by the user for integration into this private Huymaier Console build.
+- These videos may contain console logos, animation, music, sound effects, or other material owned by their respective rightsholders.
+- Huymaier Console claims no ownership of those materials and is not affiliated with Sony, Nintendo, Microsoft, or their subsidiaries.
+
+Emulator integrations
+- Huymaier Console can detect, configure, and launch separately installed emulators including DuckStation, PCSX2, RPCS3, RMG, ares, Dolphin, Cemu, Eden, Ryubing/Ryujinx-compatible builds, xemu, Cxbx-Reloaded, and Xenia.
+- Emulator binaries are not bundled in this archive. Each emulator's own license and notices apply.
+- No BIOS, firmware, encryption keys, game media, or copyrighted emulator system files are bundled.
+
+Microsoft WebView2
+- The installer may download official Microsoft WebView2 SDK/runtime components for the native browser experience.
+
+PlayStation, Nintendo, Xbox, Steam, GOG, Epic Games, EA, Ubisoft, Battle.net, Rockstar, Amazon Games, and other referenced product/service names are trademarks or marks of their respective owners. Huymaier Console is an independent personal project and is not endorsed by those owners or emulator projects.
+
+Dashboard design references
+- The Original Xbox shell was visually informed by TeamUIX / Theseus. No TeamUIX, Microsoft dashboard, XIP, XAP, or retail dashboard assets are bundled or launched by Huymaier Console.
+- Xbox 360 Blades was visually informed by Fabxx/XBMC360 and brentdc-nz/XBMC-360.
+- Xbox 360 Metro was visually informed by ZivvoZ/dashx360.
+- This archive does not bundle source code or artwork from those repositories; their names are included for attribution and design-reference disclosure.
+
+Xbox 360 profile data
+- The native achievement reader follows the publicly documented XDBF/GPD structures from the Free60 project.
+- Huymaier Console reads local Xenia profile data only; it does not connect to Xbox Live or modify achievement records.
+
+Artwork discovery / compatibility
+- Huymaier Console contains an independently implemented artwork resolver. It does not rename or modify the user's game/ROM files.
+- It can consume compatible artwork already present in ES-DE downloaded_media folders and can query public/provider/platform artwork sources at runtime.
+- ES-DE custom-cover/media tooling, game-art-downloader projects, Xbox artwork scraper projects, and FindRomCover were evaluated as workflow/reference material while designing the resolver. No source code from those projects is bundled in this archive.
+- No FindRomCover GPL source code is copied, linked, or embedded in Huymaier Console.
+- Existing Libretro thumbnail lookup remains an optional runtime fallback for supported systems.
+- A final unresolved-title fallback can query an image search engine for likely front-cover images. Retrieved artwork is cached in Huymaier Console's own local data area; it is not written into the user's ROM/game files.
+- Artwork and game imagery remain the property of their respective rightsholders/contributors. External artwork services and projects are not affiliated with Huymaier Console.

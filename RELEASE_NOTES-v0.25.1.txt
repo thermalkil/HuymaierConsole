@@ -1,0 +1,9 @@
+Huymaier Console v0.25.1 — Shell/Input/Update Stabilization
+
+- Apps now cross-checks Start Menu/Windows app registrations against the installed Games catalog and excludes recognized games.
+- Epic scanning now rejects Unreal Engine, Marketplace, plugin, asset/content pack, editor/tool and Dev-Marketplace records in installed and owned-library paths. The upgrade also refreshes an authenticated legacy Epic provider catalog so stale Marketplace records do not survive in the owned library.
+- Guide/Home is the global Huymaier Quick Access shortcut. Native console interfaces return directly to the Quick Access overlay when Guide/Home is pressed.
+- Controller activity automatically hides and parks the mouse pointer so stationary hover cannot interfere with controller scrolling. Actual mouse movement/click restores pointer ownership.
+- Quick Access location now uses a centered Bottom/Top/Left/Right selection popup instead of cycling values.
+- Settings > Updates > Windows Update and Driver Updates are dedicated pages. Entering either page starts a scan, results remain visible, updates can be installed, and Restart PC is offered when required.
+- Preserves the confirmed PS3 user-profile fix, native Steam population, shared Shelf/Library artwork, and the v0.25.0 shell layout.

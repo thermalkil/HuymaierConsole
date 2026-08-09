@@ -1,0 +1,43 @@
+﻿Huymaier Console v0.25.3 — Epic Live Download Telemetry
+
+This stabilization build fixes the Epic Games download card remaining at its initial progress state.
+
+EPIC / LEGENDARY
+- Epic install and update operations no longer wait until Legendary exits before consuming backend output.
+- Huymaier Console monitors Legendary's live progress stream while the transfer is running.
+- provider-state.json now carries:
+  * progress percentage
+  * downloaded bytes
+  * total compressed download bytes
+  * install-size bytes
+  * live download bytes/second
+  * backend ETA seconds
+- The worker parses Legendary's own Download size, Progress, ETA, Downloaded, and raw Download speed telemetry.
+- Transfer state is updated quietly during the download so the provider log is not flooded every second.
+
+DOWNLOADS PAGE
+- The active Epic download card now shows a genuinely advancing progress bar.
+- Shows percent complete.
+- Shows downloaded amount versus total transfer size using MB/GB units.
+- Shows live transfer rate using KB/s, MB/s, or GB/s.
+- Uses Legendary's backend ETA when available rather than estimating solely from elapsed wall-clock time.
+- Falls back to the previous calculated ETA for providers that do not yet expose live ETA telemetry.
+
+PRESERVED
+- Seven-day / 20-entry completed download history.
+- Dedicated Windows Update and Driver Updates pages.
+- Quick Access location chooser and global Guide/PS behavior.
+- Strict Epic Unreal Marketplace filtering.
+- PS3 user profiles, Steam library population, and shared Library/Shelf artwork.
+
+TEST FIRST
+1. Start a reasonably large Epic game install from Huymaier Console.
+2. Open Downloads.
+3. Within a few seconds of Legendary beginning its chunk transfer, verify:
+   - progress bar advances;
+   - percentage changes;
+   - downloaded MB/GB rises;
+   - total MB/GB is shown;
+   - transfer rate changes live;
+   - ETA counts down.
+4. Cancel/resume once and verify Console remains responsive.

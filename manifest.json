@@ -1,0 +1,15 @@
+{
+  "name": "Huymaier Console FSE Shell, Storefront & Artwork Integration",
+  "version": "0.25.6",
+  "baseVersion": "0.25.5",
+  "build": "settings-choice-display-scale-stabilization",
+  "builtFrom": "HC255.zip",
+  "features": [
+    "fixes centered Settings choice popup initialization under PowerShell StrictMode",
+    "uses centered choice popups for Quick Access location, keyboard theme, button prompts, and music theme",
+    "adds Settings > Display > Scale with percentage choices and Windows account DPI configuration",
+    "surfaces confirmed Windows sign-out when a newly configured display scale is pending",
+    "preserves the v0.25.5 fresh-PC startup fix, Epic live download telemetry, GitHub self-update, Windows/driver update pages, Steam population, RPCS3 users, and shared Shelf/Library artwork"
+  ],
+  "description": "Settings chooser and Windows display-scale stabilization build."
+}

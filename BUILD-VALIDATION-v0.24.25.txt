@@ -1,0 +1,7 @@
+Huymaier Console v0.24.25 validation
+- JSON configuration files parsed successfully.
+- C# lexical delimiter/string/comment validation passed for all packaged .cs files.
+- Crash-containment guards verified present for Xbox-family async library/artwork/achievement callbacks.
+- PS3 SafeBeginUi guards verified for theme/firmware/install/emulator-return asynchronous callbacks.
+- Package version references updated to 0.24.25.
+- Native Windows WPF compilation/runtime cannot be executed in this Linux packaging environment; the installer compiles the native host on the target Windows PC and will report compiler output if compilation fails.

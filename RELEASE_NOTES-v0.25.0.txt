@@ -1,0 +1,63 @@
+Huymaier Console v0.25.0 — Shell, Storefront & Artwork Integration
+
+QUICK ACCESS / MAIN MENU
+- Replaces the large main-menu panel with a compact icon-based Quick Access overlay.
+- Default placement is a bottom bar; Settings > Huymaier Console can cycle Bottom, Top, Left, and Right placement.
+- Quick Access contains Home, Games, Apps, Downloads, Settings, and Power only.
+- Import, Web Browser, and File Browser are no longer top-level Quick Access destinations.
+
+HOME
+- Adds direct Home actions for Games, Apps, Downloads, Settings, and Power.
+- Recently Launched Games is horizontal and automatically drops filesystem-backed games/ROMs that no longer exist.
+- Recently Launched Apps is horizontal and omits removed Windows/file-backed apps.
+- Adds an installed-game Random Picks rail.
+
+GAMES
+- Renames the user-facing Library hub to Games.
+- Removes Continue Playing, Across Your Libraries, Custom Platform, and the standalone Import workflow from the Games root.
+- Games now presents implemented PC storefronts plus console/emulator platforms.
+- IMPORTANT: emulator console cards retain their existing native direct-entry behavior. PS3, PS2, Original Xbox, Xbox 360, and other native emulator interfaces were NOT moved into the storefront hub.
+- PC storefronts remain visible when not installed and are dimmed.
+- Installed PC storefronts expose Shelf, Library, and Manage.
+- Missing PC storefronts expose Install and Find Installation.
+- Storefront Manage exposes normal launcher open, account/library integration where supported, refresh library/artwork, library locations/import, find installation, and uninstall.
+- Steam Big Picture remains a separate Steam Manage option while Steam games remain native Huymaier Console Library/Shelf entries.
+
+APPS
+- Removes game storefront launchers from the Apps experience; storefront management belongs to Games.
+- Web Browser and File Browser now live in Apps.
+- Shows Windows-registered installed apps through a controller-friendly grid.
+- First tile is + Add App.
+- Add App supports selecting an executable with the native file browser or choosing an installed Windows app.
+
+DOWNLOADS
+- Reworks Downloads into an install/download queue view rather than a system-settings page.
+- Active provider/storefront work appears at the top with phase, progress bar, and estimated remaining time when enough progress data exists.
+- Adds Recently Downloaded & Installed history.
+- Windows Update and Browse Downloads are removed from this page.
+
+SETTINGS
+- Reorganizes the Settings root into Display, Audio, Bluetooth / Wi-Fi, Controllers, Huymaier Console, and Updates.
+- Huymaier Console contains shell-experience options including button prompts, dynamic backgrounds, console music/theme, interface sounds, haptics, keyboard theme, online artwork, startup, and Quick Access location.
+- Updates contains Windows Update and Driver Updates.
+- Removes Browser Selection, Browser Launch Mode, and the broken Performance Counter from the visible Settings experience.
+
+SHARED NON-DESTRUCTIVE ARTWORK RESOLVER
+- Artwork acquisition never renames, moves, or modifies the user's game/ROM files.
+- Adds one shared Huymaier artwork index/cache so Library, Shelf, and native Xbox-family dashboards can reuse the same resolved cover.
+- Checks existing/local artwork first, then shared cached matches and compatible ES-DE downloaded media.
+- Keeps provider/platform-specific artwork sources and existing Libretro/GOG/Steam/Wikipedia fallbacks.
+- Adds a last-resort online image-search fallback for unresolved front-cover artwork.
+- Title cleanup and fuzzy matching happen in memory only; original filenames remain untouched.
+- Original Xbox/Xbox 360 native dashboards now consult the shared artwork cache before their dashboard-specific fallback.
+
+PRESERVED / LOCKED REGRESSIONS
+- RPCS3 user discovery/selection remains working and launch/save/trophy identity follows the selected user.
+- Steam game population remains native and Steam Big Picture remains optional.
+- Shelf artwork continues to reuse Library-resolved artwork.
+- PS3 installed-theme switching, console game-count reconciliation, native driver management, Xbox/Xbox 360 cover handling, achievements/save management, and v0.24.25 crash containment remain present.
+- Power page behavior remains unchanged except for navigation into it from the new shell.
+
+TEST CANDIDATE
+- Windows PowerShell preflight still parses the shipped modules before startup.
+- Native WPF/C# components are compiled by the installer on the target Windows PC; this Linux packaging environment cannot execute the Windows-native runtime test.

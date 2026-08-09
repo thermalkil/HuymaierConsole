@@ -1,0 +1,22 @@
+﻿Huymaier Console v0.25.4 — GitHub Self-Update Test
+
+HUYMAIER CONSOLE UPDATE
+- Adds Settings > Updates > Huymaier Console Update as its own native page.
+- Automatically checks thermalkil/HuymaierConsole GitHub Releases when opened.
+- Shows current/latest version and whether a newer release exists.
+- Downloads the selected Release ZIP into Huymaier Console's update cache.
+- Displays live downloaded/total bytes and percentage while the Console package downloads.
+- Computes SHA-256 for the completed local package.
+- Install closes Huymaier Console, runs a separate updater, invokes the packaged installer silently, and relaunches Console.
+- A lightweight root-program-file rollback snapshot is restored if installation fails.
+
+PRIVATE REPOSITORY TESTING
+- Public GitHub Releases require no account configuration.
+- While thermalkil/HuymaierConsole remains private, the PC must provide GH_TOKEN/GITHUB_TOKEN or be signed in with GitHub CLI (`gh auth login`) for Release discovery/download.
+- If the repository has no published Release yet, the page reports that state instead of silently doing nothing.
+
+PRESERVED
+- Epic/Legendary live transfer percentage, bytes, rate, and ETA from v0.25.3.
+- Seven-day / 20-entry true download history.
+- Dedicated Windows Update and Driver Updates pages.
+- PS3 users, Steam library population, shared Shelf/Library artwork, strict Epic filtering, and native emulator direct entry.

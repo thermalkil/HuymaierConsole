@@ -1,0 +1,54 @@
+Huymaier Console v0.24.14
+
+MULTI-CONSOLE STARTUP, SHELL, AND AUDIO UPDATE
+
+CANONICAL STARTUP VIDEOS
+- Uses the user-supplied startup videos for PlayStation 1, PlayStation 2, PlayStation 3, Nintendo 64, GameCube, Wii, Wii U, Nintendo Switch, original Xbox, and Xbox 360.
+- Startup playback is in-process, includes the video's own audio, can be skipped with Confirm or Back, and hands control to the platform shell when complete.
+- Startup video playback does not launch a browser or external media player.
+- Native 4K sources remain 3840x2160 for playback after H.264/AAC compatibility conversion; the supplied 8K PS3 source has a 4K playback copy.
+- The untouched uploaded source is preserved beside each platform as Startup.original.mp4. 4K platforms also include an automatic 1080p H.264/AAC fallback for systems that cannot decode the 4K stream.
+
+PLAYSTATION 1
+- Retains DuckStation as the existing PS1 backend.
+- Reworks the shell toward the original PlayStation Browser / Memory Card visual language instead of the previous generic dark launcher presentation.
+- Uses the supplied PS1 startup video and removes the separate custom startup-audio playback path.
+- Preserves PS1 game scanning, DuckStation cover reuse, multi-disc grouping, memory cards, save icons, save states, BIOS controls, fullscreen launch, and return-to-shell behavior.
+
+PLAYSTATION 2
+- Retains the existing PCSX2 integration and PSBBN-style shell.
+- Removes the generated PS2 boot animation from the active startup path.
+- Removes the separate PS2 startup sound from the active startup path; the supplied startup video's audio now owns startup.
+- Preserves PS2 menu ambience, game-boot audio, navigation sounds, memory-card browser, animated save icons, settings, and fullscreen return.
+- Migrates the old default menu ambience level from 50% to 70% and the old default interface/navigation level from 75% to 100% so both are easier to hear.
+
+PLAYSTATION 3
+- Retains the existing RPCS3 and native XMB implementation.
+- Uses the supplied PS3 startup video.
+- Stops playing the legacy PS3HomeIntro clip after the video; normal XMB ambience begins directly after startup instead.
+- Migrates the old 75% XMB navigation/key-tone default to 100% while preserving user-customized values.
+- Preserves firmware/theme assets, trophies, photos, saves, emulator settings, library scanning, controller navigation, and fullscreen return.
+
+NEW NATIVE PLATFORM SHELLS
+- Adds native, controller-first, in-process platform shells for:
+  - Nintendo 64: RMG primary with ares fallback.
+  - Nintendo GameCube: Dolphin primary with a separately selectable Dolphin fallback build.
+  - Nintendo Wii: Dolphin primary with a separately selectable Dolphin fallback build.
+  - Nintendo Wii U: Cemu primary with a separately selectable Cemu portable path.
+  - Nintendo Switch: Eden primary with Ryubing/Ryujinx-compatible fallback executable selection.
+  - Original Xbox: xemu primary with Cxbx-Reloaded fallback.
+  - Xbox 360: Xenia Canary primary with Xenia Master fallback.
+- These are first-pass period-authentic native shells, not copied firmware code and not yet pixel-for-pixel reproductions of every original system screen.
+- Each shell supports cached game lists, sidecar covers, explicit folder rescans, controller navigation, startup video, configurable ambience, louder navigation sounds, emulator selection, save-folder discovery/backup, fullscreen game launch, and return to that console's Games page.
+- New shell ambience defaults to 75% and navigation sounds to 100%; custom audio paths remain user-selectable.
+- Platform opening is cache-only. Game folders are scanned only after Add Game Folder or explicit Refresh Library.
+- OPTIONS on a selected game, or keyboard F, launches that title through the configured fallback emulator.
+
+XBOX 360 DASHBOARD ERAS
+- Adds a user-selectable Dashboard Style setting with Blades, NXE, and Metro.
+- Each style changes dashboard navigation placement, naming, card geometry, panel treatment, and palette while retaining the same games, storage, settings, and emulator configuration underneath.
+
+MAIN CONSOLE / REGRESSION
+- Preserves the v0.24.13 persistent artwork/cache behavior and large portrait shelf cards.
+- Controller reconnect continues to update controller state and prompt glyphs only; it does not start artwork rescans.
+- Preserves PS1/PS2/PS3 external emulator paths, user data, BIOS/firmware, games, saves, themes, artwork, and settings.

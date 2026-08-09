@@ -1,0 +1,32 @@
+Huymaier Console v0.25.1 build validation
+
+BASE
+- Built as a stabilization patch on top of HC2500 / v0.25.0.
+- Emulator-native direct-entry behavior is preserved.
+- Confirmed fixes from earlier builds (PS3 RPCS3 users, native Steam population, shared Shelf/Library artwork) are intentionally retained.
+
+STATIC VALIDATION COMPLETED IN BUILD ENVIRONMENT
+- 26 PowerShell source files passed string/comment-aware lexical delimiter checks.
+- 10 C# source files passed string/comment-aware lexical delimiter checks.
+- 22 JSON files parsed successfully.
+- 1 XML/AppX manifest parsed successfully.
+- Main embedded WPF Window XAML parsed successfully.
+- FSE package identity updated to 0.25.1.0.
+- Internal release manifest reports 0.25.1 and baseVersion 0.25.0.
+
+TARGETED STABILIZATION CHECKS
+- Apps cross-checks Windows Start-app registrations against the installed Huymaier Games catalog and suppresses recognized games.
+- Existing custom App pins that resolve to recognized games are suppressed from Apps.
+- Epic installed-manifest, direct-provider, and cached-provider paths contain Unreal/Marketplace exclusions.
+- Library schema is bumped to 3 so the upgrade performs one corrective installed-library rescan.
+- Pre-v0.25.1 Epic direct-provider catalogs are treated conservatively until an automatic authenticated Epic refresh replaces them with schemaVersion 2 data.
+- Guide/Home native command maps to shell mask 2 and is evaluated before keyboard/modal/browser handlers.
+- PS1, PS2, PS3, Original Xbox/Xbox 360 and other generic native console windows publish a Quick Access return request when Guide/Home is pressed.
+- Native-return restoration consumes that request before deferred dispatcher restoration, avoiding lost closure-scope state.
+- Controller takeover hides and parks the cursor, records the physical Win32 cursor position, and ignores WPF mouse-move events until the physical mouse actually moves.
+- Quick Access location uses a centered choice popup with D-pad/A/Back interaction instead of value cycling.
+- Windows Update and Driver Updates open dedicated Settings pages, automatically scan, visibly repaint as worker state changes, expose install actions, and offer Restart PC when required.
+- Back from either update child page returns to the Updates hub.
+
+LIMITATION
+- This Linux build environment does not provide Windows PowerShell/.NET Framework WPF or csc.exe, so the final Windows native executable cannot be compiled or executed here. The supplied installer performs its normal target-PC PowerShell preflight and C# compilation. Treat v0.25.1 as a Windows test candidate until exercised on the target system.

@@ -1,0 +1,19 @@
+﻿{
+  "id": "xbox360",
+  "displayName": "Xbox 360",
+  "primaryBackend": "Xenia Canary",
+  "fallbackBackend": "Xenia Master",
+  "version": "0.25.0",
+  "startupAsset": "Assets/Startup.mp4",
+  "dashboardStyles": [
+    "Blades",
+    "Metro"
+  ],
+  "defaultDashboardStyle": "Blades",
+  "bladesReferences": [
+    "Fabxx/XBMC360",
+    "brentdc-nz/XBMC-360"
+  ],
+  "metroReference": "ZivvoZ/dashx360",
+  "xboxGuideOverlay": true
+}

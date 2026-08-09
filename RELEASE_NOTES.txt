@@ -1,0 +1,21 @@
+Huymaier Console v0.25.6 — Settings Chooser + Windows Scale Stabilization
+
+Changes
+- Fixes the centered choice-popup system under PowerShell StrictMode by explicitly initializing popup state before first use.
+- Quick Access location now reliably opens a centered Bottom / Top / Left / Right chooser.
+- Keyboard Theme now opens a centered Huymaier / Light / High Contrast chooser instead of calling the old cycle action.
+- Button Prompts now use a centered Auto / Xbox / PlayStation / Nintendo / Steam / Keyboard chooser.
+- Music Theme now uses a centered chooser and only offers Custom when a custom music file is configured.
+- Adds Display -> Scale as a percentage-based Windows setting with a centered chooser.
+- Display Scale writes the Windows account DPI scale setting from 100%-500% and reports when Windows sign-out is required for the selected value to apply fully.
+- When a new scale is pending, Display offers a controller-friendly Sign out to apply display scale action with confirmation.
+- Preserves the v0.25.5 fresh-PC empty-collection startup fix and richer fatal startup diagnostics.
+- Preserves Epic/Legendary live download telemetry, 7-day/20-entry download history, GitHub self-update, Windows Update, Driver Updates, Steam population, RPCS3 users, and shared Shelf/Library artwork.
+
+Testing focus
+1. Settings -> Huymaier Console -> Quick Access location: centered popup appears and all four locations are visible at once.
+2. Settings -> Huymaier Console -> Keyboard theme: centered popup appears; selection updates the native keyboard palette.
+3. Button Prompts and Music Theme use the same chooser behavior.
+4. Settings -> Display -> Scale: chooser opens, selected percentage is written, and the page reports current -> configured scale until Windows sign-out.
+5. Sign out action requires confirmation.
+6. Fresh/empty profile still boots without .Count failures.

@@ -1,0 +1,27 @@
+Huymaier Console v0.24.26 build validation
+
+Source basis
+- Built forward from HC2425.zip / v0.24.25.
+- Preserves confirmed PS3 users, Steam population, shared Library/Shelf artwork, and v0.24.25 dashboard crash containment.
+
+Driver-management validation
+- HuymaierDriverWorker.ps1 is present and included in Install-HuymaierConsole.ps1.
+- Settings > Drivers & Hardware action/subpage is wired into the main controller-first Settings page.
+- Windows Update driver scans use Type='Driver' and remain separate from HuymaierUpdateWorker.ps1 software scans.
+- Recommended driver updates expose stable Windows Update UpdateID values so individual updates can be selected and installed.
+- Install-all recommended driver updates remains available.
+- Local driver-package flow uses the existing native PickFolder UI and invokes PnPUtil /add-driver <folder>\*.inf /subdirs /install in an elevated worker.
+- Driver state is persisted to driver-state.json and polled by the main UI without blocking the render/input loop.
+- Main daily logging records driver worker requests and state transitions.
+
+Static validation performed in build environment
+- All packaged JSON files parsed successfully.
+- All packaged XML files parsed successfully.
+- PowerShell sources passed string/comment-aware delimiter validation.
+- C# sources passed string/comment-aware delimiter validation.
+- Version surfaces updated to 0.24.26, including bootstrap/native host/installer/FSE package/platform metadata.
+- SHA-256 package manifests regenerated after modifications and exclude the checksum files themselves.
+- ZIP integrity tested after packaging.
+
+Environment limitation
+- The Linux packaging environment does not contain Windows PowerShell/WPF/COM, so target-machine PowerShell 5.1 parsing, Windows Update Agent execution, PnPUtil execution, native C# compilation, and WPF runtime behavior must be validated by the Windows installer/test run.

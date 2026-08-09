@@ -1,0 +1,23 @@
+Huymaier Console v0.24.25 — Native dashboard crash containment
+
+Preserved from v0.24.24
+- RPCS3 user discovery/selection remains enabled and confirmed working.
+- Steam installed-library discovery remains enabled and confirmed working.
+- Shelf artwork continues to use the same resolved artwork as Library.
+
+Xbox / Xbox 360 stability
+- Native console windows now have an explicit closing lifecycle and async generation token.
+- Background library, Xbox cover-art, and Xbox 360 achievement workers are cancelled logically when the dashboard closes.
+- Late worker callbacks can no longer rebuild a dashboard after its WPF window has begun closing.
+- Xbox artwork workers reject invalid/null game paths and catch unexpected worker-thread exceptions.
+- Xbox 360 achievement UI callbacks are now guarded against dispatcher shutdown.
+- Native Xbox-family dashboard dispatcher faults are logged with stack traces and contained inside the dashboard rather than terminating the shared Huymaier Console process.
+- Added explicit dashboard-open/dashboard-closing records to the main daily log.
+
+PS3 stability / diagnostics
+- Remaining asynchronous firmware-theme, firmware-asset, RPCS3 install, firmware-install, and emulator-return callbacks now use a close-aware safe UI dispatcher.
+- Late PS3 callbacks are ignored after XMB shutdown rather than touching a disposed window.
+- PS3 WARN/ERROR records are mirrored into the main Huymaier Console daily log in addition to ps3-native-xmb.log.
+- Native host now records AppDomain fatal exceptions and unobserved task exceptions in the main log for future crash diagnosis.
+
+This is a stabilization test candidate. The Windows installer still performs the native C# compilation on the target PC.

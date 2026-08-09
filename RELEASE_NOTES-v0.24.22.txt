@@ -1,0 +1,36 @@
+Huymaier Console v0.24.22
+Console Library Accuracy, PS3 User Profiles + Theme Switching, Xbox Dashboard Authenticity Pass
+
+Library counts
+- Platform game-count badges now launch throttled background scans instead of trusting stale cache-only values.
+- PlayStation 1, PlayStation 2, PlayStation 3, Nintendo 64, GameCube, Wii, Wii U, Switch, Original Xbox, and Xbox 360 counts refresh while the Games rail is open.
+- Native console windows render their existing cache immediately, then reconcile configured game folders asynchronously so newly added or removed games appear without a manual refresh.
+- The reconciliation remains local-only; opening a console does not start online artwork retrieval.
+
+PlayStation 3 users
+- The PS3 Users column now discovers real RPCS3 accounts from dev_hdd0/home/<8-digit-user-id>/localusername instead of showing a hard-coded User 1.
+- Selecting a user makes that RPCS3 profile the active PS3 identity.
+- Game launches and the advanced RPCS3 desktop UI are started with the selected user ID.
+- Saved Data Utility and trophy collection now follow the selected profile instead of mixing data from every RPCS3 account.
+- The active user selection persists in Huymaier Console PS3 settings.
+
+PlayStation 3 themes
+- Installed .p3t imports are now enumerated from the Huymaier PS3 theme store.
+- Theme Settings adds an Installed Themes submenu showing every imported theme and the currently selected one.
+- Any installed theme can be switched to immediately and persists across restarts.
+- Importing a new .p3t still applies it immediately, but no longer makes previous imports inaccessible.
+- Firmware themes remain a separate selectable list and firmware/default restoration is preserved.
+
+Original Xbox dashboard
+- Rebuilds the main chrome around the large green Xbox jewel, layered elliptical energy rings, bright green glow, and narrow 5960-style menu bars.
+- Removes the previous generic-card feel from the main navigation and tightens the right-side content surface to match the original dashboard generation more closely.
+- Games still launch directly through xemu/Cxbx; no external dashboard frontend is launched.
+
+Xbox 360 dashboards
+- Refines Blades with sharper metallic bevels, tighter blade geometry, generation-appropriate colored blades, and the existing profile/Gamerscore surfaces.
+- Keeps Blades and Metro as native in-place dashboard modes with direct Xenia launching, Xbox Guide, achievements, and save management.
+
+Baseline preserved
+- PS3 custom/automatic/theme-controlled color behavior, firmware asset/theme support, Photos, saves, trophies, emulator settings and per-game overrides.
+- Existing PS1/PS2 and storefront integrations.
+- Controller-first input, startup media, direct emulator launching, and safe return to Huymaier Console.

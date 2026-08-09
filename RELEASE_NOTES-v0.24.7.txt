@@ -1,0 +1,25 @@
+Huymaier Console v0.24.7
+Native PS2 Memory Browser, Animated Saves, Big Picture and Focus Fix
+
+PS2 GAME LAUNCH
+- Every game launches with PCSX2 -batch -bigpicture -fullscreen.
+- Only controller Cross/A or keyboard Enter starts a game.
+- D-pad Down and keyboard Space can no longer launch a game.
+
+MEMORY CARDS
+- Selecting a card now opens its saved-data grid directly.
+- The original PS2 BIOS is no longer launched for memory-card management.
+- Triangle/Options and Confirm show a visible base-PS2-style option list with actual action names.
+- Saved data supports details, copy to another card, backup, export and recoverable delete.
+- Folder cards are edited directly. Before a destructive edit to a raw .ps2/.mcd/.mc2 card, Huymaier creates a full backup and an editable PCSX2 folder-card mirror, then switches any affected slot to the safe mirror. The original raw card is preserved.
+- Actual PS2 save icon geometry is parsed and animated when the save supplies a valid icon model; unsupported icons use an animated fallback.
+
+SETTINGS
+- PCSX2 renderer, resolution, VSync, speed, audio, volume, deadzone and related values now display readable option names rather than raw numeric INI values.
+
+FOCUS RETURN
+- PCSX2 and RPCS3 exit callbacks actively restore their native Huymaier platform window.
+- Closing a native console shell restores the main Huymaier Console window, controller registration and foreground focus.
+
+PRESERVED
+- Includes the v0.24.6 installer compile repair, PS2 startup-to-ambience sequence, game boot audio and PS3 Home Menu ambience.
