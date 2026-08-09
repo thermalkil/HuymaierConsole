@@ -287,6 +287,7 @@ function New-DefaultConfig {
         StorefrontRoots = @()
         StorefrontInstallOverrides = @()
         QuickMenuPosition = 'Bottom'
+        GameBarScale = 100
         ProviderInstallRoots = @()
         LibraryScanCompleted = $false
         LibrarySchemaVersion = 1
@@ -303,7 +304,7 @@ function Load-Config {
     if ( -not (Test-Path $script:ConfigPath)) { return $defaults }
     try {
         $loaded = Get-Content -Raw -Path $script:ConfigPath | ConvertFrom-Json
-        foreach ($name in @('BrowserName','BrowserPath','BrowserMode','PromptOverride','StartWithWindows','CustomGames','CustomApps','MusicEnabled','MusicVolume','DynamicBackground','UiSoundsEnabled','HapticsEnabled','MusicTheme','CustomMusicPath','ImportedGames','RecentGames','RecentApps','StorefrontRoots','StorefrontInstallOverrides','QuickMenuPosition','ProviderInstallRoots','LibraryScanCompleted','LibrarySchemaVersion','KeyboardTheme','ShowFpsCounter','OnlineArtworkEnabled','PlatformBackgroundsEnabled','FavoriteGames')) {
+        foreach ($name in @('BrowserName','BrowserPath','BrowserMode','PromptOverride','StartWithWindows','CustomGames','CustomApps','MusicEnabled','MusicVolume','DynamicBackground','UiSoundsEnabled','HapticsEnabled','MusicTheme','CustomMusicPath','ImportedGames','RecentGames','RecentApps','StorefrontRoots','StorefrontInstallOverrides','QuickMenuPosition','GameBarScale','ProviderInstallRoots','LibraryScanCompleted','LibrarySchemaVersion','KeyboardTheme','ShowFpsCounter','OnlineArtworkEnabled','PlatformBackgroundsEnabled','FavoriteGames')) {
             if ($null -ne $loaded.PSObject.Properties[$name]) {
                 $defaults.$name = $loaded.$name
             }
@@ -317,6 +318,7 @@ function Load-Config {
     foreach ($collectionName in @('CustomGames','CustomApps','ImportedGames','RecentGames','RecentApps','StorefrontRoots','StorefrontInstallOverrides','ProviderInstallRoots','FavoriteGames')) {
         $defaults.$collectionName = Convert-ToStableArray $defaults.$collectionName
     }
+    try{$defaults.GameBarScale=[math]::Max(70,[math]::Min(140,[int]$defaults.GameBarScale))}catch{$defaults.GameBarScale=100}
     return $defaults
 }
 
@@ -2527,6 +2529,7 @@ function Invoke-Action {
         'music-toggle' { Toggle-BackgroundMusic }
         'music-volume' { Cycle-MusicVolume }
         'music-volume-slider' { Adjust-SelectedSlider 5 }
+        'gamebar-scale-slider' { Adjust-SelectedSlider 5 }
         'music-theme' { Cycle-MusicTheme }
         'music-import' { Import-CustomMusic }
         'background-toggle' { Toggle-DynamicBackground }
@@ -2606,8 +2609,13 @@ function New-Action {
 }
 
 function New-SliderAction {
-    param([string]$Id,[string]$Title,[int]$Value,[string]$Description='Use Left/Right to adjust.')
-    New-Action $Id $Title $Description 'Slider' ([math]::Max(0,[math]::Min(100,$Value)))
+    param([string]$Id,[string]$Title,[int]$Value,[string]$Description='Use Left/Right to adjust.',[int]$Minimum=0,[int]$Maximum=100)
+    if($Maximum -lt $Minimum){$tmp=$Minimum;$Minimum=$Maximum;$Maximum=$tmp}
+    $clamped=[math]::Max($Minimum,[math]::Min($Maximum,$Value))
+    $action=New-Action $Id $Title $Description 'Slider' $clamped
+    $action|Add-Member -NotePropertyName Minimum -NotePropertyValue $Minimum -Force
+    $action|Add-Member -NotePropertyName Maximum -NotePropertyValue $Maximum -Force
+    return $action
 }
 
 function Get-PageDefinition {
@@ -3611,7 +3619,7 @@ function Render-Page {
             $title=New-Object System.Windows.Controls.TextBlock;$title.Text=$action.Title;$title.FontSize=18;$title.FontWeight='SemiBold';$title.Foreground='White';$title.TextWrapping='Wrap';$title.LineHeight=23;$title.LineStackingStrategy='BlockLineHeight';$title.Padding='0,1,0,2';[System.Windows.Controls.Grid]::SetRow($title,0);$grid.Children.Add($title)|Out-Null
             if([string](Get-EntryProperty $action 'Kind' '') -eq 'Slider'){
                 $sliderGrid=New-Object System.Windows.Controls.Grid;$sliderGrid.Margin='0,10,0,4';$sliderGrid.Width=430;$sliderGrid.HorizontalAlignment='Left';$sliderGrid.ColumnDefinitions.Add((New-Object System.Windows.Controls.ColumnDefinition -Property @{Width='340'}));$sliderGrid.ColumnDefinitions.Add((New-Object System.Windows.Controls.ColumnDefinition -Property @{Width='70'}));[System.Windows.Controls.Grid]::SetRow($sliderGrid,1)
-                $slider=New-Object System.Windows.Controls.Slider;$slider.Minimum=0;$slider.Maximum=100;$slider.Value=[int](Get-EntryProperty $action 'Value' 0);$slider.IsHitTestVisible=$false;$slider.Width=330;$slider.HorizontalAlignment='Left';$slider.Height=22;$slider.VerticalAlignment='Center';$sliderGrid.Children.Add($slider)|Out-Null
+                $slider=New-Object System.Windows.Controls.Slider;$slider.Minimum=[int](Get-EntryProperty $action 'Minimum' 0);$slider.Maximum=[int](Get-EntryProperty $action 'Maximum' 100);$slider.Value=[int](Get-EntryProperty $action 'Value' 0);$slider.IsHitTestVisible=$false;$slider.Width=330;$slider.HorizontalAlignment='Left';$slider.Height=22;$slider.VerticalAlignment='Center';$sliderGrid.Children.Add($slider)|Out-Null
                 $valueText=New-Object System.Windows.Controls.TextBlock;$valueText.Text=([int](Get-EntryProperty $action 'Value' 0)).ToString()+'%';$valueText.FontSize=16;$valueText.FontWeight='Bold';$valueText.Foreground='#F2D36B';$valueText.HorizontalAlignment='Right';$valueText.VerticalAlignment='Center';[System.Windows.Controls.Grid]::SetColumn($valueText,1);$sliderGrid.Children.Add($valueText)|Out-Null
                 $grid.Children.Add($sliderGrid)|Out-Null
                 $script:SliderControls[[string]$action.Id]=[pscustomobject]@{Slider=$slider;Text=$valueText}
@@ -3716,6 +3724,10 @@ function Adjust-SelectedSlider {
         }
         'audio-volume-slider' {
             $value=[math]::Max(0,[math]::Min(100,(Get-AudioVolume)+$Delta));try{[HuymaierConsole.Native.AudioBridge]::SetMasterVolume($value/100.0)}catch{}
+        }
+        'gamebar-scale-slider' {
+            $value=[math]::Max(70,[math]::Min(140,([int]$script:Config.GameBarScale)+$Delta));$script:Config.GameBarScale=$value;Save-Config
+            try{if('HuymaierConsole.NativeApp.HuymaierGameBarHost' -as [type]){[HuymaierConsole.NativeApp.HuymaierGameBarHost]::SetScalePercent($value)}}catch{}
         }
         default{return $false}
     }
@@ -3936,6 +3948,10 @@ function Process-Gamepads {
                 Set-ActiveInputFamily $family ([string]$nativeCommand.Name)
                 Hide-ConsoleCursor
             }
+            # A centered choice popup is a true modal input surface. Feed the
+            # normalized native command directly to it instead of converting it
+            # back through the legacy mask/focus path.
+            if((Get-Command Handle-HcChoicePopupNativeCommand -ErrorAction SilentlyContinue) -and (Handle-HcChoicePopupNativeCommand ([string]$nativeCommand.Command))){return}
             $nativeMask=0;$nativeDirection=''
             switch([string]$nativeCommand.Command){
                 'Left' {$nativeDirection='Left'}

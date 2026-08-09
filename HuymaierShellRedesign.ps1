@@ -550,7 +550,7 @@ function Show-HcChoicePopup {param([string]$Title,[object[]]$Options,[string]$Cu
         # explicit focus scope. This prevents the underlying Settings page from
         # consuming D-pad/A/B while the chooser is visible.
         $script:LastGamepadMask=0;$script:LastDirection='';$script:NextDirectionAt=[datetime]::MinValue
-        try{$script:ControllerInputGuardUntil=[datetime]::MinValue;$script:Window.Activate()|Out-Null;$overlay.Focus()|Out-Null;[System.Windows.Input.Keyboard]::Focus($overlay)|Out-Null}catch{}
+        try{$script:ControllerInputGuardUntil=[datetime]::MinValue;$overlay.Focus()|Out-Null;[System.Windows.Input.Keyboard]::Focus($overlay)|Out-Null}catch{}
         Write-Log "Opened centered choice popup: $Title ($($script:HcChoiceOptions -join ', '))."
     }catch{
         $script:HcChoiceOverlay=$null
@@ -562,6 +562,7 @@ function Show-HcChoicePopup {param([string]$Title,[object[]]$Options,[string]$Cu
 
 function Move-HcChoicePopup {param([int]$Delta);$count=@($script:HcChoiceOptions).Count;if((-not (Test-HcChoicePopupVisible)) -or $count -eq 0){return};$script:HcChoiceSelected=($script:HcChoiceSelected+$Delta+$count)%$count;Invoke-UiFeedback 'Move';Update-HcChoicePopupVisuals}
 function Handle-HcChoicePopupController {param([int]$Mask,[string]$Direction);if(-not(Test-HcChoicePopupVisible)){return $false};$now=Get-Date;if($Direction){if($Direction -ne $script:LastDirection -or $now -ge $script:NextDirectionAt){if($Direction -in @('Up','Left')){Move-HcChoicePopup -1}elseif($Direction -in @('Down','Right')){Move-HcChoicePopup 1};$isNew=$Direction -ne $script:LastDirection;$script:LastDirection=$Direction;$script:NextDirectionAt=$now.AddMilliseconds($(if($isNew){330}else{120}))}}else{$script:LastDirection='';$script:NextDirectionAt=[datetime]::MinValue};if(Is-NewButtonPress $Mask 4){Invoke-HcChoicePopupSelected}elseif((Is-NewButtonPress $Mask 8)-or(Is-NewButtonPress $Mask 2)){Invoke-UiFeedback 'Back';Close-HcChoicePopup};$script:LastGamepadMask=$Mask;return $true}
+function Handle-HcChoicePopupNativeCommand {param([string]$Command);if(-not(Test-HcChoicePopupVisible)){return $false};switch($Command){'Up'{Move-HcChoicePopup -1}'Left'{Move-HcChoicePopup -1}'Down'{Move-HcChoicePopup 1}'Right'{Move-HcChoicePopup 1}'Confirm'{Invoke-HcChoicePopupSelected}'Back'{Invoke-UiFeedback 'Back';Close-HcChoicePopup}'Guide'{Invoke-UiFeedback 'Back';Close-HcChoicePopup;if(Get-Command Show-HcMainMenu -ErrorAction SilentlyContinue){Show-HcMainMenu}}};return $true}
 function Handle-HcChoicePopupKey {param($Key);if(-not(Test-HcChoicePopupVisible)){return $false};switch([string]$Key){'Up'{Move-HcChoicePopup -1}'Left'{Move-HcChoicePopup -1}'Down'{Move-HcChoicePopup 1}'Right'{Move-HcChoicePopup 1}'Enter'{Invoke-HcChoicePopupSelected}'Space'{Invoke-HcChoicePopupSelected}'Escape'{Close-HcChoicePopup}'Back'{Close-HcChoicePopup}default{return $false}};return $true}
 
 # Reorganized Settings pages.
@@ -605,6 +606,7 @@ function Get-PageDefinition {
                 (New-Action 'online-artwork-toggle' $(if($script:Config.OnlineArtworkEnabled){'Online box art: On'}else{'Online box art: Off'})),
                 (New-Action 'artwork-refresh' 'Refresh missing box art'),
                 (New-Action 'quick-menu-position' "Quick Access location: $($script:Config.QuickMenuPosition)"),
+                (New-SliderAction 'gamebar-scale-slider' 'Game Bar scale' ([int]$script:Config.GameBarScale) 'Use Left/Right to adjust the centered overlay.' 70 140),
                 (New-Action 'startup-toggle' $(if($script:Config.StartWithWindows){'Start with Windows: On'}else{'Start with Windows: Off'})),
                 (New-Action 'subpage-back' 'Back to Settings')
             )

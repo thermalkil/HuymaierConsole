@@ -439,9 +439,11 @@ namespace HuymaierConsole.NativeApp
     {
         private static Window consoleWindow;
         private static HuymaierGameBarWindow gameBar;
+        private static int scalePercent = 100;
         public static bool IsVisible { get { return gameBar != null && gameBar.IsVisible; } }
         public static void Initialize(Window mainConsoleWindow) { consoleWindow = mainConsoleWindow; }
-        public static void Show() { if (consoleWindow == null) return; if (gameBar == null) gameBar = new HuymaierGameBarWindow(consoleWindow); gameBar.ShowForForegroundWindow(); }
+        public static void SetScalePercent(int value) { scalePercent = Math.Max(70, Math.Min(140, value)); if (gameBar != null) gameBar.SetScalePercent(scalePercent); }
+        public static void Show() { if (consoleWindow == null) return; if (gameBar == null) gameBar = new HuymaierGameBarWindow(consoleWindow); gameBar.SetScalePercent(scalePercent); gameBar.ShowForForegroundWindow(); }
         public static void Hide() { if (gameBar != null) gameBar.HideBar(); }
         public static void Toggle() { if (IsVisible) Hide(); else Show(); }
         public static void ProcessCommand(string command) { if (gameBar == null || !gameBar.IsVisible || String.IsNullOrWhiteSpace(command)) return; gameBar.ProcessControllerCommand(command); }
@@ -477,6 +479,7 @@ namespace HuymaierConsole.NativeApp
         private int selected;
         private bool closeConfirmation;
         private string lastStatus;
+        private int scalePercent;
 
         internal HuymaierGameBarWindow(Window mainConsoleWindow)
         {
@@ -487,6 +490,7 @@ namespace HuymaierConsole.NativeApp
             taskPreviews = new List<DwmTaskPreviewHost.Preview>();
             audioEndpoints = new AudioEndpointInfo[0];
             lastStatus = String.Empty;
+            scalePercent = 100;
 
             WindowStyle = WindowStyle.None;
             ResizeMode = ResizeMode.NoResize;
@@ -553,27 +557,53 @@ namespace HuymaierConsole.NativeApp
             WindowState = WindowState.Normal; Activate(); Focus(); telemetryTimer.Start();
         }
 
+        internal void SetScalePercent(int value)
+        {
+            scalePercent = Math.Max(70, Math.Min(140, value));
+            if (IsVisible) PositionOnTargetMonitor(targetWindow);
+        }
+
+        private Rect GetLogicalMonitorBounds(Forms.Screen screen)
+        {
+            Drawing.Rectangle bounds = screen == null ? Forms.Screen.PrimaryScreen.Bounds : screen.Bounds;
+            try
+            {
+                IntPtr handle = new WindowInteropHelper(this).EnsureHandle();
+                HwndSource source = HwndSource.FromHwnd(handle);
+                if (source != null && source.CompositionTarget != null)
+                {
+                    Matrix fromDevice = source.CompositionTarget.TransformFromDevice;
+                    Point topLeft = fromDevice.Transform(new Point(bounds.Left, bounds.Top));
+                    Point bottomRight = fromDevice.Transform(new Point(bounds.Right, bounds.Bottom));
+                    return new Rect(topLeft, bottomRight);
+                }
+            }
+            catch { }
+            return new Rect(bounds.Left, bounds.Top, bounds.Width, bounds.Height);
+        }
+
         private void PositionOnTargetMonitor(IntPtr target)
         {
             try
             {
                 Forms.Screen screen = target != IntPtr.Zero ? Forms.Screen.FromHandle(target) : Forms.Screen.PrimaryScreen;
-                Drawing.Rectangle bounds = screen.Bounds;
-                double width = Math.Max(860.0, Math.Min(bounds.Width * 0.70, 1500.0));
-                double height = Math.Max(235.0, Math.Min(bounds.Height * 0.24, 310.0));
-                Left = bounds.Left + ((bounds.Width - width) / 2.0);
-                // Lower third, Xbox/Steam-style: visible without covering the game center.
-                Top = bounds.Top + Math.Min(bounds.Height - height - 28.0, bounds.Height * 0.66);
+                Rect bounds = GetLogicalMonitorBounds(screen);
+                double factor = scalePercent / 100.0;
+                double width = Math.Max(760.0, Math.Min(bounds.Width * 0.92, bounds.Width * 0.70 * factor));
+                double height = Math.Max(220.0, Math.Min(bounds.Height * 0.50, bounds.Height * 0.24 * factor));
                 Width = width;
                 Height = height;
+                Left = bounds.Left + ((bounds.Width - width) / 2.0);
+                Top = bounds.Top + ((bounds.Height - height) / 2.0);
             }
             catch
             {
-                double width = Math.Max(860.0, SystemParameters.PrimaryScreenWidth * 0.70);
-                double height = Math.Max(235.0, SystemParameters.PrimaryScreenHeight * 0.24);
+                double factor = scalePercent / 100.0;
+                double width = Math.Max(760.0, Math.Min(SystemParameters.PrimaryScreenWidth * 0.92, SystemParameters.PrimaryScreenWidth * 0.70 * factor));
+                double height = Math.Max(220.0, Math.Min(SystemParameters.PrimaryScreenHeight * 0.50, SystemParameters.PrimaryScreenHeight * 0.24 * factor));
                 Width = width; Height = height;
                 Left = SystemParameters.VirtualScreenLeft + ((SystemParameters.PrimaryScreenWidth - width) / 2.0);
-                Top = SystemParameters.VirtualScreenTop + (SystemParameters.PrimaryScreenHeight * 0.66);
+                Top = SystemParameters.VirtualScreenTop + ((SystemParameters.PrimaryScreenHeight - height) / 2.0);
             }
         }
 

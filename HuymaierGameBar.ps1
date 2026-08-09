@@ -1,4 +1,4 @@
-﻿# Huymaier Console v0.26.0 external game/app overlay.
+# Huymaier Console v0.26.0 external game/app overlay.
 # Quick Access remains inside Huymaier Console. This module owns only the
 # external-app Game Bar and its Guide-button watcher.
 
@@ -71,6 +71,7 @@ function Initialize-HuymaierGameBar {
             return
         }
         [HuymaierConsole.NativeApp.HuymaierGameBarHost]::Initialize($script:Window)
+        [HuymaierConsole.NativeApp.HuymaierGameBarHost]::SetScalePercent([int](Get-EntryProperty $script:Config 'GameBarScale' 100))
         Set-HcXboxGameBarSuppression
         if($null -ne $script:HcGameBarTimer){try{$script:HcGameBarTimer.Stop()}catch{}}
         $timer=New-Object System.Windows.Threading.DispatcherTimer
