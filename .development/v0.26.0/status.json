@@ -1,7 +1,6 @@
 {
-  "batch": "gamebar-horizontal-nav-1",
-  "script": "apply_gamebar_horizontal_navigation.py",
-  "patch_dir": "",
+  "batch": "popup-navigate-feedback-1",
+  "script": "apply_popup_navigate_feedback.py",
   "result": "success",
-  "recordedAtUtc": "2026-08-09T13:56:48.148019+00:00"
+  "recordedAtUtc": "2026-08-09T14:10:28.691395+00:00"
 }

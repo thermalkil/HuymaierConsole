@@ -569,7 +569,16 @@ function Show-HcChoicePopup {param([string]$Title,[object[]]$Options,[string]$Cu
     }
 }
 
-function Move-HcChoicePopup {param([int]$Delta);$count=@($script:HcChoiceOptions).Count;if((-not (Test-HcChoicePopupVisible)) -or $count -eq 0){return};$script:HcChoiceSelected=($script:HcChoiceSelected+$Delta+$count)%$count;Invoke-UiFeedback 'Move';Update-HcChoicePopupVisuals}
+function Move-HcChoicePopup {
+    param([int]$Delta)
+    $count=@($script:HcChoiceOptions).Count
+    if((-not (Test-HcChoicePopupVisible)) -or $count -eq 0){return}
+    $script:HcChoiceSelected=($script:HcChoiceSelected+$Delta+$count)%$count
+    # Use the same validated navigation feedback token as the rest of the shell.
+    # A feedback/audio failure must never abort selection movement or repaint.
+    try{Invoke-UiFeedback 'Navigate'}catch{Write-Log "Choice popup navigation feedback recovered: $($_.Exception.Message)" 'WARN'}
+    try{Update-HcChoicePopupVisuals}catch{Write-Log "Choice popup visual refresh recovered: $($_.Exception.Message)" 'WARN'}
+}
 function Handle-HcChoicePopupController {param([int]$Mask,[string]$Direction);if(-not(Test-HcChoicePopupVisible)){return $false};$now=Get-Date;if($Direction){if($Direction -ne $script:LastDirection -or $now -ge $script:NextDirectionAt){if($Direction -in @('Up','Left')){Move-HcChoicePopup -1}elseif($Direction -in @('Down','Right')){Move-HcChoicePopup 1};$isNew=$Direction -ne $script:LastDirection;$script:LastDirection=$Direction;$script:NextDirectionAt=$now.AddMilliseconds($(if($isNew){330}else{120}))}}else{$script:LastDirection='';$script:NextDirectionAt=[datetime]::MinValue};if(Is-NewButtonPress $Mask 4){Invoke-HcChoicePopupSelected}elseif((Is-NewButtonPress $Mask 8)-or(Is-NewButtonPress $Mask 2)){Invoke-UiFeedback 'Back';Close-HcChoicePopup};$script:LastGamepadMask=$Mask;return $true}
 function Handle-HcChoicePopupNativeCommand {param([string]$Command);if(-not(Test-HcChoicePopupVisible)){return $false};switch($Command){'Up'{Move-HcChoicePopup -1}'Left'{Move-HcChoicePopup -1}'Down'{Move-HcChoicePopup 1}'Right'{Move-HcChoicePopup 1}'Confirm'{Invoke-HcChoicePopupSelected}'Back'{Invoke-UiFeedback 'Back';Close-HcChoicePopup}'Guide'{Invoke-UiFeedback 'Back';Close-HcChoicePopup;if(Get-Command Show-HcMainMenu -ErrorAction SilentlyContinue){Show-HcMainMenu}}};return $true}
 function Handle-HcChoicePopupKey {param($Key);if(-not(Test-HcChoicePopupVisible)){return $false};switch([string]$Key){'Up'{Move-HcChoicePopup -1}'Left'{Move-HcChoicePopup -1}'Down'{Move-HcChoicePopup 1}'Right'{Move-HcChoicePopup 1}'Enter'{Invoke-HcChoicePopupSelected}'Space'{Invoke-HcChoicePopupSelected}'Escape'{Close-HcChoicePopup}'Back'{Close-HcChoicePopup}default{return $false}};return $true}
