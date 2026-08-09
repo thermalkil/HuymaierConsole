@@ -1,0 +1,90 @@
+diff --git a/a/HuymaierShellRedesign.ps1 b/b/HuymaierShellRedesign.ps1
+index 7dc76cb..2900119 100644
+--- a/a/HuymaierShellRedesign.ps1
++++ b/b/HuymaierShellRedesign.ps1
+@@ -1,4 +1,4 @@
+-﻿# Huymaier Console v0.25.4 shell/provider stabilization.
++# Huymaier Console v0.25.6 shell/provider stabilization.
+ # Loaded after HuymaierGameExperience.ps1 and before HuymaierEmulatorPlatforms.ps1.
+ # EmulatorPlatforms intentionally gets the final platform-select interception so
+ # emulator console cards retain their native direct-entry behavior.
+@@ -505,6 +505,12 @@ Import-HcDownloadHistory
+ Import-HcDownloadHistoryFromProviderLogs
+ 
+ # Centered controller-friendly choice popup used by multi-option settings.
++# Initialize every popup field explicitly because StrictMode treats an unset script variable as an error.
++$script:HcChoiceOverlay=$null
++$script:HcChoiceButtons=@()
++$script:HcChoiceOptions=@()
++$script:HcChoiceSelected=0
++$script:HcChoiceSetting=''
+ function Test-HcChoicePopupVisible {return ($null -ne $script:HcChoiceOverlay -and $script:HcChoiceOverlay.Visibility -eq 'Visible')}
+ function Update-HcChoicePopupVisuals {
+     for($i=0;$i -lt @($script:HcChoiceButtons).Count;$i++){$b=$script:HcChoiceButtons[$i];if($i -eq $script:HcChoiceSelected){$b.Background='#E7C45E';$b.Foreground='#10151D';$b.BorderBrush='#FFF0A0';$b.BorderThickness='2'}else{$b.Background='#E8141C28';$b.Foreground='White';$b.BorderBrush='#43536A';$b.BorderThickness='1'}}
+@@ -514,15 +520,25 @@ function Close-HcChoicePopup {
+     $script:HcChoiceOverlay=$null;$script:HcChoiceButtons=@();$script:HcChoiceOptions=@();$script:HcChoiceSelected=0;$script:HcChoiceSetting='';Set-HcShellBlur $false;Update-Footer
+ }
+ function Invoke-HcChoicePopupSelected {
+-    if($script:HcChoiceSelected -lt 0 -or $script:HcChoiceSelected -ge $script:HcChoiceOptions.Count){return};$value=[string]$script:HcChoiceOptions[$script:HcChoiceSelected]
+-    switch($script:HcChoiceSetting){'QuickMenuPosition'{$script:Config.QuickMenuPosition=$value;Save-Config;Apply-HcQuickMenuLayout}}
++    if($script:HcChoiceSelected -lt 0 -or $script:HcChoiceSelected -ge @($script:HcChoiceOptions).Count){return}
++    $value=[string]$script:HcChoiceOptions[$script:HcChoiceSelected]
++    switch($script:HcChoiceSetting){
++        'QuickMenuPosition' {$script:Config.QuickMenuPosition=$value;Save-Config;Apply-HcQuickMenuLayout}
++        'KeyboardTheme' {$script:Config.KeyboardTheme=$value;Save-Config;try{Apply-NativeKeyboardTheme}catch{}}
++        'PromptOverride' {$script:Config.PromptOverride=$value;Save-Config;Update-Footer}
++        'MusicTheme' {$script:Config.MusicTheme=$value;Save-Config;Initialize-BackgroundMusic}
++        'DisplayScale' {
++            $pct=0
++            if([int]::TryParse(($value -replace '[^0-9]',''),[ref]$pct)){Set-WindowsDisplayScalePercent $pct}
++        }
++    }
+     Invoke-UiFeedback 'Confirm';Close-HcChoicePopup;Render-Page
+ }
+ function Show-HcChoicePopup {param([string]$Title,[object[]]$Options,[string]$Current,[string]$Setting)
+     try{
+         if($null -eq $script:RootGrid){throw 'The root overlay grid is not initialized.'}
+         if(Test-HcChoicePopupVisible){Close-HcChoicePopup}
+-        $script:HcChoiceOptions=[object[]]$Options;$script:HcChoiceSetting=$Setting;$idx=[array]::IndexOf($script:HcChoiceOptions,$Current);$script:HcChoiceSelected=$(if($idx -ge 0){$idx}else{0})
++        $script:HcChoiceOptions=Convert-ToStableArray $Options;$script:HcChoiceSetting=$Setting;$idx=[array]::IndexOf($script:HcChoiceOptions,$Current);$script:HcChoiceSelected=$(if($idx -ge 0){$idx}else{0})
+         $overlay=New-Object System.Windows.Controls.Grid;$overlay.Background='#96000000';$overlay.IsHitTestVisible=$true;$overlay.Focusable=$true;[System.Windows.Controls.Panel]::SetZIndex($overlay,9000)
+         $card=New-Object System.Windows.Controls.Border;$card.Width=560;$card.Padding='28';$card.Background='#F20B111B';$card.BorderBrush='#596A83';$card.BorderThickness='1.5';$card.CornerRadius=20;$card.HorizontalAlignment='Center';$card.VerticalAlignment='Center';$card.IsHitTestVisible=$true
+         $stack=New-Object System.Windows.Controls.StackPanel;$title=New-Object System.Windows.Controls.TextBlock;$title.Text=$Title;$title.FontSize=27;$title.FontWeight='Bold';$title.Foreground='White';$title.Margin='0,0,0,18';$stack.Children.Add($title)|Out-Null
+@@ -539,7 +555,7 @@ function Show-HcChoicePopup {param([string]$Title,[object[]]$Options,[string]$Cu
+     }
+ }
+ 
+-function Move-HcChoicePopup {param([int]$Delta);if((-not (Test-HcChoicePopupVisible)) -or $script:HcChoiceOptions.Count -eq 0){return};$script:HcChoiceSelected=($script:HcChoiceSelected+$Delta+$script:HcChoiceOptions.Count)%$script:HcChoiceOptions.Count;Invoke-UiFeedback 'Move';Update-HcChoicePopupVisuals}
++function Move-HcChoicePopup {param([int]$Delta);$count=@($script:HcChoiceOptions).Count;if((-not (Test-HcChoicePopupVisible)) -or $count -eq 0){return};$script:HcChoiceSelected=($script:HcChoiceSelected+$Delta+$count)%$count;Invoke-UiFeedback 'Move';Update-HcChoicePopupVisuals}
+ function Handle-HcChoicePopupController {param([int]$Mask,[string]$Direction);if(-not(Test-HcChoicePopupVisible)){return $false};$now=Get-Date;if($Direction){if($Direction -ne $script:LastDirection -or $now -ge $script:NextDirectionAt){if($Direction -in @('Up','Left')){Move-HcChoicePopup -1}elseif($Direction -in @('Down','Right')){Move-HcChoicePopup 1};$isNew=$Direction -ne $script:LastDirection;$script:LastDirection=$Direction;$script:NextDirectionAt=$now.AddMilliseconds($(if($isNew){330}else{120}))}}else{$script:LastDirection='';$script:NextDirectionAt=[datetime]::MinValue};if(Is-NewButtonPress $Mask 4){Invoke-HcChoicePopupSelected}elseif((Is-NewButtonPress $Mask 8)-or(Is-NewButtonPress $Mask 2)){Invoke-UiFeedback 'Back';Close-HcChoicePopup};$script:LastGamepadMask=$Mask;return $true}
+ function Handle-HcChoicePopupKey {param($Key);if(-not(Test-HcChoicePopupVisible)){return $false};switch([string]$Key){'Up'{Move-HcChoicePopup -1}'Left'{Move-HcChoicePopup -1}'Down'{Move-HcChoicePopup 1}'Right'{Move-HcChoicePopup 1}'Enter'{Invoke-HcChoicePopupSelected}'Space'{Invoke-HcChoicePopupSelected}'Escape'{Close-HcChoicePopup}'Back'{Close-HcChoicePopup}default{return $false}};return $true}
+ 
+@@ -664,7 +680,7 @@ function Render-Page {
+     if($script:SelectedTab -eq 0 -and -not $script:SubPage){
+         $script:ActionPanel.Children.Clear();$script:ActionButtons=@();$script:CurrentActions=@();$script:HomeRows=@();$script:SliderControls=@{};$script:PageTitle.Visibility='Collapsed';$script:PageSubtitle.Visibility='Collapsed';$script:HeroPanel.Visibility='Collapsed';[System.Windows.Controls.Grid]::SetColumnSpan($script:MainListArea,2);$script:MainListArea.Margin='0'
+         $installed=Get-HcInstalledGameMap;$script:HcShellRecentGames=@();foreach($r in @($script:Config.RecentGames)){if($null -eq $r){continue};$resolved=Resolve-HcRecentGame $r $installed.Map;if($null -ne $resolved){$script:HcShellRecentGames+=$resolved}};$script:HcShellRecentGames=@($script:HcShellRecentGames|Select-Object -First 12)
+-        $script:HcShellRecentApps=@($script:Config.RecentApps|Where-Object{$_ -and (Test-HcRecentAppAvailable $_)}|Select-Object -First 12);$script:HcShellRandomPicks=if($installed.Entries.Count -gt 12){@($installed.Entries|Get-Random -Count 12)}else{@($installed.Entries)}
++        $script:HcShellRecentApps=@($script:Config.RecentApps|Where-Object{$_ -and (Test-HcRecentAppAvailable $_)}|Select-Object -First 12);$installedEntries=Convert-ToStableArray (Get-EntryProperty $installed 'Entries' @());$script:HcShellRandomPicks=if($installedEntries.Count -gt 12){@($installedEntries|Get-Random -Count 12)}else{@($installedEntries)}
+         Add-HcHomeActionBar
+         Add-HomeRail 'Recently Launched Games' $script:HcShellRecentGames 'home-recent-game' 'Launch a game and it will appear here.';Add-HomeRail 'Recently Launched Apps' $script:HcShellRecentApps 'home-recent-app' 'Launch an app and it will appear here.';Add-HomeRail 'Random Picks' $script:HcShellRandomPicks 'home-random-game' 'Installed games will appear here.'
+         if($script:SelectedAction -ge $script:ActionButtons.Count){$script:SelectedAction=0};Update-ActionVisuals;Update-NavVisuals;Update-Footer;Set-PlatformBackground $false;return
+@@ -694,6 +710,19 @@ function Invoke-HcShellCriticalAction {param([string]$Id)
+         'console-update-download' {Start-HcConsoleUpdateWorker 'Download';return $true}
+         'console-update-install' {Start-HcConsoleSelfUpdate;return $true}
+         'quick-menu-position' {Write-Log 'Settings action: opening Quick Access location chooser.';Show-HcChoicePopup 'Quick Access location' @('Bottom','Top','Left','Right') ([string](Get-EntryProperty $script:Config 'QuickMenuPosition' 'Bottom')) 'QuickMenuPosition';return $true}
++        'keyboard-theme' {Write-Log 'Settings action: opening keyboard theme chooser.';Show-HcChoicePopup 'Keyboard theme' @('Huymaier','Light','High Contrast') ([string](Get-EntryProperty $script:Config 'KeyboardTheme' 'Huymaier')) 'KeyboardTheme';return $true}
++        'prompt-override' {Write-Log 'Settings action: opening button prompt chooser.';Show-HcChoicePopup 'Button prompts' @('Auto','Xbox','PlayStation','Nintendo','Steam','Keyboard') ([string](Get-EntryProperty $script:Config 'PromptOverride' 'Auto')) 'PromptOverride';return $true}
++        'music-theme' {
++            $themes=New-Object System.Collections.ArrayList
++            $customPath=[string](Get-EntryProperty $script:Config 'CustomMusicPath' '')
++            foreach($theme in @('Orchestral','Power','Custom')){
++                if($theme -ne 'Custom' -or ($customPath -and (Test-Path -LiteralPath $customPath))){[void]$themes.Add($theme)}
++            }
++            Write-Log 'Settings action: opening music theme chooser.'
++            Show-HcChoicePopup 'Music theme' ([object[]]$themes.ToArray()) ([string](Get-EntryProperty $script:Config 'MusicTheme' 'Orchestral')) 'MusicTheme'
++            return $true
++        }
++        'display-scale' {$scale=Get-WindowsConfiguredDisplayScalePercent;Write-Log "Settings action: opening Windows display scale chooser. Current/configured=$scale%.";Show-HcChoicePopup 'Windows display scale' @('100%','125%','150%','175%','200%','225%','250%','300%','350%','400%','450%','500%') "$scale%" 'DisplayScale';return $true}
+         'subpage-back' {if($script:SelectedTab -eq 7 -and $script:SubPage -in @('WindowsUpdate','Drivers','ConsoleUpdate')){$script:SubPage='UpdatesHub';$script:SelectedAction=0;Render-Page;return $true}}
+     }
+     return $false
