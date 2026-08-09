@@ -1,5 +1,5 @@
 {
-  "batch": "test5-center-scale-popup",
-  "script": "apply_test5_center_scale_popup.py",
+  "batch": "popup-visual-feedback-1",
+  "script": "apply_popup_visual_feedback.py",
   "attempt": 1
 }
