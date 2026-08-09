@@ -1,0 +1,59 @@
+diff --git a/Install-HuymaierConsole.ps1 b/Install-HuymaierConsole.ps1
+--- a/Install-HuymaierConsole.ps1
++++ b/Install-HuymaierConsole.ps1
+@@ -1,1 +1,1 @@
+-$script:InstallVersion = '0.25.6'
++$script:InstallVersion = '0.26.0'
+@@ -1,4 +1,6 @@
+     'HuymaierGameExperience.ps1',
+     'HuymaierShellRedesign.ps1',
++    'HuymaierGameBar.ps1',
++    'HuymaierGameInputBridge.dll',
+     'HuymaierEmulatorPlatforms.ps1',
+     'HuymaierArtworkWorker.ps1',
+@@ -1,6 +1,26 @@
+ if(Test-Path $toolsSource){
+     New-Item -ItemType Directory -Force -Path $toolsDestination|Out-Null
+     Copy-Item (Join-Path $toolsSource '*') $toolsDestination -Recurse -Force
+ }
++
++# The official Microsoft.GameInput redistributable is packaged with v0.26+
++# because the native Guide callback requires the modern system-button API.
++# Microsoft guarantees that the redistributable will not downgrade a newer
++# installed runtime. A local version marker avoids prompting on every update.
++$gameInputRedistVersion='3.5.262'
++$gameInputRedist=Join-Path $toolsDestination 'GameInput\GameInputRedist.msi'
++$gameInputMarker=Join-Path $destination 'gameinput-redist.version'
++$installedGameInputVersion=''
++try{if(Test-Path -LiteralPath $gameInputMarker -PathType Leaf){$installedGameInputVersion=(Get-Content -Raw -LiteralPath $gameInputMarker).Trim()}}catch{}
++if((Test-Path -LiteralPath $gameInputRedist -PathType Leaf) -and $installedGameInputVersion -ne $gameInputRedistVersion){
++    try{
++        Write-InstallerRecord "Installing Microsoft GameInput redistributable $gameInputRedistVersion. Windows may request administrator approval."
++        $msiArgs='/i "'+$gameInputRedist+'" /qn /norestart'
++        $gameInputInstall=Start-Process -FilePath "$env:SystemRoot\System32\msiexec.exe" -ArgumentList $msiArgs -Verb RunAs -Wait -PassThru
++        if($gameInputInstall.ExitCode -notin @(0,3010,1638)){throw "GameInput redistributable installer exited with code $($gameInputInstall.ExitCode)."}
++        Set-Content -LiteralPath $gameInputMarker -Value $gameInputRedistVersion -Encoding ASCII
++        Write-InstallerRecord 'Microsoft GameInput redistributable is ready.'
++    }catch{Write-InstallerRecord "Microsoft GameInput redistributable could not be installed; controller input will fall back to Raw HID/XInput where available. $($_.Exception.Message)" 'WARN'}
++}
+ 
+ $nativeSourceRoot=Join-Path $source 'Native'
+@@ -1,5 +1,7 @@
+ $nativeAppSource=Join-Path $nativeDestinationRoot 'HuymaierConsole.NativeApp.cs'
+ $nativePs1Source=Join-Path $nativeDestinationRoot 'HuymaierConsole.Ps1.cs'
+ $nativeConsolePlatformsSource=Join-Path $nativeDestinationRoot 'HuymaierConsole.ConsolePlatforms.cs'
++$nativeGameBarSource=Join-Path $nativeDestinationRoot 'HuymaierGameBar.cs'
++$nativeGameInputSource=Join-Path $nativeDestinationRoot 'HuymaierConsole.GameInput.cs'
+ $nativeInputSource=Join-Path $destination 'HuymaierNativeInput.cs'
+ $nativeDisplaySource=Join-Path $destination 'HuymaierNativeDisplay.cs'
+@@ -1,1 +1,1 @@
+-foreach($requiredSource in @($nativeAppSource,$nativePs1Source,$nativeConsolePlatformsSource,$nativeInputSource,$nativeDisplaySource,$nativeAudioSource,$nativePerformanceSource,$p3tSource)){
++foreach($requiredSource in @($nativeAppSource,$nativePs1Source,$nativeConsolePlatformsSource,$nativeGameBarSource,$nativeGameInputSource,$nativeInputSource,$nativeDisplaySource,$nativeAudioSource,$nativePerformanceSource,$p3tSource)){
+@@ -1,5 +1,7 @@
+     $nativeAppSource,
+     $nativePs1Source,
+     $nativeConsolePlatformsSource,
++    $nativeGameBarSource,
++    $nativeGameInputSource,
+     $nativeInputSource,
+     $nativeDisplaySource,
