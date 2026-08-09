@@ -70,28 +70,46 @@ jobs:
           cl /nologo /std:c++17 /EHsc /LD /I"%GAMEINPUT_INCLUDE%" Native\HuymaierGameInputBridge.cpp /link /LIBPATH:"%GAMEINPUT_LIBDIR%" gameinput.lib /OUT:"%RUNNER_TEMP%\hc-native\HuymaierGameInputBridge.dll"
           if errorlevel 1 exit /b %errorlevel%
 
-      - name: Compile managed Game Bar sources
+      - name: Compile complete managed application source set
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
-          Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Windows.Forms,System.Drawing
+          Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Windows.Forms,System.Drawing,System.Web.Extensions
           $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
           if(-not(Test-Path -LiteralPath $csc)){throw 'Framework64 csc.exe was not found.'}
+          $automationAssembly=[System.Management.Automation.PSObject].Assembly.Location
           $refs=@(
             [System.Uri].Assembly.Location,
             [System.Linq.Enumerable].Assembly.Location,
             [System.Xaml.XamlReader].Assembly.Location,
+            [System.Xml.XmlDocument].Assembly.Location,
             [System.Windows.DependencyObject].Assembly.Location,
             [System.Windows.Media.Visual].Assembly.Location,
             [System.Windows.Window].Assembly.Location,
             [System.Windows.Forms.Form].Assembly.Location,
-            [System.Drawing.Bitmap].Assembly.Location
+            [System.Drawing.Bitmap].Assembly.Location,
+            [System.Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,
+            $automationAssembly
           )|Select-Object -Unique
+          $sources=@(
+            'Native\HuymaierConsole.NativeApp.cs',
+            'Native\HuymaierConsole.Ps1.cs',
+            'Native\HuymaierConsole.ConsolePlatforms.cs',
+            'Native\HuymaierConsole.SystemOverlay.cs',
+            'Native\HuymaierConsole.GameInput.cs',
+            'HuymaierNativeInput.cs',
+            'HuymaierNativeDisplay.cs',
+            'HuymaierNativeAudio.cs',
+            'HuymaierPerformance.cs',
+            'EmulatorPlatforms\Shared\Huymaier.P3T.cs'
+          )
+          foreach($source in $sources){if(-not(Test-Path -LiteralPath $source -PathType Leaf)){throw "Native source missing: $source"}}
           $args=@('/noconfig','/nologo','/target:library',('/out:'+(Join-Path $env:RUNNER_TEMP 'hc-native\HuymaierOverlayValidation.dll')))
           foreach($ref in $refs){$args+=('/reference:'+$ref)}
-          $args+=@('Native\HuymaierConsole.SystemOverlay.cs','Native\HuymaierConsole.GameInput.cs','HuymaierNativeAudio.cs')
+          $args+=$sources
           & $csc @args
-          if($LASTEXITCODE -ne 0){throw "Managed overlay compiler exited with $LASTEXITCODE."}
+          if($LASTEXITCODE -ne 0){throw "Managed application compiler exited with $LASTEXITCODE."}
+          Write-Host 'Complete managed application compile validation passed.'
 
       - name: Stage GameInput runtime payload artifact
         shell: powershell
