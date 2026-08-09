@@ -1,9 +1,9 @@
 {
-  "tag": "v0.25.8",
-  "version": "0.25.8",
-  "asset": "HC258.zip",
+  "tag": "v0.26.0",
+  "version": "0.26.0",
+  "asset": "HC260.zip",
   "result": "success",
   "alreadyPublished": false,
-  "commit": "b284aaadaa482001aa631da64a35a10b45f375cf",
-  "recordedAtUtc": "2026-08-09T10:09:37.603880+00:00"
+  "commit": "11efd732db472fea0fb8276a76b2e4dddabe51c2",
+  "recordedAtUtc": "2026-08-09T14:26:25.823468+00:00"
 }
