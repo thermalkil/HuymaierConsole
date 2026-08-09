@@ -1,4 +1,4 @@
-name: v0.26.0 Apply Feature Foundation
+name: v0.26.0 Apply Feature Development Batch
 
 on:
   pull_request:
@@ -9,11 +9,11 @@ permissions:
   contents: write
 
 concurrency:
-  group: v026-foundation-${{ github.event.pull_request.number }}
+  group: v026-development-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
-  apply-foundation:
+  apply-development:
     if: github.event.pull_request.head.ref == 'feature/v0.26.0-native-gamebar' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
@@ -24,29 +24,35 @@ jobs:
           fetch-depth: 0
           token: ${{ github.token }}
 
-      - name: Apply deterministic foundation transform
+      - name: Apply deterministic development batch
         shell: bash
         run: |
           set -euo pipefail
           BATCH="$(python3 -c "import json;print(json.load(open('.development/v0.26.0/apply.json'))['batch'])")"
+          SCRIPT="$(python3 -c "import json;print(json.load(open('.development/v0.26.0/apply.json')).get('script','apply_foundation.py'))")"
           LAST=''
           if [ -f .development/v0.26.0/status.json ]; then
             LAST="$(python3 -c "import json;print(json.load(open('.development/v0.26.0/status.json')).get('batch',''))")"
           fi
           if [ "$LAST" = "$BATCH" ]; then
-            echo "Foundation batch $BATCH is already applied."
+            echo "Development batch $BATCH is already applied."
             exit 0
           fi
-
-          # The transformer lives two directories below the repository root.
-          # Correct older staged copies before executing it.
-          sed -i 's/parents\[3\]/parents[2]/' .development/v0.26.0/apply_foundation.py
-          python3 .development/v0.26.0/apply_foundation.py
+          TRANSFORMER=".development/v0.26.0/$SCRIPT"
+          if [ ! -f "$TRANSFORMER" ]; then
+            echo "Transformer not found: $TRANSFORMER"
+            exit 1
+          fi
+          # Compatibility for the first transformer, which originally used one
+          # parent too many when locating the repository root.
+          sed -i 's/parents\[3\]/parents[2]/' "$TRANSFORMER"
+          python3 "$TRANSFORMER"
 
           python3 - <<PY
           import json, datetime
           state={
             'batch':'$BATCH',
+            'script':'$SCRIPT',
             'result':'success',
             'recordedAtUtc':datetime.datetime.now(datetime.timezone.utc).isoformat()
           }
@@ -56,5 +62,5 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
-          git commit -m "Apply v0.26.0 foundation batch $BATCH"
+          git commit -m "Apply v0.26.0 development batch $BATCH"
           git push origin HEAD:feature/v0.26.0-native-gamebar
