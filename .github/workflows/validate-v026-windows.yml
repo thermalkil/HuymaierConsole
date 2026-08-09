@@ -89,7 +89,7 @@ jobs:
           )|Select-Object -Unique
           $args=@('/noconfig','/nologo','/target:library',('/out:'+(Join-Path $env:RUNNER_TEMP 'hc-native\HuymaierOverlayValidation.dll')))
           foreach($ref in $refs){$args+=('/reference:'+$ref)}
-          $args+=@('Native\HuymaierConsole.SystemOverlay.cs','Native\HuymaierConsole.GameInput.cs')
+          $args+=@('Native\HuymaierConsole.SystemOverlay.cs','Native\HuymaierConsole.GameInput.cs','HuymaierNativeAudio.cs')
           & $csc @args
           if($LASTEXITCODE -ne 0){throw "Managed overlay compiler exited with $LASTEXITCODE."}
 
