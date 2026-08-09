@@ -47,6 +47,7 @@ namespace HuymaierConsole.NativeApp
         [DllImport("user32.dll")] internal static extern IntPtr GetForegroundWindow();
         [DllImport("user32.dll")] internal static extern bool SetForegroundWindow(IntPtr hWnd);
         [DllImport("user32.dll")] internal static extern bool ShowWindow(IntPtr hWnd, int command);
+        [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr hWnd);
         [DllImport("user32.dll")] internal static extern bool PostMessage(IntPtr hWnd, uint message, IntPtr wParam, IntPtr lParam);
         [DllImport("dwmapi.dll")] private static extern int DwmGetWindowAttribute(IntPtr hWnd, int attribute, out int value, int size);
 
@@ -126,7 +127,9 @@ namespace HuymaierConsole.NativeApp
         internal static void Activate(IntPtr hWnd)
         {
             if (hWnd == IntPtr.Zero) return;
-            try { ShowWindow(hWnd, SW_RESTORE); } catch { }
+            // Never restore a maximized/fullscreen game to its normal windowed size.
+            // SW_RESTORE is needed only for an actually minimized task.
+            try { if (IsIconic(hWnd)) ShowWindow(hWnd, SW_RESTORE); } catch { }
             try { SetForegroundWindow(hWnd); } catch { }
         }
 
@@ -496,17 +499,17 @@ namespace HuymaierConsole.NativeApp
             WindowStartupLocation = WindowStartupLocation.Manual;
 
             root = new Grid();
-            root.Background = new SolidColorBrush(Color.FromArgb(180, 0, 0, 0));
+            // This is a compact Game Bar, not a fullscreen takeover. The window itself
+            // is positioned over only the lower-center portion of the target monitor.
+            root.Background = Brushes.Transparent;
             Border card = new Border();
-            card.Width = 1180;
-            card.MaxHeight = 790;
-            card.HorizontalAlignment = HorizontalAlignment.Center;
-            card.VerticalAlignment = VerticalAlignment.Center;
-            card.Background = new SolidColorBrush(Color.FromArgb(248, 8, 12, 18));
+            card.HorizontalAlignment = HorizontalAlignment.Stretch;
+            card.VerticalAlignment = VerticalAlignment.Stretch;
+            card.Background = new SolidColorBrush(Color.FromArgb(246, 8, 12, 18));
             card.BorderBrush = new SolidColorBrush(Color.FromRgb(69, 81, 99));
             card.BorderThickness = new Thickness(1.5);
-            card.CornerRadius = new CornerRadius(22);
-            card.Padding = new Thickness(32, 25, 32, 23);
+            card.CornerRadius = new CornerRadius(20);
+            card.Padding = new Thickness(22, 16, 22, 14);
 
             Grid layout = new Grid();
             layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -517,16 +520,16 @@ namespace HuymaierConsole.NativeApp
             layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             StackPanel header = new StackPanel(); header.Orientation = Orientation.Horizontal;
-            TextBlock brand = new TextBlock(); brand.Text = "HUYMAIER GAME BAR"; brand.FontSize = 24; brand.FontWeight = FontWeights.Bold; brand.Foreground = new SolidColorBrush(Color.FromRgb(231, 196, 94)); header.Children.Add(brand);
-            contextText = new TextBlock(); contextText.Margin = new Thickness(18, 7, 0, 0); contextText.FontSize = 13; contextText.Foreground = new SolidColorBrush(Color.FromRgb(164, 177, 196)); header.Children.Add(contextText);
+            TextBlock brand = new TextBlock(); brand.Text = "HUYMAIER GAME BAR"; brand.FontSize = 18; brand.FontWeight = FontWeights.Bold; brand.Foreground = new SolidColorBrush(Color.FromRgb(231, 196, 94)); header.Children.Add(brand);
+            contextText = new TextBlock(); contextText.Margin = new Thickness(14, 3, 0, 0); contextText.FontSize = 11; contextText.Foreground = new SolidColorBrush(Color.FromRgb(164, 177, 196)); header.Children.Add(contextText);
             Grid.SetRow(header, 0); layout.Children.Add(header);
 
-            tabsText = new TextBlock(); tabsText.Margin = new Thickness(0, 15, 0, 0); tabsText.FontSize = 12; tabsText.FontWeight = FontWeights.SemiBold; tabsText.Foreground = new SolidColorBrush(Color.FromRgb(135, 151, 174)); Grid.SetRow(tabsText, 1); layout.Children.Add(tabsText);
-            pageText = new TextBlock(); pageText.Margin = new Thickness(0, 10, 0, 16); pageText.FontSize = 31; pageText.FontWeight = FontWeights.SemiBold; Grid.SetRow(pageText, 2); layout.Children.Add(pageText);
+            tabsText = new TextBlock(); tabsText.Margin = new Thickness(0, 8, 0, 0); tabsText.FontSize = 10; tabsText.FontWeight = FontWeights.SemiBold; tabsText.Foreground = new SolidColorBrush(Color.FromRgb(135, 151, 174)); Grid.SetRow(tabsText, 1); layout.Children.Add(tabsText);
+            pageText = new TextBlock(); pageText.Margin = new Thickness(0, 5, 0, 7); pageText.FontSize = 20; pageText.FontWeight = FontWeights.SemiBold; Grid.SetRow(pageText, 2); layout.Children.Add(pageText);
 
             scroller = new ScrollViewer(); scroller.VerticalScrollBarVisibility = ScrollBarVisibility.Hidden; scroller.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled; itemPanel = new StackPanel(); scroller.Content = itemPanel; Grid.SetRow(scroller, 3); layout.Children.Add(scroller);
-            statusText = new TextBlock(); statusText.Margin = new Thickness(0, 12, 0, 0); statusText.FontSize = 12; statusText.Foreground = new SolidColorBrush(Color.FromRgb(231, 196, 94)); statusText.TextWrapping = TextWrapping.Wrap; Grid.SetRow(statusText, 4); layout.Children.Add(statusText);
-            footerText = new TextBlock(); footerText.Margin = new Thickness(0, 12, 0, 0); footerText.FontSize = 13; footerText.Foreground = new SolidColorBrush(Color.FromRgb(155, 168, 188)); Grid.SetRow(footerText, 5); layout.Children.Add(footerText);
+            statusText = new TextBlock(); statusText.Margin = new Thickness(0, 5, 0, 0); statusText.FontSize = 10; statusText.Foreground = new SolidColorBrush(Color.FromRgb(231, 196, 94)); statusText.TextWrapping = TextWrapping.Wrap; Grid.SetRow(statusText, 4); layout.Children.Add(statusText);
+            footerText = new TextBlock(); footerText.Margin = new Thickness(0, 5, 0, 0); footerText.FontSize = 10; footerText.Foreground = new SolidColorBrush(Color.FromRgb(155, 168, 188)); Grid.SetRow(footerText, 5); layout.Children.Add(footerText);
             card.Child = layout; root.Children.Add(card); Content = root;
 
             PreviewKeyDown += delegate(object sender, System.Windows.Input.KeyEventArgs e) { if (e.Key == System.Windows.Input.Key.Escape) { HideBar(); e.Handled = true; } };
@@ -552,8 +555,26 @@ namespace HuymaierConsole.NativeApp
 
         private void PositionOnTargetMonitor(IntPtr target)
         {
-            try { Forms.Screen screen = target != IntPtr.Zero ? Forms.Screen.FromHandle(target) : Forms.Screen.PrimaryScreen; Drawing.Rectangle bounds = screen.Bounds; Left = bounds.Left; Top = bounds.Top; Width = bounds.Width; Height = bounds.Height; }
-            catch { Left = SystemParameters.VirtualScreenLeft; Top = SystemParameters.VirtualScreenTop; Width = SystemParameters.PrimaryScreenWidth; Height = SystemParameters.PrimaryScreenHeight; }
+            try
+            {
+                Forms.Screen screen = target != IntPtr.Zero ? Forms.Screen.FromHandle(target) : Forms.Screen.PrimaryScreen;
+                Drawing.Rectangle bounds = screen.Bounds;
+                double width = Math.Max(860.0, Math.Min(bounds.Width * 0.70, 1500.0));
+                double height = Math.Max(235.0, Math.Min(bounds.Height * 0.24, 310.0));
+                Left = bounds.Left + ((bounds.Width - width) / 2.0);
+                // Lower third, Xbox/Steam-style: visible without covering the game center.
+                Top = bounds.Top + Math.Min(bounds.Height - height - 28.0, bounds.Height * 0.66);
+                Width = width;
+                Height = height;
+            }
+            catch
+            {
+                double width = Math.Max(860.0, SystemParameters.PrimaryScreenWidth * 0.70);
+                double height = Math.Max(235.0, SystemParameters.PrimaryScreenHeight * 0.24);
+                Width = width; Height = height;
+                Left = SystemParameters.VirtualScreenLeft + ((SystemParameters.PrimaryScreenWidth - width) / 2.0);
+                Top = SystemParameters.VirtualScreenTop + (SystemParameters.PrimaryScreenHeight * 0.66);
+            }
         }
 
         internal void HideBar()
@@ -586,9 +607,10 @@ namespace HuymaierConsole.NativeApp
         {
             DisposeTaskPreviews();
             itemPanel.Children.Clear(); itemCards.Clear();
-            itemPanel.Orientation = page == PageSwitcher ? Orientation.Horizontal : Orientation.Vertical;
-            scroller.HorizontalScrollBarVisibility = page == PageSwitcher ? ScrollBarVisibility.Hidden : ScrollBarVisibility.Disabled;
-            scroller.VerticalScrollBarVisibility = page == PageSwitcher ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Hidden;
+            bool horizontalRail = page == PageHome || page == PageSwitcher;
+            itemPanel.Orientation = horizontalRail ? Orientation.Horizontal : Orientation.Vertical;
+            scroller.HorizontalScrollBarVisibility = horizontalRail ? ScrollBarVisibility.Hidden : ScrollBarVisibility.Disabled;
+            scroller.VerticalScrollBarVisibility = horizontalRail ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Hidden;
             contextText.Text = GetTargetTitle(); RefreshTabs(); statusText.Text = lastStatus ?? String.Empty;
             if (page == PageHome) BuildHome();
             else if (page == PageSwitcher) BuildSwitcher();
@@ -682,20 +704,28 @@ namespace HuymaierConsole.NativeApp
 
         private void AddStandardItem(string title, string detail, bool selectable)
         {
-            Border border = new Border(); border.Height = 78; border.Margin = new Thickness(0, 0, 0, 9); border.Padding = new Thickness(18, 10, 18, 10); border.CornerRadius = new CornerRadius(13); border.BorderThickness = new Thickness(1); border.Tag = selectable;
+            bool compactRail = page == PageHome;
+            Border border = new Border();
+            border.Height = compactRail ? 86 : 56;
+            border.Width = compactRail ? 158 : Double.NaN;
+            border.Margin = compactRail ? new Thickness(0, 0, 9, 0) : new Thickness(0, 0, 0, 6);
+            border.Padding = compactRail ? new Thickness(12, 9, 12, 8) : new Thickness(14, 7, 14, 7);
+            border.CornerRadius = new CornerRadius(11); border.BorderThickness = new Thickness(1); border.Tag = selectable;
             StackPanel stack = new StackPanel();
-            TextBlock titleText = new TextBlock(); titleText.Text = title; titleText.FontSize = 19; titleText.FontWeight = FontWeights.SemiBold;
-            TextBlock detailText = new TextBlock(); detailText.Text = detail; detailText.FontSize = 12; detailText.Foreground = new SolidColorBrush(Color.FromRgb(153, 168, 190)); detailText.Margin = new Thickness(0, 5, 0, 0); detailText.TextTrimming = TextTrimming.CharacterEllipsis;
+            TextBlock titleText = new TextBlock(); titleText.Text = title; titleText.FontSize = compactRail ? 14 : 15; titleText.FontWeight = FontWeights.SemiBold; titleText.TextWrapping = TextWrapping.Wrap;
+            TextBlock detailText = new TextBlock(); detailText.Text = detail; detailText.FontSize = compactRail ? 9 : 10; detailText.Foreground = new SolidColorBrush(Color.FromRgb(153, 168, 190)); detailText.Margin = new Thickness(0, 3, 0, 0); detailText.TextTrimming = TextTrimming.CharacterEllipsis; detailText.MaxHeight = compactRail ? 28 : 20;
             stack.Children.Add(titleText); stack.Children.Add(detailText); border.Child = stack; itemPanel.Children.Add(border); itemCards.Add(border);
         }
 
         private void AddTaskItem(SystemWindowEntry entry)
         {
-            Border border = new Border(); border.Width = 330; border.Height = 300; border.Margin = new Thickness(0, 0, 14, 0); border.Padding = new Thickness(12); border.CornerRadius = new CornerRadius(14); border.BorderThickness = new Thickness(1); border.Tag = true;
-            Grid grid = new Grid(); grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(190) }); grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            Border previewTarget = new Border(); previewTarget.Background = new SolidColorBrush(Color.FromRgb(3, 6, 10)); previewTarget.CornerRadius = new CornerRadius(9); previewTarget.ClipToBounds = true; Grid.SetRow(previewTarget, 0); grid.Children.Add(previewTarget);
-            TextBlock title = new TextBlock(); title.Text = entry.Title; title.FontSize = 17; title.FontWeight = FontWeights.SemiBold; title.Margin = new Thickness(3, 10, 3, 0); title.TextTrimming = TextTrimming.CharacterEllipsis; Grid.SetRow(title, 1); grid.Children.Add(title);
-            TextBlock process = new TextBlock(); process.Text = String.IsNullOrWhiteSpace(entry.ProcessName) ? "Desktop app" : entry.ProcessName; process.FontSize = 11; process.Foreground = new SolidColorBrush(Color.FromRgb(153, 168, 190)); process.Margin = new Thickness(3, 5, 3, 0); Grid.SetRow(process, 2); grid.Children.Add(process);
+            // Preview cards must stay fully inside the compact bar; the horizontal
+            // ScrollViewer handles additional tasks instead of letting cards overflow.
+            Border border = new Border(); border.Width = 214; border.Height = 112; border.Margin = new Thickness(0, 0, 9, 0); border.Padding = new Thickness(7); border.CornerRadius = new CornerRadius(11); border.BorderThickness = new Thickness(1); border.Tag = true;
+            Grid grid = new Grid(); grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(66) }); grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(21) }); grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(14) });
+            Border previewTarget = new Border(); previewTarget.Background = new SolidColorBrush(Color.FromRgb(3, 6, 10)); previewTarget.CornerRadius = new CornerRadius(7); previewTarget.ClipToBounds = true; Grid.SetRow(previewTarget, 0); grid.Children.Add(previewTarget);
+            TextBlock title = new TextBlock(); title.Text = entry.Title; title.FontSize = 11; title.FontWeight = FontWeights.SemiBold; title.Margin = new Thickness(2, 3, 2, 0); title.TextTrimming = TextTrimming.CharacterEllipsis; Grid.SetRow(title, 1); grid.Children.Add(title);
+            TextBlock process = new TextBlock(); process.Text = String.IsNullOrWhiteSpace(entry.ProcessName) ? "Desktop app" : entry.ProcessName; process.FontSize = 9; process.Foreground = new SolidColorBrush(Color.FromRgb(153, 168, 190)); process.Margin = new Thickness(2, 1, 2, 0); process.TextTrimming = TextTrimming.CharacterEllipsis; Grid.SetRow(process, 2); grid.Children.Add(process);
             border.Child = grid; itemPanel.Children.Add(border); itemCards.Add(border); taskPreviewTargets.Add(previewTarget);
         }
 

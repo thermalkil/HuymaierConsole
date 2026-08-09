@@ -1,6 +1,7 @@
 {
-  "batch": "polish-1",
-  "script": "apply_polish.py",
+  "batch": "compact-gamebar-popup-1",
+  "script": "apply_compact_gamebar_popup_v3.py",
+  "patch_dir": "",
   "result": "success",
-  "recordedAtUtc": "2026-08-09T13:17:59.231907+00:00"
+  "recordedAtUtc": "2026-08-09T13:31:34.715380+00:00"
 }

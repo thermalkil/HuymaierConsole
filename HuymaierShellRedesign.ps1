@@ -18,6 +18,7 @@ $script:HcChoiceButtons=@()
 $script:HcChoiceOptions=@()
 $script:HcChoiceSelected=0
 $script:HcChoiceSetting=''
+$script:HcChoicePreviousFocus=$null
 $script:HcDownloadHistoryPath=Join-Path $script:DataDir 'download-history.json'
 $script:HcDownloadHistory=@()
 $script:HcDownloadObserved=@{}
@@ -517,7 +518,7 @@ function Update-HcChoicePopupVisuals {
 }
 function Close-HcChoicePopup {
     if($null -ne $script:HcChoiceOverlay){try{$script:RootGrid.Children.Remove($script:HcChoiceOverlay)|Out-Null}catch{}}
-    $script:HcChoiceOverlay=$null;$script:HcChoiceButtons=@();$script:HcChoiceOptions=@();$script:HcChoiceSelected=0;$script:HcChoiceSetting='';Set-HcShellBlur $false;Update-Footer
+    $script:HcChoiceOverlay=$null;$script:HcChoiceButtons=@();$script:HcChoiceOptions=@();$script:HcChoiceSelected=0;$script:HcChoiceSetting='';Set-HcShellBlur $false;Update-Footer;try{if($null -ne $script:HcChoicePreviousFocus){[System.Windows.Input.Keyboard]::Focus($script:HcChoicePreviousFocus)|Out-Null}}catch{};$script:HcChoicePreviousFocus=$null
 }
 function Invoke-HcChoicePopupSelected {
     if($script:HcChoiceSelected -lt 0 -or $script:HcChoiceSelected -ge @($script:HcChoiceOptions).Count){return}
@@ -539,13 +540,17 @@ function Show-HcChoicePopup {param([string]$Title,[object[]]$Options,[string]$Cu
         if($null -eq $script:RootGrid){throw 'The root overlay grid is not initialized.'}
         if(Test-HcChoicePopupVisible){Close-HcChoicePopup}
         $script:HcChoiceOptions=Convert-ToStableArray $Options;$script:HcChoiceSetting=$Setting;$idx=[array]::IndexOf($script:HcChoiceOptions,$Current);$script:HcChoiceSelected=$(if($idx -ge 0){$idx}else{0})
-        $overlay=New-Object System.Windows.Controls.Grid;$overlay.Background='#96000000';$overlay.IsHitTestVisible=$true;$overlay.Focusable=$true;[System.Windows.Controls.Panel]::SetZIndex($overlay,9000)
+        $script:HcChoicePreviousFocus=[System.Windows.Input.Keyboard]::FocusedElement;$overlay=New-Object System.Windows.Controls.Grid;$overlay.Background='#96000000';$overlay.IsHitTestVisible=$true;$overlay.Focusable=$true;[System.Windows.Input.KeyboardNavigation]::SetDirectionalNavigation($overlay,[System.Windows.Input.KeyboardNavigationMode]::None);[System.Windows.Input.KeyboardNavigation]::SetTabNavigation($overlay,[System.Windows.Input.KeyboardNavigationMode]::None);[System.Windows.Controls.Panel]::SetZIndex($overlay,9000)
         $card=New-Object System.Windows.Controls.Border;$card.Width=560;$card.Padding='28';$card.Background='#F20B111B';$card.BorderBrush='#596A83';$card.BorderThickness='1.5';$card.CornerRadius=20;$card.HorizontalAlignment='Center';$card.VerticalAlignment='Center';$card.IsHitTestVisible=$true
         $stack=New-Object System.Windows.Controls.StackPanel;$titleBlock=New-Object System.Windows.Controls.TextBlock;$titleBlock.Text=$Title;$titleBlock.FontSize=27;$titleBlock.FontWeight='Bold';$titleBlock.Foreground='White';$titleBlock.Margin='0,0,0,18';$stack.Children.Add($titleBlock)|Out-Null
-        $script:HcChoiceButtons=@();for($i=0;$i -lt $script:HcChoiceOptions.Count;$i++){$b=New-Object System.Windows.Controls.Button;$b.Tag=$i;$b.Content=[string]$script:HcChoiceOptions[$i];$b.Height=58;$b.Margin='0,0,0,8';$b.Padding='18,8';$b.HorizontalContentAlignment='Left';$b.FontSize=18;$b.Cursor='Hand';$b.Add_Click({param($sender,$e)$script:HcChoiceSelected=[int]$sender.Tag;Invoke-HcChoicePopupSelected});$stack.Children.Add($b)|Out-Null;$script:HcChoiceButtons+=$b}
+        $script:HcChoiceButtons=@();for($i=0;$i -lt $script:HcChoiceOptions.Count;$i++){$b=New-Object System.Windows.Controls.Button;$b.Tag=$i;$b.Content=[string]$script:HcChoiceOptions[$i];$b.Height=58;$b.Margin='0,0,0,8';$b.Padding='18,8';$b.HorizontalContentAlignment='Left';$b.FontSize=18;$b.Cursor='Hand';$b.Focusable=$false;$b.IsTabStop=$false;$b.Add_Click({param($sender,$e)$script:HcChoiceSelected=[int]$sender.Tag;Invoke-HcChoicePopupSelected});$stack.Children.Add($b)|Out-Null;$script:HcChoiceButtons+=$b}
         $hint=New-Object System.Windows.Controls.TextBlock;$hint.Text='D-pad  Select     A / Enter  Apply     B / Back  Cancel';$hint.FontSize=12;$hint.Foreground='#94A5BC';$hint.Margin='0,10,0,0';$stack.Children.Add($hint)|Out-Null;$card.Child=$stack;$overlay.Children.Add($card)|Out-Null
         $script:RootGrid.Children.Add($overlay)|Out-Null;$script:HcChoiceOverlay=$overlay;Set-HcShellBlur $true;Update-HcChoicePopupVisuals;Update-Footer
-        try{$overlay.Focus()|Out-Null}catch{}
+        # Clear the activation edge that opened the popup, then make the popup the
+        # explicit focus scope. This prevents the underlying Settings page from
+        # consuming D-pad/A/B while the chooser is visible.
+        $script:LastGamepadMask=0;$script:LastDirection='';$script:NextDirectionAt=[datetime]::MinValue
+        try{$script:ControllerInputGuardUntil=[datetime]::MinValue;$script:Window.Activate()|Out-Null;$overlay.Focus()|Out-Null;[System.Windows.Input.Keyboard]::Focus($overlay)|Out-Null}catch{}
         Write-Log "Opened centered choice popup: $Title ($($script:HcChoiceOptions -join ', '))."
     }catch{
         $script:HcChoiceOverlay=$null
