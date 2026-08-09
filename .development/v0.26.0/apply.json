@@ -1,5 +1,5 @@
 {
   "batch": "compact-gamebar-popup-1",
-  "script": "apply_compact_gamebar_popup.py",
-  "attempt": 2
+  "script": "apply_compact_gamebar_popup_v2.py",
+  "attempt": 3
 }
