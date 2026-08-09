@@ -1,6 +1,6 @@
 {
-  "candidate": "v0.26.0-test-2",
+  "candidate": "v0.26.0-test-3",
   "base_release": "v0.25.8",
-  "requested_at": "2026-08-09T13:08:00Z",
-  "focus": "GameInput Guide bridge, popup chooser, prompt cleanup, external Game Bar"
+  "requested_at": "2026-08-09T13:18:21Z",
+  "focus": "full GameInput/Huymaier Game Bar validation after CI dependency and workflow-permission fixes"
 }
