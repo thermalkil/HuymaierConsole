@@ -1,6 +1,6 @@
 {
-  "candidate": "v0.26.0-test-7",
+  "candidate": "v0.26.0-test-8",
   "base_release": "v0.25.8",
-  "requested_at": "2026-08-09T13:57:15Z",
-  "focus": "popup visual selection marker plus correct horizontal Left/Right navigation on Game Bar Home and Switch Apps; retain test5 DPI/scale/modal input and fullscreen-state fixes"
+  "requested_at": "2026-08-09T14:11:00Z",
+  "focus": "fix popup D-pad regression caused by invalid Invoke-UiFeedback Move token; use validated Navigate feedback and isolate feedback/visual failures while retaining test7 Game Bar horizontal navigation and prior DPI/scale/fullscreen fixes"
 }
