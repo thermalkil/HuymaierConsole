@@ -1,10 +1,11 @@
 {
   "publish": false,
-  "version": "0.25.6",
-  "tag": "v0.25.6",
-  "title": "Huymaier Console v0.25.6",
-  "asset_name": "HC256.zip",
-  "package_root": "HC256",
-  "notes_file": "RELEASE_NOTES-v0.25.6.txt",
+  "version": "0.25.7",
+  "tag": "v0.25.7",
+  "title": "Huymaier Console v0.25.7",
+  "asset_name": "HC257.zip",
+  "package_root": "HC257",
+  "notes_file": ".release/notes/v0.25.7.md",
+  "patch_dir": ".release/patches/v0.25.7",
   "delete_paths": []
 }
