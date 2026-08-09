@@ -1,20 +1,26 @@
 # GitHub release packaging
 
-Huymaier Console's native updater reads the latest GitHub Release from `thermalkil/HuymaierConsole`.
+Huymaier Console's native updater reads the latest public GitHub Release from `thermalkil/HuymaierConsole`.
 
-Each installable release should contain:
+Each installable release contains:
 
-1. One complete Huymaier Console ZIP package, for example `HC254.zip`.
-2. A SHA-256 companion asset named either `HC254.zip.sha256`, `HC254.sha256`, or `SHA256SUMS.txt`.
+1. One complete Huymaier Console ZIP package, for example `HC256.zip`.
+2. A matching SHA-256 companion asset such as `HC256.zip.sha256`.
 
-The updater refuses to install a package if it cannot verify the ZIP against a companion SHA-256 asset.
+The native updater refuses to install a package if it cannot verify the downloaded ZIP against its companion SHA-256 asset.
 
-For a private repository the PC must provide authenticated GitHub API access using one of:
+Because the repository is public, normal update checks and downloads work anonymously; end-user PCs do not require `GH_TOKEN`, `GITHUB_TOKEN`, or GitHub CLI authentication.
 
-- `HUYMAIER_GITHUB_TOKEN`
-- `GITHUB_TOKEN`
-- `gh auth login` / GitHub CLI authentication
+## Automated publishing
 
-If the repository becomes public, release checks and downloads work without a token.
+`.github/workflows/publish-release.yml` publishes releases from `.release/release.json`.
 
-Large runtime media and firmware-derived/proprietary presentation assets should stay out of normal Git history and be included only in the release package when redistribution is permitted.
+For large packaged builds, the workflow can download the previous complete Release ZIP, apply a verified patch set from `.release/patches/<version>/`, regenerate the package's internal checksum manifests, create the new ZIP and external SHA-256 asset, and publish both under the requested tag.
+
+The workflow writes `.release/status.json` after each publication attempt so release success/failure can be checked through normal repository access.
+
+## Source synchronization
+
+`.github/workflows/sync-source-from-release.yml` can extract a published release and synchronize releasable text/source/configuration files back into `main`. Large runtime audio/video/image assets remain outside ordinary Git history.
+
+Large runtime media and firmware-derived/proprietary presentation assets must only be redistributed when appropriate.
