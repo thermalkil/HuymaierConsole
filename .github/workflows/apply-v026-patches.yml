@@ -1,0 +1,97 @@
+name: Apply v0.26.0 Feature Patches
+
+on:
+  push:
+    branches:
+      - feature/v0.26.0-native-gamebar
+    paths:
+      - '.development/v0.26.0/apply.json'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v026-feature-patches
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read patch batch
+        id: batch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          data=json.load(open('.development/v0.26.0/apply.json',encoding='utf-8'))
+          batch=str(data.get('batch','')).strip()
+          patch_dir=str(data.get('patch_dir','')).strip()
+          if not batch or not patch_dir:
+              raise SystemExit('apply.json requires batch and patch_dir')
+          with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as f:
+              f.write('batch='+batch+'\n')
+              f.write('patch_dir='+patch_dir+'\n')
+          PY
+
+      - name: Apply source patches
+        env:
+          BATCH: ${{ steps.batch.outputs.batch }}
+          PATCH_DIR: ${{ steps.batch.outputs.patch_dir }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f .development/v0.26.0/status.json ]; then
+            LAST="$(python3 -c "import json;print(json.load(open('.development/v0.26.0/status.json')).get('batch',''))")"
+            if [ "$LAST" = "$BATCH" ]; then
+              echo "Batch $BATCH was already applied."
+              exit 0
+            fi
+          fi
+          shopt -s nullglob
+          patches=("$PATCH_DIR"/*.patch)
+          if [ "${#patches[@]}" -eq 0 ]; then
+            echo "No patch files found in $PATCH_DIR"
+            exit 1
+          fi
+          for patch in "${patches[@]}"; do
+            echo "Checking $(basename "$patch")"
+            git apply --check --whitespace=nowarn "$patch"
+          done
+          for patch in "${patches[@]}"; do
+            echo "Applying $(basename "$patch")"
+            git apply --whitespace=nowarn "$patch"
+          done
+          python3 - <<'PY'
+          import json, os, datetime
+          state={
+            'batch':os.environ['BATCH'],
+            'result':'success',
+            'commitBefore':os.environ.get('GITHUB_SHA',''),
+            'recordedAtUtc':datetime.datetime.now(datetime.timezone.utc).isoformat()
+          }
+          os.makedirs('.development/v0.26.0',exist_ok=True)
+          open('.development/v0.26.0/status.json','w',encoding='utf-8').write(json.dumps(state,indent=2)+'\n')
+          PY
+
+      - name: Commit applied source
+        env:
+          BATCH: ${{ steps.batch.outputs.batch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'No source changes to commit.'
+            exit 0
+          fi
+          git commit -m "Apply v0.26.0 feature patch batch $BATCH"
+          git push
