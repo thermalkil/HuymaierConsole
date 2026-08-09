@@ -814,10 +814,20 @@ namespace HuymaierConsole.NativeApp
             }
             if (command == "LeftShoulder") { ChangePage(-1); return; }
             if (command == "RightShoulder") { ChangePage(1); return; }
-            if (command == "Left") { if (page == PageAudio && selected == 0) { AdjustVolume(-5); return; } if (page == PageSwitcher) { Move(-1); return; } }
-            if (command == "Right") { if (page == PageAudio && selected == 0) { AdjustVolume(5); return; } if (page == PageSwitcher) { Move(1); return; } }
-            if (command == "Up") { if (page != PageSwitcher) Move(-1); return; }
-            if (command == "Down") { if (page != PageSwitcher) Move(1); return; }
+            bool horizontalRail = page == PageHome || page == PageSwitcher;
+            if (command == "Left")
+            {
+                if (page == PageAudio && selected == 0) { AdjustVolume(-5); return; }
+                if (horizontalRail) { Move(-1); return; }
+            }
+            if (command == "Right")
+            {
+                if (page == PageAudio && selected == 0) { AdjustVolume(5); return; }
+                if (horizontalRail) { Move(1); return; }
+            }
+            // Home and Switch Apps are horizontal rails. Vertical pages keep Up/Down.
+            if (command == "Up") { if (!horizontalRail) Move(-1); return; }
+            if (command == "Down") { if (!horizontalRail) Move(1); return; }
             if (command == "Secondary") { if (page == PageSwitcher) RequestCloseSelectedTask(); return; }
             if (command == "Confirm") { InvokeSelected(); return; }
         }
