@@ -203,7 +203,7 @@ namespace HuymaierConsole.NativeApp
 
     public sealed class NativeBridge
     {
-        public string Version { get { return "0.25.6"; } }
+        public string Version { get { return "0.26.0"; } }
 
         public bool ConsumeQuickAccessRequest() { return NativeQuickAccessRequest.Consume(); }
 
