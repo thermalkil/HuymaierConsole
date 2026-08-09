@@ -1,0 +1,107 @@
+name: Validate v0.26.0 Windows Overlay
+
+on:
+  push:
+    branches:
+      - feature/v0.26.0-native-gamebar
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'Huymaier*.ps1'
+      - 'Install-HuymaierConsole.ps1'
+      - 'Native/**'
+      - '.github/workflows/validate-v026-windows.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - name: Check out feature source
+        uses: actions/checkout@v4
+
+      - name: Parse Windows PowerShell source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $failures=New-Object System.Collections.Generic.List[string]
+          foreach($file in @(Get-ChildItem -LiteralPath . -Filter '*.ps1' -File -Recurse)){
+            $tokens=$null;$errors=$null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($file.FullName,[ref]$tokens,[ref]$errors)
+            foreach($error in @($errors)){
+              [void]$failures.Add(('{0}:{1}:{2} {3}' -f $file.FullName,$error.Extent.StartLineNumber,$error.Extent.StartColumnNumber,$error.Message))
+            }
+          }
+          if($failures.Count -gt 0){throw ($failures -join "`r`n")}
+          Write-Host 'PowerShell parser validation passed.'
+
+      - name: Acquire official Microsoft GameInput SDK
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $version='3.5.262'
+          $package=Join-Path $env:RUNNER_TEMP 'Microsoft.GameInput.nupkg'
+          $archive=Join-Path $env:RUNNER_TEMP 'Microsoft.GameInput.zip'
+          $expanded=Join-Path $env:RUNNER_TEMP 'Microsoft.GameInput'
+          Invoke-WebRequest -UseBasicParsing -Uri "https://api.nuget.org/v3-flatcontainer/microsoft.gameinput/$version/microsoft.gameinput.$version.nupkg" -OutFile $package
+          Copy-Item $package $archive -Force
+          Expand-Archive -LiteralPath $archive -DestinationPath $expanded -Force
+          $header=Get-ChildItem -LiteralPath $expanded -Recurse -Filter 'GameInput.h' -File|Select-Object -First 1
+          $library=Get-ChildItem -LiteralPath $expanded -Recurse -Filter 'gameinput.lib' -File|Where-Object{$_.FullName -match '(?i)x64|amd64'}|Select-Object -First 1
+          $redist=Get-ChildItem -LiteralPath $expanded -Recurse -Filter 'GameInputRedist.msi' -File|Select-Object -First 1
+          if($null -eq $header -or $null -eq $library -or $null -eq $redist){throw 'The official Microsoft.GameInput package did not contain the expected header, x64 library, and redistributable.'}
+          "GAMEINPUT_INCLUDE=$($header.Directory.FullName)"|Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "GAMEINPUT_LIBDIR=$($library.Directory.FullName)"|Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "GAMEINPUT_REDIST=$($redist.FullName)"|Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          New-Item -ItemType Directory -Force -Path (Join-Path $env:RUNNER_TEMP 'hc-native')|Out-Null
+
+      - name: Compile native GameInput Guide bridge
+        shell: cmd
+        run: |
+          @echo off
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set VSINSTALL=%%i
+          if not defined VSINSTALL exit /b 2
+          call "%VSINSTALL%\VC\Auxiliary\Build\vcvars64.bat"
+          if errorlevel 1 exit /b %errorlevel%
+          cl /nologo /std:c++17 /EHsc /LD /I"%GAMEINPUT_INCLUDE%" Native\HuymaierGameInputBridge.cpp /link /LIBPATH:"%GAMEINPUT_LIBDIR%" gameinput.lib /OUT:"%RUNNER_TEMP%\hc-native\HuymaierGameInputBridge.dll"
+          if errorlevel 1 exit /b %errorlevel%
+
+      - name: Compile managed Game Bar sources
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Windows.Forms,System.Drawing
+          $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          if(-not(Test-Path -LiteralPath $csc)){throw 'Framework64 csc.exe was not found.'}
+          $refs=@(
+            [System.Uri].Assembly.Location,
+            [System.Linq.Enumerable].Assembly.Location,
+            [System.Xaml.XamlReader].Assembly.Location,
+            [System.Windows.DependencyObject].Assembly.Location,
+            [System.Windows.Media.Visual].Assembly.Location,
+            [System.Windows.Window].Assembly.Location,
+            [System.Windows.Forms.Form].Assembly.Location,
+            [System.Drawing.Bitmap].Assembly.Location
+          )|Select-Object -Unique
+          $args=@('/noconfig','/nologo','/target:library',('/out:'+(Join-Path $env:RUNNER_TEMP 'hc-native\HuymaierOverlayValidation.dll')))
+          foreach($ref in $refs){$args+=('/reference:'+$ref)}
+          $args+=@('Native\HuymaierGameBar.cs','Native\HuymaierConsole.GameInput.cs')
+          & $csc @args
+          if($LASTEXITCODE -ne 0){throw "Managed overlay compiler exited with $LASTEXITCODE."}
+
+      - name: Stage GameInput runtime payload artifact
+        shell: powershell
+        run: |
+          Copy-Item -LiteralPath $env:GAMEINPUT_REDIST -Destination (Join-Path $env:RUNNER_TEMP 'hc-native\GameInputRedist.msi') -Force
+
+      - name: Upload native validation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: v026-gameinput-native
+          path: |
+            ${{ runner.temp }}\hc-native\HuymaierGameInputBridge.dll
+            ${{ runner.temp }}\hc-native\GameInputRedist.msi
+          if-no-files-found: error
