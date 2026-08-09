@@ -1,0 +1,66 @@
+name: Validate v0.26.0 Guide Bridge
+
+on:
+  push:
+    branches:
+      - feature/v0.26.0-native-gamebar
+    paths:
+      - 'Native/GuideBridge/**'
+      - 'HuymaierGuideInput.cs'
+      - '.github/workflows/validate-v026-guide-bridge.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-guide-bridge:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Configure MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Restore Microsoft GameInput
+        shell: pwsh
+        run: |
+          nuget install Microsoft.GameInput -Version 3.5.262 -OutputDirectory packages -NonInteractive
+
+      - name: Build native Guide bridge
+        shell: pwsh
+        run: |
+          $header = Get-ChildItem -Path packages -Filter GameInput.h -File -Recurse | Select-Object -First 1
+          if (-not $header) { throw 'GameInput.h was not found in Microsoft.GameInput.' }
+          $libs = @(Get-ChildItem -Path packages -Filter gameinput.lib -File -Recurse)
+          $lib = $libs | Where-Object { $_.FullName -match '(?i)(x64|amd64)' } | Select-Object -First 1
+          if (-not $lib) { $lib = $libs | Select-Object -First 1 }
+          if (-not $lib) { throw 'gameinput.lib was not found in Microsoft.GameInput.' }
+          Write-Host "Header: $($header.FullName)"
+          Write-Host "Library: $($lib.FullName)"
+          New-Item -ItemType Directory -Force -Path build | Out-Null
+          cl /nologo /std:c++17 /O2 /EHsc /LD /DUNICODE /D_UNICODE `
+             /I"$($header.Directory.FullName)" `
+             Native\GuideBridge\HuymaierGuideBridge.cpp `
+             /link /OUT:build\HuymaierGuideBridge.dll /LIBPATH:"$($lib.Directory.FullName)" gameinput.lib
+          if ($LASTEXITCODE -ne 0) { throw "cl.exe failed with exit code $LASTEXITCODE" }
+          if (-not (Test-Path build\HuymaierGuideBridge.dll)) { throw 'Guide bridge DLL was not produced.' }
+
+      - name: Verify exports
+        shell: pwsh
+        run: |
+          $exports = (& dumpbin /nologo /exports build\HuymaierGuideBridge.dll) -join "`n"
+          foreach ($name in @('HCGuideInitialize','HCGuideConsumePresses','HCGuideIsAvailable','HCGuideShutdown')) {
+            if ($exports -notmatch [regex]::Escape($name)) { throw "Missing export: $name" }
+          }
+          Write-Host $exports
+
+      - name: Upload Guide bridge
+        uses: actions/upload-artifact@v4
+        with:
+          name: HuymaierGuideBridge-x64
+          path: build/HuymaierGuideBridge.dll
+          if-no-files-found: error
