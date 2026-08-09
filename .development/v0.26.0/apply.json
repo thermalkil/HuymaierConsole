@@ -1,5 +1,5 @@
 {
-  "batch": "build-status-1",
-  "script": "apply_build_status.py",
+  "batch": "polish-1",
+  "script": "apply_polish.py",
   "attempt": 1
 }
