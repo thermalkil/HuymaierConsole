@@ -9,7 +9,7 @@ on:
       - '.github/workflows/build-v026-test.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: v026-test-package
@@ -21,6 +21,9 @@ jobs:
     steps:
       - name: Check out v0.26.0 source
         uses: actions/checkout@v4
+        with:
+          ref: feature/v0.26.0-native-gamebar
+          fetch-depth: 0
 
       - name: Stage full package from stable v0.25.8 release
         shell: powershell
@@ -41,9 +44,6 @@ jobs:
           $roots=@(Get-ChildItem -LiteralPath $extractDir -Directory)
           $baseRoot=if($roots.Count -eq 1){$roots[0].FullName}else{$extractDir}
           Copy-Item (Join-Path $baseRoot '*') $stageRoot -Recurse -Force
-
-          # Overlay tracked product source/configuration but keep development,
-          # GitHub plumbing, and release-control files out of the runtime ZIP.
           foreach($relative in @(& git ls-files)){
             if([string]::IsNullOrWhiteSpace($relative)){continue}
             if($relative -match '^(\.github/|\.development/|\.release/|\.source/|\.gitignore$|README\.md$|RELEASING\.md$|GITHUB-RELEASES\.md$)'){continue}
@@ -195,3 +195,23 @@ jobs:
             ${{ env.HC260_OUTPUT }}\HC260-test.zip
             ${{ env.HC260_OUTPUT }}\HC260-test.zip.sha256
           if-no-files-found: error
+
+      - name: Record test-package build status
+        if: always()
+        shell: powershell
+        env:
+          BUILD_RESULT: ${{ job.status }}
+        run: |
+          $ErrorActionPreference='Stop'
+          $statusPath='.development\v0.26.0\build-status.json'
+          $status=[ordered]@{
+            candidate='v0.26.0-test'
+            result=$env:BUILD_RESULT
+            commit=$env:GITHUB_SHA
+            recordedAtUtc=[DateTime]::UtcNow.ToString('o')
+          }
+          $status|ConvertTo-Json|Set-Content -LiteralPath $statusPath -Encoding UTF8
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add $statusPath
+          if(-not (git diff --cached --quiet)){git commit -m "Record v0.26.0 test package build status";git push origin HEAD:feature/v0.26.0-native-gamebar}
