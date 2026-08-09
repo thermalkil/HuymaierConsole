@@ -1,0 +1,54 @@
+diff --git a/a/HuymaierConsoleUpdateWorker.ps1 b/b/HuymaierConsoleUpdateWorker.ps1
+index f5ce07f..71f9279 100644
+--- a/a/HuymaierConsoleUpdateWorker.ps1
++++ b/b/HuymaierConsoleUpdateWorker.ps1
+@@ -1,7 +1,7 @@
+-﻿param(
++param(
+     [ValidateSet('Scan','Download')][string]$Action='Scan',
+     [Parameter(Mandatory=$true)][string]$StatePath,
+-    [string]$CurrentVersion='0.25.4',
++    [string]$CurrentVersion='0.25.6',
+     [string]$Repository='thermalkil/HuymaierConsole'
+ )
+ Set-StrictMode -Version 2.0
+@@ -98,7 +98,7 @@ try{
+     Add-Type -AssemblyName System.Net.Http
+     $handler=[System.Net.Http.HttpClientHandler]::new();$handler.AllowAutoRedirect=$true
+     $client=[System.Net.Http.HttpClient]::new($handler)
+-    $client.DefaultRequestHeaders.UserAgent.ParseAdd('HuymaierConsole/0.25.4')
++    $client.DefaultRequestHeaders.UserAgent.ParseAdd('HuymaierConsole/0.25.6')
+     if($token){$client.DefaultRequestHeaders.Authorization=[System.Net.Http.Headers.AuthenticationHeaderValue]::new('Bearer',$token)}
+     $downloadUri=if($token -and [string]$asset.url){[string]$asset.url}else{[string]$asset.browser_download_url}
+     if($token){$client.DefaultRequestHeaders.Accept.Clear();$client.DefaultRequestHeaders.Accept.Add([System.Net.Http.Headers.MediaTypeWithQualityHeaderValue]::new('application/octet-stream'))}
+diff --git a/a/HuymaierEmulatorPlatforms.ps1 b/b/HuymaierEmulatorPlatforms.ps1
+index 3be4e72..2325755 100644
+--- a/a/HuymaierEmulatorPlatforms.ps1
++++ b/b/HuymaierEmulatorPlatforms.ps1
+@@ -1,4 +1,4 @@
+-﻿# Huymaier Console emulator-platform host.
++# Huymaier Console emulator-platform host.
+ # Loaded after the shared game-experience module so emulator platforms can
+ # participate in the existing Platforms rail without replacing storefront code.
+ 
+@@ -120,7 +120,7 @@ function Start-HcEmulatorPlatform {
+             }
+             if($null -eq $nativeBridge -and $null -eq $nativeType){
+                 $script:NativePlatformRetryAfter=[datetime]::UtcNow.AddSeconds(3)
+-                Set-ConsoleNotice "The native $Platform view was not registered in the current Huymaier Console process. Close Huymaier Console and run the v0.25.3 installer once." 'ERROR'
++                Set-ConsoleNotice "The native $Platform view was not registered in the current Huymaier Console process. Close Huymaier Console and run the v0.25.6 installer once." 'ERROR'
+                 Write-Log "Native $Platform bridge/type was not visible to the hosted PowerShell runspace." 'ERROR'
+                 Render-Page
+                 return $true
+diff --git a/a/HuymaierGameProviders.ps1 b/b/HuymaierGameProviders.ps1
+index c09b14e..7836da7 100644
+--- a/a/HuymaierGameProviders.ps1
++++ b/b/HuymaierGameProviders.ps1
+@@ -323,6 +323,7 @@ function Add-ProviderControlRail {
+ 
+ function Add-ProviderGameRail {
+     param([string]$Title,[object[]]$Games,[string]$EmptyText)
++    $Games = Convert-ToStableArray $Games
+     $heading=New-Object System.Windows.Controls.TextBlock;$heading.Text=$Title;$heading.FontSize=25;$heading.FontWeight='SemiBold';$heading.Margin='0,0,0,12';$heading.Foreground='#F5F7FB';$script:ActionPanel.Children.Add($heading)|Out-Null
+     if($Games.Count -eq 0){
+         $empty=New-Object System.Windows.Controls.Border;$empty.Height=96;$empty.CornerRadius=14;$empty.Background='#7A101827';$empty.BorderBrush='#2B3A51';$empty.BorderThickness=1;$empty.Margin='0,0,0,20'
