@@ -28,19 +28,17 @@ jobs:
         run: |
           python3 - <<'PY'
           import json, os
-          p = '.release/release.json'
-          data = json.load(open(p, encoding='utf-8'))
-          required = ['version','tag','title','asset_name','package_root','notes_file']
-          missing = [k for k in required if not data.get(k)]
+          data=json.load(open('.release/release.json',encoding='utf-8'))
+          required=['version','tag','title','asset_name','package_root','notes_file']
+          missing=[k for k in required if not data.get(k)]
           if missing:
-              raise SystemExit('Missing release manifest fields: ' + ', '.join(missing))
-          out = os.environ['GITHUB_OUTPUT']
-          with open(out,'a',encoding='utf-8') as f:
+              raise SystemExit('Missing release manifest fields: '+', '.join(missing))
+          with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as f:
               for k in required:
-                  f.write(f"{k}={data[k]}\n")
-              f.write(f"publish={str(bool(data.get('publish', False))).lower()}\n")
+                  f.write(f'{k}={data[k]}\n')
+              f.write(f"publish={str(bool(data.get('publish',False))).lower()}\n")
               f.write(f"patch_dir={data.get('patch_dir','')}\n")
-          open('/tmp/delete-paths.txt','w',encoding='utf-8').write('\n'.join(data.get('delete_paths', [])))
+          open('/tmp/delete-paths.txt','w',encoding='utf-8').write('\n'.join(data.get('delete_paths',[])))
           PY
 
       - name: Stop when manifest is staged only
@@ -58,9 +56,7 @@ jobs:
         run: |
           set -euo pipefail
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $TAG already exists; validating its required assets."
             mapfile -t assets < <(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
-            printf '%s\n' "${assets[@]}"
             printf '%s\n' "${assets[@]}" | grep -Fxq "$ASSET_NAME"
             printf '%s\n' "${assets[@]}" | grep -Fxq "$ASSET_NAME.sha256"
             echo 'exists=true' >> "$GITHUB_OUTPUT"
@@ -74,6 +70,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p /tmp/hc-base
           gh release download --repo "$GITHUB_REPOSITORY" --pattern '*.zip' --dir /tmp/hc-base
           BASE_ZIP="$(find /tmp/hc-base -maxdepth 1 -type f -iname '*.zip' -printf '%s %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)"
@@ -81,7 +78,6 @@ jobs:
             echo 'No installable ZIP asset was found on the previous GitHub Release.'
             exit 1
           fi
-          echo "Using base package: $BASE_ZIP"
           echo "BASE_ZIP=$BASE_ZIP" >> "$GITHUB_ENV"
 
       - name: Stage package and apply verified release delta
@@ -101,11 +97,9 @@ jobs:
           mkdir -p "$DEST"
           cp -a "$BASE_ROOT"/. "$DEST"/
 
-          # Overlay tracked package source/configuration. Repository-only release plumbing
-          # and early standalone updater prototypes are deliberately not packaged.
           while IFS= read -r -d '' f; do
             case "$f" in
-              .github/*|.release/*|.gitignore|README.md|RELEASING.md|GITHUB-RELEASES.md|HuymaierConsoleUpdate.ps1|HuymaierConsoleUpdateWorker.ps1|HuymaierConsoleApplyUpdate.ps1) continue ;;
+              .github/*|.release/*|.source/*|.gitignore|README.md|RELEASING.md|GITHUB-RELEASES.md|HuymaierConsoleUpdate.ps1|HuymaierConsoleUpdateWorker.ps1|HuymaierConsoleApplyUpdate.ps1) continue ;;
             esac
             [ -f "$f" ] || continue
             mkdir -p "$DEST/$(dirname "$f")"
@@ -119,7 +113,10 @@ jobs:
           if [ -n "$PATCH_DIR" ]; then
             shopt -s nullglob
             patches=("$GITHUB_WORKSPACE/$PATCH_DIR"/*.patch)
-            if [ "${#patches[@]}" -eq 0 ]; then echo "Patch directory contains no .patch files: $PATCH_DIR"; exit 1; fi
+            if [ "${#patches[@]}" -eq 0 ]; then
+              echo "Patch directory contains no .patch files: $PATCH_DIR"
+              exit 1
+            fi
             for patch_file in "${patches[@]}"; do
               echo "Applying $(basename "$patch_file")"
               (cd "$DEST" && git apply -p2 --whitespace=nowarn "$patch_file")
@@ -127,7 +124,34 @@ jobs:
           fi
           echo "PACKAGE_DIR=$DEST" >> "$GITHUB_ENV"
 
-      - name: Verify staged release version
+      - name: Normalize Windows PowerShell 5.1 source encoding
+        if: steps.manifest.outputs.publish == 'true' && steps.existing.outputs.exists != 'true'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          root=os.environ['PACKAGE_DIR']
+          bom=b'\xef\xbb\xbf'
+          count=0
+          for dp,_,names in os.walk(root):
+              for name in names:
+                  if not name.lower().endswith(('.ps1','.psm1','.psd1')):
+                      continue
+                  p=os.path.join(dp,name)
+                  data=open(p,'rb').read()
+                  if data.startswith(bom):
+                      body=data[len(bom):]
+                  else:
+                      body=data
+                  body.decode('utf-8')
+                  open(p,'wb').write(bom+body)
+                  count+=1
+          if count == 0:
+              raise SystemExit('No PowerShell source files were found in the staged package.')
+          print(f'Normalized {count} PowerShell files to UTF-8 with BOM.')
+          PY
+
+      - name: Verify staged release
         if: steps.manifest.outputs.publish == 'true' && steps.existing.outputs.exists != 'true'
         env:
           VERSION: ${{ steps.manifest.outputs.version }}
@@ -135,11 +159,23 @@ jobs:
         run: |
           python3 - <<'PY'
           import json, os
-          root=os.environ['PACKAGE_DIR']; manifest=os.path.join(root,'manifest.json')
-          if not os.path.isfile(manifest): raise SystemExit('Packaged manifest.json is missing.')
-          actual=str(json.load(open(manifest,encoding='utf-8-sig')).get('version','')); expected=os.environ['VERSION']
-          if actual != expected: raise SystemExit(f'Package version mismatch: expected {expected}, found {actual}')
-          print(f'Verified staged package version {actual}.')
+          root=os.environ['PACKAGE_DIR']
+          manifest=os.path.join(root,'manifest.json')
+          if not os.path.isfile(manifest):
+              raise SystemExit('Packaged manifest.json is missing.')
+          actual=str(json.load(open(manifest,encoding='utf-8-sig')).get('version',''))
+          expected=os.environ['VERSION']
+          if actual != expected:
+              raise SystemExit(f'Package version mismatch: expected {expected}, found {actual}')
+          bom=b'\xef\xbb\xbf'
+          ps=[]
+          for dp,_,names in os.walk(root):
+              for name in names:
+                  if name.lower().endswith(('.ps1','.psm1','.psd1')):
+                      p=os.path.join(dp,name); ps.append(p)
+                      if not open(p,'rb').read(3)==bom:
+                          raise SystemExit('PowerShell source is missing UTF-8 BOM: '+os.path.relpath(p,root))
+          print(f'Verified package version {actual} and BOM on {len(ps)} PowerShell files.')
           PY
 
       - name: Regenerate internal checksums
@@ -149,7 +185,7 @@ jobs:
           python3 - <<'PY'
           import hashlib, os
           root=os.environ['PACKAGE_DIR']; excluded={'checksums.sha256','SHA256SUMS.txt'}; rows=[]
-          for dp, _, names in os.walk(root):
+          for dp,_,names in os.walk(root):
               for name in names:
                   rel=os.path.relpath(os.path.join(dp,name),root).replace(os.sep,'/')
                   if rel in excluded: continue
@@ -157,8 +193,10 @@ jobs:
                   with open(p,'rb') as f:
                       for chunk in iter(lambda:f.read(1024*1024),b''): h.update(chunk)
                   rows.append((rel,h.hexdigest()))
-          rows.sort(key=lambda x:x[0].lower()); text=''.join(f'{h}  {rel}\n' for rel,h in rows)
-          for name in excluded: open(os.path.join(root,name),'w',encoding='utf-8',newline='\n').write(text)
+          rows.sort(key=lambda x:x[0].lower())
+          text=''.join(f'{h}  {rel}\n' for rel,h in rows)
+          for name in excluded:
+              open(os.path.join(root,name),'w',encoding='utf-8',newline='\n').write(text)
           print(f'Checksummed {len(rows)} payload files.')
           PY
 
@@ -203,8 +241,10 @@ jobs:
           python3 - <<'PY'
           import json, os, datetime
           state={
-            'tag':os.environ.get('TAG',''), 'version':os.environ.get('VERSION',''),
-            'asset':os.environ.get('ASSET_NAME',''), 'result':os.environ.get('RESULT','unknown'),
+            'tag':os.environ.get('TAG',''),
+            'version':os.environ.get('VERSION',''),
+            'asset':os.environ.get('ASSET_NAME',''),
+            'result':os.environ.get('RESULT','unknown'),
             'alreadyPublished':os.environ.get('EXISTED','')=='true',
             'commit':os.environ.get('GITHUB_SHA',''),
             'recordedAtUtc':datetime.datetime.now(datetime.timezone.utc).isoformat()
