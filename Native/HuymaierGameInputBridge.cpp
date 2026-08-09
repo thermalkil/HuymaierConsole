@@ -3,6 +3,23 @@
 #include <atomic>
 #include <mutex>
 
+// Microsoft.GameInput 3.x exposes the current API through a versioned
+// namespace. Keep this bridge explicit so future SDK upgrades fail at compile
+// time instead of silently binding to the wrong interface layout.
+#ifndef GAMEINPUT_API_VERSION
+#define GAMEINPUT_API_VERSION 0
+#endif
+
+#if GAMEINPUT_API_VERSION == 1
+using namespace GameInput::v1;
+#elif GAMEINPUT_API_VERSION == 2
+using namespace GameInput::v2;
+#elif GAMEINPUT_API_VERSION == 3
+using namespace GameInput::v3;
+#elif GAMEINPUT_API_VERSION != 0
+#error Unsupported GAMEINPUT_API_VERSION. Update HuymaierGameInputBridge.cpp for the new GameInput API.
+#endif
+
 namespace
 {
     std::mutex g_lock;
