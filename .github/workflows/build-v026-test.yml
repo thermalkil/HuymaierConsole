@@ -204,9 +204,19 @@ jobs:
         run: |
           $ErrorActionPreference='Stop'
           $statusPath='.development\v0.26.0\build-status.json'
+          $triggerPath='.development\v0.26.0\build-trigger.json'
+          $candidate='v0.26.0-test'
+          try{
+            if(Test-Path -LiteralPath $triggerPath -PathType Leaf){
+              $trigger=Get-Content -Raw -LiteralPath $triggerPath -Encoding UTF8|ConvertFrom-Json
+              if(-not [string]::IsNullOrWhiteSpace([string]$trigger.candidate)){$candidate=[string]$trigger.candidate}
+            }
+          }catch{}
           $status=[ordered]@{
-            candidate='v0.26.0-test'
+            candidate=$candidate
             result=$env:BUILD_RESULT
+            runId=$env:GITHUB_RUN_ID
+            runAttempt=$env:GITHUB_RUN_ATTEMPT
             commit=$env:GITHUB_SHA
             recordedAtUtc=[DateTime]::UtcNow.ToString('o')
           }
