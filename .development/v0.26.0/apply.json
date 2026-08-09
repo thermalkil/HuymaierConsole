@@ -1,5 +1,5 @@
 {
-  "batch": "installer-lock-hotfix-1",
-  "script": "apply_installer_lock_hotfix.py",
+  "batch": "v0261-version-1",
+  "script": "apply_v0261_version.py",
   "attempt": 1
 }
