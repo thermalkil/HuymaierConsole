@@ -1,0 +1,191 @@
+diff --git a/b/BUILD-VALIDATION-v0.25.5.txt b/b/BUILD-VALIDATION-v0.25.5.txt
+new file mode 100644
+index 0000000..77c9ec2
+--- /dev/null
++++ b/b/BUILD-VALIDATION-v0.25.5.txt
+@@ -0,0 +1,13 @@
++Huymaier Console v0.25.5 build validation
++
++- Fresh-PC Home rail inputs normalized to stable arrays before Count/index operations.
++- Persisted config list fields normalized for zero/one/many item JSON representations.
++- Random Picks installed-entry collection normalized before Count/Get-Random.
++- Provider and game-hub rail list boundaries hardened.
++- Fatal startup diagnostics now include invocation position and script stack when available.
++- JSON and XML payloads parsed successfully in the build environment.
++- Source delimiter/lexical validation completed for packaged PowerShell/C# source.
++- Payload SHA-256 manifests regenerated after modifications.
++- ZIP integrity verified after packaging.
++
++Windows PowerShell 5.1/WPF execution remains a target-PC validation step.
+diff --git a/b/BUILD-VALIDATION-v0.25.6.txt b/b/BUILD-VALIDATION-v0.25.6.txt
+new file mode 100644
+index 0000000..347982f
+--- /dev/null
++++ b/b/BUILD-VALIDATION-v0.25.6.txt
+@@ -0,0 +1,11 @@
++Huymaier Console v0.25.6 build validation
++
++Static validation performed in the build environment:
++- PowerShell and C# delimiter/lexical scan.
++- JSON and AppX XML parsing.
++- Choice-popup state is explicitly initialized before StrictMode reads it.
++- Quick Access location, keyboard theme, prompt override, music theme, and display scale are routed through the centered chooser.
++- Display scale range is constrained to 100%-500%; Windows account DPI values are written under HKCU and sign-out is surfaced when effective/configured scale differs.
++- Release/package checksum manifests regenerated after all changes.
++
++Windows runtime validation still required on a Windows 11 target for WPF/native compilation and live DPI behavior.
+diff --git a/a/BUILD-VALIDATION.txt b/b/BUILD-VALIDATION.txt
+index 88ebf63..347982f 100644
+--- a/a/BUILD-VALIDATION.txt
++++ b/b/BUILD-VALIDATION.txt
+@@ -1,10 +1,11 @@
+-﻿Huymaier Console v0.25.4 build validation
++Huymaier Console v0.25.6 build validation
+ 
+-- Source base: HC253.zip / v0.25.3.
+-- Added HuymaierConsoleUpdateWorker.ps1 and HuymaierSelfUpdater.ps1.
+-- Added dedicated Huymaier Console Update Settings page and state polling.
+-- Installer supports -SilentUpdate for updater handoff and includes the two updater scripts.
+-- GitHub Release updater supports public repositories and private access through GH_TOKEN/GITHUB_TOKEN or GitHub CLI authentication.
+-- Downloaded package is SHA-256 hashed locally before install is offered.
+-- Windows PowerShell/.NET Framework WPF compilation cannot run in this Linux build environment; target Windows installer preflight remains authoritative.
+-- Treat v0.25.4 as an updater test candidate.
++Static validation performed in the build environment:
++- PowerShell and C# delimiter/lexical scan.
++- JSON and AppX XML parsing.
++- Choice-popup state is explicitly initialized before StrictMode reads it.
++- Quick Access location, keyboard theme, prompt override, music theme, and display scale are routed through the centered chooser.
++- Display scale range is constrained to 100%-500%; Windows account DPI values are written under HKCU and sign-out is surfaced when effective/configured scale differs.
++- Release/package checksum manifests regenerated after all changes.
++
++Windows runtime validation still required on a Windows 11 target for WPF/native compilation and live DPI behavior.
+diff --git a/a/Docs/BUILD-VALIDATION.txt b/b/Docs/BUILD-VALIDATION.txt
+index 9355887..347982f 100644
+--- a/a/Docs/BUILD-VALIDATION.txt
++++ b/b/Docs/BUILD-VALIDATION.txt
+@@ -1,17 +1,11 @@
+-﻿Huymaier Console v0.25.3 build validation
++Huymaier Console v0.25.6 build validation
+ 
+-- Source base: HC252.zip / v0.25.2.
+-- Epic Legendary install/update path now uses a live process monitor rather than Start-Process -Wait followed by post-exit output parsing.
+-- Live parser recognizes Legendary's documented/logged:
+-  * Install size: <MiB>
+-  * Download size: <MiB>
+-  * Progress: <percent> ... ETA: HH:MM:SS
+-  * Downloaded: <MiB>
+-  * + Download - <MiB/s> (raw)
+-- provider-state.json exposes DownloadedBytes, TotalBytes, InstallSizeBytes, DownloadSpeedBytesPerSec and EtaSeconds.
+-- Downloads UI renders those values while retaining fallback ETA for providers without live telemetry.
+-- JSON and XML syntax validated in the build environment.
+-- 209 internal SHA-256 payload checks generated and verified (checksum manifest files excluded from self-hashing).
+-- PowerShell/C# delimiter and lexical checks completed in the build environment.
+-- Windows PowerShell/.NET Framework WPF and csc.exe are not available in this Linux build environment, so target-Windows parser preflight/native compilation remains required.
+-- Treat v0.25.3 as a Windows test candidate until exercised on the target system.
++Static validation performed in the build environment:
++- PowerShell and C# delimiter/lexical scan.
++- JSON and AppX XML parsing.
++- Choice-popup state is explicitly initialized before StrictMode reads it.
++- Quick Access location, keyboard theme, prompt override, music theme, and display scale are routed through the centered chooser.
++- Display scale range is constrained to 100%-500%; Windows account DPI values are written under HKCU and sign-out is surfaced when effective/configured scale differs.
++- Release/package checksum manifests regenerated after all changes.
++
++Windows runtime validation still required on a Windows 11 target for WPF/native compilation and live DPI behavior.
+diff --git a/a/Docs/TEST-CHECKLIST.txt b/b/Docs/TEST-CHECKLIST.txt
+index 430ffd6..3532316 100644
+--- a/a/Docs/TEST-CHECKLIST.txt
++++ b/b/Docs/TEST-CHECKLIST.txt
+@@ -1,24 +1,27 @@
+-﻿Huymaier Console v0.25.3 Test Checklist
++Huymaier Console v0.25.6 Test Checklist
+ 
+-EPIC LIVE DOWNLOAD TELEMETRY
+-1. Install v0.25.3 over the current test build.
+-2. Start an Epic title large enough to remain downloading for at least 20 seconds.
+-3. Open Downloads while the install is active.
+-4. Confirm the active card shows:
+-   - game title and Epic provider;
+-   - a progress bar that advances;
+-   - percentage complete;
+-   - downloaded MB/GB compared with total MB/GB;
+-   - live KB/s, MB/s, or GB/s transfer rate;
+-   - an ETA that updates from Legendary's backend.
+-5. Leave Downloads and return. Confirm telemetry resumes without restarting the install.
+-6. Cancel an Epic install and confirm Console remains responsive.
+-7. Resume/reinstall and confirm live telemetry begins again once Legendary starts transferring chunks.
++1. Fresh/empty-profile startup
++- Install on a PC/user with no Huymaier Console history.
++- Confirm Home renders with empty recent rails and no .Count startup failure.
+ 
+-REGRESSION CHECKS
+-8. Confirm Recently Downloaded & Installed still keeps only genuine Install completions, at most 20 and no older than 7 days.
+-9. Confirm Windows Update and Driver Updates still open their dedicated pages.
+-10. Confirm Quick Access Location still opens the centered chooser.
+-11. Confirm PS/Guide opens Quick Access globally.
+-12. Confirm Steam games remain populated and Shelf artwork matches Library.
+-13. Confirm PS3 user switching remains available.
++2. Centered option choosers
++- Settings -> Huymaier Console -> Quick Access location. Confirm Bottom / Top / Left / Right appear together.
++- Keyboard Theme. Confirm Huymaier / Light / High Contrast appear together and selection changes keyboard palette.
++- Button Prompts. Confirm all prompt families appear together.
++- Music Theme. Confirm available themes appear together; Custom appears only when custom music exists.
++- Verify D-pad/arrow navigation, A/Enter apply, B/Back cancel.
++
++3. Display scale
++- Settings -> Display -> Scale. Confirm percentage popup opens.
++- Select a different percentage. Confirm the page reports current -> configured scale until Windows sign-out.
++- Confirm Sign out to apply display scale requires confirmation.
++- After sign-in, confirm Windows and Huymaier Console use the selected scale.
++
++4. Regression locks
++- Steam library population.
++- RPCS3 user discovery.
++- Shelf uses Library artwork.
++- Epic library excludes Unreal Engine assets.
++- Epic download card shows progress, downloaded/total, rate and ETA.
++- GitHub updater can check public thermalkil/HuymaierConsole Releases without authentication.
++- Windows Update and Driver Updates open their own pages.
+diff --git a/a/FSEPackage/AppxManifest.xml b/b/FSEPackage/AppxManifest.xml
+index 18f91c9..75eb816 100644
+--- a/a/FSEPackage/AppxManifest.xml
++++ b/b/FSEPackage/AppxManifest.xml
+@@ -1,4 +1,4 @@
+-﻿<?xml version="1.0" encoding="utf-8"?>
++<?xml version="1.0" encoding="utf-8"?>
+ <Package
+   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+@@ -7,7 +7,7 @@
+   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+   IgnorableNamespaces="uap uap3 uap4 rescap">
+ 
+-  <Identity Name="Huymaier.Console.FSE.Home" Publisher="CN=Huymaier" Version="0.25.3.0" ProcessorArchitecture="x64" />
++  <Identity Name="Huymaier.Console.FSE.Home" Publisher="CN=Huymaier" Version="0.25.6.0" ProcessorArchitecture="x64" />
+ 
+   <Properties>
+     <DisplayName>Huymaier Console</DisplayName>
+diff --git a/a/HuymaierBootstrap.ps1 b/b/HuymaierBootstrap.ps1
+index c600381..e13546d 100644
+--- a/a/HuymaierBootstrap.ps1
++++ b/b/HuymaierBootstrap.ps1
+@@ -1,4 +1,4 @@
+-﻿param(
++param(
+     [switch]$Windowed
+ )
+ 
+@@ -53,12 +53,12 @@ try {
+     Test-PowerShellFile $artworkWorkerPath 'Online artwork worker'
+     Test-PowerShellFile $gameExperiencePath 'Unified game experience'
+     Test-PowerShellFile $shellRedesignPath 'Shell redesign'
+-    Write-BootstrapLog 'Huymaier Console v0.25.3 preflight passed.'
++    Write-BootstrapLog 'Huymaier Console v0.25.6 preflight passed.'
+     if ($Windowed) { & $corePath -Windowed } else { & $corePath }
+ }
+ catch {
+     $message=$_.Exception.Message
+-    Write-BootstrapLog "v0.25.3 preflight/startup failed:`n$message" 'FATAL'
++    Write-BootstrapLog "v0.25.6 preflight/startup failed:`n$message" 'FATAL'
+     try {
+         Add-Type -AssemblyName PresentationFramework
+         [System.Windows.MessageBox]::Show(
