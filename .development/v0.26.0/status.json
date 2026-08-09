@@ -1,6 +1,7 @@
 {
-  "batch": "popup-navigate-feedback-1",
-  "script": "apply_popup_navigate_feedback.py",
+  "batch": "installer-lock-hotfix-1",
+  "script": "apply_installer_lock_hotfix.py",
+  "patch_dir": "",
   "result": "success",
-  "recordedAtUtc": "2026-08-09T14:10:28.691395+00:00"
+  "recordedAtUtc": "2026-08-09T14:37:59.993507+00:00"
 }

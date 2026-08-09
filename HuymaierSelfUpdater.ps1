@@ -1,4 +1,4 @@
-﻿param(
+param(
     [Parameter(Mandatory=$true)][string]$PackagePath,
     [Parameter(Mandatory=$true)][int]$ParentProcessId,
     [string]$InstallRoot=(Join-Path $env:LOCALAPPDATA 'Huymaier Console')
@@ -16,9 +16,23 @@ try{
     Start-Sleep -Milliseconds 500
     if(-not (Test-Path -LiteralPath $PackagePath -PathType Leaf)){throw "Downloaded update package is missing: $PackagePath"}
     New-Item -ItemType Directory -Force -Path $temp,$backup|Out-Null
-    # Lightweight rollback snapshot: preserve installed program files, not caches/assets/user data.
+    # Recursive rollback snapshot. Exclude only transient Logs/Updates so a
+    # failed install cannot leave old native binaries mixed with new scripts.
+    $backupInstall=Join-Path $backup 'install'
+    New-Item -ItemType Directory -Force -Path $backupInstall|Out-Null
     if(Test-Path -LiteralPath $InstallRoot){
-        foreach($f in @(Get-ChildItem -LiteralPath $InstallRoot -File -ErrorAction SilentlyContinue)){Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $backup $f.Name) -Force -ErrorAction SilentlyContinue}
+        foreach($dir in @(Get-ChildItem -LiteralPath $InstallRoot -Directory -Recurse -ErrorAction SilentlyContinue)){
+            $relative=$dir.FullName.Substring($InstallRoot.Length).TrimStart('\\')
+            if($relative -match '^(?i)(Logs|Updates)(\\|$)'){continue}
+            New-Item -ItemType Directory -Force -Path (Join-Path $backupInstall $relative)|Out-Null
+        }
+        foreach($f in @(Get-ChildItem -LiteralPath $InstallRoot -File -Recurse -ErrorAction SilentlyContinue)){
+            $relative=$f.FullName.Substring($InstallRoot.Length).TrimStart('\\')
+            if($relative -match '^(?i)(Logs|Updates)(\\|$)'){continue}
+            $target=Join-Path $backupInstall $relative
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target)|Out-Null
+            Copy-Item -LiteralPath $f.FullName -Destination $target -Force -ErrorAction SilentlyContinue
+        }
     }
     Expand-Archive -LiteralPath $PackagePath -DestinationPath $temp -Force
     $installer=Get-ChildItem -LiteralPath $temp -Recurse -File -Filter 'Install-HuymaierConsole.ps1'|Select-Object -First 1
@@ -34,7 +48,19 @@ try{
 }catch{
     Log ('ERROR '+$_.Exception.Message)
     try{
-        if(Test-Path -LiteralPath $backup){foreach($f in @(Get-ChildItem -LiteralPath $backup -File -ErrorAction SilentlyContinue)){Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $InstallRoot $f.Name) -Force -ErrorAction SilentlyContinue}}
+        $backupInstall=Join-Path $backup 'install'
+        if(Test-Path -LiteralPath $backupInstall){
+            foreach($dir in @(Get-ChildItem -LiteralPath $backupInstall -Directory -Recurse -ErrorAction SilentlyContinue)){
+                $relative=$dir.FullName.Substring($backupInstall.Length).TrimStart('\\')
+                New-Item -ItemType Directory -Force -Path (Join-Path $InstallRoot $relative)|Out-Null
+            }
+            foreach($f in @(Get-ChildItem -LiteralPath $backupInstall -File -Recurse -ErrorAction SilentlyContinue)){
+                $relative=$f.FullName.Substring($backupInstall.Length).TrimStart('\\')
+                $target=Join-Path $InstallRoot $relative
+                New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target)|Out-Null
+                Copy-Item -LiteralPath $f.FullName -Destination $target -Force -ErrorAction SilentlyContinue
+            }
+        }
         $old=Join-Path $InstallRoot 'HuymaierConsole.exe';if(Test-Path -LiteralPath $old){Start-Process -FilePath $old -WorkingDirectory $InstallRoot|Out-Null}
     }catch{}
 }finally{
