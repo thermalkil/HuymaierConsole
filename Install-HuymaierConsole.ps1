@@ -2,7 +2,7 @@ param([switch]$SilentUpdate)
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
-$script:InstallVersion = '0.26.0'
+$script:InstallVersion = '0.26.1'
 $script:InstallStartedUtc = [DateTime]::UtcNow
 $script:InstallLogRoot = Join-Path $env:LOCALAPPDATA 'Huymaier Console\Logs'
 New-Item -ItemType Directory -Force -Path $script:InstallLogRoot | Out-Null
@@ -80,6 +80,69 @@ Remove-Item -LiteralPath $staleBrowserRequest -Force -ErrorAction SilentlyContin
 
 New-Item -ItemType Directory -Force -Path $destination | Out-Null
 
+function Test-HcInstallFilesIdentical {
+    param([string]$SourcePath,[string]$DestinationPath)
+    if(-not (Test-Path -LiteralPath $SourcePath -PathType Leaf) -or -not (Test-Path -LiteralPath $DestinationPath -PathType Leaf)){return $false}
+    try{
+        $srcInfo=Get-Item -LiteralPath $SourcePath -ErrorAction Stop
+        $dstInfo=Get-Item -LiteralPath $DestinationPath -ErrorAction Stop
+        if($srcInfo.Length -ne $dstInfo.Length){return $false}
+        $srcHash=(Get-FileHash -LiteralPath $SourcePath -Algorithm SHA256 -ErrorAction Stop).Hash
+        $dstHash=(Get-FileHash -LiteralPath $DestinationPath -Algorithm SHA256 -ErrorAction Stop).Hash
+        return [string]::Equals($srcHash,$dstHash,[StringComparison]::OrdinalIgnoreCase)
+    }catch{return $false}
+}
+
+function Copy-HcInstallFile {
+    param([Parameter(Mandatory=$true)][string]$SourcePath,[Parameter(Mandatory=$true)][string]$DestinationPath)
+    if(Test-HcInstallFilesIdentical $SourcePath $DestinationPath){
+        Write-InstallerRecord "Unchanged payload already installed: $([IO.Path]::GetFileName($DestinationPath))"
+        return
+    }
+    $parent=Split-Path -Parent $DestinationPath
+    if($parent){New-Item -ItemType Directory -Force -Path $parent|Out-Null}
+    $lastError=$null
+    for($attempt=1;$attempt -le 30;$attempt++){
+        try{
+            Copy-Item -LiteralPath $SourcePath -Destination $DestinationPath -Force -ErrorAction Stop
+            return
+        }catch{
+            $lastError=$_.Exception
+            if($attempt -lt 30){Start-Sleep -Milliseconds 250}
+        }
+    }
+    throw "Could not replace installed file after 7.5 seconds: $DestinationPath. $($lastError.Message)"
+}
+
+function Copy-HcInstallTree {
+    param([Parameter(Mandatory=$true)][string]$SourceRoot,[Parameter(Mandatory=$true)][string]$DestinationRoot)
+    if(-not (Test-Path -LiteralPath $SourceRoot -PathType Container)){return}
+    New-Item -ItemType Directory -Force -Path $DestinationRoot|Out-Null
+    foreach($dir in @(Get-ChildItem -LiteralPath $SourceRoot -Directory -Recurse -ErrorAction Stop)){
+        $relative=$dir.FullName.Substring($SourceRoot.Length).TrimStart('\\')
+        New-Item -ItemType Directory -Force -Path (Join-Path $DestinationRoot $relative)|Out-Null
+    }
+    foreach($file in @(Get-ChildItem -LiteralPath $SourceRoot -File -Recurse -ErrorAction Stop)){
+        $relative=$file.FullName.Substring($SourceRoot.Length).TrimStart('\\')
+        Copy-HcInstallFile -SourcePath $file.FullName -DestinationPath (Join-Path $DestinationRoot $relative)
+    }
+}
+
+# Stop every native Console host before replacing *any* payload file. The old
+# installer performed this step after copying scripts/assets, allowing a single
+# locked file to leave a mixed-version installation.
+$runningConsole = @(Get-Process -Name 'HuymaierConsole' -ErrorAction SilentlyContinue)
+if($runningConsole.Count -gt 0){
+    Write-InstallerRecord ('Closing {0} running Huymaier Console process(es) before payload replacement.' -f $runningConsole.Count)
+    $runningConsole | Stop-Process -Force -ErrorAction SilentlyContinue
+    $deadline = [DateTime]::UtcNow.AddSeconds(10)
+    do {
+        Start-Sleep -Milliseconds 150
+        $stillRunning = @(Get-Process -Name 'HuymaierConsole' -ErrorAction SilentlyContinue)
+    } while($stillRunning.Count -gt 0 -and [DateTime]::UtcNow -lt $deadline)
+    if($stillRunning.Count -gt 0){ throw 'HuymaierConsole.exe is still running and installed files cannot be replaced safely.' }
+}
+
 $files = @(
     'HuymaierBootstrap.ps1',
     'HuymaierConsole.ps1',
@@ -119,37 +182,25 @@ $files = @(
 )
 foreach ($file in $files) {
     $src = Join-Path $source $file
-    if (Test-Path $src) { Copy-Item $src (Join-Path $destination $file) -Force }
+    if (Test-Path -LiteralPath $src -PathType Leaf) { Copy-HcInstallFile -SourcePath $src -DestinationPath (Join-Path $destination $file) }
 }
 
 
 $fseSource=Join-Path $source 'FSEPackage'
 $fseDestination=Join-Path $destination 'FSEPackage'
-if(Test-Path $fseSource){
-    New-Item -ItemType Directory -Force -Path $fseDestination|Out-Null
-    Copy-Item (Join-Path $fseSource '*') $fseDestination -Recurse -Force
-}
+if(Test-Path $fseSource){Copy-HcInstallTree -SourceRoot $fseSource -DestinationRoot $fseDestination}
 
 $assetSource = Join-Path $source 'Assets'
 $assetDestination = Join-Path $destination 'Assets'
-if (Test-Path $assetSource) {
-    New-Item -ItemType Directory -Force -Path $assetDestination | Out-Null
-    Copy-Item (Join-Path $assetSource '*') $assetDestination -Recurse -Force
-}
+if (Test-Path $assetSource) {Copy-HcInstallTree -SourceRoot $assetSource -DestinationRoot $assetDestination}
 
 
 $emulatorSource=Join-Path $source 'EmulatorPlatforms'
 $emulatorDestination=Join-Path $destination 'EmulatorPlatforms'
-if(Test-Path $emulatorSource){
-    New-Item -ItemType Directory -Force -Path $emulatorDestination|Out-Null
-    Copy-Item (Join-Path $emulatorSource '*') $emulatorDestination -Recurse -Force
-}
+if(Test-Path $emulatorSource){Copy-HcInstallTree -SourceRoot $emulatorSource -DestinationRoot $emulatorDestination}
 $toolsSource=Join-Path $source 'Tools'
 $toolsDestination=Join-Path $destination 'Tools'
-if(Test-Path $toolsSource){
-    New-Item -ItemType Directory -Force -Path $toolsDestination|Out-Null
-    Copy-Item (Join-Path $toolsSource '*') $toolsDestination -Recurse -Force
-}
+if(Test-Path $toolsSource){Copy-HcInstallTree -SourceRoot $toolsSource -DestinationRoot $toolsDestination}
 
 # Microsoft GameInput is the primary Xbox system-button path for v0.26+.
 # The official redistributable does not downgrade a newer installed runtime.
@@ -171,29 +222,11 @@ if((Test-Path -LiteralPath $gameInputRedist -PathType Leaf) -and $installedGameI
 
 $nativeSourceRoot=Join-Path $source 'Native'
 $nativeDestinationRoot=Join-Path $destination 'Native'
-if(Test-Path $nativeSourceRoot){
-    New-Item -ItemType Directory -Force -Path $nativeDestinationRoot|Out-Null
-    Copy-Item (Join-Path $nativeSourceRoot '*') $nativeDestinationRoot -Recurse -Force
-}
+if(Test-Path $nativeSourceRoot){Copy-HcInstallTree -SourceRoot $nativeSourceRoot -DestinationRoot $nativeDestinationRoot}
 
 # Remove Mark-of-the-Web from installed local files so the compiled host can
 # relaunch even when Windows PowerShell is configured for RemoteSigned.
 try { Get-ChildItem -LiteralPath $destination -Recurse -File -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue } catch { }
-
-# Stop a running native host before replacing HuymaierConsole.exe. Earlier
-# installers could fail with a locked executable and then close before the user
-# could read the error.
-$runningConsole = @(Get-Process -Name 'HuymaierConsole' -ErrorAction SilentlyContinue)
-if($runningConsole.Count -gt 0){
-    Write-InstallerRecord ('Closing {0} running Huymaier Console process(es).' -f $runningConsole.Count)
-    $runningConsole | Stop-Process -Force -ErrorAction Stop
-    $deadline = [DateTime]::UtcNow.AddSeconds(8)
-    do {
-        Start-Sleep -Milliseconds 150
-        $stillRunning = @(Get-Process -Name 'HuymaierConsole' -ErrorAction SilentlyContinue)
-    } while($stillRunning.Count -gt 0 -and [DateTime]::UtcNow -lt $deadline)
-    if($stillRunning.Count -gt 0){ throw 'HuymaierConsole.exe is still running and could not be replaced.' }
-}
 
 # Build the normal-use Windows GUI executable. PowerShell is used only here as
 # an installer/compiler host; HuymaierConsole.exe owns the runtime process and
@@ -410,7 +443,7 @@ if($SilentUpdate){
     Write-InstallerRecord 'Silent self-update installation completed; relaunch is delegated to HuymaierSelfUpdater.ps1.'
     exit 0
 }
-$result = [System.Windows.MessageBox]::Show("Huymaier Console v0.25.6 stabilization build was installed for this Windows account.`n`nLocation:`n$destination`n`nLaunch it now?", 'Huymaier Console', 'YesNo', 'Information')
+$result = [System.Windows.MessageBox]::Show("Huymaier Console v0.26.1 was installed for this Windows account.`n`nLocation:`n$destination`n`nLaunch it now?", 'Huymaier Console', 'YesNo', 'Information')
 if ($result -eq 'Yes') {
     Start-Process $nativeExe -WorkingDirectory $destination
 }

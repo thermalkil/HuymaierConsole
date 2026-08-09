@@ -55,12 +55,12 @@ try {
     Test-PowerShellFile $gameExperiencePath 'Unified game experience'
     Test-PowerShellFile $shellRedesignPath 'Shell redesign'
     Test-PowerShellFile $gameBarPath 'Huymaier Game Bar'
-    Write-BootstrapLog 'Huymaier Console v0.26.0 preflight passed.'
+    Write-BootstrapLog 'Huymaier Console v0.26.1 preflight passed.'
     if ($Windowed) { & $corePath -Windowed } else { & $corePath }
 }
 catch {
     $message=$_.Exception.Message
-    Write-BootstrapLog "v0.26.0 preflight/startup failed:`n$message" 'FATAL'
+    Write-BootstrapLog "v0.26.1 preflight/startup failed:`n$message" 'FATAL'
     try {
         Add-Type -AssemblyName PresentationFramework
         [System.Windows.MessageBox]::Show(
