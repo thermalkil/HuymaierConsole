@@ -203,14 +203,14 @@ $nativeTemp=Join-Path $destination 'HuymaierConsole.native.new.exe'
 $nativeAppSource=Join-Path $nativeDestinationRoot 'HuymaierConsole.NativeApp.cs'
 $nativePs1Source=Join-Path $nativeDestinationRoot 'HuymaierConsole.Ps1.cs'
 $nativeConsolePlatformsSource=Join-Path $nativeDestinationRoot 'HuymaierConsole.ConsolePlatforms.cs'
-$nativeGameBarSource=Join-Path $nativeDestinationRoot 'HuymaierGameBar.cs'
+$nativeSystemOverlaySource=Join-Path $nativeDestinationRoot 'HuymaierConsole.SystemOverlay.cs'
 $nativeGameInputSource=Join-Path $nativeDestinationRoot 'HuymaierConsole.GameInput.cs'
 $nativeInputSource=Join-Path $destination 'HuymaierNativeInput.cs'
 $nativeDisplaySource=Join-Path $destination 'HuymaierNativeDisplay.cs'
 $nativeAudioSource=Join-Path $destination 'HuymaierNativeAudio.cs'
 $nativePerformanceSource=Join-Path $destination 'HuymaierPerformance.cs'
 $p3tSource=Join-Path $destination 'EmulatorPlatforms\Shared\Huymaier.P3T.cs'
-foreach($requiredSource in @($nativeAppSource,$nativePs1Source,$nativeConsolePlatformsSource,$nativeGameBarSource,$nativeGameInputSource,$nativeInputSource,$nativeDisplaySource,$nativeAudioSource,$nativePerformanceSource,$p3tSource)){
+foreach($requiredSource in @($nativeAppSource,$nativePs1Source,$nativeConsolePlatformsSource,$nativeSystemOverlaySource,$nativeGameInputSource,$nativeInputSource,$nativeDisplaySource,$nativeAudioSource,$nativePerformanceSource,$p3tSource)){
     if(-not (Test-Path -LiteralPath $requiredSource)){throw "Native application source is missing: $requiredSource"}
 }
 Remove-Item -LiteralPath $nativeTemp -Force -ErrorAction SilentlyContinue
@@ -259,7 +259,7 @@ $compilerArgs += @(
     $nativeAppSource,
     $nativePs1Source,
     $nativeConsolePlatformsSource,
-    $nativeGameBarSource,
+    $nativeSystemOverlaySource,
     $nativeGameInputSource,
     $nativeInputSource,
     $nativeDisplaySource,

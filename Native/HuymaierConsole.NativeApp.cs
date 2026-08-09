@@ -4140,7 +4140,7 @@ namespace HuymaierConsole.NativeApp
 
     internal enum XmbInputCommand
     {
-        None, Left, Right, Up, Down, Confirm, Back, Guide, Menu, Options, LeftShoulder, RightShoulder
+        None, Left, Right, Up, Down, Confirm, Back, Secondary, Tertiary, Guide, Menu, View, Options, LeftShoulder, RightShoulder
     }
 
     internal sealed class XmbInputRouter
@@ -4237,8 +4237,11 @@ namespace HuymaierConsole.NativeApp
             lastButtons = active.Buttons;
             if ((newButtons & 1) != 0) return XmbInputCommand.Confirm;
             if ((newButtons & 2) != 0) return XmbInputCommand.Back;
+            if ((newButtons & 64) != 0) return XmbInputCommand.Secondary;
+            if ((newButtons & 128) != 0) return XmbInputCommand.Tertiary;
             if ((newButtons & 4) != 0) return XmbInputCommand.Guide;
-            if ((newButtons & 32) != 0) return XmbInputCommand.Options;
+            if ((newButtons & 32) != 0) return XmbInputCommand.Menu;
+            if ((newButtons & 256) != 0) return XmbInputCommand.View;
             if ((newButtons & 8) != 0) return XmbInputCommand.LeftShoulder;
             if ((newButtons & 16) != 0) return XmbInputCommand.RightShoulder;
 
@@ -4308,7 +4311,9 @@ namespace HuymaierConsole.NativeApp
                     // Raw HID distinguishes Options (mask 1) from PS/Guide (mask 2).
                     // PS/Guide globally requests Huymaier Quick Access; Options stays local.
                     if ((snapshot.Mask & 2) != 0 && !systemGuideOwned) buttons |= 4;
-                    if ((snapshot.Mask & 1) != 0 || (snapshot.Mask & 32) != 0) buttons |= 32;
+                    if ((snapshot.Mask & 1) != 0) buttons |= 32;
+                    if ((snapshot.Mask & 16) != 0) buttons |= 64;
+                    if ((snapshot.Mask & 32) != 0) buttons |= 128;
                     if ((snapshot.Mask & 1024) != 0) buttons |= 8;
                     if ((snapshot.Mask & 2048) != 0) buttons |= 16;
                     string direction = snapshot.Direction == null ? String.Empty : snapshot.Direction;
@@ -4572,7 +4577,10 @@ namespace HuymaierConsole.NativeApp
                         // Guide is distinct from Start/Menu and Back/View. GameInput owns the
                         // primary system-button path; 0x0400 remains compatibility fallback only.
                         if ((mask & 0x0400) != 0) buttons |= 4;
-                        if ((mask & 0x8000) != 0) buttons |= 32;
+                        if ((mask & 0x0010) != 0) buttons |= 32;
+                        if ((mask & 0x0020) != 0) buttons |= 256;
+                        if ((mask & 0x4000) != 0) buttons |= 64;
+                        if ((mask & 0x8000) != 0) buttons |= 128;
                         if ((mask & 0x0100) != 0) buttons |= 8;
                         if ((mask & 0x0200) != 0) buttons |= 16;
                         if ((mask & 0x0004) != 0 || state.Gamepad.LeftThumbX < -15000) direction = "Left";

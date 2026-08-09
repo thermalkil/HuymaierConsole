@@ -1098,14 +1098,12 @@ function Render-PromptFooter {
             Add-PromptPair (New-PlayStationPrompt 'Circle') 'Back'
             if($secondary){Add-PromptPair (New-PlayStationPrompt 'Square') $secondary}
             Add-PromptPair (New-KeycapPrompt 'PS' 34) 'Quick Access'
-            Add-PromptPair (New-PlayStationPrompt 'Options') 'Power'
         }
         'Nintendo' {
             Add-PromptPair (New-LetterPrompt 'A' '#F4F6FA') 'Select'
             Add-PromptPair (New-LetterPrompt 'B' '#F4F6FA') 'Back'
             if($secondary){Add-PromptPair (New-LetterPrompt 'X' '#F4F6FA') $secondary}
             Add-PromptPair (New-KeycapPrompt 'HOME' 48) 'Quick Access'
-            Add-PromptPair (New-KeycapPrompt '+') 'Power'
         }
         'Steam' {
             Add-PromptPair (New-LetterPrompt 'A' '#7ECF75') 'Select'
@@ -1118,7 +1116,6 @@ function Render-PromptFooter {
             Add-PromptPair (New-LetterPrompt 'B' '#E56565') 'Back'
             if($secondary){Add-PromptPair (New-LetterPrompt 'X' '#65AEE8') $secondary}
             Add-PromptPair (New-KeycapPrompt 'XBOX' 48) 'Quick Access'
-            Add-PromptPair (New-KeycapPrompt 'MENU' 48) 'Power'
         }
         default {
             Add-PromptPair (New-KeycapPrompt 'ENTER' 54) 'Select'
@@ -3904,7 +3901,6 @@ function Apply-ControllerNavigation {
     if(Is-NewButtonPress $Mask 4){Invoke-SelectedAction}
     if(Is-NewButtonPress $Mask 8){Handle-Back}
     if(Is-NewButtonPress $Mask 16){Invoke-SecondaryAction}
-    if(Is-NewButtonPress $Mask 1){Invoke-UiFeedback 'Confirm';Set-Tab 8}
     # LB/RB belonged to the retired shelf-art preview strip. Do not call its
     # legacy handler while the shared cinematic shelf is active.
     if($script:SubPage -eq 'PlatformShelf' -and $null -ne $script:ShelfPreviewImage){
@@ -3945,7 +3941,11 @@ function Process-Gamepads {
                 'Down' {$nativeDirection='Down'}
                 'Confirm' {$nativeMask=4}
                 'Back' {$nativeMask=8}
+                'Secondary' {$nativeMask=16}
+                'Tertiary' {$nativeMask=32}
                 'Guide' {$nativeMask=2}
+                'Menu' {$nativeMask=1}
+                'View' {$nativeMask=4096}
                 'LeftShoulder' {$nativeMask=1024}
                 'RightShoulder' {$nativeMask=2048}
             }
