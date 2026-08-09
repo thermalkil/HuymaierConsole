@@ -1,0 +1,35 @@
+diff --git a/HuymaierBootstrap.ps1 b/HuymaierBootstrap.ps1
+--- a/HuymaierBootstrap.ps1
++++ b/HuymaierBootstrap.ps1
+@@ -1,3 +1,4 @@
+ $gameExperiencePath = Join-Path $baseDir 'HuymaierGameExperience.ps1'
+ $shellRedesignPath = Join-Path $baseDir 'HuymaierShellRedesign.ps1'
++$gameBarPath = Join-Path $baseDir 'HuymaierGameBar.ps1'
+ $dataDir = Join-Path $env:LOCALAPPDATA 'Huymaier Console'
+@@ -1,4 +1,5 @@
+     Test-PowerShellFile $gameExperiencePath 'Unified game experience'
+     Test-PowerShellFile $shellRedesignPath 'Shell redesign'
+-    Write-BootstrapLog 'Huymaier Console v0.25.6 preflight passed.'
++    Test-PowerShellFile $gameBarPath 'Huymaier Game Bar'
++    Write-BootstrapLog 'Huymaier Console v0.26.0 preflight passed.'
+     if ($Windowed) { & $corePath -Windowed } else { & $corePath }
+@@ -1,1 +1,1 @@
+-    Write-BootstrapLog "v0.25.6 preflight/startup failed:`n$message" 'FATAL'
++    Write-BootstrapLog "v0.26.0 preflight/startup failed:`n$message" 'FATAL'
+diff --git a/HuymaierConsoleUpdateWorker.ps1 b/HuymaierConsoleUpdateWorker.ps1
+--- a/HuymaierConsoleUpdateWorker.ps1
++++ b/HuymaierConsoleUpdateWorker.ps1
+@@ -1,1 +1,1 @@
+-    [string]$CurrentVersion='0.25.6',
++    [string]$CurrentVersion='0.26.0',
+@@ -1,1 +1,1 @@
+-    $client.DefaultRequestHeaders.UserAgent.ParseAdd('HuymaierConsole/0.25.6')
++    $client.DefaultRequestHeaders.UserAgent.ParseAdd('HuymaierConsole/0.26.0')
+@@ -1,2 +1,6 @@
+-        $total=[long]$asset.size;if($response.Content.Headers.ContentLength.HasValue){$total=[long]$response.Content.Headers.ContentLength.Value}
++        $total=[long]$asset.size
++        $contentLength=$response.Content.Headers.ContentLength
++        if($null -ne $contentLength -and [long]$contentLength -gt 0){
++            $total=[long]$contentLength
++        }
+         $buffer=New-Object byte[] (1024*1024);$done=[long]0;$last=[DateTime]::MinValue
