@@ -1,0 +1,149 @@
+diff --git a/a/HuymaierConsole.ps1 b/b/HuymaierConsole.ps1
+index 4323d78..c0635bb 100644
+--- a/a/HuymaierConsole.ps1
++++ b/b/HuymaierConsole.ps1
+@@ -1,4 +1,4 @@
+-﻿param(
++param(
+     [switch]$Windowed
+ )
+ 
+@@ -11,7 +11,7 @@ Add-Type -AssemblyName WindowsBase
+ Add-Type -AssemblyName System.Xaml
+ try { Add-Type -AssemblyName System.Runtime.WindowsRuntime -ErrorAction SilentlyContinue } catch { }
+ 
+-$script:AppVersion = '0.25.4'
++$script:AppVersion = '0.25.6'
+ $script:AppName = 'Huymaier Console'
+ $script:DataDir = Join-Path $env:LOCALAPPDATA 'Huymaier Console'
+ $script:ConfigPath = Join-Path $script:DataDir 'config.json'
+@@ -310,6 +310,12 @@ function Load-Config {
+     } catch {
+         Write-Log "Config load failed: $($_.Exception.Message)" 'WARN'
+     }
++    # PowerShell can unwrap JSON/argument collections into $null or a scalar.
++    # Keep every persisted list array-shaped so first-run, one-item, and many-item
++    # machines take the same code paths under StrictMode.
++    foreach ($collectionName in @('CustomGames','CustomApps','ImportedGames','RecentGames','RecentApps','StorefrontRoots','StorefrontInstallOverrides','ProviderInstallRoots','FavoriteGames')) {
++        $defaults.$collectionName = Convert-ToStableArray $defaults.$collectionName
++    }
+     return $defaults
+ }
+ 
+@@ -1891,6 +1897,51 @@ function Toggle-DisplayHdr {
+     }
+ }
+ 
++function Get-WindowsEffectiveDisplayScalePercent {
++    try {
++        if ($null -ne $script:Window) {
++            $dpi = [System.Windows.Media.VisualTreeHelper]::GetDpi($script:Window)
++            if ($dpi.DpiScaleX -gt 0) { return [int][math]::Round([double]$dpi.DpiScaleX * 100.0) }
++        }
++    } catch { }
++    return 100
++}
++
++function Get-WindowsConfiguredDisplayScalePercent {
++    $effective = Get-WindowsEffectiveDisplayScalePercent
++    try {
++        $desktop = Get-ItemProperty -LiteralPath 'HKCU:\Control Panel\Desktop' -ErrorAction Stop
++        $logPixels = $null
++        try { $logPixels = [int]$desktop.LogPixels } catch { }
++        if ($null -ne $logPixels -and $logPixels -ge 96 -and $logPixels -le 480) {
++            return [int][math]::Round([double]$logPixels * 100.0 / 96.0)
++        }
++    } catch { }
++    return $effective
++}
++
++function Set-WindowsDisplayScalePercent {
++    param([int]$Percent)
++    if ($Percent -lt 100 -or $Percent -gt 500) {
++        Set-ConsoleNotice 'Windows display scale must be between 100% and 500%.' 'ERROR'
++        return
++    }
++    try {
++        $desktop = 'HKCU:\Control Panel\Desktop'
++        $dpi = [int][math]::Round(96.0 * $Percent / 100.0)
++        $props = Get-ItemProperty -LiteralPath $desktop -ErrorAction Stop
++        if ($props.PSObject.Properties.Name -contains 'LogPixels') { Set-ItemProperty -LiteralPath $desktop -Name 'LogPixels' -Value $dpi -Force }
++        else { New-ItemProperty -LiteralPath $desktop -Name 'LogPixels' -PropertyType DWord -Value $dpi -Force | Out-Null }
++        if ($props.PSObject.Properties.Name -contains 'Win8DpiScaling') { Set-ItemProperty -LiteralPath $desktop -Name 'Win8DpiScaling' -Value 1 -Force }
++        else { New-ItemProperty -LiteralPath $desktop -Name 'Win8DpiScaling' -PropertyType DWord -Value 1 -Force | Out-Null }
++        Write-Log "Windows display scale configured to $Percent% ($dpi DPI). Windows sign-out is required for full application."
++        Set-ConsoleNotice "Windows scale set to $Percent%. Sign out of Windows to apply it fully." 'INFO'
++    } catch {
++        Write-Log "Windows display scale change failed: $($_.Exception.ToString())" 'ERROR'
++        Set-ConsoleNotice "Display scale change failed: $($_.Exception.Message)" 'ERROR'
++    }
++}
++
+ function Start-ElementAnimation {
+     param($Target, $Property, [double]$From, [double]$To, [double]$Seconds, [bool]$AutoReverse)
+     if ($null -eq $Target) { return }
+@@ -2336,6 +2387,7 @@ function Complete-NativeConfirmation {
+     }
+     switch($action){
+         'update-restart'{Start-Process 'shutdown.exe' -ArgumentList '/r','/t','0'|Out-Null}
++        'display-scale-signout'{Start-Process 'shutdown.exe' -ArgumentList '/l'|Out-Null}
+         'sleep'{Start-Process 'rundll32.exe' -ArgumentList 'powrprof.dll,SetSuspendState 0,1,0'|Out-Null}
+         'restart-pc'{Start-Process 'shutdown.exe' -ArgumentList '/r','/t','0'|Out-Null}
+         'shutdown-pc'{Start-Process 'shutdown.exe' -ArgumentList '/s','/t','0'|Out-Null}
+@@ -2517,6 +2569,8 @@ function Invoke-Action {
+         'display-keep' { Keep-DisplayMode }
+         'display-revert' { Revert-DisplayMode }
+         'display-hdr' { Toggle-DisplayHdr }
++        'display-scale' { if(Get-Command Show-HcChoicePopup -ErrorAction SilentlyContinue){$scale=Get-WindowsConfiguredDisplayScalePercent;Show-HcChoicePopup 'Windows display scale' @('100%','125%','150%','175%','200%','225%','250%','300%','350%','400%','450%','500%') "$scale%" 'DisplayScale'}else{Set-ConsoleNotice 'Display scale chooser is unavailable.' 'ERROR'} }
++        'display-scale-signout' { Request-NativeConfirmation 'display-scale-signout' 'Sign out of Windows now to apply the new display scale?' }
+         'subpage-back' { Handle-Back }
+         'sound-settings' { $script:SubPage='Audio';$script:SelectedAction=0;Refresh-AudioState;Render-Page }
+         'audio-output' { Cycle-AudioOutput }
+@@ -2618,8 +2672,8 @@ function Get-PageDefinition {
+             if($script:SubPage -eq 'Display'){
+                 Refresh-DisplayState;$display=Get-SelectedDisplay;if($null -eq $display){return [pscustomobject]@{Title='Display & HDR';Subtitle='Native display controls are unavailable.';Hero='NO ACTIVE DISPLAY';HeroText='No active display was returned.';Actions=@((New-Action 'subpage-back' 'Back to Settings'))}}
+                 $hdr=Get-DisplayHdrStatus;$hdrLabel=if($null -eq $hdr -or -not $hdr.Supported){'Unsupported'}elseif($hdr.Enabled){'On'}else{'Off'};$actions=New-Object System.Collections.Generic.List[object]
+-                if($script:DisplayPendingConfirmation){$seconds=[math]::Max(0,[math]::Ceiling(($script:DisplayConfirmUntil-(Get-Date)).TotalSeconds));$actions.Add((New-Action 'display-keep' "Keep this display mode ($seconds)"));$actions.Add((New-Action 'display-revert' 'Revert display mode'))}else{$actions.Add((New-Action 'display-target' "Display: $($display.FriendlyName)"));$actions.Add((New-Action 'display-resolution' "Resolution: $($script:PendingWidth) x $($script:PendingHeight)"));$actions.Add((New-Action 'display-refresh' "Refresh rate: $($script:PendingFrequency) Hz"));$actions.Add((New-Action 'display-apply' 'Apply display mode' '15-second automatic rollback.'));$actions.Add((New-Action 'display-hdr' "HDR: $hdrLabel"))};$actions.Add((New-Action 'subpage-back' 'Back to Settings'))
+-                return [pscustomobject]@{Title='Display & HDR';Subtitle='Native resolution, refresh-rate, and HDR controls.';Hero=$display.FriendlyName.ToUpperInvariant();HeroText="Current: $($display.Width) x $($display.Height) at $($display.Frequency) Hz`nHDR: $hdrLabel";Actions=([object[]]$actions.ToArray())}
++                if($script:DisplayPendingConfirmation){$seconds=[math]::Max(0,[math]::Ceiling(($script:DisplayConfirmUntil-(Get-Date)).TotalSeconds));$actions.Add((New-Action 'display-keep' "Keep this display mode ($seconds)"));$actions.Add((New-Action 'display-revert' 'Revert display mode'))}else{$actions.Add((New-Action 'display-target' "Display: $($display.FriendlyName)"));$actions.Add((New-Action 'display-resolution' "Resolution: $($script:PendingWidth) x $($script:PendingHeight)"));$actions.Add((New-Action 'display-refresh' "Refresh rate: $($script:PendingFrequency) Hz"));$effectiveScale=Get-WindowsEffectiveDisplayScalePercent;$configuredScale=Get-WindowsConfiguredDisplayScalePercent;$scaleLabel=$(if($effectiveScale -ne $configuredScale){"Scale: $effectiveScale% → $configuredScale% after sign out"}else{"Scale: $effectiveScale%"});$actions.Add((New-Action 'display-scale' $scaleLabel 'Change the native Windows account display scale.'));if($effectiveScale -ne $configuredScale){$actions.Add((New-Action 'display-scale-signout' 'Sign out to apply display scale' "Windows is currently using $effectiveScale%; $configuredScale% is configured."))};$actions.Add((New-Action 'display-apply' 'Apply display mode' '15-second automatic rollback.'));$actions.Add((New-Action 'display-hdr' "HDR: $hdrLabel"))};$actions.Add((New-Action 'subpage-back' 'Back to Settings'))
++                return [pscustomobject]@{Title='Display & HDR';Subtitle='Native resolution, refresh rate, Windows scale, and HDR controls.';Hero=$display.FriendlyName.ToUpperInvariant();HeroText="Current: $($display.Width) x $($display.Height) at $($display.Frequency) Hz`nHDR: $hdrLabel";Actions=([object[]]$actions.ToArray())}
+             }
+             if($script:SubPage -eq 'Drivers'){
+                 Read-DriverState
+@@ -2943,6 +2997,7 @@ function New-HomeCard {
+ 
+ function Add-HomeRail {
+     param([string]$Title,[object[]]$Entries,[string]$Prefix,[string]$EmptyText)
++    $Entries = Convert-ToStableArray $Entries
+     $heading=New-Object System.Windows.Controls.TextBlock;$heading.Text=$Title;$heading.FontSize=22;$heading.FontWeight='SemiBold';$heading.Margin='0,0,0,10';$heading.Foreground='#F5F7FB';$script:ActionPanel.Children.Add($heading)|Out-Null
+     if($Entries.Count -eq 0){$empty=New-Object System.Windows.Controls.Border;$empty.Height=112;$empty.CornerRadius=14;$empty.Background='#7A101827';$empty.BorderBrush='#2B3A51';$empty.BorderThickness=1;$empty.Margin='0,0,0,22';$tb=New-Object System.Windows.Controls.TextBlock;$tb.Text=$EmptyText;$tb.FontSize=16;$tb.Foreground='#AAB7C9';$tb.VerticalAlignment='Center';$tb.HorizontalAlignment='Center';$empty.Child=$tb;$script:ActionPanel.Children.Add($empty)|Out-Null;$script:HomeRows+=,[pscustomobject]@{Start=$script:ActionButtons.Count;Count=0};return}
+     $start=$script:ActionButtons.Count;$row=New-Object System.Windows.Controls.StackPanel;$row.Orientation='Horizontal'
+@@ -3304,6 +3359,7 @@ function Add-PlatformRail {
+ 
+ function Add-GameHubRail {
+     param([string]$Title,[object[]]$Entries,[string]$EmptyText)
++    $Entries = Convert-ToStableArray $Entries
+     $heading=New-Object System.Windows.Controls.TextBlock;$heading.Text=$Title;$heading.FontSize=22;$heading.FontWeight='SemiBold';$heading.Margin='0,0,0,10';$heading.Foreground='#F5F7FB';$script:ActionPanel.Children.Add($heading)|Out-Null
+     if($Entries.Count -eq 0){$empty=New-Object System.Windows.Controls.Border;$empty.Height=96;$empty.CornerRadius=14;$empty.Background='#7A101827';$empty.BorderBrush='#2B3A51';$empty.BorderThickness=1;$empty.Margin='0,0,0,20';$tb=New-Object System.Windows.Controls.TextBlock;$tb.Text=$EmptyText;$tb.FontSize=16;$tb.Foreground='#AAB7C9';$tb.VerticalAlignment='Center';$tb.HorizontalAlignment='Center';$empty.Child=$tb;$script:ActionPanel.Children.Add($empty)|Out-Null;$script:HomeRows+=,[pscustomobject]@{Start=$script:ActionButtons.Count;Count=0;Platform=$false};return}
+     $start=$script:ActionButtons.Count;$row=New-Object System.Windows.Controls.StackPanel;$row.Orientation='Horizontal'
+@@ -4341,7 +4397,7 @@ $xaml = @'
+                     <ColumnDefinition Width="Auto"/>
+                 </Grid.ColumnDefinitions>
+                 <StackPanel x:Name="PromptPanel" Orientation="Horizontal" VerticalAlignment="Center"/>
+-                <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="HUYMAIER FSE  v0.25.4" FontSize="12" Foreground="#77869C"/>
++                <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="HUYMAIER FSE  v0.25.6" FontSize="12" Foreground="#77869C"/>
+             </Grid>
+         </Grid>
+ 
+@@ -4711,7 +4767,10 @@ try {
+     $script:Window.ShowDialog() | Out-Null
+ }
+ catch {
+-    Write-Log "Fatal startup error: $($_.Exception.ToString())" 'FATAL'
++    $fatalDetails=$_.Exception.ToString()
++    try{if($_.InvocationInfo -and $_.InvocationInfo.PositionMessage){$fatalDetails += "`nInvocation: $($_.InvocationInfo.PositionMessage)"}}catch{}
++    try{if($_.ScriptStackTrace){$fatalDetails += "`nScript stack:`n$($_.ScriptStackTrace)"}}catch{}
++    Write-Log "Fatal startup error: $fatalDetails" 'FATAL'
+     [System.Windows.MessageBox]::Show("Huymaier Console could not start.`n`n$($_.Exception.Message)`n`nA log was saved to:`n$script:LogDir", $script:AppName, 'OK', 'Error') | Out-Null
+     exit 1
+ }
