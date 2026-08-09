@@ -1,0 +1,10 @@
+{
+  "publish": false,
+  "version": "0.25.6",
+  "tag": "v0.25.6",
+  "title": "Huymaier Console v0.25.6",
+  "asset_name": "HC256.zip",
+  "package_root": "HC256",
+  "notes_file": "RELEASE_NOTES-v0.25.6.txt",
+  "delete_paths": []
+}
