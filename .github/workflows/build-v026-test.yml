@@ -1,0 +1,227 @@
+name: Build v0.26.0 Windows Test Package
+
+on:
+  push:
+    branches:
+      - feature/v0.26.0-native-gamebar
+    paths:
+      - '.development/v0.26.0/build-trigger.json'
+      - '.github/workflows/build-v026-test.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v026-test-package
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Check out v0.26.0 source
+        uses: actions/checkout@v4
+        with:
+          ref: feature/v0.26.0-native-gamebar
+          fetch-depth: 0
+
+      - name: Stage full package from stable v0.25.8 release
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference='Stop'
+          $baseDir=Join-Path $env:RUNNER_TEMP 'hc260-base'
+          $extractDir=Join-Path $env:RUNNER_TEMP 'hc260-extract'
+          $stageParent=Join-Path $env:RUNNER_TEMP 'hc260-stage'
+          $stageRoot=Join-Path $stageParent 'HC260'
+          New-Item -ItemType Directory -Force -Path $baseDir,$extractDir,$stageRoot|Out-Null
+          gh release download v0.25.8 --repo $env:GITHUB_REPOSITORY --pattern 'HC258.zip' --dir $baseDir
+          if($LASTEXITCODE -ne 0){throw 'Could not download the stable HC258 release package.'}
+          $baseZip=Get-ChildItem -LiteralPath $baseDir -Filter 'HC258.zip' -File|Select-Object -First 1
+          if($null -eq $baseZip){throw 'HC258.zip was not downloaded.'}
+          Expand-Archive -LiteralPath $baseZip.FullName -DestinationPath $extractDir -Force
+          $roots=@(Get-ChildItem -LiteralPath $extractDir -Directory)
+          $baseRoot=if($roots.Count -eq 1){$roots[0].FullName}else{$extractDir}
+          Copy-Item (Join-Path $baseRoot '*') $stageRoot -Recurse -Force
+          foreach($relative in @(& git ls-files)){
+            if([string]::IsNullOrWhiteSpace($relative)){continue}
+            if($relative -match '^(\.github/|\.development/|\.release/|\.source/|\.gitignore$|README\.md$|RELEASING\.md$|GITHUB-RELEASES\.md$)'){continue}
+            $source=Join-Path $env:GITHUB_WORKSPACE ($relative -replace '/','\')
+            if(-not(Test-Path -LiteralPath $source -PathType Leaf)){continue}
+            $destination=Join-Path $stageRoot ($relative -replace '/','\')
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination)|Out-Null
+            Copy-Item -LiteralPath $source -Destination $destination -Force
+          }
+          "HC260_STAGE_ROOT=$stageRoot"|Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "HC260_STAGE_PARENT=$stageParent"|Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Acquire Microsoft GameInput SDK and redistributable
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $version='3.5.262'
+          $package=Join-Path $env:RUNNER_TEMP 'Microsoft.GameInput.nupkg'
+          $archive=Join-Path $env:RUNNER_TEMP 'Microsoft.GameInput.zip'
+          $expanded=Join-Path $env:RUNNER_TEMP 'Microsoft.GameInput'
+          Invoke-WebRequest -UseBasicParsing -Uri "https://api.nuget.org/v3-flatcontainer/microsoft.gameinput/$version/microsoft.gameinput.$version.nupkg" -OutFile $package
+          Copy-Item $package $archive -Force
+          Expand-Archive -LiteralPath $archive -DestinationPath $expanded -Force
+          $header=Get-ChildItem -LiteralPath $expanded -Recurse -Filter 'GameInput.h' -File|Select-Object -First 1
+          $library=Get-ChildItem -LiteralPath $expanded -Recurse -Filter 'gameinput.lib' -File|Where-Object{$_.FullName -match '(?i)x64|amd64'}|Select-Object -First 1
+          $redist=Get-ChildItem -LiteralPath $expanded -Recurse -Filter 'GameInputRedist.msi' -File|Select-Object -First 1
+          if($null -eq $header -or $null -eq $library -or $null -eq $redist){throw 'Microsoft.GameInput package is missing required x64 SDK/redist files.'}
+          "GAMEINPUT_INCLUDE=$($header.Directory.FullName)"|Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "GAMEINPUT_LIBDIR=$($library.Directory.FullName)"|Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $redistDestination=Join-Path $env:HC260_STAGE_ROOT 'Tools\GameInput\GameInputRedist.msi'
+          New-Item -ItemType Directory -Force -Path (Split-Path -Parent $redistDestination)|Out-Null
+          Copy-Item -LiteralPath $redist.FullName -Destination $redistDestination -Force
+
+      - name: Compile x64 native GameInput Guide bridge
+        shell: cmd
+        run: |
+          @echo off
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set VSINSTALL=%%i
+          if not defined VSINSTALL exit /b 2
+          call "%VSINSTALL%\VC\Auxiliary\Build\vcvars64.bat"
+          if errorlevel 1 exit /b %errorlevel%
+          cl /nologo /std:c++17 /EHsc /LD /I"%GAMEINPUT_INCLUDE%" Native\HuymaierGameInputBridge.cpp /link /LIBPATH:"%GAMEINPUT_LIBDIR%" gameinput.lib /OUT:"%HC260_STAGE_ROOT%\HuymaierGameInputBridge.dll"
+          if errorlevel 1 exit /b %errorlevel%
+
+      - name: Normalize packaged Windows PowerShell source to UTF-8 BOM
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $utf8Bom=New-Object System.Text.UTF8Encoding($true)
+          $count=0
+          foreach($file in @(Get-ChildItem -LiteralPath $env:HC260_STAGE_ROOT -Recurse -File|Where-Object{$_.Extension -in @('.ps1','.psm1','.psd1')})){
+            $text=[IO.File]::ReadAllText($file.FullName,[Text.Encoding]::UTF8)
+            [IO.File]::WriteAllText($file.FullName,$text,$utf8Bom)
+            $count++
+          }
+          if($count -eq 0){throw 'No PowerShell files were found in the staged package.'}
+          Write-Host "Normalized $count PowerShell files to UTF-8 BOM."
+
+      - name: Validate packaged PowerShell with Windows PowerShell 5.1 parser
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $failures=New-Object System.Collections.Generic.List[string]
+          foreach($file in @(Get-ChildItem -LiteralPath $env:HC260_STAGE_ROOT -Filter '*.ps1' -Recurse -File)){
+            $tokens=$null;$parseErrors=$null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($file.FullName,[ref]$tokens,[ref]$parseErrors)
+            foreach($parseError in @($parseErrors)){[void]$failures.Add(('{0}:{1}:{2} {3}' -f $file.FullName,$parseError.Extent.StartLineNumber,$parseError.Extent.StartColumnNumber,$parseError.Message))}
+          }
+          if($failures.Count -gt 0){throw ($failures -join "`r`n")}
+          Write-Host 'Packaged PowerShell parser validation passed.'
+
+      - name: Compile complete native application source set
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Windows.Forms,System.Drawing,System.Web.Extensions
+          $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          if(-not(Test-Path -LiteralPath $csc)){throw 'Framework64 csc.exe was not found.'}
+          $automationAssembly=[System.Management.Automation.PSObject].Assembly.Location
+          $refs=@(
+            [System.Uri].Assembly.Location,
+            [System.Linq.Enumerable].Assembly.Location,
+            [System.Xaml.XamlReader].Assembly.Location,
+            [System.Xml.XmlDocument].Assembly.Location,
+            [System.Windows.DependencyObject].Assembly.Location,
+            [System.Windows.Media.Visual].Assembly.Location,
+            [System.Windows.Window].Assembly.Location,
+            [System.Windows.Forms.Form].Assembly.Location,
+            [System.Drawing.Bitmap].Assembly.Location,
+            [System.Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,
+            $automationAssembly
+          )|Select-Object -Unique
+          $r=$env:HC260_STAGE_ROOT
+          $sources=@(
+            (Join-Path $r 'Native\HuymaierConsole.NativeApp.cs'),
+            (Join-Path $r 'Native\HuymaierConsole.Ps1.cs'),
+            (Join-Path $r 'Native\HuymaierConsole.ConsolePlatforms.cs'),
+            (Join-Path $r 'Native\HuymaierConsole.SystemOverlay.cs'),
+            (Join-Path $r 'Native\HuymaierConsole.GameInput.cs'),
+            (Join-Path $r 'HuymaierNativeInput.cs'),
+            (Join-Path $r 'HuymaierNativeDisplay.cs'),
+            (Join-Path $r 'HuymaierNativeAudio.cs'),
+            (Join-Path $r 'HuymaierPerformance.cs'),
+            (Join-Path $r 'EmulatorPlatforms\Shared\Huymaier.P3T.cs')
+          )
+          foreach($source in $sources){if(-not(Test-Path -LiteralPath $source -PathType Leaf)){throw "Native source missing from package: $source"}}
+          $compileRoot=Join-Path $env:RUNNER_TEMP 'hc260-full-compile';New-Item -ItemType Directory -Force -Path $compileRoot|Out-Null
+          $out=Join-Path $compileRoot 'HuymaierConsole.exe'
+          $args=@('/noconfig','/nologo','/target:winexe','/platform:anycpu','/optimize+',('/out:'+$out),('/win32icon:'+(Join-Path $r 'HuymaierConsole.ico')))
+          foreach($ref in $refs){$args+=('/reference:'+$ref)}
+          $args+=$sources
+          & $csc @args
+          if($LASTEXITCODE -ne 0 -or -not(Test-Path -LiteralPath $out -PathType Leaf)){throw "Full HuymaierConsole native compile failed with exit code $LASTEXITCODE."}
+          Write-Host 'Full native application compile validation passed.'
+
+      - name: Regenerate internal package checksums
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $root=$env:HC260_STAGE_ROOT
+          $rows=New-Object System.Collections.Generic.List[string]
+          foreach($file in @(Get-ChildItem -LiteralPath $root -File -Recurse|Where-Object{$_.Name -notin @('checksums.sha256','SHA256SUMS.txt')}|Sort-Object FullName)){
+            $relative=$file.FullName.Substring($root.Length).TrimStart('\').Replace('\','/')
+            $hash=(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            [void]$rows.Add("$hash  $relative")
+          }
+          $text=($rows -join "`n")+"`n"
+          [IO.File]::WriteAllText((Join-Path $root 'checksums.sha256'),$text,(New-Object Text.UTF8Encoding($false)))
+          [IO.File]::WriteAllText((Join-Path $root 'SHA256SUMS.txt'),$text,(New-Object Text.UTF8Encoding($false)))
+          Write-Host "Checksummed $($rows.Count) payload files."
+
+      - name: Build HC260 test ZIP and SHA-256
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $outDir=Join-Path $env:RUNNER_TEMP 'hc260-output';New-Item -ItemType Directory -Force -Path $outDir|Out-Null
+          $zip=Join-Path $outDir 'HC260-test.zip'
+          Compress-Archive -LiteralPath $env:HC260_STAGE_ROOT -DestinationPath $zip -CompressionLevel Optimal -Force
+          $hash=(Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -LiteralPath ($zip+'.sha256') -Value ($hash+'  HC260-test.zip') -Encoding ASCII
+          Write-Host "HC260 test SHA-256: $hash"
+          "HC260_OUTPUT=$outDir"|Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Upload v0.26.0 test candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: HC260-test-candidate
+          path: |
+            ${{ env.HC260_OUTPUT }}\HC260-test.zip
+            ${{ env.HC260_OUTPUT }}\HC260-test.zip.sha256
+          if-no-files-found: error
+
+      - name: Record test-package build status
+        if: always()
+        shell: powershell
+        env:
+          BUILD_RESULT: ${{ job.status }}
+        run: |
+          $ErrorActionPreference='Stop'
+          $statusPath='.development\v0.26.0\build-status.json'
+          $triggerPath='.development\v0.26.0\build-trigger.json'
+          $candidate='v0.26.0-test'
+          try{
+            if(Test-Path -LiteralPath $triggerPath -PathType Leaf){
+              $trigger=Get-Content -Raw -LiteralPath $triggerPath -Encoding UTF8|ConvertFrom-Json
+              if(-not [string]::IsNullOrWhiteSpace([string]$trigger.candidate)){$candidate=[string]$trigger.candidate}
+            }
+          }catch{}
+          $status=[ordered]@{
+            candidate=$candidate
+            result=$env:BUILD_RESULT
+            runId=$env:GITHUB_RUN_ID
+            runAttempt=$env:GITHUB_RUN_ATTEMPT
+            commit=$env:GITHUB_SHA
+            recordedAtUtc=[DateTime]::UtcNow.ToString('o')
+          }
+          $status|ConvertTo-Json|Set-Content -LiteralPath $statusPath -Encoding UTF8
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add $statusPath
+          if(-not (git diff --cached --quiet)){git commit -m "Record v0.26.0 test package build status";git push origin HEAD:feature/v0.26.0-native-gamebar}

@@ -1,0 +1,6 @@
+{
+  "batch": "popup-navigate-feedback-1",
+  "script": "apply_popup_navigate_feedback.py",
+  "result": "success",
+  "recordedAtUtc": "2026-08-09T14:10:28.691395+00:00"
+}

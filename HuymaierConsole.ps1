@@ -11,7 +11,7 @@ Add-Type -AssemblyName WindowsBase
 Add-Type -AssemblyName System.Xaml
 try { Add-Type -AssemblyName System.Runtime.WindowsRuntime -ErrorAction SilentlyContinue } catch { }
 
-$script:AppVersion = '0.25.6'
+$script:AppVersion = '0.26.0'
 $script:AppName = 'Huymaier Console'
 $script:DataDir = Join-Path $env:LOCALAPPDATA 'Huymaier Console'
 $script:ConfigPath = Join-Path $script:DataDir 'config.json'
@@ -37,6 +37,7 @@ $script:GameExperienceModulePath = Join-Path $script:BaseDir 'HuymaierGameExperi
 $script:ShellRedesignModulePath = Join-Path $script:BaseDir 'HuymaierShellRedesign.ps1'
 $script:EmulatorPlatformsModulePath = Join-Path $script:BaseDir 'HuymaierEmulatorPlatforms.ps1'
 $script:WebBrowserModulePath = Join-Path $script:BaseDir 'HuymaierWebBrowser.ps1'
+$script:GameBarModulePath = Join-Path $script:BaseDir 'HuymaierGameBar.ps1'
 $script:NavItems = @('Home','Games','Apps','Web','Downloads','Import','File Explorer','Settings','Power')
 $script:SelectedTab = 0
 $script:SelectedAction = 0
@@ -286,6 +287,7 @@ function New-DefaultConfig {
         StorefrontRoots = @()
         StorefrontInstallOverrides = @()
         QuickMenuPosition = 'Bottom'
+        GameBarScale = 100
         ProviderInstallRoots = @()
         LibraryScanCompleted = $false
         LibrarySchemaVersion = 1
@@ -302,7 +304,7 @@ function Load-Config {
     if ( -not (Test-Path $script:ConfigPath)) { return $defaults }
     try {
         $loaded = Get-Content -Raw -Path $script:ConfigPath | ConvertFrom-Json
-        foreach ($name in @('BrowserName','BrowserPath','BrowserMode','PromptOverride','StartWithWindows','CustomGames','CustomApps','MusicEnabled','MusicVolume','DynamicBackground','UiSoundsEnabled','HapticsEnabled','MusicTheme','CustomMusicPath','ImportedGames','RecentGames','RecentApps','StorefrontRoots','StorefrontInstallOverrides','QuickMenuPosition','ProviderInstallRoots','LibraryScanCompleted','LibrarySchemaVersion','KeyboardTheme','ShowFpsCounter','OnlineArtworkEnabled','PlatformBackgroundsEnabled','FavoriteGames')) {
+        foreach ($name in @('BrowserName','BrowserPath','BrowserMode','PromptOverride','StartWithWindows','CustomGames','CustomApps','MusicEnabled','MusicVolume','DynamicBackground','UiSoundsEnabled','HapticsEnabled','MusicTheme','CustomMusicPath','ImportedGames','RecentGames','RecentApps','StorefrontRoots','StorefrontInstallOverrides','QuickMenuPosition','GameBarScale','ProviderInstallRoots','LibraryScanCompleted','LibrarySchemaVersion','KeyboardTheme','ShowFpsCounter','OnlineArtworkEnabled','PlatformBackgroundsEnabled','FavoriteGames')) {
             if ($null -ne $loaded.PSObject.Properties[$name]) {
                 $defaults.$name = $loaded.$name
             }
@@ -316,6 +318,7 @@ function Load-Config {
     foreach ($collectionName in @('CustomGames','CustomApps','ImportedGames','RecentGames','RecentApps','StorefrontRoots','StorefrontInstallOverrides','ProviderInstallRoots','FavoriteGames')) {
         $defaults.$collectionName = Convert-ToStableArray $defaults.$collectionName
     }
+    try{$defaults.GameBarScale=[math]::Max(70,[math]::Min(140,[int]$defaults.GameBarScale))}catch{$defaults.GameBarScale=100}
     return $defaults
 }
 
@@ -1088,40 +1091,37 @@ function Render-PromptFooter {
     if ($null -eq $script:PromptPanel) { return }
     $script:PromptPanel.Children.Clear()
     $family = Get-PromptFamily
-    $secondary='Search'
-    try{$secondary=Get-StorefrontSecondaryLabel}catch{}
+    $secondary=''
+    try{$secondary=[string](Get-StorefrontSecondaryLabel)}catch{}
+    if($secondary -notin @('Manage','Install')){$secondary=''}
     switch ($family) {
         'PlayStation' {
             Add-PromptPair (New-PlayStationPrompt 'Cross') 'Select'
             Add-PromptPair (New-PlayStationPrompt 'Circle') 'Back'
-            Add-PromptPair (New-PlayStationPrompt 'Square') $secondary
-            Add-PromptPair (New-KeycapPrompt 'PS' 34) 'Menu'
-            Add-PromptPair (New-PlayStationPrompt 'Options') 'Power'
+            if($secondary){Add-PromptPair (New-PlayStationPrompt 'Square') $secondary}
+            Add-PromptPair (New-KeycapPrompt 'PS' 34) 'Quick Access'
         }
         'Nintendo' {
             Add-PromptPair (New-LetterPrompt 'A' '#F4F6FA') 'Select'
             Add-PromptPair (New-LetterPrompt 'B' '#F4F6FA') 'Back'
-            Add-PromptPair (New-LetterPrompt 'X' '#F4F6FA') $secondary
-            Add-PromptPair (New-KeycapPrompt 'HOME' 48) 'Menu'
-            Add-PromptPair (New-KeycapPrompt '+') 'Power'
+            if($secondary){Add-PromptPair (New-LetterPrompt 'X' '#F4F6FA') $secondary}
+            Add-PromptPair (New-KeycapPrompt 'HOME' 48) 'Quick Access'
         }
         'Steam' {
             Add-PromptPair (New-LetterPrompt 'A' '#7ECF75') 'Select'
             Add-PromptPair (New-LetterPrompt 'B' '#E66B6B') 'Back'
-            Add-PromptPair (New-LetterPrompt 'X' '#65AEE8') $secondary
-            Add-PromptPair (New-KeycapPrompt 'STEAM' 52) 'Menu'
+            if($secondary){Add-PromptPair (New-LetterPrompt 'X' '#65AEE8') $secondary}
+            Add-PromptPair (New-KeycapPrompt 'STEAM' 52) 'Quick Access'
         }
         'Xbox' {
             Add-PromptPair (New-LetterPrompt 'A' '#73C86B') 'Select'
             Add-PromptPair (New-LetterPrompt 'B' '#E56565') 'Back'
-            Add-PromptPair (New-LetterPrompt 'X' '#65AEE8') $secondary
-            Add-PromptPair (New-KeycapPrompt 'VIEW' 44) 'Menu'
-            Add-PromptPair (New-KeycapPrompt 'MENU' 48) 'Power'
+            if($secondary){Add-PromptPair (New-LetterPrompt 'X' '#65AEE8') $secondary}
+            Add-PromptPair (New-KeycapPrompt 'XBOX' 48) 'Quick Access'
         }
         default {
             Add-PromptPair (New-KeycapPrompt 'ENTER' 54) 'Select'
             Add-PromptPair (New-KeycapPrompt 'ESC' 42) 'Back'
-            Add-PromptPair (New-KeycapPrompt 'X' 30) $secondary
             Add-PromptPair (New-KeycapPrompt 'F10' 42) 'Windowed'
         }
     }
@@ -2529,6 +2529,7 @@ function Invoke-Action {
         'music-toggle' { Toggle-BackgroundMusic }
         'music-volume' { Cycle-MusicVolume }
         'music-volume-slider' { Adjust-SelectedSlider 5 }
+        'gamebar-scale-slider' { Adjust-SelectedSlider 5 }
         'music-theme' { Cycle-MusicTheme }
         'music-import' { Import-CustomMusic }
         'background-toggle' { Toggle-DynamicBackground }
@@ -2608,8 +2609,13 @@ function New-Action {
 }
 
 function New-SliderAction {
-    param([string]$Id,[string]$Title,[int]$Value,[string]$Description='Use Left/Right to adjust.')
-    New-Action $Id $Title $Description 'Slider' ([math]::Max(0,[math]::Min(100,$Value)))
+    param([string]$Id,[string]$Title,[int]$Value,[string]$Description='Use Left/Right to adjust.',[int]$Minimum=0,[int]$Maximum=100)
+    if($Maximum -lt $Minimum){$tmp=$Minimum;$Minimum=$Maximum;$Maximum=$tmp}
+    $clamped=[math]::Max($Minimum,[math]::Min($Maximum,$Value))
+    $action=New-Action $Id $Title $Description 'Slider' $clamped
+    $action|Add-Member -NotePropertyName Minimum -NotePropertyValue $Minimum -Force
+    $action|Add-Member -NotePropertyName Maximum -NotePropertyValue $Maximum -Force
+    return $action
 }
 
 function Get-PageDefinition {
@@ -3613,7 +3619,7 @@ function Render-Page {
             $title=New-Object System.Windows.Controls.TextBlock;$title.Text=$action.Title;$title.FontSize=18;$title.FontWeight='SemiBold';$title.Foreground='White';$title.TextWrapping='Wrap';$title.LineHeight=23;$title.LineStackingStrategy='BlockLineHeight';$title.Padding='0,1,0,2';[System.Windows.Controls.Grid]::SetRow($title,0);$grid.Children.Add($title)|Out-Null
             if([string](Get-EntryProperty $action 'Kind' '') -eq 'Slider'){
                 $sliderGrid=New-Object System.Windows.Controls.Grid;$sliderGrid.Margin='0,10,0,4';$sliderGrid.Width=430;$sliderGrid.HorizontalAlignment='Left';$sliderGrid.ColumnDefinitions.Add((New-Object System.Windows.Controls.ColumnDefinition -Property @{Width='340'}));$sliderGrid.ColumnDefinitions.Add((New-Object System.Windows.Controls.ColumnDefinition -Property @{Width='70'}));[System.Windows.Controls.Grid]::SetRow($sliderGrid,1)
-                $slider=New-Object System.Windows.Controls.Slider;$slider.Minimum=0;$slider.Maximum=100;$slider.Value=[int](Get-EntryProperty $action 'Value' 0);$slider.IsHitTestVisible=$false;$slider.Width=330;$slider.HorizontalAlignment='Left';$slider.Height=22;$slider.VerticalAlignment='Center';$sliderGrid.Children.Add($slider)|Out-Null
+                $slider=New-Object System.Windows.Controls.Slider;$slider.Minimum=[int](Get-EntryProperty $action 'Minimum' 0);$slider.Maximum=[int](Get-EntryProperty $action 'Maximum' 100);$slider.Value=[int](Get-EntryProperty $action 'Value' 0);$slider.IsHitTestVisible=$false;$slider.Width=330;$slider.HorizontalAlignment='Left';$slider.Height=22;$slider.VerticalAlignment='Center';$sliderGrid.Children.Add($slider)|Out-Null
                 $valueText=New-Object System.Windows.Controls.TextBlock;$valueText.Text=([int](Get-EntryProperty $action 'Value' 0)).ToString()+'%';$valueText.FontSize=16;$valueText.FontWeight='Bold';$valueText.Foreground='#F2D36B';$valueText.HorizontalAlignment='Right';$valueText.VerticalAlignment='Center';[System.Windows.Controls.Grid]::SetColumn($valueText,1);$sliderGrid.Children.Add($valueText)|Out-Null
                 $grid.Children.Add($sliderGrid)|Out-Null
                 $script:SliderControls[[string]$action.Id]=[pscustomobject]@{Slider=$slider;Text=$valueText}
@@ -3719,6 +3725,10 @@ function Adjust-SelectedSlider {
         'audio-volume-slider' {
             $value=[math]::Max(0,[math]::Min(100,(Get-AudioVolume)+$Delta));try{[HuymaierConsole.Native.AudioBridge]::SetMasterVolume($value/100.0)}catch{}
         }
+        'gamebar-scale-slider' {
+            $value=[math]::Max(70,[math]::Min(140,([int]$script:Config.GameBarScale)+$Delta));$script:Config.GameBarScale=$value;Save-Config
+            try{if('HuymaierConsole.NativeApp.HuymaierGameBarHost' -as [type]){[HuymaierConsole.NativeApp.HuymaierGameBarHost]::SetScalePercent($value)}}catch{}
+        }
         default{return $false}
     }
     try{$action.Value=$value}catch{}
@@ -3784,7 +3794,8 @@ function Get-RawControllerVirtualState {
                 '^(XboxX|LetterX|Square)$' { $result.Mask = $result.Mask -bor 16; continue }
                 '^(XboxY|LetterY|Triangle)$' { $result.Mask = $result.Mask -bor 32; continue }
                 '^(XboxMenu|XboxStart|Menu|Start|Options)$' { $result.Mask = $result.Mask -bor 1; continue }
-                '^(XboxView|View|Back|Share|Create|Home|Guide|PS)$' { $result.Mask = $result.Mask -bor 2; continue }
+                '^(XboxGuide|Guide|Home|PS|PlayStation)$' { $result.Mask = $result.Mask -bor 2; continue }
+                '^(XboxView|View|Back|Share|Create)$' { $result.Mask = $result.Mask -bor 4096; continue }
                 '^(XboxLeftBumper|LeftBumper|LetterL)$' { $result.Mask = $result.Mask -bor 1024; continue }
                 '^(XboxRightBumper|RightBumper|LetterR)$' { $result.Mask = $result.Mask -bor 2048; continue }
                 '(XboxUp|^Up$)' { $result.Direction = 'Up'; continue }
@@ -3902,7 +3913,6 @@ function Apply-ControllerNavigation {
     if(Is-NewButtonPress $Mask 4){Invoke-SelectedAction}
     if(Is-NewButtonPress $Mask 8){Handle-Back}
     if(Is-NewButtonPress $Mask 16){Invoke-SecondaryAction}
-    if(Is-NewButtonPress $Mask 1){Invoke-UiFeedback 'Confirm';Set-Tab 8}
     # LB/RB belonged to the retired shelf-art preview strip. Do not call its
     # legacy handler while the shared cinematic shelf is active.
     if($script:SubPage -eq 'PlatformShelf' -and $null -ne $script:ShelfPreviewImage){
@@ -3919,8 +3929,11 @@ function Process-Gamepads {
         return
     }
     if(-not (Test-ConsoleHasInputFocus)){
+        # Do not reset the native router here. While an external game/app or the
+        # Huymaier Game Bar owns focus, the external Guide watcher uses this same
+        # router for A/B/D-pad/shoulder input. Resetting it from the background
+        # Console timer would erase every navigation edge before the overlay sees it.
         $script:LastGamepadMask=0;$script:LastDirection='';$script:NextDirectionAt=[datetime]::MinValue
-        try{if('HuymaierConsole.NativeApp.NativeConsoleNavigation' -as [type]){[HuymaierConsole.NativeApp.NativeConsoleNavigation]::Reset()}}catch{}
         return
     }
     # v0.24.11 uses one neutral-armed physical controller source at a time.
@@ -3935,6 +3948,10 @@ function Process-Gamepads {
                 Set-ActiveInputFamily $family ([string]$nativeCommand.Name)
                 Hide-ConsoleCursor
             }
+            # A centered choice popup is a true modal input surface. Feed the
+            # normalized native command directly to it instead of converting it
+            # back through the legacy mask/focus path.
+            if((Get-Command Handle-HcChoicePopupNativeCommand -ErrorAction SilentlyContinue) -and (Handle-HcChoicePopupNativeCommand ([string]$nativeCommand.Command))){return}
             $nativeMask=0;$nativeDirection=''
             switch([string]$nativeCommand.Command){
                 'Left' {$nativeDirection='Left'}
@@ -3943,7 +3960,11 @@ function Process-Gamepads {
                 'Down' {$nativeDirection='Down'}
                 'Confirm' {$nativeMask=4}
                 'Back' {$nativeMask=8}
-                'Menu' {$nativeMask=2}
+                'Secondary' {$nativeMask=16}
+                'Tertiary' {$nativeMask=32}
+                'Guide' {$nativeMask=2}
+                'Menu' {$nativeMask=1}
+                'View' {$nativeMask=4096}
                 'LeftShoulder' {$nativeMask=1024}
                 'RightShoulder' {$nativeMask=2048}
             }
@@ -4048,6 +4069,8 @@ function Process-Gamepads {
         try {
             $reading = $snap.Gamepads[$i].GetCurrentReading()
             $mask = [int]$reading.Buttons
+            # Windows.Gaming.Input bit 2 is View/Back, not the Xbox system Guide button.
+            $mask = $mask -band (-bnot 2)
             $combinedMask = $combinedMask -bor $mask
             $x = [double]$reading.LeftThumbstickX
             $y = [double]$reading.LeftThumbstickY
@@ -4138,6 +4161,10 @@ if (Test-Path -LiteralPath $script:EmulatorPlatformsModulePath) {
 if (Test-Path -LiteralPath $script:WebBrowserModulePath) {
     try { . $script:WebBrowserModulePath }
     catch { Write-Log "Native browser module load failed: $($_.Exception.Message)" 'ERROR' }
+}
+if (Test-Path -LiteralPath $script:GameBarModulePath) {
+    try { . $script:GameBarModulePath }
+    catch { Write-Log "Huymaier Game Bar module load failed: $($_.Exception.Message)" 'ERROR' }
 }
 
 $xaml = @'
@@ -4397,7 +4424,7 @@ $xaml = @'
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel x:Name="PromptPanel" Orientation="Horizontal" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="HUYMAIER FSE  v0.25.6" FontSize="12" Foreground="#77869C"/>
+                <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="HUYMAIER FSE  v0.26.0" FontSize="12" Foreground="#77869C"/>
             </Grid>
         </Grid>
 
@@ -4734,9 +4761,12 @@ try {
     $gamepadTimer.Start()
     $script:MainGamepadTimer=$gamepadTimer
 
+    if(Get-Command Initialize-HuymaierGameBar -ErrorAction SilentlyContinue){Initialize-HuymaierGameBar}
+
     $script:Window.Add_Closing({
         param($sender,$eventArgs)
         if(-not $script:AllowWindowClose -and (Get-Date) -lt $script:PreventAutoCloseUntil){$eventArgs.Cancel=$true;Write-Log 'Prevented unintended console close after external launch.' 'WARN';return}
+        try{if(Get-Command Stop-HuymaierGameBar -ErrorAction SilentlyContinue){Stop-HuymaierGameBar};if('HuymaierConsole.NativeApp.NativeConsoleNavigation' -as [type]){[HuymaierConsole.NativeApp.NativeConsoleNavigation]::Shutdown()}}catch{}
         $script:IsClosing = $true
         try { $clockTimer.Stop(); $systemTimer.Stop(); $gamepadTimer.Stop(); if(Get-Command Stop-HuymaierWebBrowser -ErrorAction SilentlyContinue){Stop-HuymaierWebBrowser}; if ($null -ne $script:InitialScanTimer) { $script:InitialScanTimer.Stop() };if($null -ne $script:ArtworkContinuationTimer){$script:ArtworkContinuationTimer.Stop()};Stop-PlatformBackgroundAnimations;if($script:FpsMonitorStarted -and ('HuymaierConsole.Native.FrameRateMonitor' -as [type])){[HuymaierConsole.Native.FrameRateMonitor]::Stop();$script:FpsMonitorStarted=$false};if($null -ne $script:RawInputSource -and $null -ne $script:RawInputHook){$script:RawInputSource.RemoveHook($script:RawInputHook)} } catch { }
         try { if ($null -ne $script:MusicPlayer) { $script:MusicPlayer.Stop(); $script:MusicPlayer.Close() } } catch { }

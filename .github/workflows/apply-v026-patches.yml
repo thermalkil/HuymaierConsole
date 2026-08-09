@@ -1,0 +1,84 @@
+name: v0.26.0 Apply Feature Development Batch
+
+on:
+  push:
+    branches:
+      - feature/v0.26.0-native-gamebar
+    paths:
+      - '.development/v0.26.0/apply.json'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v026-feature-development
+  cancel-in-progress: false
+
+jobs:
+  apply-development:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/v0.26.0-native-gamebar
+          fetch-depth: 0
+
+      - name: Apply deterministic development batch
+        shell: bash
+        run: |
+          set -euo pipefail
+          BATCH="$(python3 -c "import json;print(json.load(open('.development/v0.26.0/apply.json'))['batch'])")"
+          SCRIPT="$(python3 -c "import json;print(json.load(open('.development/v0.26.0/apply.json')).get('script',''))")"
+          PATCH_DIR="$(python3 -c "import json;print(json.load(open('.development/v0.26.0/apply.json')).get('patch_dir',''))")"
+          LAST=''
+          if [ -f .development/v0.26.0/status.json ]; then
+            LAST="$(python3 -c "import json;print(json.load(open('.development/v0.26.0/status.json')).get('batch',''))")"
+          fi
+          if [ "$LAST" = "$BATCH" ]; then
+            echo "Development batch $BATCH is already applied."
+            exit 0
+          fi
+
+          if [ -n "$SCRIPT" ]; then
+            TRANSFORMER=".development/v0.26.0/$SCRIPT"
+            if [ ! -f "$TRANSFORMER" ]; then
+              echo "Transformer not found: $TRANSFORMER"
+              exit 1
+            fi
+            python3 "$TRANSFORMER"
+          elif [ -n "$PATCH_DIR" ]; then
+            shopt -s nullglob
+            patches=("$PATCH_DIR"/*.patch)
+            if [ "${#patches[@]}" -eq 0 ]; then
+              echo "No patch files found in $PATCH_DIR"
+              exit 1
+            fi
+            for patch in "${patches[@]}"; do git apply --check --whitespace=nowarn "$patch"; done
+            for patch in "${patches[@]}"; do git apply --whitespace=nowarn "$patch"; done
+          else
+            echo 'apply.json requires either script or patch_dir.'
+            exit 1
+          fi
+
+          python3 - <<PY
+          import json, datetime
+          state={
+            'batch':'$BATCH',
+            'script':'$SCRIPT',
+            'patch_dir':'$PATCH_DIR',
+            'result':'success',
+            'recordedAtUtc':datetime.datetime.now(datetime.timezone.utc).isoformat()
+          }
+          open('.development/v0.26.0/status.json','w',encoding='utf-8').write(json.dumps(state,indent=2)+'\n')
+          PY
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'No source changes to commit.'
+            exit 0
+          fi
+          git commit -m "Apply v0.26.0 development batch $BATCH"
+          git push origin HEAD:feature/v0.26.0-native-gamebar

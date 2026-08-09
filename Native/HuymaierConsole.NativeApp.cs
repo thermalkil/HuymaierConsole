@@ -203,7 +203,7 @@ namespace HuymaierConsole.NativeApp
 
     public sealed class NativeBridge
     {
-        public string Version { get { return "0.25.6"; } }
+        public string Version { get { return "0.26.0"; } }
 
         public bool ConsumeQuickAccessRequest() { return NativeQuickAccessRequest.Consume(); }
 
@@ -4140,7 +4140,7 @@ namespace HuymaierConsole.NativeApp
 
     internal enum XmbInputCommand
     {
-        None, Left, Right, Up, Down, Confirm, Back, Menu, Options, LeftShoulder, RightShoulder
+        None, Left, Right, Up, Down, Confirm, Back, Secondary, Tertiary, Guide, Menu, View, Options, LeftShoulder, RightShoulder
     }
 
     internal sealed class XmbInputRouter
@@ -4237,8 +4237,11 @@ namespace HuymaierConsole.NativeApp
             lastButtons = active.Buttons;
             if ((newButtons & 1) != 0) return XmbInputCommand.Confirm;
             if ((newButtons & 2) != 0) return XmbInputCommand.Back;
-            if ((newButtons & 4) != 0) return XmbInputCommand.Menu;
-            if ((newButtons & 32) != 0) return XmbInputCommand.Options;
+            if ((newButtons & 64) != 0) return XmbInputCommand.Secondary;
+            if ((newButtons & 128) != 0) return XmbInputCommand.Tertiary;
+            if ((newButtons & 4) != 0) return XmbInputCommand.Guide;
+            if ((newButtons & 32) != 0) return XmbInputCommand.Menu;
+            if ((newButtons & 256) != 0) return XmbInputCommand.View;
             if ((newButtons & 8) != 0) return XmbInputCommand.LeftShoulder;
             if ((newButtons & 16) != 0) return XmbInputCommand.RightShoulder;
 
@@ -4294,6 +4297,7 @@ namespace HuymaierConsole.NativeApp
         private void GetCandidates()
         {
             candidates.Clear();
+            bool systemGuideOwned = HuymaierSystemButtonBridge.IsAvailable;
             try
             {
                 int count = HuymaierConsole.Native.RawHidController.CopyNavigationSnapshots(sonySnapshots);
@@ -4306,8 +4310,10 @@ namespace HuymaierConsole.NativeApp
                     if ((snapshot.Mask & 8) != 0) buttons |= 2;
                     // Raw HID distinguishes Options (mask 1) from PS/Guide (mask 2).
                     // PS/Guide globally requests Huymaier Quick Access; Options stays local.
-                    if ((snapshot.Mask & 2) != 0) buttons |= 4;
-                    if ((snapshot.Mask & 1) != 0 || (snapshot.Mask & 32) != 0) buttons |= 32;
+                    if ((snapshot.Mask & 2) != 0 && !systemGuideOwned) buttons |= 4;
+                    if ((snapshot.Mask & 1) != 0) buttons |= 32;
+                    if ((snapshot.Mask & 16) != 0) buttons |= 64;
+                    if ((snapshot.Mask & 32) != 0) buttons |= 128;
                     if ((snapshot.Mask & 1024) != 0) buttons |= 8;
                     if ((snapshot.Mask & 2048) != 0) buttons |= 16;
                     string direction = snapshot.Direction == null ? String.Empty : snapshot.Direction;
@@ -4322,9 +4328,11 @@ namespace HuymaierConsole.NativeApp
             {
                 XInputNavigationSnapshot snapshot = xinputSnapshots[index];
                 if (!snapshot.Connected) continue;
-                bool activity = snapshot.Buttons != 0 || !String.IsNullOrWhiteSpace(snapshot.Direction);
+                int candidateButtons = snapshot.Buttons;
+                if (systemGuideOwned) candidateButtons &= ~4;
+                bool activity = candidateButtons != 0 || !String.IsNullOrWhiteSpace(snapshot.Direction);
                 candidates.Add(new InputCandidate(new InputSourceIdentity(1, snapshot.Index), 0,
-                    snapshot.Buttons, snapshot.Direction, activity, !activity));
+                    candidateButtons, snapshot.Direction, activity, !activity));
             }
 
             // Generic DirectInput navigation is intentionally disabled. Gaming mice and
@@ -4365,6 +4373,16 @@ namespace HuymaierConsole.NativeApp
                 {
                     router = new XmbInputRouter();
                     deviceChangeResetPending = false;
+                }
+                if (HuymaierSystemButtonBridge.ConsumeGuidePress())
+                {
+                    string systemSource = router.ActiveSourceKey ?? String.Empty;
+                    return new NativeNavigationCommand {
+                        Command = "Guide",
+                        Active = true,
+                        Family = systemSource.StartsWith("sony:", StringComparison.OrdinalIgnoreCase) ? "PlayStation" : "Xbox",
+                        Name = systemSource.StartsWith("sony:", StringComparison.OrdinalIgnoreCase) ? "PlayStation Guide Button" : "Xbox Guide Button"
+                    };
                 }
                 XmbInputCommand command = router.Poll();
                 string source = router.ActiveSourceKey == null ? String.Empty : router.ActiveSourceKey;
@@ -4409,6 +4427,15 @@ namespace HuymaierConsole.NativeApp
                 router = new XmbInputRouter();
                 deviceChangeResetPending = false;
                 deviceChangeQuietUntilUtc = DateTime.UtcNow.AddMilliseconds(300);
+            }
+        }
+
+        public static void Shutdown()
+        {
+            lock (Sync)
+            {
+                router.Reset();
+                HuymaierSystemButtonBridge.Shutdown();
             }
         }
     }
@@ -4547,10 +4574,13 @@ namespace HuymaierConsole.NativeApp
                         ushort mask = state.Gamepad.Buttons;
                         if ((mask & 0x1000) != 0) buttons |= 1;
                         if ((mask & 0x2000) != 0) buttons |= 2;
-                        // XInputGetState exposes Guide as 0x0400 on supported Windows/XInput paths.
-                        // Preserve existing Start/Back compatibility while making Guide explicit.
-                        if ((mask & 0x0400) != 0 || (mask & 0x0010) != 0 || (mask & 0x0020) != 0) buttons |= 4;
-                        if ((mask & 0x8000) != 0) buttons |= 32;
+                        // Guide is distinct from Start/Menu and Back/View. GameInput owns the
+                        // primary system-button path; 0x0400 remains compatibility fallback only.
+                        if ((mask & 0x0400) != 0) buttons |= 4;
+                        if ((mask & 0x0010) != 0) buttons |= 32;
+                        if ((mask & 0x0020) != 0) buttons |= 256;
+                        if ((mask & 0x4000) != 0) buttons |= 64;
+                        if ((mask & 0x8000) != 0) buttons |= 128;
                         if ((mask & 0x0100) != 0) buttons |= 8;
                         if ((mask & 0x0200) != 0) buttons |= 16;
                         if ((mask & 0x0004) != 0 || state.Gamepad.LeftThumbX < -15000) direction = "Left";

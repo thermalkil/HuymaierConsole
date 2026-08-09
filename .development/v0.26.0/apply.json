@@ -1,0 +1,5 @@
+{
+  "batch": "popup-navigate-feedback-1",
+  "script": "apply_popup_navigate_feedback.py",
+  "attempt": 1
+}

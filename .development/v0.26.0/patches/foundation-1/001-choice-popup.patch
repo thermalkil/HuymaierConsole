@@ -1,0 +1,6 @@
+diff --git a/HuymaierShellRedesign.ps1 b/HuymaierShellRedesign.ps1
+--- a/HuymaierShellRedesign.ps1
++++ b/HuymaierShellRedesign.ps1
+@@ -1,1 +1,1 @@
+-        $stack=New-Object System.Windows.Controls.StackPanel;$title=New-Object System.Windows.Controls.TextBlock;$title.Text=$Title;$title.FontSize=27;$title.FontWeight='Bold';$title.Foreground='White';$title.Margin='0,0,0,18';$stack.Children.Add($title)|Out-Null
++        $stack=New-Object System.Windows.Controls.StackPanel;$titleBlock=New-Object System.Windows.Controls.TextBlock;$titleBlock.Text=$Title;$titleBlock.FontSize=27;$titleBlock.FontWeight='Bold';$titleBlock.Foreground='White';$titleBlock.Margin='0,0,0,18';$stack.Children.Add($titleBlock)|Out-Null
