@@ -11,7 +11,7 @@ Add-Type -AssemblyName WindowsBase
 Add-Type -AssemblyName System.Xaml
 try { Add-Type -AssemblyName System.Runtime.WindowsRuntime -ErrorAction SilentlyContinue } catch { }
 
-$script:AppVersion = '0.25.6'
+$script:AppVersion = '0.26.0'
 $script:AppName = 'Huymaier Console'
 $script:DataDir = Join-Path $env:LOCALAPPDATA 'Huymaier Console'
 $script:ConfigPath = Join-Path $script:DataDir 'config.json'
@@ -37,6 +37,7 @@ $script:GameExperienceModulePath = Join-Path $script:BaseDir 'HuymaierGameExperi
 $script:ShellRedesignModulePath = Join-Path $script:BaseDir 'HuymaierShellRedesign.ps1'
 $script:EmulatorPlatformsModulePath = Join-Path $script:BaseDir 'HuymaierEmulatorPlatforms.ps1'
 $script:WebBrowserModulePath = Join-Path $script:BaseDir 'HuymaierWebBrowser.ps1'
+$script:GameBarModulePath = Join-Path $script:BaseDir 'HuymaierGameBar.ps1'
 $script:NavItems = @('Home','Games','Apps','Web','Downloads','Import','File Explorer','Settings','Power')
 $script:SelectedTab = 0
 $script:SelectedAction = 0
@@ -1088,40 +1089,40 @@ function Render-PromptFooter {
     if ($null -eq $script:PromptPanel) { return }
     $script:PromptPanel.Children.Clear()
     $family = Get-PromptFamily
-    $secondary='Search'
-    try{$secondary=Get-StorefrontSecondaryLabel}catch{}
+    $secondary=''
+    try{$secondary=[string](Get-StorefrontSecondaryLabel)}catch{}
+    if($secondary -notin @('Manage','Install')){$secondary=''}
     switch ($family) {
         'PlayStation' {
             Add-PromptPair (New-PlayStationPrompt 'Cross') 'Select'
             Add-PromptPair (New-PlayStationPrompt 'Circle') 'Back'
-            Add-PromptPair (New-PlayStationPrompt 'Square') $secondary
-            Add-PromptPair (New-KeycapPrompt 'PS' 34) 'Menu'
+            if($secondary){Add-PromptPair (New-PlayStationPrompt 'Square') $secondary}
+            Add-PromptPair (New-KeycapPrompt 'PS' 34) 'Quick Access'
             Add-PromptPair (New-PlayStationPrompt 'Options') 'Power'
         }
         'Nintendo' {
             Add-PromptPair (New-LetterPrompt 'A' '#F4F6FA') 'Select'
             Add-PromptPair (New-LetterPrompt 'B' '#F4F6FA') 'Back'
-            Add-PromptPair (New-LetterPrompt 'X' '#F4F6FA') $secondary
-            Add-PromptPair (New-KeycapPrompt 'HOME' 48) 'Menu'
+            if($secondary){Add-PromptPair (New-LetterPrompt 'X' '#F4F6FA') $secondary}
+            Add-PromptPair (New-KeycapPrompt 'HOME' 48) 'Quick Access'
             Add-PromptPair (New-KeycapPrompt '+') 'Power'
         }
         'Steam' {
             Add-PromptPair (New-LetterPrompt 'A' '#7ECF75') 'Select'
             Add-PromptPair (New-LetterPrompt 'B' '#E66B6B') 'Back'
-            Add-PromptPair (New-LetterPrompt 'X' '#65AEE8') $secondary
-            Add-PromptPair (New-KeycapPrompt 'STEAM' 52) 'Menu'
+            if($secondary){Add-PromptPair (New-LetterPrompt 'X' '#65AEE8') $secondary}
+            Add-PromptPair (New-KeycapPrompt 'STEAM' 52) 'Quick Access'
         }
         'Xbox' {
             Add-PromptPair (New-LetterPrompt 'A' '#73C86B') 'Select'
             Add-PromptPair (New-LetterPrompt 'B' '#E56565') 'Back'
-            Add-PromptPair (New-LetterPrompt 'X' '#65AEE8') $secondary
-            Add-PromptPair (New-KeycapPrompt 'VIEW' 44) 'Menu'
+            if($secondary){Add-PromptPair (New-LetterPrompt 'X' '#65AEE8') $secondary}
+            Add-PromptPair (New-KeycapPrompt 'XBOX' 48) 'Quick Access'
             Add-PromptPair (New-KeycapPrompt 'MENU' 48) 'Power'
         }
         default {
             Add-PromptPair (New-KeycapPrompt 'ENTER' 54) 'Select'
             Add-PromptPair (New-KeycapPrompt 'ESC' 42) 'Back'
-            Add-PromptPair (New-KeycapPrompt 'X' 30) $secondary
             Add-PromptPair (New-KeycapPrompt 'F10' 42) 'Windowed'
         }
     }
@@ -3784,7 +3785,8 @@ function Get-RawControllerVirtualState {
                 '^(XboxX|LetterX|Square)$' { $result.Mask = $result.Mask -bor 16; continue }
                 '^(XboxY|LetterY|Triangle)$' { $result.Mask = $result.Mask -bor 32; continue }
                 '^(XboxMenu|XboxStart|Menu|Start|Options)$' { $result.Mask = $result.Mask -bor 1; continue }
-                '^(XboxView|View|Back|Share|Create|Home|Guide|PS)$' { $result.Mask = $result.Mask -bor 2; continue }
+                '^(XboxGuide|Guide|Home|PS|PlayStation)$' { $result.Mask = $result.Mask -bor 2; continue }
+                '^(XboxView|View|Back|Share|Create)$' { $result.Mask = $result.Mask -bor 4096; continue }
                 '^(XboxLeftBumper|LeftBumper|LetterL)$' { $result.Mask = $result.Mask -bor 1024; continue }
                 '^(XboxRightBumper|RightBumper|LetterR)$' { $result.Mask = $result.Mask -bor 2048; continue }
                 '(XboxUp|^Up$)' { $result.Direction = 'Up'; continue }
@@ -3943,7 +3945,7 @@ function Process-Gamepads {
                 'Down' {$nativeDirection='Down'}
                 'Confirm' {$nativeMask=4}
                 'Back' {$nativeMask=8}
-                'Menu' {$nativeMask=2}
+                'Guide' {$nativeMask=2}
                 'LeftShoulder' {$nativeMask=1024}
                 'RightShoulder' {$nativeMask=2048}
             }
@@ -4048,6 +4050,8 @@ function Process-Gamepads {
         try {
             $reading = $snap.Gamepads[$i].GetCurrentReading()
             $mask = [int]$reading.Buttons
+            # Windows.Gaming.Input bit 2 is View/Back, not the Xbox system Guide button.
+            $mask = $mask -band (-bnot 2)
             $combinedMask = $combinedMask -bor $mask
             $x = [double]$reading.LeftThumbstickX
             $y = [double]$reading.LeftThumbstickY
@@ -4138,6 +4142,10 @@ if (Test-Path -LiteralPath $script:EmulatorPlatformsModulePath) {
 if (Test-Path -LiteralPath $script:WebBrowserModulePath) {
     try { . $script:WebBrowserModulePath }
     catch { Write-Log "Native browser module load failed: $($_.Exception.Message)" 'ERROR' }
+}
+if (Test-Path -LiteralPath $script:GameBarModulePath) {
+    try { . $script:GameBarModulePath }
+    catch { Write-Log "Huymaier Game Bar module load failed: $($_.Exception.Message)" 'ERROR' }
 }
 
 $xaml = @'
@@ -4397,7 +4405,7 @@ $xaml = @'
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel x:Name="PromptPanel" Orientation="Horizontal" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="HUYMAIER FSE  v0.25.6" FontSize="12" Foreground="#77869C"/>
+                <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="HUYMAIER FSE  v0.26.0" FontSize="12" Foreground="#77869C"/>
             </Grid>
         </Grid>
 
@@ -4734,9 +4742,12 @@ try {
     $gamepadTimer.Start()
     $script:MainGamepadTimer=$gamepadTimer
 
+    if(Get-Command Initialize-HuymaierGameBar -ErrorAction SilentlyContinue){Initialize-HuymaierGameBar}
+
     $script:Window.Add_Closing({
         param($sender,$eventArgs)
         if(-not $script:AllowWindowClose -and (Get-Date) -lt $script:PreventAutoCloseUntil){$eventArgs.Cancel=$true;Write-Log 'Prevented unintended console close after external launch.' 'WARN';return}
+        try{if(Get-Command Stop-HuymaierGameBar -ErrorAction SilentlyContinue){Stop-HuymaierGameBar};if('HuymaierConsole.NativeApp.NativeConsoleNavigation' -as [type]){[HuymaierConsole.NativeApp.NativeConsoleNavigation]::Shutdown()}}catch{}
         $script:IsClosing = $true
         try { $clockTimer.Stop(); $systemTimer.Stop(); $gamepadTimer.Stop(); if(Get-Command Stop-HuymaierWebBrowser -ErrorAction SilentlyContinue){Stop-HuymaierWebBrowser}; if ($null -ne $script:InitialScanTimer) { $script:InitialScanTimer.Stop() };if($null -ne $script:ArtworkContinuationTimer){$script:ArtworkContinuationTimer.Stop()};Stop-PlatformBackgroundAnimations;if($script:FpsMonitorStarted -and ('HuymaierConsole.Native.FrameRateMonitor' -as [type])){[HuymaierConsole.Native.FrameRateMonitor]::Stop();$script:FpsMonitorStarted=$false};if($null -ne $script:RawInputSource -and $null -ne $script:RawInputHook){$script:RawInputSource.RemoveHook($script:RawInputHook)} } catch { }
         try { if ($null -ne $script:MusicPlayer) { $script:MusicPlayer.Stop(); $script:MusicPlayer.Close() } } catch { }

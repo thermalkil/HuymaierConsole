@@ -17,6 +17,7 @@ $providerWorkerPath = Join-Path $baseDir 'HuymaierGameProviderWorker.ps1'
 $artworkWorkerPath = Join-Path $baseDir 'HuymaierArtworkWorker.ps1'
 $gameExperiencePath = Join-Path $baseDir 'HuymaierGameExperience.ps1'
 $shellRedesignPath = Join-Path $baseDir 'HuymaierShellRedesign.ps1'
+$gameBarPath = Join-Path $baseDir 'HuymaierGameBar.ps1'
 $dataDir = Join-Path $env:LOCALAPPDATA 'Huymaier Console'
 $logDir = Join-Path $dataDir 'Logs'
 New-Item -ItemType Directory -Force -Path $dataDir, $logDir | Out-Null
@@ -53,12 +54,13 @@ try {
     Test-PowerShellFile $artworkWorkerPath 'Online artwork worker'
     Test-PowerShellFile $gameExperiencePath 'Unified game experience'
     Test-PowerShellFile $shellRedesignPath 'Shell redesign'
-    Write-BootstrapLog 'Huymaier Console v0.25.6 preflight passed.'
+    Test-PowerShellFile $gameBarPath 'Huymaier Game Bar'
+    Write-BootstrapLog 'Huymaier Console v0.26.0 preflight passed.'
     if ($Windowed) { & $corePath -Windowed } else { & $corePath }
 }
 catch {
     $message=$_.Exception.Message
-    Write-BootstrapLog "v0.25.6 preflight/startup failed:`n$message" 'FATAL'
+    Write-BootstrapLog "v0.26.0 preflight/startup failed:`n$message" 'FATAL'
     try {
         Add-Type -AssemblyName PresentationFramework
         [System.Windows.MessageBox]::Show(

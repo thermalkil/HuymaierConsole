@@ -1,7 +1,7 @@
 param(
     [ValidateSet('Scan','Download')][string]$Action='Scan',
     [Parameter(Mandatory=$true)][string]$StatePath,
-    [string]$CurrentVersion='0.25.6',
+    [string]$CurrentVersion='0.26.0',
     [string]$Repository='thermalkil/HuymaierConsole'
 )
 Set-StrictMode -Version 2.0
@@ -98,14 +98,14 @@ try{
     Add-Type -AssemblyName System.Net.Http
     $handler=[System.Net.Http.HttpClientHandler]::new();$handler.AllowAutoRedirect=$true
     $client=[System.Net.Http.HttpClient]::new($handler)
-    $client.DefaultRequestHeaders.UserAgent.ParseAdd('HuymaierConsole/0.25.6')
+    $client.DefaultRequestHeaders.UserAgent.ParseAdd('HuymaierConsole/0.26.0')
     if($token){$client.DefaultRequestHeaders.Authorization=[System.Net.Http.Headers.AuthenticationHeaderValue]::new('Bearer',$token)}
     $downloadUri=if($token -and [string]$asset.url){[string]$asset.url}else{[string]$asset.browser_download_url}
     if($token){$client.DefaultRequestHeaders.Accept.Clear();$client.DefaultRequestHeaders.Accept.Add([System.Net.Http.Headers.MediaTypeWithQualityHeaderValue]::new('application/octet-stream'))}
     $response=$client.GetAsync($downloadUri,[System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult();$response.EnsureSuccessStatusCode()
     $stream=$response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();$file=[IO.File]::Open($partial,[IO.FileMode]::Create,[IO.FileAccess]::Write,[IO.FileShare]::None)
     try{
-        $total=[long]$asset.size;if($response.Content.Headers.ContentLength.HasValue){$total=[long]$response.Content.Headers.ContentLength.Value}
+        $total=[long]$asset.size;$contentLength=$response.Content.Headers.ContentLength;if($null -ne $contentLength -and [long]$contentLength -gt 0){$total=[long]$contentLength}
         $buffer=New-Object byte[] (1024*1024);$done=[long]0;$last=[DateTime]::MinValue
         while(($read=$stream.Read($buffer,0,$buffer.Length)) -gt 0){
             $file.Write($buffer,0,$read);$done+=$read

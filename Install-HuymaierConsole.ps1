@@ -2,7 +2,7 @@ param([switch]$SilentUpdate)
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
-$script:InstallVersion = '0.25.6'
+$script:InstallVersion = '0.26.0'
 $script:InstallStartedUtc = [DateTime]::UtcNow
 $script:InstallLogRoot = Join-Path $env:LOCALAPPDATA 'Huymaier Console\Logs'
 New-Item -ItemType Directory -Force -Path $script:InstallLogRoot | Out-Null
@@ -100,6 +100,8 @@ $files = @(
     'HuymaierGameProviderWorker.ps1',
     'HuymaierGameExperience.ps1',
     'HuymaierShellRedesign.ps1',
+    'HuymaierGameBar.ps1',
+    'HuymaierGameInputBridge.dll',
     'HuymaierEmulatorPlatforms.ps1',
     'HuymaierArtworkWorker.ps1',
     'HuymaierPs3LibraryWorker.ps1',
@@ -149,6 +151,24 @@ if(Test-Path $toolsSource){
     Copy-Item (Join-Path $toolsSource '*') $toolsDestination -Recurse -Force
 }
 
+# Microsoft GameInput is the primary Xbox system-button path for v0.26+.
+# The official redistributable does not downgrade a newer installed runtime.
+$gameInputRedistVersion='3.5.262'
+$gameInputRedist=Join-Path $toolsDestination 'GameInput\GameInputRedist.msi'
+$gameInputMarker=Join-Path $destination 'gameinput-redist.version'
+$installedGameInputVersion=''
+try{if(Test-Path -LiteralPath $gameInputMarker -PathType Leaf){$installedGameInputVersion=(Get-Content -Raw -LiteralPath $gameInputMarker).Trim()}}catch{}
+if((Test-Path -LiteralPath $gameInputRedist -PathType Leaf) -and $installedGameInputVersion -ne $gameInputRedistVersion){
+    try{
+        Write-InstallerRecord "Installing Microsoft GameInput redistributable $gameInputRedistVersion. Windows may request administrator approval."
+        $msiArgs='/i "'+$gameInputRedist+'" /qn /norestart'
+        $gameInputInstall=Start-Process -FilePath "$env:SystemRoot\System32\msiexec.exe" -ArgumentList $msiArgs -Verb RunAs -Wait -PassThru
+        if($gameInputInstall.ExitCode -notin @(0,3010,1638)){throw "GameInput redistributable installer exited with code $($gameInputInstall.ExitCode)."}
+        Set-Content -LiteralPath $gameInputMarker -Value $gameInputRedistVersion -Encoding ASCII
+        Write-InstallerRecord 'Microsoft GameInput redistributable is ready.'
+    }catch{Write-InstallerRecord "Microsoft GameInput redistributable could not be installed; controller input will fall back to Raw HID/XInput where available. $($_.Exception.Message)" 'WARN'}
+}
+
 $nativeSourceRoot=Join-Path $source 'Native'
 $nativeDestinationRoot=Join-Path $destination 'Native'
 if(Test-Path $nativeSourceRoot){
@@ -183,12 +203,14 @@ $nativeTemp=Join-Path $destination 'HuymaierConsole.native.new.exe'
 $nativeAppSource=Join-Path $nativeDestinationRoot 'HuymaierConsole.NativeApp.cs'
 $nativePs1Source=Join-Path $nativeDestinationRoot 'HuymaierConsole.Ps1.cs'
 $nativeConsolePlatformsSource=Join-Path $nativeDestinationRoot 'HuymaierConsole.ConsolePlatforms.cs'
+$nativeGameBarSource=Join-Path $nativeDestinationRoot 'HuymaierGameBar.cs'
+$nativeGameInputSource=Join-Path $nativeDestinationRoot 'HuymaierConsole.GameInput.cs'
 $nativeInputSource=Join-Path $destination 'HuymaierNativeInput.cs'
 $nativeDisplaySource=Join-Path $destination 'HuymaierNativeDisplay.cs'
 $nativeAudioSource=Join-Path $destination 'HuymaierNativeAudio.cs'
 $nativePerformanceSource=Join-Path $destination 'HuymaierPerformance.cs'
 $p3tSource=Join-Path $destination 'EmulatorPlatforms\Shared\Huymaier.P3T.cs'
-foreach($requiredSource in @($nativeAppSource,$nativePs1Source,$nativeConsolePlatformsSource,$nativeInputSource,$nativeDisplaySource,$nativeAudioSource,$nativePerformanceSource,$p3tSource)){
+foreach($requiredSource in @($nativeAppSource,$nativePs1Source,$nativeConsolePlatformsSource,$nativeGameBarSource,$nativeGameInputSource,$nativeInputSource,$nativeDisplaySource,$nativeAudioSource,$nativePerformanceSource,$p3tSource)){
     if(-not (Test-Path -LiteralPath $requiredSource)){throw "Native application source is missing: $requiredSource"}
 }
 Remove-Item -LiteralPath $nativeTemp -Force -ErrorAction SilentlyContinue
@@ -237,6 +259,8 @@ $compilerArgs += @(
     $nativeAppSource,
     $nativePs1Source,
     $nativeConsolePlatformsSource,
+    $nativeGameBarSource,
+    $nativeGameInputSource,
     $nativeInputSource,
     $nativeDisplaySource,
     $nativeAudioSource,

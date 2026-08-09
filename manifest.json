@@ -1,15 +1,17 @@
 {
   "name": "Huymaier Console FSE Shell, Storefront & Artwork Integration",
-  "version": "0.25.6",
-  "baseVersion": "0.25.5",
-  "build": "settings-choice-display-scale-stabilization",
-  "builtFrom": "HC255.zip",
+  "version": "0.26.0",
+  "baseVersion": "0.25.8",
+  "build": "native-gamebar-guide-task-switcher-development",
+  "builtFrom": "HC258.zip",
   "features": [
-    "fixes centered Settings choice popup initialization under PowerShell StrictMode",
-    "uses centered choice popups for Quick Access location, keyboard theme, button prompts, and music theme",
-    "adds Settings > Display > Scale with percentage choices and Windows account DPI configuration",
-    "surfaces confirmed Windows sign-out when a newly configured display scale is pending",
-    "preserves the v0.25.5 fresh-PC startup fix, Epic live download telemetry, GitHub self-update, Windows/driver update pages, Steam population, RPCS3 users, and shared Shelf/Library artwork"
+    "keeps Quick Access exclusive to Huymaier Console while adding a separate external-game/app Huymaier Game Bar",
+    "separates physical Guide/Xbox/PS/Home from Xbox View/Back and PlayStation Share/Create",
+    "adds a native Microsoft GameInput system-button bridge with Raw HID/XInput compatibility fallback",
+    "adds a native Huymaier task switcher baseline for user-facing top-level Windows application windows",
+    "fixes the PowerShell Title/title collision that prevented centered finite-choice popups from opening",
+    "removes decorative X/Square Search prompts when no secondary action exists",
+    "preserves the v0.25.8 Windows PowerShell BOM packaging and updater ContentLength hotfixes"
   ],
-  "description": "Settings chooser and Windows display-scale stabilization build."
+  "description": "Development baseline for the native Huymaier Game Bar, task switcher, real Guide routing, popup chooser repair, and capability-driven prompts."
 }
