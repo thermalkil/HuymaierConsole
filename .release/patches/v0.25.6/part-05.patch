@@ -1,0 +1,196 @@
+diff --git a/a/HuymaierWebBrowser.ps1 b/b/HuymaierWebBrowser.ps1
+index 1773b55..c1942fa 100644
+--- a/a/HuymaierWebBrowser.ps1
++++ b/b/HuymaierWebBrowser.ps1
+@@ -1,4 +1,4 @@
+-﻿# Huymaier Console native controller browser (WebView2)
++# Huymaier Console native controller browser (WebView2)
+ # Loaded by HuymaierConsole.ps1. All browser data stays under the current
+ # Windows user's Huymaier Console data directory.
+ 
+@@ -117,7 +117,7 @@ function Initialize-HuymaierWebBrowser {
+         }
+     }else{
+         $fallbackTitle.Text='Native browser components missing'
+-        $fallbackText.Text='Re-run the v0.25.3 installer while connected to the internet. It downloads the official Microsoft WebView2 SDK components.'
++        $fallbackText.Text='Re-run the v0.25.6 installer while connected to the internet. It downloads the official Microsoft WebView2 SDK components.'
+     }
+ 
+     $timer=New-Object System.Windows.Threading.DispatcherTimer;$timer.Interval=[TimeSpan]::FromMilliseconds(250)
+@@ -136,7 +136,7 @@ function Initialize-HcBrowserCore {
+         $core.Settings.IsZoomControlEnabled=$false
+         try{$core.Settings.IsPasswordAutosaveEnabled=$true}catch{}
+         try{$core.Settings.IsGeneralAutofillEnabled=$true}catch{}
+-        try{$core.Settings.UserAgent=$core.Settings.UserAgent+' HuymaierConsole/0.25.3'}catch{}
++        try{$core.Settings.UserAgent=$core.Settings.UserAgent+' HuymaierConsole/0.25.6'}catch{}
+         $core.Add_NewWindowRequested({param($s,$e)try{$e.Handled=$true;if($e.Uri){$script:HcBrowserWebView.Source=[uri]$e.Uri}}catch{}})
+         $core.Add_DocumentTitleChanged({try{Update-HcBrowserAddress}catch{}})
+         $core.Add_HistoryChanged({try{Update-HcBrowserToolbarVisuals}catch{}})
+diff --git a/a/Install-HuymaierConsole.cmd b/b/Install-HuymaierConsole.cmd
+index 55384fe..e0a824e 100644
+--- a/a/Install-HuymaierConsole.cmd
++++ b/b/Install-HuymaierConsole.cmd
+@@ -1,10 +1,10 @@
+-﻿@echo off
++@echo off
+ setlocal EnableExtensions
+ cd /d "%~dp0"
+-title Huymaier Console v0.25.0 Installer
++title Huymaier Console v0.25.6 Installer
+ 
+ echo ============================================================
+-echo  Huymaier Console v0.25.0 Installer
++echo  Huymaier Console v0.25.6 Installer
+ echo ============================================================
+ echo.
+ echo The installer will remain open if anything fails.
+@@ -22,7 +22,7 @@ if not "%HC_EXIT%"=="0" (
+     echo The full error was saved under:
+     echo   %%LOCALAPPDATA%%\Huymaier Console\Logs
+     echo.
+-    echo Please send the newest install-v0.25.0-*.log file.
++    echo Please send the newest install-v0.25.6-*.log file.
+     echo.
+     pause
+     exit /b %HC_EXIT%
+diff --git a/a/Install-HuymaierConsole.ps1 b/b/Install-HuymaierConsole.ps1
+index 6cd329e..bd7211d 100644
+--- a/a/Install-HuymaierConsole.ps1
++++ b/b/Install-HuymaierConsole.ps1
+@@ -1,8 +1,8 @@
+-﻿param([switch]$SilentUpdate)
++param([switch]$SilentUpdate)
+ Set-StrictMode -Version 2.0
+ $ErrorActionPreference = 'Stop'
+ 
+-$script:InstallVersion = '0.25.4'
++$script:InstallVersion = '0.25.6'
+ $script:InstallStartedUtc = [DateTime]::UtcNow
+ $script:InstallLogRoot = Join-Path $env:LOCALAPPDATA 'Huymaier Console\Logs'
+ New-Item -ItemType Directory -Force -Path $script:InstallLogRoot | Out-Null
+@@ -386,7 +386,7 @@ if($SilentUpdate){
+     Write-InstallerRecord 'Silent self-update installation completed; relaunch is delegated to HuymaierSelfUpdater.ps1.'
+     exit 0
+ }
+-$result = [System.Windows.MessageBox]::Show("Huymaier Console v0.25.4 stabilization build was installed for this Windows account.`n`nLocation:`n$destination`n`nLaunch it now?", 'Huymaier Console', 'YesNo', 'Information')
++$result = [System.Windows.MessageBox]::Show("Huymaier Console v0.25.6 stabilization build was installed for this Windows account.`n`nLocation:`n$destination`n`nLaunch it now?", 'Huymaier Console', 'YesNo', 'Information')
+ if ($result -eq 'Yes') {
+     Start-Process $nativeExe -WorkingDirectory $destination
+ }
+diff --git a/a/Native/HuymaierConsole.ConsolePlatforms.cs b/b/Native/HuymaierConsole.ConsolePlatforms.cs
+index 7eda6fb..8b63ced 100644
+--- a/a/Native/HuymaierConsole.ConsolePlatforms.cs
++++ b/b/Native/HuymaierConsole.ConsolePlatforms.cs
+@@ -1,4 +1,4 @@
+-﻿using System;
++using System;
+ using System.Collections.Generic;
+ using System.Diagnostics;
+ using System.Globalization;
+@@ -2219,7 +2219,7 @@ namespace HuymaierConsole.NativeApp
+                     try
+                     {
+                         HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+-                        request.UserAgent = "HuymaierConsole/0.25.3";
++                        request.UserAgent = "HuymaierConsole/0.25.6";
+                         request.Timeout = 4500; request.ReadWriteTimeout = 6500;
+                         request.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
+                         using (WebResponse response = request.GetResponse())
+diff --git a/a/Native/HuymaierConsole.NativeApp.cs b/b/Native/HuymaierConsole.NativeApp.cs
+index 4cee485..8ad1a06 100644
+--- a/a/Native/HuymaierConsole.NativeApp.cs
++++ b/b/Native/HuymaierConsole.NativeApp.cs
+@@ -1,4 +1,4 @@
+-﻿using System;
++using System;
+ using System.Collections.Generic;
+ using System.Collections.ObjectModel;
+ using System.Diagnostics;
+@@ -203,7 +203,7 @@ namespace HuymaierConsole.NativeApp
+ 
+     public sealed class NativeBridge
+     {
+-        public string Version { get { return "0.25.3"; } }
++        public string Version { get { return "0.25.6"; } }
+ 
+         public bool ConsumeQuickAccessRequest() { return NativeQuickAccessRequest.Consume(); }
+ 
+diff --git a/a/README.txt b/b/README.txt
+index 9c9ec25..3f38e88 100644
+--- a/a/README.txt
++++ b/b/README.txt
+@@ -1,21 +1,14 @@
+-﻿HUYMAIER CONSOLE FSE v0.25.3
++HUYMAIER CONSOLE FSE v0.25.6
+ 
+-- Epic installs/updates now stream Legendary progress into Downloads: percentage, ETA, downloaded/total bytes, and live transfer rate.
+-Focused stabilization candidate on top of v0.25.1.
++Controller-first Windows 11 full-screen console shell.
+ 
+-Primary fixes:
+-- Windows Update and Driver Updates now have real Settings-owned pages. Opening either page starts a visible scan; results, install actions, errors, and restart-required actions stay on that page.
+-- Quick Access location opens a centered Bottom / Top / Left / Right chooser rather than a dead/cycling setting.
+-- Controller input owns navigation while active. A stationary mouse no longer steals selection when scrolling moves controls underneath it; physical mouse movement/click restores mouse control.
+-- PS/Guide opens Huymaier Quick Access globally, including native PlayStation-family console interfaces; Options remains local to the native console.
+-- Downloads history contains only genuine completed install/download events, retained for seven days and capped at twenty. Old Refresh/scan history is removed. Recent direct-provider installs can be reconstructed from provider logs.
+-- Apps aggressively excludes recognized games rather than mirroring every Windows Start registration.
+-- Epic filtering now rejects Unreal Engine Marketplace assets/plugins/content in local manifests and direct owned-library catalogs, and v0.25.2 forces one cleanup library rescan.
++This stabilization build adds reliable centered option choosers for Quick Access location, keyboard theme, button prompts, music theme, and Windows display scale. Display Scale is under Settings -> Display and uses percentage choices from 100% through 500%; Windows sign-out is surfaced when required for the new account scale to apply fully.
+ 
+-Preserved confirmed behavior:
+-- RPCS3 users/profiles work.
+-- Steam games populate natively.
+-- Shelf uses Library artwork.
+-- Emulator platform cards continue direct native-console entry.
++It also preserves the v0.25.5 clean-install startup fix, Epic/Legendary live transfer telemetry, 7-day / 20-entry download history, dedicated Windows Update and Driver Update pages, GitHub self-update, Steam population, RPCS3 users, and shared Shelf/Library artwork.
+ 
+-See RELEASE_NOTES-v0.25.3.txt and Docs\TEST-CHECKLIST.txt.
++Install
++1. Extract the ZIP to a normal local folder such as C:\HC256.
++2. Run Install-HuymaierConsole.cmd.
++3. Launch Huymaier Console from the installed shortcut.
++
++See RELEASE_NOTES-v0.25.6.txt and Docs\TEST-CHECKLIST.txt.
+diff --git a/b/RELEASE_NOTES-v0.25.5.txt b/b/RELEASE_NOTES-v0.25.5.txt
+new file mode 100644
+index 0000000..617f396
+--- /dev/null
++++ b/b/RELEASE_NOTES-v0.25.5.txt
+@@ -0,0 +1,10 @@
++Huymaier Console v0.25.5
++
++Fresh-PC startup stabilization
++
++- Fixed a first-run crash under PowerShell StrictMode when Home rails were empty. Empty arrays could be unwrapped to $null at function parameter boundaries and then fail on .Count.
++- Home, game-hub, and provider rails now normalize zero/one/many item inputs into stable arrays before Count/index operations.
++- Persisted config list fields are normalized after loading so empty, scalar, and array JSON representations behave identically.
++- Home Random Picks now normalizes the installed-game Entries collection before Count/Get-Random.
++- Fatal startup logs now include InvocationInfo position and ScriptStackTrace when available, making future machine-specific startup failures line-addressable.
++- All v0.25.4 GitHub updater, Epic live telemetry, Downloads retention, Settings update pages, Quick Access, artwork, Steam and RPCS3 fixes are preserved.
+diff --git a/b/RELEASE_NOTES-v0.25.6.txt b/b/RELEASE_NOTES-v0.25.6.txt
+new file mode 100644
+index 0000000..d099768
+--- /dev/null
++++ b/b/RELEASE_NOTES-v0.25.6.txt
+@@ -0,0 +1,21 @@
++Huymaier Console v0.25.6 — Settings Chooser + Windows Scale Stabilization
++
++Changes
++- Fixes the centered choice-popup system under PowerShell StrictMode by explicitly initializing popup state before first use.
++- Quick Access location now reliably opens a centered Bottom / Top / Left / Right chooser.
++- Keyboard Theme now opens a centered Huymaier / Light / High Contrast chooser instead of calling the old cycle action.
++- Button Prompts now use a centered Auto / Xbox / PlayStation / Nintendo / Steam / Keyboard chooser.
++- Music Theme now uses a centered chooser and only offers Custom when a custom music file is configured.
++- Adds Display -> Scale as a percentage-based Windows setting with a centered chooser.
++- Display Scale writes the Windows account DPI scale setting from 100%-500% and reports when Windows sign-out is required for the selected value to apply fully.
++- When a new scale is pending, Display offers a controller-friendly Sign out to apply display scale action with confirmation.
++- Preserves the v0.25.5 fresh-PC empty-collection startup fix and richer fatal startup diagnostics.
++- Preserves Epic/Legendary live download telemetry, 7-day/20-entry download history, GitHub self-update, Windows Update, Driver Updates, Steam population, RPCS3 users, and shared Shelf/Library artwork.
++
++Testing focus
++1. Settings -> Huymaier Console -> Quick Access location: centered popup appears and all four locations are visible at once.
++2. Settings -> Huymaier Console -> Keyboard theme: centered popup appears; selection updates the native keyboard palette.
++3. Button Prompts and Music Theme use the same chooser behavior.
++4. Settings -> Display -> Scale: chooser opens, selected percentage is written, and the page reports current -> configured scale until Windows sign-out.
++5. Sign out action requires confirmation.
++6. Fresh/empty profile still boots without .Count failures.
