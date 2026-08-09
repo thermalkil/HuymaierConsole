@@ -39,6 +39,7 @@ jobs:
               for k in required:
                   f.write(f"{k}={data[k]}\n")
               f.write(f"publish={str(bool(data.get('publish', False))).lower()}\n")
+              f.write(f"patch_dir={data.get('patch_dir','')}\n")
           open('/tmp/delete-paths.txt','w',encoding='utf-8').write('\n'.join(data.get('delete_paths', [])))
           PY
 
@@ -78,8 +79,10 @@ jobs:
         if: steps.manifest.outputs.publish == 'true'
         env:
           PACKAGE_ROOT: ${{ steps.manifest.outputs.package_root }}
+          PATCH_DIR: ${{ steps.manifest.outputs.patch_dir }}
         shell: bash
         run: |
+          set -euo pipefail
           rm -rf /tmp/hc-extract /tmp/hc-stage
           mkdir -p /tmp/hc-extract /tmp/hc-stage
           unzip -q "$BASE_ZIP" -d /tmp/hc-extract
@@ -93,10 +96,11 @@ jobs:
           mkdir -p "$DEST"
           cp -a "$BASE_ROOT"/. "$DEST"/
 
-          # Overlay all tracked source/configuration files except repository-only metadata.
+          # Overlay tracked package source/configuration. Repository-only release plumbing
+          # and the early standalone updater prototypes are deliberately not packaged.
           while IFS= read -r -d '' f; do
             case "$f" in
-              .github/*|.release/*|.gitignore|README.md|RELEASING.md) continue ;;
+              .github/*|.release/*|.gitignore|README.md|RELEASING.md|GITHUB-RELEASES.md|HuymaierConsoleUpdate.ps1|HuymaierConsoleUpdateWorker.ps1|HuymaierConsoleApplyUpdate.ps1) continue ;;
             esac
             [ -f "$f" ] || continue
             mkdir -p "$DEST/$(dirname "$f")"
@@ -111,7 +115,41 @@ jobs:
             done < /tmp/delete-paths.txt
           fi
 
+          # Verified release deltas are generated from the previous complete package.
+          # Split patch files keep large historical runtime/media assets out of Git.
+          if [ -n "$PATCH_DIR" ]; then
+            shopt -s nullglob
+            patches=("$GITHUB_WORKSPACE/$PATCH_DIR"/*.patch)
+            if [ "${#patches[@]}" -eq 0 ]; then
+              echo "Patch directory contains no .patch files: $PATCH_DIR"
+              exit 1
+            fi
+            for patch_file in "${patches[@]}"; do
+              echo "Applying $(basename "$patch_file")"
+              (cd "$DEST" && git apply -p2 --whitespace=nowarn "$patch_file")
+            done
+          fi
+
           echo "PACKAGE_DIR=$DEST" >> "$GITHUB_ENV"
+
+      - name: Verify staged release version
+        if: steps.manifest.outputs.publish == 'true'
+        env:
+          VERSION: ${{ steps.manifest.outputs.version }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os
+          root=os.environ['PACKAGE_DIR']
+          manifest=os.path.join(root,'manifest.json')
+          if not os.path.isfile(manifest):
+              raise SystemExit('Packaged manifest.json is missing.')
+          actual=str(json.load(open(manifest,encoding='utf-8-sig')).get('version',''))
+          expected=os.environ['VERSION']
+          if actual != expected:
+              raise SystemExit(f'Package version mismatch: expected {expected}, found {actual}')
+          print(f'Verified staged package version {actual}.')
+          PY
 
       - name: Regenerate internal checksums
         if: steps.manifest.outputs.publish == 'true'
