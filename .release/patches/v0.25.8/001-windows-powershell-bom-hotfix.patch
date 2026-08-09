@@ -1,0 +1,356 @@
+diff --git a/new/BUILD-VALIDATION-v0.25.8.txt b/new/BUILD-VALIDATION-v0.25.8.txt
+new file mode 100644
+index 0000000..cb1e2a6
+--- /dev/null
++++ b/new/BUILD-VALIDATION-v0.25.8.txt
+@@ -0,0 +1,5 @@
++Huymaier Console v0.25.8 build validation
++
++- All packaged PowerShell source files are UTF-8 with BOM for Windows PowerShell 5.1 compatibility.
++- HuymaierConsoleUpdateWorker.ps1 uses scalar ContentLength handling and contains no .HasValue access.
++- Internal checksums are regenerated after encoding normalization by the release publisher.
+diff --git a/old/BUILD-VALIDATION.txt b/new/BUILD-VALIDATION.txt
+index 347982f..cb1e2a6 100644
+--- a/old/BUILD-VALIDATION.txt
++++ b/new/BUILD-VALIDATION.txt
+@@ -1,11 +1,5 @@
+-Huymaier Console v0.25.6 build validation
++Huymaier Console v0.25.8 build validation
+ 
+-Static validation performed in the build environment:
+-- PowerShell and C# delimiter/lexical scan.
+-- JSON and AppX XML parsing.
+-- Choice-popup state is explicitly initialized before StrictMode reads it.
+-- Quick Access location, keyboard theme, prompt override, music theme, and display scale are routed through the centered chooser.
+-- Display scale range is constrained to 100%-500%; Windows account DPI values are written under HKCU and sign-out is surfaced when effective/configured scale differs.
+-- Release/package checksum manifests regenerated after all changes.
+-
+-Windows runtime validation still required on a Windows 11 target for WPF/native compilation and live DPI behavior.
++- All packaged PowerShell source files are UTF-8 with BOM for Windows PowerShell 5.1 compatibility.
++- HuymaierConsoleUpdateWorker.ps1 uses scalar ContentLength handling and contains no .HasValue access.
++- Internal checksums are regenerated after encoding normalization by the release publisher.
+diff --git a/old/Docs/BUILD-VALIDATION.txt b/new/Docs/BUILD-VALIDATION.txt
+index 347982f..cb1e2a6 100644
+--- a/old/Docs/BUILD-VALIDATION.txt
++++ b/new/Docs/BUILD-VALIDATION.txt
+@@ -1,11 +1,5 @@
+-Huymaier Console v0.25.6 build validation
++Huymaier Console v0.25.8 build validation
+ 
+-Static validation performed in the build environment:
+-- PowerShell and C# delimiter/lexical scan.
+-- JSON and AppX XML parsing.
+-- Choice-popup state is explicitly initialized before StrictMode reads it.
+-- Quick Access location, keyboard theme, prompt override, music theme, and display scale are routed through the centered chooser.
+-- Display scale range is constrained to 100%-500%; Windows account DPI values are written under HKCU and sign-out is surfaced when effective/configured scale differs.
+-- Release/package checksum manifests regenerated after all changes.
+-
+-Windows runtime validation still required on a Windows 11 target for WPF/native compilation and live DPI behavior.
++- All packaged PowerShell source files are UTF-8 with BOM for Windows PowerShell 5.1 compatibility.
++- HuymaierConsoleUpdateWorker.ps1 uses scalar ContentLength handling and contains no .HasValue access.
++- Internal checksums are regenerated after encoding normalization by the release publisher.
+diff --git a/old/Docs/TEST-CHECKLIST.txt b/new/Docs/TEST-CHECKLIST.txt
+index 3532316..ca32b98 100644
+--- a/old/Docs/TEST-CHECKLIST.txt
++++ b/new/Docs/TEST-CHECKLIST.txt
+@@ -1,4 +1,4 @@
+-Huymaier Console v0.25.6 Test Checklist
++Huymaier Console v0.25.8 Test Checklist
+ 
+ 1. Fresh/empty-profile startup
+ - Install on a PC/user with no Huymaier Console history.
+diff --git a/old/FSEPackage/AppxManifest.xml b/new/FSEPackage/AppxManifest.xml
+index 75eb816..6b84259 100644
+--- a/old/FSEPackage/AppxManifest.xml
++++ b/new/FSEPackage/AppxManifest.xml
+@@ -7,7 +7,7 @@
+   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+   IgnorableNamespaces="uap uap3 uap4 rescap">
+ 
+-  <Identity Name="Huymaier.Console.FSE.Home" Publisher="CN=Huymaier" Version="0.25.6.0" ProcessorArchitecture="x64" />
++  <Identity Name="Huymaier.Console.FSE.Home" Publisher="CN=Huymaier" Version="0.25.8.0" ProcessorArchitecture="x64" />
+ 
+   <Properties>
+     <DisplayName>Huymaier Console</DisplayName>
+diff --git a/old/HuymaierBootstrap.ps1 b/new/HuymaierBootstrap.ps1
+index e13546d..52e81cd 100644
+--- a/old/HuymaierBootstrap.ps1
++++ b/new/HuymaierBootstrap.ps1
+@@ -1,4 +1,4 @@
+-param(
++﻿param(
+     [switch]$Windowed
+ )
+ 
+@@ -53,12 +53,12 @@ try {
+     Test-PowerShellFile $artworkWorkerPath 'Online artwork worker'
+     Test-PowerShellFile $gameExperiencePath 'Unified game experience'
+     Test-PowerShellFile $shellRedesignPath 'Shell redesign'
+-    Write-BootstrapLog 'Huymaier Console v0.25.6 preflight passed.'
++    Write-BootstrapLog 'Huymaier Console v0.25.8 preflight passed.'
+     if ($Windowed) { & $corePath -Windowed } else { & $corePath }
+ }
+ catch {
+     $message=$_.Exception.Message
+-    Write-BootstrapLog "v0.25.6 preflight/startup failed:`n$message" 'FATAL'
++    Write-BootstrapLog "v0.25.8 preflight/startup failed:`n$message" 'FATAL'
+     try {
+         Add-Type -AssemblyName PresentationFramework
+         [System.Windows.MessageBox]::Show(
+diff --git a/old/HuymaierConsole.ps1 b/new/HuymaierConsole.ps1
+index c0635bb..2e996fa 100644
+--- a/old/HuymaierConsole.ps1
++++ b/new/HuymaierConsole.ps1
+@@ -1,4 +1,4 @@
+-param(
++﻿param(
+     [switch]$Windowed
+ )
+ 
+@@ -11,7 +11,7 @@ Add-Type -AssemblyName WindowsBase
+ Add-Type -AssemblyName System.Xaml
+ try { Add-Type -AssemblyName System.Runtime.WindowsRuntime -ErrorAction SilentlyContinue } catch { }
+ 
+-$script:AppVersion = '0.25.6'
++$script:AppVersion = '0.25.8'
+ $script:AppName = 'Huymaier Console'
+ $script:DataDir = Join-Path $env:LOCALAPPDATA 'Huymaier Console'
+ $script:ConfigPath = Join-Path $script:DataDir 'config.json'
+@@ -4397,7 +4397,7 @@ $xaml = @'
+                     <ColumnDefinition Width="Auto"/>
+                 </Grid.ColumnDefinitions>
+                 <StackPanel x:Name="PromptPanel" Orientation="Horizontal" VerticalAlignment="Center"/>
+-                <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="HUYMAIER FSE  v0.25.6" FontSize="12" Foreground="#77869C"/>
++                <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="HUYMAIER FSE  v0.25.8" FontSize="12" Foreground="#77869C"/>
+             </Grid>
+         </Grid>
+ 
+diff --git a/old/HuymaierConsoleUpdateWorker.ps1 b/new/HuymaierConsoleUpdateWorker.ps1
+index 7357f0f..854e522 100644
+--- a/old/HuymaierConsoleUpdateWorker.ps1
++++ b/new/HuymaierConsoleUpdateWorker.ps1
+@@ -1,7 +1,7 @@
+-param(
++﻿param(
+     [ValidateSet('Scan','Download')][string]$Action='Scan',
+     [Parameter(Mandatory=$true)][string]$StatePath,
+-    [string]$CurrentVersion='0.25.7',
++    [string]$CurrentVersion='0.25.8',
+     [string]$Repository='thermalkil/HuymaierConsole'
+ )
+ Set-StrictMode -Version 2.0
+@@ -98,7 +98,7 @@ try{
+     Add-Type -AssemblyName System.Net.Http
+     $handler=[System.Net.Http.HttpClientHandler]::new();$handler.AllowAutoRedirect=$true
+     $client=[System.Net.Http.HttpClient]::new($handler)
+-    $client.DefaultRequestHeaders.UserAgent.ParseAdd('HuymaierConsole/0.25.7')
++    $client.DefaultRequestHeaders.UserAgent.ParseAdd('HuymaierConsole/0.25.8')
+     if($token){$client.DefaultRequestHeaders.Authorization=[System.Net.Http.Headers.AuthenticationHeaderValue]::new('Bearer',$token)}
+     $downloadUri=if($token -and [string]$asset.url){[string]$asset.url}else{[string]$asset.browser_download_url}
+     if($token){$client.DefaultRequestHeaders.Accept.Clear();$client.DefaultRequestHeaders.Accept.Add([System.Net.Http.Headers.MediaTypeWithQualityHeaderValue]::new('application/octet-stream'))}
+diff --git a/old/HuymaierEmulatorPlatforms.ps1 b/new/HuymaierEmulatorPlatforms.ps1
+index 2325755..84d8581 100644
+--- a/old/HuymaierEmulatorPlatforms.ps1
++++ b/new/HuymaierEmulatorPlatforms.ps1
+@@ -1,4 +1,4 @@
+-# Huymaier Console emulator-platform host.
++﻿# Huymaier Console emulator-platform host.
+ # Loaded after the shared game-experience module so emulator platforms can
+ # participate in the existing Platforms rail without replacing storefront code.
+ 
+@@ -120,7 +120,7 @@ function Start-HcEmulatorPlatform {
+             }
+             if($null -eq $nativeBridge -and $null -eq $nativeType){
+                 $script:NativePlatformRetryAfter=[datetime]::UtcNow.AddSeconds(3)
+-                Set-ConsoleNotice "The native $Platform view was not registered in the current Huymaier Console process. Close Huymaier Console and run the v0.25.6 installer once." 'ERROR'
++                Set-ConsoleNotice "The native $Platform view was not registered in the current Huymaier Console process. Close Huymaier Console and run the v0.25.8 installer once." 'ERROR'
+                 Write-Log "Native $Platform bridge/type was not visible to the hosted PowerShell runspace." 'ERROR'
+                 Render-Page
+                 return $true
+diff --git a/old/HuymaierShellRedesign.ps1 b/new/HuymaierShellRedesign.ps1
+index 2900119..0d10cad 100644
+--- a/old/HuymaierShellRedesign.ps1
++++ b/new/HuymaierShellRedesign.ps1
+@@ -1,4 +1,4 @@
+-# Huymaier Console v0.25.6 shell/provider stabilization.
++﻿# Huymaier Console v0.25.8 shell/provider stabilization.
+ # Loaded after HuymaierGameExperience.ps1 and before HuymaierEmulatorPlatforms.ps1.
+ # EmulatorPlatforms intentionally gets the final platform-select interception so
+ # emulator console cards retain their native direct-entry behavior.
+diff --git a/old/HuymaierWebBrowser.ps1 b/new/HuymaierWebBrowser.ps1
+index c1942fa..9bae78e 100644
+--- a/old/HuymaierWebBrowser.ps1
++++ b/new/HuymaierWebBrowser.ps1
+@@ -1,4 +1,4 @@
+-# Huymaier Console native controller browser (WebView2)
++﻿# Huymaier Console native controller browser (WebView2)
+ # Loaded by HuymaierConsole.ps1. All browser data stays under the current
+ # Windows user's Huymaier Console data directory.
+ 
+@@ -117,7 +117,7 @@ function Initialize-HuymaierWebBrowser {
+         }
+     }else{
+         $fallbackTitle.Text='Native browser components missing'
+-        $fallbackText.Text='Re-run the v0.25.6 installer while connected to the internet. It downloads the official Microsoft WebView2 SDK components.'
++        $fallbackText.Text='Re-run the v0.25.8 installer while connected to the internet. It downloads the official Microsoft WebView2 SDK components.'
+     }
+ 
+     $timer=New-Object System.Windows.Threading.DispatcherTimer;$timer.Interval=[TimeSpan]::FromMilliseconds(250)
+@@ -136,7 +136,7 @@ function Initialize-HcBrowserCore {
+         $core.Settings.IsZoomControlEnabled=$false
+         try{$core.Settings.IsPasswordAutosaveEnabled=$true}catch{}
+         try{$core.Settings.IsGeneralAutofillEnabled=$true}catch{}
+-        try{$core.Settings.UserAgent=$core.Settings.UserAgent+' HuymaierConsole/0.25.6'}catch{}
++        try{$core.Settings.UserAgent=$core.Settings.UserAgent+' HuymaierConsole/0.25.8'}catch{}
+         $core.Add_NewWindowRequested({param($s,$e)try{$e.Handled=$true;if($e.Uri){$script:HcBrowserWebView.Source=[uri]$e.Uri}}catch{}})
+         $core.Add_DocumentTitleChanged({try{Update-HcBrowserAddress}catch{}})
+         $core.Add_HistoryChanged({try{Update-HcBrowserToolbarVisuals}catch{}})
+diff --git a/old/Install-HuymaierConsole.cmd b/new/Install-HuymaierConsole.cmd
+index e0a824e..296fcdf 100644
+--- a/old/Install-HuymaierConsole.cmd
++++ b/new/Install-HuymaierConsole.cmd
+@@ -1,10 +1,10 @@
+ @echo off
+ setlocal EnableExtensions
+ cd /d "%~dp0"
+-title Huymaier Console v0.25.6 Installer
++title Huymaier Console v0.25.8 Installer
+ 
+ echo ============================================================
+-echo  Huymaier Console v0.25.6 Installer
++echo  Huymaier Console v0.25.8 Installer
+ echo ============================================================
+ echo.
+ echo The installer will remain open if anything fails.
+@@ -22,7 +22,7 @@ if not "%HC_EXIT%"=="0" (
+     echo The full error was saved under:
+     echo   %%LOCALAPPDATA%%\Huymaier Console\Logs
+     echo.
+-    echo Please send the newest install-v0.25.6-*.log file.
++    echo Please send the newest install-v0.25.8-*.log file.
+     echo.
+     pause
+     exit /b %HC_EXIT%
+diff --git a/old/Install-HuymaierConsole.ps1 b/new/Install-HuymaierConsole.ps1
+index bd7211d..b63f563 100644
+--- a/old/Install-HuymaierConsole.ps1
++++ b/new/Install-HuymaierConsole.ps1
+@@ -1,8 +1,8 @@
+-param([switch]$SilentUpdate)
++﻿param([switch]$SilentUpdate)
+ Set-StrictMode -Version 2.0
+ $ErrorActionPreference = 'Stop'
+ 
+-$script:InstallVersion = '0.25.6'
++$script:InstallVersion = '0.25.8'
+ $script:InstallStartedUtc = [DateTime]::UtcNow
+ $script:InstallLogRoot = Join-Path $env:LOCALAPPDATA 'Huymaier Console\Logs'
+ New-Item -ItemType Directory -Force -Path $script:InstallLogRoot | Out-Null
+@@ -386,7 +386,7 @@ if($SilentUpdate){
+     Write-InstallerRecord 'Silent self-update installation completed; relaunch is delegated to HuymaierSelfUpdater.ps1.'
+     exit 0
+ }
+-$result = [System.Windows.MessageBox]::Show("Huymaier Console v0.25.6 stabilization build was installed for this Windows account.`n`nLocation:`n$destination`n`nLaunch it now?", 'Huymaier Console', 'YesNo', 'Information')
++$result = [System.Windows.MessageBox]::Show("Huymaier Console v0.25.8 stabilization build was installed for this Windows account.`n`nLocation:`n$destination`n`nLaunch it now?", 'Huymaier Console', 'YesNo', 'Information')
+ if ($result -eq 'Yes') {
+     Start-Process $nativeExe -WorkingDirectory $destination
+ }
+diff --git a/old/Native/HuymaierConsole.ConsolePlatforms.cs b/new/Native/HuymaierConsole.ConsolePlatforms.cs
+index 8b63ced..e4bf458 100644
+--- a/old/Native/HuymaierConsole.ConsolePlatforms.cs
++++ b/new/Native/HuymaierConsole.ConsolePlatforms.cs
+@@ -2219,7 +2219,7 @@ namespace HuymaierConsole.NativeApp
+                     try
+                     {
+                         HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+-                        request.UserAgent = "HuymaierConsole/0.25.6";
++                        request.UserAgent = "HuymaierConsole/0.25.8";
+                         request.Timeout = 4500; request.ReadWriteTimeout = 6500;
+                         request.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
+                         using (WebResponse response = request.GetResponse())
+diff --git a/old/Native/HuymaierConsole.NativeApp.cs b/new/Native/HuymaierConsole.NativeApp.cs
+index 8ad1a06..3ec620d 100644
+--- a/old/Native/HuymaierConsole.NativeApp.cs
++++ b/new/Native/HuymaierConsole.NativeApp.cs
+@@ -203,7 +203,7 @@ namespace HuymaierConsole.NativeApp
+ 
+     public sealed class NativeBridge
+     {
+-        public string Version { get { return "0.25.6"; } }
++        public string Version { get { return "0.25.8"; } }
+ 
+         public bool ConsumeQuickAccessRequest() { return NativeQuickAccessRequest.Consume(); }
+ 
+diff --git a/old/README.txt b/new/README.txt
+index 3f38e88..6dcfe3b 100644
+--- a/old/README.txt
++++ b/new/README.txt
+@@ -1,4 +1,4 @@
+-HUYMAIER CONSOLE FSE v0.25.6
++HUYMAIER CONSOLE FSE v0.25.8
+ 
+ Controller-first Windows 11 full-screen console shell.
+ 
+@@ -11,4 +11,4 @@ Install
+ 2. Run Install-HuymaierConsole.cmd.
+ 3. Launch Huymaier Console from the installed shortcut.
+ 
+-See RELEASE_NOTES-v0.25.6.txt and Docs\TEST-CHECKLIST.txt.
++See RELEASE_NOTES-v0.25.8.txt and Docs\TEST-CHECKLIST.txt.
+diff --git a/new/RELEASE_NOTES-v0.25.8.txt b/new/RELEASE_NOTES-v0.25.8.txt
+new file mode 100644
+index 0000000..f2aaf68
+--- /dev/null
++++ b/new/RELEASE_NOTES-v0.25.8.txt
+@@ -0,0 +1,7 @@
++Huymaier Console v0.25.8
++
++Windows PowerShell 5.1 packaging hotfix
++- Restores UTF-8 BOM encoding on every packaged PowerShell script/module/data file so Windows PowerShell 5.1 reads non-ASCII UI glyphs correctly.
++- Fixes the v0.25.7 installer parser failure caused by UTF-8-without-BOM source produced by the Linux release pipeline.
++- Preserves the GitHub updater ContentLength scalar fix; no .HasValue access remains.
++- Preserves v0.25.6 Settings choice popups, Display Scale, clean-PC startup, download telemetry/history, and prior stability fixes.
+diff --git a/old/RELEASE_NOTES.txt b/new/RELEASE_NOTES.txt
+index d099768..f2aaf68 100644
+--- a/old/RELEASE_NOTES.txt
++++ b/new/RELEASE_NOTES.txt
+@@ -1,21 +1,7 @@
+-Huymaier Console v0.25.6 — Settings Chooser + Windows Scale Stabilization
++Huymaier Console v0.25.8
+ 
+-Changes
+-- Fixes the centered choice-popup system under PowerShell StrictMode by explicitly initializing popup state before first use.
+-- Quick Access location now reliably opens a centered Bottom / Top / Left / Right chooser.
+-- Keyboard Theme now opens a centered Huymaier / Light / High Contrast chooser instead of calling the old cycle action.
+-- Button Prompts now use a centered Auto / Xbox / PlayStation / Nintendo / Steam / Keyboard chooser.
+-- Music Theme now uses a centered chooser and only offers Custom when a custom music file is configured.
+-- Adds Display -> Scale as a percentage-based Windows setting with a centered chooser.
+-- Display Scale writes the Windows account DPI scale setting from 100%-500% and reports when Windows sign-out is required for the selected value to apply fully.
+-- When a new scale is pending, Display offers a controller-friendly Sign out to apply display scale action with confirmation.
+-- Preserves the v0.25.5 fresh-PC empty-collection startup fix and richer fatal startup diagnostics.
+-- Preserves Epic/Legendary live download telemetry, 7-day/20-entry download history, GitHub self-update, Windows Update, Driver Updates, Steam population, RPCS3 users, and shared Shelf/Library artwork.
+-
+-Testing focus
+-1. Settings -> Huymaier Console -> Quick Access location: centered popup appears and all four locations are visible at once.
+-2. Settings -> Huymaier Console -> Keyboard theme: centered popup appears; selection updates the native keyboard palette.
+-3. Button Prompts and Music Theme use the same chooser behavior.
+-4. Settings -> Display -> Scale: chooser opens, selected percentage is written, and the page reports current -> configured scale until Windows sign-out.
+-5. Sign out action requires confirmation.
+-6. Fresh/empty profile still boots without .Count failures.
++Windows PowerShell 5.1 packaging hotfix
++- Restores UTF-8 BOM encoding on every packaged PowerShell script/module/data file so Windows PowerShell 5.1 reads non-ASCII UI glyphs correctly.
++- Fixes the v0.25.7 installer parser failure caused by UTF-8-without-BOM source produced by the Linux release pipeline.
++- Preserves the GitHub updater ContentLength scalar fix; no .HasValue access remains.
++- Preserves v0.25.6 Settings choice popups, Display Scale, clean-PC startup, download telemetry/history, and prior stability fixes.
+diff --git a/old/manifest.json b/new/manifest.json
+index d7a7b8e..9744630 100644
+--- a/old/manifest.json
++++ b/new/manifest.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "Huymaier Console FSE Shell, Storefront & Artwork Integration",
+-  "version": "0.25.6",
++  "version": "0.25.8",
+   "baseVersion": "0.25.5",
+   "build": "settings-choice-display-scale-stabilization",
+   "builtFrom": "HC255.zip",
