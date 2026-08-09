@@ -1,7 +1,7 @@
 {
-  "batch": "installer-lock-hotfix-1",
-  "script": "apply_installer_lock_hotfix.py",
+  "batch": "v0261-version-1",
+  "script": "apply_v0261_version.py",
   "patch_dir": "",
   "result": "success",
-  "recordedAtUtc": "2026-08-09T14:37:59.993507+00:00"
+  "recordedAtUtc": "2026-08-09T14:39:24.081974+00:00"
 }

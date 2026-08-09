@@ -1,8 +1,8 @@
 {
   "name": "Huymaier Console FSE Shell, Storefront & Artwork Integration",
-  "version": "0.26.0",
-  "baseVersion": "0.25.8",
-  "build": "native-gamebar-guide-task-switcher-development",
+  "version": "0.26.1",
+  "baseVersion": "0.26.0",
+  "build": "installer-lock-and-atomic-rollback-hotfix",
   "builtFrom": "HC258.zip",
   "features": [
     "keeps Quick Access exclusive to Huymaier Console while adding a separate external-game/app Huymaier Game Bar",
@@ -11,7 +11,10 @@
     "adds a native Huymaier task switcher baseline for user-facing top-level Windows application windows",
     "fixes the PowerShell Title/title collision that prevented centered finite-choice popups from opening",
     "removes decorative X/Square Search prompts when no secondary action exists",
-    "preserves the v0.25.8 Windows PowerShell BOM packaging and updater ContentLength hotfixes"
+    "preserves the v0.25.8 Windows PowerShell BOM packaging and updater ContentLength hotfixes",
+    "stops all native Huymaier Console hosts before replacing any installed payload files",
+    "skips byte-identical locked files and retries changed locked files instead of aborting immediately",
+    "uses recursive updater rollback so a failed update cannot relaunch a mixed native/script installation"
   ],
-  "description": "Development baseline for the native Huymaier Game Bar, task switcher, real Guide routing, popup chooser repair, and capability-driven prompts."
+  "description": "v0.26.1 hotfix for reliable self-update/install replacement while preserving the runtime-tested v0.26.0 Game Bar, Guide routing, task switcher, and popup navigation behavior."
 }
