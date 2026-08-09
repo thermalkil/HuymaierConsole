@@ -2,16 +2,19 @@
   "name": "Huymaier Console FSE Shell, Storefront & Artwork Integration",
   "version": "0.26.0",
   "baseVersion": "0.25.8",
-  "build": "native-gamebar-guide-task-switcher-development",
+  "build": "release",
   "builtFrom": "HC258.zip",
   "features": [
     "keeps Quick Access exclusive to Huymaier Console while adding a separate external-game/app Huymaier Game Bar",
     "separates physical Guide/Xbox/PS/Home from Xbox View/Back and PlayStation Share/Create",
     "adds a native Microsoft GameInput system-button bridge with Raw HID/XInput compatibility fallback",
-    "adds a native Huymaier task switcher baseline for user-facing top-level Windows application windows",
-    "fixes the PowerShell Title/title collision that prevented centered finite-choice popups from opening",
+    "adds a native Huymaier task switcher for user-facing top-level Windows application windows",
+    "adds a centered DPI-aware Huymaier Game Bar with user-adjustable scale",
+    "uses horizontal Left/Right controller navigation for Game Bar Home and Switch Apps rails",
+    "fixes centered finite-choice popup controller navigation, audio feedback, and visible selected-state feedback",
+    "preserves maximized/fullscreen external application state when task switching",
     "removes decorative X/Square Search prompts when no secondary action exists",
     "preserves the v0.25.8 Windows PowerShell BOM packaging and updater ContentLength hotfixes"
   ],
-  "description": "Development baseline for the native Huymaier Game Bar, task switcher, real Guide routing, popup chooser repair, and capability-driven prompts."
+  "description": "Stable v0.26.0 release with the native Huymaier Game Bar, task switcher, physical Guide routing, controller-friendly finite-choice popups, DPI-aware scaling, and fullscreen-state preservation."
 }
