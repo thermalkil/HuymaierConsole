@@ -1,5 +1,6 @@
 {
-  "candidate": "v0.26.0-test-1",
+  "candidate": "v0.26.0-test-2",
   "base_release": "v0.25.8",
-  "requested_at": "2026-08-09T12:42:00Z"
+  "requested_at": "2026-08-09T13:08:00Z",
+  "focus": "GameInput Guide bridge, popup chooser, prompt cleanup, external Game Bar"
 }
