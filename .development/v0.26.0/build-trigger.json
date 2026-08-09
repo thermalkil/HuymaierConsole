@@ -1,6 +1,6 @@
 {
-  "candidate": "v0.26.0-test-8",
-  "base_release": "v0.25.8",
-  "requested_at": "2026-08-09T14:11:00Z",
-  "focus": "fix popup D-pad regression caused by invalid Invoke-UiFeedback Move token; use validated Navigate feedback and isolate feedback/visual failures while retaining test7 Game Bar horizontal navigation and prior DPI/scale/fullscreen fixes"
+  "candidate": "v0.26.1-test-1",
+  "base_release": "v0.26.0",
+  "requested_at": "2026-08-09T14:40:10Z",
+  "focus": "repair failed self-update caused by locked HuymaierConsole.ico; stop native hosts before payload copy, skip identical locked files, retry changed locked files, recursive rollback; preserve validated v0.26.0 Game Bar/Guide behavior"
 }
