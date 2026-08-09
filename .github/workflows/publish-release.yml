@@ -47,20 +47,29 @@ jobs:
         if: steps.manifest.outputs.publish != 'true'
         run: echo 'Release manifest is staged with publish=false; nothing to publish.'
 
-      - name: Ensure target release does not already exist
+      - name: Check target release
+        id: existing
         if: steps.manifest.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.manifest.outputs.tag }}
+          ASSET_NAME: ${{ steps.manifest.outputs.asset_name }}
         shell: bash
         run: |
+          set -euo pipefail
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $TAG already exists; refusing to overwrite it."
-            exit 1
+            echo "Release $TAG already exists; validating its required assets."
+            mapfile -t assets < <(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+            printf '%s\n' "${assets[@]}"
+            printf '%s\n' "${assets[@]}" | grep -Fxq "$ASSET_NAME"
+            printf '%s\n' "${assets[@]}" | grep -Fxq "$ASSET_NAME.sha256"
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
           fi
 
       - name: Download previous full release package
-        if: steps.manifest.outputs.publish == 'true'
+        if: steps.manifest.outputs.publish == 'true' && steps.existing.outputs.exists != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -75,8 +84,8 @@ jobs:
           echo "Using base package: $BASE_ZIP"
           echo "BASE_ZIP=$BASE_ZIP" >> "$GITHUB_ENV"
 
-      - name: Stage package and overlay repository payload
-        if: steps.manifest.outputs.publish == 'true'
+      - name: Stage package and apply verified release delta
+        if: steps.manifest.outputs.publish == 'true' && steps.existing.outputs.exists != 'true'
         env:
           PACKAGE_ROOT: ${{ steps.manifest.outputs.package_root }}
           PATCH_DIR: ${{ steps.manifest.outputs.patch_dir }}
@@ -87,17 +96,13 @@ jobs:
           mkdir -p /tmp/hc-extract /tmp/hc-stage
           unzip -q "$BASE_ZIP" -d /tmp/hc-extract
           mapfile -t roots < <(find /tmp/hc-extract -mindepth 1 -maxdepth 1 -type d)
-          if [ "${#roots[@]}" -eq 1 ]; then
-            BASE_ROOT="${roots[0]}"
-          else
-            BASE_ROOT='/tmp/hc-extract'
-          fi
+          if [ "${#roots[@]}" -eq 1 ]; then BASE_ROOT="${roots[0]}"; else BASE_ROOT='/tmp/hc-extract'; fi
           DEST="/tmp/hc-stage/$PACKAGE_ROOT"
           mkdir -p "$DEST"
           cp -a "$BASE_ROOT"/. "$DEST"/
 
           # Overlay tracked package source/configuration. Repository-only release plumbing
-          # and the early standalone updater prototypes are deliberately not packaged.
+          # and early standalone updater prototypes are deliberately not packaged.
           while IFS= read -r -d '' f; do
             case "$f" in
               .github/*|.release/*|.gitignore|README.md|RELEASING.md|GITHUB-RELEASES.md|HuymaierConsoleUpdate.ps1|HuymaierConsoleUpdateWorker.ps1|HuymaierConsoleApplyUpdate.ps1) continue ;;
@@ -107,79 +112,58 @@ jobs:
             cp -f "$f" "$DEST/$f"
           done < <(git ls-files -z)
 
-          # Optional deletions for files intentionally removed from a release package.
           if [ -s /tmp/delete-paths.txt ]; then
-            while IFS= read -r p; do
-              [ -n "$p" ] || continue
-              rm -rf "$DEST/$p"
-            done < /tmp/delete-paths.txt
+            while IFS= read -r p; do [ -n "$p" ] && rm -rf "$DEST/$p"; done < /tmp/delete-paths.txt
           fi
 
-          # Verified release deltas are generated from the previous complete package.
-          # Split patch files keep large historical runtime/media assets out of Git.
           if [ -n "$PATCH_DIR" ]; then
             shopt -s nullglob
             patches=("$GITHUB_WORKSPACE/$PATCH_DIR"/*.patch)
-            if [ "${#patches[@]}" -eq 0 ]; then
-              echo "Patch directory contains no .patch files: $PATCH_DIR"
-              exit 1
-            fi
+            if [ "${#patches[@]}" -eq 0 ]; then echo "Patch directory contains no .patch files: $PATCH_DIR"; exit 1; fi
             for patch_file in "${patches[@]}"; do
               echo "Applying $(basename "$patch_file")"
               (cd "$DEST" && git apply -p2 --whitespace=nowarn "$patch_file")
             done
           fi
-
           echo "PACKAGE_DIR=$DEST" >> "$GITHUB_ENV"
 
       - name: Verify staged release version
-        if: steps.manifest.outputs.publish == 'true'
+        if: steps.manifest.outputs.publish == 'true' && steps.existing.outputs.exists != 'true'
         env:
           VERSION: ${{ steps.manifest.outputs.version }}
         shell: bash
         run: |
           python3 - <<'PY'
           import json, os
-          root=os.environ['PACKAGE_DIR']
-          manifest=os.path.join(root,'manifest.json')
-          if not os.path.isfile(manifest):
-              raise SystemExit('Packaged manifest.json is missing.')
-          actual=str(json.load(open(manifest,encoding='utf-8-sig')).get('version',''))
-          expected=os.environ['VERSION']
-          if actual != expected:
-              raise SystemExit(f'Package version mismatch: expected {expected}, found {actual}')
+          root=os.environ['PACKAGE_DIR']; manifest=os.path.join(root,'manifest.json')
+          if not os.path.isfile(manifest): raise SystemExit('Packaged manifest.json is missing.')
+          actual=str(json.load(open(manifest,encoding='utf-8-sig')).get('version','')); expected=os.environ['VERSION']
+          if actual != expected: raise SystemExit(f'Package version mismatch: expected {expected}, found {actual}')
           print(f'Verified staged package version {actual}.')
           PY
 
       - name: Regenerate internal checksums
-        if: steps.manifest.outputs.publish == 'true'
+        if: steps.manifest.outputs.publish == 'true' && steps.existing.outputs.exists != 'true'
         shell: bash
         run: |
           python3 - <<'PY'
           import hashlib, os
-          root = os.environ['PACKAGE_DIR']
-          excluded = {'checksums.sha256','SHA256SUMS.txt'}
-          rows=[]
+          root=os.environ['PACKAGE_DIR']; excluded={'checksums.sha256','SHA256SUMS.txt'}; rows=[]
           for dp, _, names in os.walk(root):
               for name in names:
                   rel=os.path.relpath(os.path.join(dp,name),root).replace(os.sep,'/')
-                  if rel in excluded:
-                      continue
-                  p=os.path.join(root,rel.replace('/',os.sep))
-                  h=hashlib.sha256()
+                  if rel in excluded: continue
+                  p=os.path.join(root,rel.replace('/',os.sep)); h=hashlib.sha256()
                   with open(p,'rb') as f:
-                      for chunk in iter(lambda:f.read(1024*1024),b''):
-                          h.update(chunk)
+                      for chunk in iter(lambda:f.read(1024*1024),b''): h.update(chunk)
                   rows.append((rel,h.hexdigest()))
-          rows.sort(key=lambda x:x[0].lower())
-          text=''.join(f'{h}  {rel}\n' for rel,h in rows)
-          for name in excluded:
-              open(os.path.join(root,name),'w',encoding='utf-8',newline='\n').write(text)
+          rows.sort(key=lambda x:x[0].lower()); text=''.join(f'{h}  {rel}\n' for rel,h in rows)
+          for name in excluded: open(os.path.join(root,name),'w',encoding='utf-8',newline='\n').write(text)
           print(f'Checksummed {len(rows)} payload files.')
           PY
 
       - name: Build release ZIP and SHA-256 asset
-        if: steps.manifest.outputs.publish == 'true'
+        if: steps.manifest.outputs.publish == 'true' && steps.existing.outputs.exists != 'true'
         env:
           ASSET_NAME: ${{ steps.manifest.outputs.asset_name }}
           PACKAGE_ROOT: ${{ steps.manifest.outputs.package_root }}
@@ -193,7 +177,7 @@ jobs:
           echo "Release asset SHA-256: $HASH"
 
       - name: Publish GitHub Release
-        if: steps.manifest.outputs.publish == 'true'
+        if: steps.manifest.outputs.publish == 'true' && steps.existing.outputs.exists != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.manifest.outputs.tag }}
@@ -202,14 +186,35 @@ jobs:
           NOTES_FILE: ${{ steps.manifest.outputs.notes_file }}
         shell: bash
         run: |
-          if [ ! -f "$NOTES_FILE" ]; then
-            echo "Release notes file not found: $NOTES_FILE"
-            exit 1
-          fi
-          gh release create "$TAG" \
-            "$ASSET_NAME" \
-            "$ASSET_NAME.sha256" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title "$TITLE" \
-            --notes-file "$NOTES_FILE"
+          [ -f "$NOTES_FILE" ] || { echo "Release notes file not found: $NOTES_FILE"; exit 1; }
+          gh release create "$TAG" "$ASSET_NAME" "$ASSET_NAME.sha256" \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TITLE" --notes-file "$NOTES_FILE"
+
+      - name: Record release attempt status
+        if: always() && steps.manifest.outputs.publish == 'true'
+        env:
+          TAG: ${{ steps.manifest.outputs.tag }}
+          VERSION: ${{ steps.manifest.outputs.version }}
+          ASSET_NAME: ${{ steps.manifest.outputs.asset_name }}
+          RESULT: ${{ job.status }}
+          EXISTED: ${{ steps.existing.outputs.exists }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os, datetime
+          state={
+            'tag':os.environ.get('TAG',''), 'version':os.environ.get('VERSION',''),
+            'asset':os.environ.get('ASSET_NAME',''), 'result':os.environ.get('RESULT','unknown'),
+            'alreadyPublished':os.environ.get('EXISTED','')=='true',
+            'commit':os.environ.get('GITHUB_SHA',''),
+            'recordedAtUtc':datetime.datetime.now(datetime.timezone.utc).isoformat()
+          }
+          os.makedirs('.release',exist_ok=True)
+          open('.release/status.json','w',encoding='utf-8').write(json.dumps(state,indent=2)+'\n')
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .release/status.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Record $TAG release status"
+          git push
