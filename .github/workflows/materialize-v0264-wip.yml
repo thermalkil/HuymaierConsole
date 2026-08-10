@@ -1,0 +1,101 @@
+name: Materialize and Validate Huymaier Console v0.26.4 WIP
+
+on:
+  pull_request:
+    branches:
+      - feature/v0.26.3-console-fidelity
+    paths:
+      - '.development/v0.26.4/**'
+      - 'EmulatorPlatforms/**'
+      - 'HuymaierEmulatorSettings.ps1'
+      - 'HuymaierConsole.ps1'
+      - 'Native/HuymaierConsole.ConsolePlatforms.cs'
+      - '.github/workflows/materialize-v0264-wip.yml'
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: huymaier-v0264-wip-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  materialize-and-validate:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: windows-latest
+    steps:
+      - name: Check out expansion branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/v0.26.4-platform-expansion
+          fetch-depth: 0
+
+      - name: Materialize pending v0.26.4 production source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $core=Get-Content -Raw -LiteralPath 'HuymaierConsole.ps1' -Encoding UTF8
+          if($core -notmatch [regex]::Escape('$script:EmulatorSettingsModulePath')){
+            python .development\v0.26.4\apply_settings_core.py
+            if($LASTEXITCODE -ne 0){throw 'Native emulator settings core materializer failed.'}
+          }else{Write-Host 'Native emulator settings core already materialized.'}
+
+          $native=Get-Content -Raw -LiteralPath 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8
+          if($native -notmatch [regex]::Escape('private void Render3dsHome()')){
+            python .development\v0.26.4\apply_wave1_native.py
+            if($LASTEXITCODE -ne 0){throw 'Wave 1 native console materializer failed.'}
+          }else{Write-Host 'Wave 1 native console source already materialized.'}
+
+      - name: Parse Windows PowerShell source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          foreach($path in @('.\HuymaierConsole.ps1','.\HuymaierEmulatorSettings.ps1','.\HuymaierEmulatorPlatforms.ps1')){
+            $tokens=$null;$errors=$null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path),[ref]$tokens,[ref]$errors)
+            if($errors.Count){$errors|ForEach-Object{Write-Host "$path : $($_.Message)"};throw "$path does not parse in Windows PowerShell 5.1."}
+          }
+
+      - name: Validate expansion registries
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $expansion=Get-Content -Raw '.development\v0.26.4\platform-expansion.json' -Encoding UTF8|ConvertFrom-Json
+          if(@($expansion.missingPlatforms).Count -ne 27){throw 'Expected exactly 27 missing platform targets from the supplied ROM-root screenshot.'}
+          if(@($expansion.missingPlatforms|Where-Object{[string]::IsNullOrWhiteSpace([string]$_.primaryBackend)}).Count){throw 'Every expansion platform must name a primary emulator backend.'}
+          $adapters=Get-Content -Raw 'EmulatorPlatforms\emulator-adapters.json' -Encoding UTF8|ConvertFrom-Json
+          if(-not [bool]$adapters.policy.preserveUnknownSettings -or -not [bool]$adapters.policy.nativeSettingsRequired){throw 'Native settings preservation policy is not enforced.'}
+          foreach($platform in @('3DS','NDS','DSI','Dreamcast','Saturn','PSP')){
+            $definition=Get-Content -Raw (Join-Path (Join-Path 'EmulatorPlatforms' $platform) 'platform.json') -Encoding UTF8|ConvertFrom-Json
+            if([bool]$definition.enabled){throw "$platform must remain disabled until launch/storage/settings integration is complete."}
+          }
+
+      - name: Compile exact x64 native host source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Windows.Forms,System.Drawing,System.Web.Extensions
+          $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          if(-not(Test-Path $csc)){throw 'Framework64 csc.exe was not found.'}
+          $automation=[Management.Automation.PSObject].Assembly.Location
+          $refs=@([Uri].Assembly.Location,[Linq.Enumerable].Assembly.Location,[System.Xaml.XamlReader].Assembly.Location,[Xml.XmlDocument].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,[Windows.Window].Assembly.Location,[Windows.Forms.Form].Assembly.Location,[Drawing.Bitmap].Assembly.Location,[Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,$automation)|Select-Object -Unique
+          $sources=@('Native\HuymaierConsole.NativeApp.cs','Native\HuymaierConsole.Ps1.cs','Native\HuymaierConsole.ConsolePlatforms.cs','Native\HuymaierConsole.SystemOverlay.cs','Native\HuymaierConsole.GameInput.cs','HuymaierNativeInput.cs','HuymaierNativeDisplay.cs','HuymaierNativeAudio.cs','HuymaierPerformance.cs','EmulatorPlatforms\Shared\Huymaier.P3T.cs')
+          foreach($s in $sources){if(-not(Test-Path $s)){throw "Native source missing: $s"}}
+          $out=Join-Path $env:RUNNER_TEMP 'HuymaierConsole-v0264-wip.dll'
+          $args=@('/noconfig','/nologo','/target:library','/platform:x64','/optimize+',('/out:'+$out))
+          foreach($r in $refs){$args+=('/reference:'+$r)};$args+=$sources
+          & $csc @args
+          if($LASTEXITCODE -ne 0 -or -not(Test-Path $out)){throw 'v0.26.4 x64 native source compilation failed.'}
+
+      - name: Commit validated materialized source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add HuymaierConsole.ps1 Native/HuymaierConsole.ConsolePlatforms.cs
+          if(git diff --cached --quiet){Write-Host 'No pending materialized source changes.';exit 0}
+          git commit -m 'Materialize validated v0.26.4 settings core and Wave 1 native surfaces'
+          git push origin HEAD:feature/v0.26.4-platform-expansion
+          if($LASTEXITCODE -ne 0){throw 'Could not push validated v0.26.4 materialized source.'}
