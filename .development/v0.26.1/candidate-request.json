@@ -1,10 +1,10 @@
 {
-  "candidate": "v0.26.1-rc12",
+  "candidate": "v0.26.1-rc14",
   "version": "0.26.1",
   "base_release": "v0.26.0",
   "base_asset": "HC260.zip",
   "package_root": "HC261",
   "asset_name": "HC261.zip",
-  "requested_at": "2026-08-10T11:00:00Z",
-  "focus": "RC12 consolidated blocker candidate: installer wrapper seeds LASTEXITCODE=0 and propagates real failure codes; hidden external overlay uses dedicated Guide/Home-only arbiter with GameInput plus XInput 0x0400 and PlayStation Raw-HID edge fallbacks while preserving D-pad/A/B/shoulder input; Win32 foreground ownership; Xbox storefront versus Original Xbox identity separation; legacy Game Bar setting migration; transactional fail-closed install/update; cleaned exact x64 package; consolidated candidate gates"
+  "requested_at": "2026-08-10T12:29:00Z",
+  "focus": "RC14 combined next-build test candidate: Game Bar HWND_TOPMOST foreground promotion and modal Huymaier controller ownership; dedicated Guide-only wake path; storefront library/import native folder picker routing; Xbox storefront count separated from Original Xbox emulator identity; shared card focus-visual and selected-text clipping cleanup; Settings Customization page with console display name, interface/accent/focus colors, dynamic-theme presets and editable dynamic colors, music and navigation sound settings; transactional installer and exact x64 package integrity"
 }
