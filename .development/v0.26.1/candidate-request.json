@@ -1,0 +1,10 @@
+{
+  "candidate": "v0.26.1-rc6",
+  "version": "0.26.1",
+  "base_release": "v0.26.0",
+  "base_asset": "HC260.zip",
+  "package_root": "HC261",
+  "asset_name": "HC261.zip",
+  "requested_at": "2026-08-10T09:49:00Z",
+  "focus": "all-audit runtime: cleaned production package, immediate Windows-setting crash recovery watchdog, visible Game Bar input priority, hidden external overlay Guide-only polling, exact-artifact promotion"
+}
