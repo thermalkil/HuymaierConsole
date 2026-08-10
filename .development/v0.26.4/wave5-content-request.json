@@ -1,0 +1,1 @@
+{"batch":"wave5-installed-content","requestedAtUtc":"2026-08-11T00:46:00Z","platforms":["PS4","Vita"],"requirements":["scan installed eboot.bin applications","read sce_sys/param.sfo title metadata","reuse icon0.png","package archives remain install media","accurate main-platform counts","x64 compile"]}
