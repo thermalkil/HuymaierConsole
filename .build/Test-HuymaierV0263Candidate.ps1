@@ -86,7 +86,7 @@ $wiiBlock=$console.Substring($wiiStart,$wiiEnd-$wiiStart)
 if($wiiBlock -match [regex]::Escape('Process.Start("explorer.exe"')){throw 'Wii save-data UI still delegates save browsing to Explorer.'}
 
 $saveRootStart=$console.IndexOf('private List<string> FindSaveRoots()')
-$saveRootEnd=$console.IndexOf('private void RenderStorageManager',$saveRootStart)
+$saveRootEnd=$console.IndexOf('private static void AddExisting',$saveRootStart)
 if($saveRootStart -lt 0 -or $saveRootEnd -le $saveRootStart){throw 'Could not isolate console save-root discovery.'}
 $saveRoots=$console.Substring($saveRootStart,$saveRootEnd-$saveRootStart)
 if($saveRoots -match [regex]::Escape('definition.Shell == "GameCube" || definition.Shell == "Wii"')){throw 'GameCube and Wii save roots are still cross-wired.'}
@@ -121,7 +121,7 @@ $artwork=Require-Rc4Text (Join-Path $StageRoot 'HuymaierArtworkWorker.ps1') @(
     'https://www.steamgriddb.com/api/v2/grids/steam/',
     'https://www.steamgriddb.com/api/v2/search/autocomplete/',
     'https://www.steamgriddb.com/api/v2/grids/game/',
-    "'Authorization'= ('Bearer '+$key)"
+    "'Authorization'=('Bearer '+$key)"
 ) 'SteamGridDB artwork worker'
 if($artwork -match 'SteamGridDbApiKey\s*=\s*[''"][A-Za-z0-9_-]{20,}[''"]'){throw 'A SteamGridDB API key appears to be hard-coded in production source.'}
 $steamOfficial=$artwork.IndexOf("if(-not `$found -and `$source -match '(?i)^steam`$')")
