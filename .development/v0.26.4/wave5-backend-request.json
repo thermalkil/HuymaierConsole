@@ -1,0 +1,6 @@
+{
+  "batch":"wave5-modern-playstation-backends",
+  "requestedAtUtc":"2026-08-11T00:20:00Z",
+  "platforms":["PS4","Vita"],
+  "requirements":["latest GitHub release installer resolution","TOML/YAML full settings support","unknown-key preservation","preliminary package scanning only; remain disabled until installed-content launch model is implemented","PowerShell 5.1 parse","x64 compile"]
+}
