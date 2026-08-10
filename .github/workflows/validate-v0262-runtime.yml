@@ -70,7 +70,10 @@ jobs:
           )|ForEach-Object{Join-Path $env:GITHUB_WORKSPACE $_}
           foreach($source in $sources){if(-not(Test-Path -LiteralPath $source -PathType Leaf)){throw "Native source missing: $source"}}
           $out=Join-Path $env:RUNNER_TEMP 'HuymaierConsole-v0262-validation.exe'
-          $args=@('/noconfig','/nologo','/target:winexe','/platform:x64','/optimize+',('/out:'+$out),('/win32icon:'+(Join-Path $env:GITHUB_WORKSPACE 'HuymaierConsole.ico')))
+          # The release builder adds HuymaierConsole.ico from the staged base release.
+          # Source-only validation intentionally omits /win32icon so the managed
+          # compile gate tests code, not an asset that is not tracked in Git.
+          $args=@('/noconfig','/nologo','/target:winexe','/platform:x64','/optimize+',('/out:'+$out))
           foreach($ref in $refs){$args+=('/reference:'+$ref)};$args+=$sources
           & $csc @args
           if($LASTEXITCODE -ne 0 -or -not(Test-Path -LiteralPath $out -PathType Leaf)){throw 'v0.26.2 x64 managed host compile failed.'}
@@ -86,7 +89,7 @@ jobs:
           $runtime=Get-Content -Raw -LiteralPath 'HuymaierV0262Runtime.ps1' -Encoding UTF8
           foreach($required in @('GamesPlatformOrder','GamesHiddenPlatforms','GamesPlatformSizes','layout-edit-games','Steam Client','Start-HcSteamWorker','MinHeight=[math]::Max(170')){if($runtime -notmatch [regex]::Escape($required)){throw "v0.26.2 runtime invariant missing: $required"}}
           $steam=Get-Content -Raw -LiteralPath 'HuymaierSteamWorker.ps1' -Encoding UTF8
-          foreach($required in @("steam://install/","steam://uninstall/","steam://validate/",'BytesToDownload','BytesDownloaded','Refresh-SteamCatalog')){if($steam -notmatch [regex]::Escape($required)){throw "Steam worker invariant missing: $required"}}
+          foreach($required in @('steam://install/','steam://uninstall/','steam://validate/','BytesToDownload','BytesDownloaded','Refresh-SteamCatalog')){if($steam -notmatch [regex]::Escape($required)){throw "Steam worker invariant missing: $required"}}
           $provider=Get-Content -Raw -LiteralPath 'HuymaierV0262ProviderRuntime.ps1' -Encoding UTF8
           foreach($required in @('provider-progress.json','ProgressPath','IsIndeterminate','Observed writes')){if($provider -notmatch [regex]::Escape($required)){throw "Provider-progress invariant missing: $required"}}
           $sidecar=Get-Content -Raw -LiteralPath 'HuymaierProviderProgressWorker.ps1' -Encoding UTF8
