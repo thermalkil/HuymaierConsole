@@ -1,0 +1,61 @@
+name: Apply Huymaier Console v0.26.4 Wave 1 Native Surfaces
+
+on:
+  push:
+    branches:
+      - feature/v0.26.4-platform-expansion
+    paths:
+      - '.development/v0.26.4/wave1-native-request.json'
+
+permissions:
+  contents: write
+
+jobs:
+  materialize-and-compile:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Materialize Wave 1 native interfaces
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          python .development\v0.26.4\apply_wave1_native.py
+          if($LASTEXITCODE -ne 0){throw 'Wave 1 native materializer failed.'}
+      - name: Parse PowerShell expansion modules
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          foreach($path in @('.\HuymaierConsole.ps1','.\HuymaierEmulatorSettings.ps1','.\HuymaierEmulatorPlatforms.ps1')){
+            $tokens=$null;$errors=$null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path),[ref]$tokens,[ref]$errors)
+            if($errors.Count){$errors|ForEach-Object{Write-Host "$path $($_.Message)"};throw "$path does not parse in Windows PowerShell 5.1."}
+          }
+      - name: Compile exact x64 native host source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Windows.Forms,System.Drawing,System.Web.Extensions
+          $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          if(-not(Test-Path $csc)){throw 'Framework64 csc.exe was not found.'}
+          $automation=[Management.Automation.PSObject].Assembly.Location
+          $refs=@([Uri].Assembly.Location,[Linq.Enumerable].Assembly.Location,[System.Xaml.XamlReader].Assembly.Location,[Xml.XmlDocument].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,[Windows.Window].Assembly.Location,[Windows.Forms.Form].Assembly.Location,[Drawing.Bitmap].Assembly.Location,[Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,$automation)|Select-Object -Unique
+          $sources=@('Native\HuymaierConsole.NativeApp.cs','Native\HuymaierConsole.Ps1.cs','Native\HuymaierConsole.ConsolePlatforms.cs','Native\HuymaierConsole.SystemOverlay.cs','Native\HuymaierConsole.GameInput.cs','HuymaierNativeInput.cs','HuymaierNativeDisplay.cs','HuymaierNativeAudio.cs','HuymaierPerformance.cs','EmulatorPlatforms\Shared\Huymaier.P3T.cs')
+          foreach($s in $sources){if(-not(Test-Path $s)){throw "Native source missing: $s"}}
+          $out=Join-Path $env:RUNNER_TEMP 'HuymaierConsole-Wave1-compile-check.dll'
+          $args=@('/noconfig','/nologo','/target:library','/platform:x64','/optimize+',('/out:'+$out))
+          foreach($r in $refs){$args+=('/reference:'+$r)};$args+=$sources
+          & $csc @args
+          if($LASTEXITCODE -ne 0 -or -not(Test-Path $out)){throw 'Wave 1 x64 native source compilation failed.'}
+      - name: Commit compiled Wave 1 source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Native/HuymaierConsole.ConsolePlatforms.cs
+          if(git diff --cached --quiet){throw 'Wave 1 renderer produced no source changes.'}
+          git commit -m 'Materialize v0.26.4 Wave 1 native console surfaces'
+          git push origin HEAD:feature/v0.26.4-platform-expansion
