@@ -1,10 +1,10 @@
 {
-  "candidate": "v0.26.3-rc3",
+  "candidate": "v0.26.3-rc3-clean",
   "version": "0.26.3",
   "base_release": "v0.26.2",
   "base_asset": "HC262.zip",
   "package_root": "HC263",
   "asset_name": "HC263.zip",
-  "requested_at": "2026-08-10T20:49:00Z",
-  "focus": "Build the immutable v0.26.3 RC3 candidate from the materialized authentic-console source. Validate x64 host compilation, PowerShell 5.1 parsing, Huymaier-native emulator picker/install flow, emulator-first console artwork, Steam never-blank artwork, no-bumper console navigation, frozen PlayStation presentation, v0.26.2 inherited regressions, installer integrity, and Steam ownership behavior."
+  "requested_at": "2026-08-10T20:56:00Z",
+  "focus": "Build the cleaned immutable v0.26.3 RC3 candidate from the materialized authentic-console source. Strip inherited obsolete root/non-PlayStation README.txt files, retain PS1/PS2/PS3 asset README files, reseal and verify the final ZIP, rerun installer/integrity failure injection on the cleaned stage, then run the authentic-console, Huymaier-native emulator picker/install, emulator-first artwork, Steam never-blank artwork, no-bumper navigation, frozen PlayStation presentation, inherited v0.26.2, and Steam ownership gates."
 }
