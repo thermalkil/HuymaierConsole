@@ -1,0 +1,9 @@
+{
+  "batch": "platform-expansion-stage1",
+  "requestedAtUtc": "2026-08-10T22:02:00Z",
+  "base": "v0.26.3-rc4",
+  "goals": [
+    "make SteamGridDB artwork settings obvious and controller reachable",
+    "begin the researched missing-platform expansion without modifying the immutable RC4 branch"
+  ]
+}
