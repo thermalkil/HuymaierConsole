@@ -1,7 +1,7 @@
 {
-  "batch": "rc9-guide-only-and-wrapper-2",
-  "script": "apply_rc9_guide_only_and_wrapper.py",
+  "batch": "rc11-wrapper-exit-contract-1",
+  "script": "apply_rc11_wrapper_exit_contract.py",
   "patch_dir": "",
   "result": "success",
-  "recordedAtUtc": "2026-08-10T10:47:29.492870+00:00"
+  "recordedAtUtc": "2026-08-10T10:49:59.471164+00:00"
 }

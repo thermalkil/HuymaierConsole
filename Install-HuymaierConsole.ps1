@@ -11,9 +11,10 @@ if(-not(Test-Path -LiteralPath $core -PathType Leaf)){
     exit 1
 }
 
-# HuymaierInstallerCore.ps1 exits 1 itself on a transactional failure. A
-# successful core invocation returns normally, so the public wrapper owns the
-# successful process exit code explicitly. Never depend on $LASTEXITCODE here:
-# PowerShell scripts do not guarantee that automatic variable is initialized.
+# Seed the process exit state because an interactive successful PowerShell
+# script invocation may never create $LASTEXITCODE. The installer core uses
+# explicit `exit 1` for a transactional failure, which updates this value; a
+# normal interactive success leaves the seeded 0 unchanged.
+$global:LASTEXITCODE=0
 & $core -PackageRoot $PSScriptRoot -SilentUpdate:$SilentUpdate
-exit 0
+exit ([int]$global:LASTEXITCODE)

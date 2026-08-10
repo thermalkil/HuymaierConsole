@@ -160,8 +160,8 @@ try{
     $nativeInput=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierNativeInput.cs') -Encoding UTF8
     if($nativeInput -notmatch [regex]::Escape('value.PendingMask &= ~2')){throw 'PlayStation Guide-only fallback does not preserve non-Guide pending input.'}
     $wrapper=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'Install-HuymaierConsole.ps1') -Encoding UTF8
-    if($wrapper -match [regex]::Escape('$LASTEXITCODE')){throw 'Public installer wrapper still references $LASTEXITCODE.'}
-    if($wrapper -notmatch [regex]::Escape('exit 0')){throw 'Public installer wrapper has no explicit success exit code.'}
+    if($wrapper -notmatch [regex]::Escape('$global:LASTEXITCODE=0')){throw 'Public installer wrapper does not seed a deterministic success exit state.'}
+    if($wrapper -notmatch [regex]::Escape('exit ([int]$global:LASTEXITCODE)')){throw 'Public installer wrapper does not propagate the core transaction exit state.'}
 
     $validation=Get-Content -Raw -LiteralPath $ValidationPath -Encoding UTF8|ConvertFrom-Json
     $validation|Add-Member -NotePropertyName failureInjectionTests -NotePropertyValue 'success' -Force
