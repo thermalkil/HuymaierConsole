@@ -1,0 +1,56 @@
+name: Materialize Huymaier Console v0.26.4 Stella Native Settings
+
+on:
+  pull_request:
+    branches:
+      - feature/v0.26.3-console-fidelity
+    paths:
+      - '.development/v0.26.4/stella-request.json'
+      - '.development/v0.26.4/apply_stella_cli_adapter.py'
+      - '.github/workflows/materialize-v0264-stella.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: huymaier-v0264-stella
+  cancel-in-progress: false
+
+jobs:
+  materialize-and-validate:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v0.26.4-platform-expansion
+          fetch-depth: 0
+      - name: Materialize Stella command-line settings adapter
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $worker=Get-Content -Raw 'HuymaierEmulatorSettingsWorker.ps1' -Encoding UTF8
+          if($worker -notmatch [regex]::Escape('function Get-StellaCliSettings')){
+            python .development\v0.26.4\apply_stella_cli_adapter.py
+            if($LASTEXITCODE -ne 0){throw 'Stella native settings materializer failed.'}
+          }else{Write-Host 'Stella native settings adapter already materialized.'}
+      - name: Parse and validate Stella adapter
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          foreach($path in @('.\HuymaierEmulatorSettingsWorker.ps1','.\HuymaierEmulatorSettings.ps1')){$t=$null;$e=$null;[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path),[ref]$t,[ref]$e);if($e.Count){$e|ForEach-Object{Write-Host "$path : $($_.Message)"};throw "$path parse failed."}}
+          $worker=Get-Content -Raw 'HuymaierEmulatorSettingsWorker.ps1' -Encoding UTF8
+          foreach($required in @('Get-StellaHelpText','Arguments='' -help'''.Replace(''' ','''') ,'Get-StellaCliSettings','Set-StellaCliOverride','stella-command-line-overrides.json','Only entries with an argument placeholder are persistent settings')){if($worker -notmatch [regex]::Escape($required)){throw "Stella settings invariant missing: $required"}}
+          if($worker -match 'stella\.sqlite3[^\r\n]*(Set|Write|Remove|Delete)'){throw 'Huymaier must not write Stella 7 SQLite configuration directly.'}
+          $native=Get-Content -Raw 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8
+          foreach($required in @('BuildStellaOverrideArguments','stella-command-line-overrides.json','definition.Shell == "Atari2600" && exe.IndexOf("stella"')){if($native -notmatch [regex]::Escape($required)){throw "Stella launch override invariant missing: $required"}}
+      - name: Compile exact x64 native source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Windows.Forms,System.Drawing,System.Web.Extensions
+          $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe';$automation=[Management.Automation.PSObject].Assembly.Location;$refs=@([Uri].Assembly.Location,[Linq.Enumerable].Assembly.Location,[System.Xaml.XamlReader].Assembly.Location,[Xml.XmlDocument].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,[Windows.Window].Assembly.Location,[Windows.Forms.Form].Assembly.Location,[Drawing.Bitmap].Assembly.Location,[Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,$automation)|Select-Object -Unique
+          $sources=@('Native\HuymaierConsole.NativeApp.cs','Native\HuymaierConsole.Ps1.cs','Native\HuymaierConsole.ConsolePlatforms.cs','Native\HuymaierConsole.SystemOverlay.cs','Native\HuymaierConsole.GameInput.cs','HuymaierNativeInput.cs','HuymaierNativeDisplay.cs','HuymaierNativeAudio.cs','HuymaierPerformance.cs','EmulatorPlatforms\Shared\Huymaier.P3T.cs');$out=Join-Path $env:RUNNER_TEMP 'HuymaierConsole-v0264-stella.dll';$args=@('/noconfig','/nologo','/target:library','/platform:x64','/optimize+',('/out:'+$out));foreach($r in $refs){$args+=('/reference:'+$r)};$args+=$sources;& $csc @args;if($LASTEXITCODE -ne 0){throw 'Stella native adapter x64 compile failed.'}
+      - name: Commit validated Stella adapter
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com';git add HuymaierEmulatorSettingsWorker.ps1 Native/HuymaierConsole.ConsolePlatforms.cs;if(git diff --cached --quiet){Write-Host 'No Stella source changes to commit.';exit 0};git commit -m 'Materialize v0.26.4 Stella full native settings adapter';git fetch origin feature/v0.26.4-platform-expansion;git rebase origin/feature/v0.26.4-platform-expansion;if($LASTEXITCODE -ne 0){throw 'Stella adapter rebase failed.'};git push origin HEAD:feature/v0.26.4-platform-expansion;if($LASTEXITCODE -ne 0){throw 'Stella adapter push failed.'}
