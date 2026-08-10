@@ -1,5 +1,5 @@
 {
-  "batch": "next-gamebar-modal-filepicker-2",
-  "script": "apply_rc13_overlay_modal_filepicker.py",
-  "requested_at": "2026-08-10T11:38:00Z"
+  "batch": "next-combined-gamebar-customization-1",
+  "script": "apply_next_combined_customization.py",
+  "requested_at": "2026-08-10T11:41:00Z"
 }
