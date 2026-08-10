@@ -1,0 +1,340 @@
+{
+  "schemaVersion": 1,
+  "generatedFromBranch": "feature/v0.26.4-platform-expansion",
+  "platformCount": 16,
+  "enabledCount": 16,
+  "enabledMissingNativeSettings": [
+    "ps1",
+    "ps2",
+    "ps3",
+    "n64",
+    "gamecube",
+    "wii",
+    "wiiu",
+    "switch",
+    "xbox",
+    "xbox360"
+  ],
+  "platforms": [
+    {
+      "id": "ps1",
+      "name": "PlayStation 1",
+      "enabled": true,
+      "primaryBackend": "DuckStation",
+      "adapter": "",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": false,
+      "specialAdapterReady": false,
+      "nativeSettingsReady": false,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "ps2",
+      "name": "PlayStation 2",
+      "enabled": true,
+      "primaryBackend": "PCSX2",
+      "adapter": "",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": false,
+      "specialAdapterReady": false,
+      "nativeSettingsReady": false,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "ps3",
+      "name": "PlayStation 3",
+      "enabled": true,
+      "primaryBackend": "RPCS3",
+      "adapter": "",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": false,
+      "specialAdapterReady": false,
+      "nativeSettingsReady": false,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "psp",
+      "name": "PlayStation Portable",
+      "enabled": true,
+      "primaryBackend": "PPSSPP",
+      "adapter": "ppsspp",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "n64",
+      "name": "Nintendo 64",
+      "enabled": true,
+      "primaryBackend": "RMG",
+      "adapter": "",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": false,
+      "specialAdapterReady": false,
+      "nativeSettingsReady": false,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "nds",
+      "name": "Nintendo DS",
+      "enabled": true,
+      "primaryBackend": "melonDS",
+      "adapter": "melonds",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "dsi",
+      "name": "Nintendo DSi",
+      "enabled": true,
+      "primaryBackend": "melonDS",
+      "adapter": "melonds",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "3ds",
+      "name": "Nintendo 3DS",
+      "enabled": true,
+      "primaryBackend": "Azahar",
+      "adapter": "azahar",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "gamecube",
+      "name": "Nintendo GameCube",
+      "enabled": true,
+      "primaryBackend": "Dolphin",
+      "adapter": "",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": false,
+      "specialAdapterReady": false,
+      "nativeSettingsReady": false,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "wii",
+      "name": "Nintendo Wii",
+      "enabled": true,
+      "primaryBackend": "Dolphin",
+      "adapter": "",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": false,
+      "specialAdapterReady": false,
+      "nativeSettingsReady": false,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "wiiu",
+      "name": "Nintendo Wii U",
+      "enabled": true,
+      "primaryBackend": "Cemu",
+      "adapter": "",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": false,
+      "specialAdapterReady": false,
+      "nativeSettingsReady": false,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "switch",
+      "name": "Nintendo Switch",
+      "enabled": true,
+      "primaryBackend": "Eden",
+      "adapter": "",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": false,
+      "specialAdapterReady": false,
+      "nativeSettingsReady": false,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "xbox",
+      "name": "Original Xbox",
+      "enabled": true,
+      "primaryBackend": "xemu",
+      "adapter": "",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": false,
+      "specialAdapterReady": false,
+      "nativeSettingsReady": false,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "xbox360",
+      "name": "Xbox 360",
+      "enabled": true,
+      "primaryBackend": "Xenia Canary",
+      "adapter": "",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": false,
+      "specialAdapterReady": false,
+      "nativeSettingsReady": false,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "dreamcast",
+      "name": "Sega Dreamcast",
+      "enabled": true,
+      "primaryBackend": "Flycast",
+      "adapter": "flycast",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "saturn",
+      "name": "Sega Saturn",
+      "enabled": true,
+      "primaryBackend": "Mednafen",
+      "adapter": "mednafen",
+      "fallbackAdapter": "kronos",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    }
+  ]
+}
