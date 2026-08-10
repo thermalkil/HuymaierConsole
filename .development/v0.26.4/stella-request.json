@@ -1,0 +1,7 @@
+{
+  "batch":"stella-native-cli-settings",
+  "requestedAtUtc":"2026-08-10T23:24:00Z",
+  "platform":"Atari2600",
+  "backend":"Stella",
+  "requirements":["discover installed-version settings from Stella -help","never write Stella sqlite database directly","store only Huymaier command-line overrides","apply overrides at launch","PowerShell 5.1 parse","exact x64 compile"]
+}
