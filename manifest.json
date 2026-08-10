@@ -2,19 +2,21 @@
   "name": "Huymaier Console FSE Shell, Storefront & Artwork Integration",
   "version": "0.26.1",
   "baseVersion": "0.26.0",
-  "build": "installer-lock-and-atomic-rollback-hotfix",
-  "builtFrom": "HC258.zip",
+  "build": "system-integrity-transactional-installer-hotfix",
+  "builtFrom": "HC260.zip",
   "features": [
     "keeps Quick Access exclusive to Huymaier Console while adding a separate external-game/app Huymaier Game Bar",
     "separates physical Guide/Xbox/PS/Home from Xbox View/Back and PlayStation Share/Create",
-    "adds a native Microsoft GameInput system-button bridge with Raw HID/XInput compatibility fallback",
-    "adds a native Huymaier task switcher baseline for user-facing top-level Windows application windows",
-    "fixes the PowerShell Title/title collision that prevented centered finite-choice popups from opening",
-    "removes decorative X/Square Search prompts when no secondary action exists",
-    "preserves the v0.25.8 Windows PowerShell BOM packaging and updater ContentLength hotfixes",
-    "stops all native Huymaier Console hosts before replacing any installed payload files",
-    "skips byte-identical locked files and retries changed locked files instead of aborting immediately",
-    "uses recursive updater rollback so a failed update cannot relaunch a mixed native/script installation"
+    "preserves the runtime-tested v0.26.0 native Huymaier Game Bar, task switcher, DPI scaling, fullscreen preservation, popup navigation, and Guide behavior",
+    "builds the GameInput bridge as x64 with the static MSVC runtime and ships the Microsoft GameInput redistributable",
+    "builds and installs the exact x64 HuymaierConsole.exe and FSE host validated by Windows CI instead of recompiling application binaries on client PCs",
+    "uses a closed SHA-256 package manifest as the authoritative managed-file list and rejects missing, tampered, duplicate, traversing, or unchecksummed payload",
+    "uses a persistent incomplete-install marker plus managed-file rollback so interrupted or failed updates cannot silently launch a mixed-version installation",
+    "fails startup closed when the installed manifest, native Game Bar host, or system-button bridge is missing or inconsistent",
+    "verifies the SHA-256 asset published with GitHub Releases before self-update installation",
+    "keeps Xbox Game Bar suppression limited to controller-button takeover and restores the user's prior setting on normal exit, recovery, next sign-in, and uninstall",
+    "keeps FSE Home registration per-user without changing machine-wide Developer Mode policy",
+    "removes obsolete parallel updater and Guide bridge implementations"
   ],
-  "description": "v0.26.1 hotfix for reliable self-update/install replacement while preserving the runtime-tested v0.26.0 Game Bar, Guide routing, task switcher, and popup navigation behavior."
+  "description": "v0.26.1 is the system-integrity hotfix for Huymaier Console: exact-artifact Windows packaging, closed package verification, transactional/fail-closed install and update behavior, reversible Windows setting ownership, x64 dependency parity, and removal of stale parallel runtime paths."
 }
