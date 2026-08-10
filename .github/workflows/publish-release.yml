@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 concurrency:
   group: huymaier-console-release
@@ -17,204 +18,206 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out source
+      - name: Check out release metadata
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Read release manifest
+      - name: Read exact-candidate release manifest
         id: manifest
         shell: bash
         run: |
+          set -euo pipefail
           python3 - <<'PY'
-          import json, os
+          import json,os
           data=json.load(open('.release/release.json',encoding='utf-8'))
-          required=['version','tag','title','asset_name','package_root','notes_file']
-          missing=[k for k in required if not data.get(k)]
+          required=[
+            'version','tag','title','asset_name','package_root','notes_file',
+            'candidate_run_id','candidate_run_attempt','candidate_commit',
+            'candidate_sha256','candidate_artifact_name'
+          ]
+          missing=[k for k in required if data.get(k) in (None,'')]
           if missing:
-              raise SystemExit('Missing release manifest fields: '+', '.join(missing))
+              raise SystemExit('Missing exact-candidate release fields: '+', '.join(missing))
           with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as f:
               for k in required:
                   f.write(f'{k}={data[k]}\n')
               f.write(f"publish={str(bool(data.get('publish',False))).lower()}\n")
-              f.write(f"patch_dir={data.get('patch_dir','')}\n")
-          open('/tmp/delete-paths.txt','w',encoding='utf-8').write('\n'.join(data.get('delete_paths',[])))
           PY
 
-      - name: Stop when manifest is staged only
+      - name: Stop when release is only staged
         if: steps.manifest.outputs.publish != 'true'
-        run: echo 'Release manifest is staged with publish=false; nothing to publish.'
+        run: echo 'Release manifest is staged with publish=false; nothing will be published.'
 
-      - name: Check target release
+      - name: Refuse to overwrite an existing release
         id: existing
         if: steps.manifest.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.manifest.outputs.tag }}
-          ASSET_NAME: ${{ steps.manifest.outputs.asset_name }}
         shell: bash
         run: |
           set -euo pipefail
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            mapfile -t assets < <(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
-            printf '%s\n' "${assets[@]}" | grep -Fxq "$ASSET_NAME"
-            printf '%s\n' "${assets[@]}" | grep -Fxq "$ASSET_NAME.sha256"
             echo 'exists=true' >> "$GITHUB_OUTPUT"
           else
             echo 'exists=false' >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Download previous full release package
+      - name: Validate pinned candidate workflow run
         if: steps.manifest.outputs.publish == 'true' && steps.existing.outputs.exists != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ steps.manifest.outputs.candidate_run_id }}
+          RUN_ATTEMPT: ${{ steps.manifest.outputs.candidate_run_attempt }}
+          SOURCE_COMMIT: ${{ steps.manifest.outputs.candidate_commit }}
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/hc-base
-          gh release download --repo "$GITHUB_REPOSITORY" --pattern '*.zip' --dir /tmp/hc-base
-          BASE_ZIP="$(find /tmp/hc-base -maxdepth 1 -type f -iname '*.zip' -printf '%s %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)"
-          if [ -z "$BASE_ZIP" ] || [ ! -f "$BASE_ZIP" ]; then
-            echo 'No installable ZIP asset was found on the previous GitHub Release.'
-            exit 1
-          fi
-          echo "BASE_ZIP=$BASE_ZIP" >> "$GITHUB_ENV"
-
-      - name: Stage package and apply verified release delta
-        if: steps.manifest.outputs.publish == 'true' && steps.existing.outputs.exists != 'true'
-        env:
-          PACKAGE_ROOT: ${{ steps.manifest.outputs.package_root }}
-          PATCH_DIR: ${{ steps.manifest.outputs.patch_dir }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf /tmp/hc-extract /tmp/hc-stage
-          mkdir -p /tmp/hc-extract /tmp/hc-stage
-          unzip -q "$BASE_ZIP" -d /tmp/hc-extract
-          mapfile -t roots < <(find /tmp/hc-extract -mindepth 1 -maxdepth 1 -type d)
-          if [ "${#roots[@]}" -eq 1 ]; then BASE_ROOT="${roots[0]}"; else BASE_ROOT='/tmp/hc-extract'; fi
-          DEST="/tmp/hc-stage/$PACKAGE_ROOT"
-          mkdir -p "$DEST"
-          cp -a "$BASE_ROOT"/. "$DEST"/
-
-          while IFS= read -r -d '' f; do
-            case "$f" in
-              .github/*|.release/*|.source/*|.gitignore|README.md|RELEASING.md|GITHUB-RELEASES.md|HuymaierConsoleUpdate.ps1|HuymaierConsoleUpdateWorker.ps1|HuymaierConsoleApplyUpdate.ps1) continue ;;
-            esac
-            [ -f "$f" ] || continue
-            mkdir -p "$DEST/$(dirname "$f")"
-            cp -f "$f" "$DEST/$f"
-          done < <(git ls-files -z)
-
-          if [ -s /tmp/delete-paths.txt ]; then
-            while IFS= read -r p; do [ -n "$p" ] && rm -rf "$DEST/$p"; done < /tmp/delete-paths.txt
-          fi
-
-          if [ -n "$PATCH_DIR" ]; then
-            shopt -s nullglob
-            patches=("$GITHUB_WORKSPACE/$PATCH_DIR"/*.patch)
-            if [ "${#patches[@]}" -eq 0 ]; then
-              echo "Patch directory contains no .patch files: $PATCH_DIR"
-              exit 1
-            fi
-            for patch_file in "${patches[@]}"; do
-              echo "Applying $(basename "$patch_file")"
-              (cd "$DEST" && git apply -p2 --whitespace=nowarn "$patch_file")
-            done
-          fi
-          echo "PACKAGE_DIR=$DEST" >> "$GITHUB_ENV"
-
-      - name: Normalize Windows PowerShell 5.1 source encoding
-        if: steps.manifest.outputs.publish == 'true' && steps.existing.outputs.exists != 'true'
-        shell: bash
-        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" > /tmp/candidate-run.json
           python3 - <<'PY'
-          import os
-          root=os.environ['PACKAGE_DIR']
-          bom=b'\xef\xbb\xbf'
-          count=0
-          for dp,_,names in os.walk(root):
-              for name in names:
-                  if not name.lower().endswith(('.ps1','.psm1','.psd1')):
-                      continue
-                  p=os.path.join(dp,name)
-                  data=open(p,'rb').read()
-                  if data.startswith(bom):
-                      body=data[len(bom):]
-                  else:
-                      body=data
-                  body.decode('utf-8')
-                  open(p,'wb').write(bom+body)
-                  count+=1
-          if count == 0:
-              raise SystemExit('No PowerShell source files were found in the staged package.')
-          print(f'Normalized {count} PowerShell files to UTF-8 with BOM.')
+          import json,os
+          run=json.load(open('/tmp/candidate-run.json',encoding='utf-8'))
+          expected_sha=os.environ['SOURCE_COMMIT'].lower()
+          actual_sha=str(run.get('head_sha','')).lower()
+          expected_attempt=int(os.environ['RUN_ATTEMPT'])
+          actual_attempt=int(run.get('run_attempt') or 0)
+          if run.get('status')!='completed' or run.get('conclusion')!='success':
+              raise SystemExit(f"Candidate run is not successful: status={run.get('status')} conclusion={run.get('conclusion')}")
+          if actual_sha!=expected_sha:
+              raise SystemExit(f'Candidate source commit mismatch: expected {expected_sha}, found {actual_sha}')
+          if actual_attempt!=expected_attempt:
+              raise SystemExit(f'Candidate run-attempt mismatch: expected {expected_attempt}, found {actual_attempt}')
+          print(f'Pinned candidate run {run.get("id")} attempt {actual_attempt} at {actual_sha} is successful.')
           PY
 
-      - name: Verify staged release
+      - name: Download the exact validated candidate artifact
+        if: steps.manifest.outputs.publish == 'true' && steps.existing.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ steps.manifest.outputs.candidate_run_id }}
+          ARTIFACT_NAME: ${{ steps.manifest.outputs.candidate_artifact_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/hc-candidate
+          mkdir -p /tmp/hc-candidate
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$ARTIFACT_NAME" --dir /tmp/hc-candidate
+
+      - name: Verify exact candidate provenance and closed package
         if: steps.manifest.outputs.publish == 'true' && steps.existing.outputs.exists != 'true'
         env:
           VERSION: ${{ steps.manifest.outputs.version }}
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          import json, os
-          root=os.environ['PACKAGE_DIR']
-          manifest=os.path.join(root,'manifest.json')
-          if not os.path.isfile(manifest):
-              raise SystemExit('Packaged manifest.json is missing.')
-          actual=str(json.load(open(manifest,encoding='utf-8-sig')).get('version',''))
-          expected=os.environ['VERSION']
-          if actual != expected:
-              raise SystemExit(f'Package version mismatch: expected {expected}, found {actual}')
-          bom=b'\xef\xbb\xbf'
-          ps=[]
-          for dp,_,names in os.walk(root):
-              for name in names:
-                  if name.lower().endswith(('.ps1','.psm1','.psd1')):
-                      p=os.path.join(dp,name); ps.append(p)
-                      if not open(p,'rb').read(3)==bom:
-                          raise SystemExit('PowerShell source is missing UTF-8 BOM: '+os.path.relpath(p,root))
-          print(f'Verified package version {actual} and BOM on {len(ps)} PowerShell files.')
-          PY
-
-      - name: Regenerate internal checksums
-        if: steps.manifest.outputs.publish == 'true' && steps.existing.outputs.exists != 'true'
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          import hashlib, os
-          root=os.environ['PACKAGE_DIR']; excluded={'checksums.sha256','SHA256SUMS.txt'}; rows=[]
-          for dp,_,names in os.walk(root):
-              for name in names:
-                  rel=os.path.relpath(os.path.join(dp,name),root).replace(os.sep,'/')
-                  if rel in excluded: continue
-                  p=os.path.join(root,rel.replace('/',os.sep)); h=hashlib.sha256()
-                  with open(p,'rb') as f:
-                      for chunk in iter(lambda:f.read(1024*1024),b''): h.update(chunk)
-                  rows.append((rel,h.hexdigest()))
-          rows.sort(key=lambda x:x[0].lower())
-          text=''.join(f'{h}  {rel}\n' for rel,h in rows)
-          for name in excluded:
-              open(os.path.join(root,name),'w',encoding='utf-8',newline='\n').write(text)
-          print(f'Checksummed {len(rows)} payload files.')
-          PY
-
-      - name: Build release ZIP and SHA-256 asset
-        if: steps.manifest.outputs.publish == 'true' && steps.existing.outputs.exists != 'true'
-        env:
           ASSET_NAME: ${{ steps.manifest.outputs.asset_name }}
           PACKAGE_ROOT: ${{ steps.manifest.outputs.package_root }}
+          EXPECTED_SHA: ${{ steps.manifest.outputs.candidate_sha256 }}
+          SOURCE_COMMIT: ${{ steps.manifest.outputs.candidate_commit }}
+          RUN_ID: ${{ steps.manifest.outputs.candidate_run_id }}
+          RUN_ATTEMPT: ${{ steps.manifest.outputs.candidate_run_attempt }}
         shell: bash
         run: |
-          cd /tmp/hc-stage
-          zip -q -r "$GITHUB_WORKSPACE/$ASSET_NAME" "$PACKAGE_ROOT"
-          cd "$GITHUB_WORKSPACE"
-          HASH="$(sha256sum "$ASSET_NAME" | awk '{print $1}')"
-          printf '%s  %s\n' "$HASH" "$ASSET_NAME" > "$ASSET_NAME.sha256"
-          echo "Release asset SHA-256: $HASH"
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib,re,struct,zipfile
+          root=pathlib.Path('/tmp/hc-candidate')
+          asset_name=os.environ['ASSET_NAME']
+          zip_matches=list(root.rglob(asset_name))
+          side_matches=list(root.rglob(asset_name+'.sha256'))
+          validation_matches=list(root.rglob('candidate-validation.json'))
+          if len(zip_matches)!=1 or len(side_matches)!=1 or len(validation_matches)!=1:
+              raise SystemExit(f'Candidate artifact must contain exactly one ZIP, sidecar, and validation record; found zip={len(zip_matches)} sidecar={len(side_matches)} validation={len(validation_matches)}')
+          zp,side,vp=zip_matches[0],side_matches[0],validation_matches[0]
 
-      - name: Publish GitHub Release
+          def sha256(path):
+              h=hashlib.sha256()
+              with open(path,'rb') as f:
+                  for chunk in iter(lambda:f.read(1024*1024),b''):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          actual=sha256(zp)
+          expected=os.environ['EXPECTED_SHA'].lower()
+          if actual!=expected:
+              raise SystemExit(f'Candidate ZIP SHA-256 mismatch: expected {expected}, found {actual}')
+          line=side.read_text(encoding='ascii').strip()
+          m=re.match(r'^([0-9a-fA-F]{64})(?:\s+.+)?$',line)
+          if not m or m.group(1).lower()!=actual:
+              raise SystemExit('Candidate SHA-256 sidecar does not match the candidate ZIP.')
+
+          validation=json.loads(vp.read_text(encoding='utf-8-sig'))
+          required={
+              'version':os.environ['VERSION'],
+              'asset':asset_name,
+              'sha256':actual,
+              'sourceCommit':os.environ['SOURCE_COMMIT'],
+              'architecture':'x64',
+              'failureInjectionTests':'success',
+              'lockedIdenticalRepair':'success',
+              'lockedChangedFailClosedRepair':'success',
+              'unmanagedDataPreservation':'success',
+          }
+          for key,value in required.items():
+              if str(validation.get(key,''))!=str(value):
+                  raise SystemExit(f'Candidate validation mismatch for {key}: expected {value!r}, found {validation.get(key)!r}')
+          if int(validation.get('runId') or 0)!=int(os.environ['RUN_ID']):
+              raise SystemExit('candidate-validation.json runId does not match the pinned release run.')
+          if int(validation.get('runAttempt') or 0)!=int(os.environ['RUN_ATTEMPT']):
+              raise SystemExit('candidate-validation.json runAttempt does not match the pinned release attempt.')
+
+          package_root=os.environ['PACKAGE_ROOT'].rstrip('/')
+          with zipfile.ZipFile(zp,'r') as z:
+              names=[n.replace('\\','/') for n in z.namelist() if not n.endswith('/')]
+              if not names:
+                  raise SystemExit('Candidate ZIP has no files.')
+              prefix=package_root+'/'
+              for name in names:
+                  p=pathlib.PurePosixPath(name)
+                  if p.is_absolute() or '..' in p.parts or not name.startswith(prefix):
+                      raise SystemExit(f'Unsafe or unexpected ZIP entry: {name}')
+              manifest_name=prefix+'manifest.json'
+              checks_name=prefix+'checksums.sha256'
+              compat_name=prefix+'SHA256SUMS.txt'
+              for req in (manifest_name,checks_name,compat_name):
+                  if req not in names:
+                      raise SystemExit(f'Candidate ZIP is missing {req}')
+              manifest=json.loads(z.read(manifest_name).decode('utf-8-sig'))
+              if str(manifest.get('version',''))!=os.environ['VERSION']:
+                  raise SystemExit('Packaged manifest version does not match release version.')
+              checks=z.read(checks_name).decode('utf-8')
+              compat=z.read(compat_name).decode('utf-8')
+              if checks!=compat:
+                  raise SystemExit('Internal checksum manifests disagree.')
+              expected_files={}
+              for line in checks.splitlines():
+                  if not line.strip(): continue
+                  m=re.match(r'^([0-9a-fA-F]{64})  (.+)$',line)
+                  if not m: raise SystemExit(f'Invalid internal checksum row: {line}')
+                  rel=m.group(2).replace('\\','/')
+                  if rel in expected_files: raise SystemExit(f'Duplicate internal checksum path: {rel}')
+                  expected_files[rel]=m.group(1).lower()
+              actual_rel={n[len(prefix):] for n in names if n not in (checks_name,compat_name)}
+              if actual_rel!=set(expected_files):
+                  missing=set(expected_files)-actual_rel
+                  extra=actual_rel-set(expected_files)
+                  raise SystemExit(f'Closed package mismatch. missing={sorted(missing)} extra={sorted(extra)}')
+              for rel,expected_hash in expected_files.items():
+                  data=z.read(prefix+rel)
+                  if hashlib.sha256(data).hexdigest()!=expected_hash:
+                      raise SystemExit(f'Internal checksum mismatch: {rel}')
+              for rel in ('HuymaierConsole.exe','HuymaierGameInputBridge.dll','FSEPackage/HuymaierFSEHost.exe'):
+                  data=z.read(prefix+rel)
+                  if len(data)<0x40 or data[:2]!=b'MZ': raise SystemExit(f'Invalid PE file: {rel}')
+                  peoff=struct.unpack_from('<I',data,0x3c)[0]
+                  if data[peoff:peoff+4]!=b'PE\0\0': raise SystemExit(f'Invalid PE signature: {rel}')
+                  machine=struct.unpack_from('<H',data,peoff+4)[0]
+                  if machine!=0x8664: raise SystemExit(f'{rel} is not x64: machine=0x{machine:04x}')
+
+          pathlib.Path(os.environ['GITHUB_WORKSPACE'],asset_name).write_bytes(zp.read_bytes())
+          pathlib.Path(os.environ['GITHUB_WORKSPACE'],asset_name+'.sha256').write_bytes(side.read_bytes())
+          print(f'Exact candidate promotion verified: {asset_name} sha256={actual}')
+          PY
+
+      - name: Publish exact candidate as GitHub Release
         if: steps.manifest.outputs.publish == 'true' && steps.existing.outputs.exists != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -224,7 +227,8 @@ jobs:
           NOTES_FILE: ${{ steps.manifest.outputs.notes_file }}
         shell: bash
         run: |
-          [ -f "$NOTES_FILE" ] || { echo "Release notes file not found: $NOTES_FILE"; exit 1; }
+          set -euo pipefail
+          test -f "$NOTES_FILE"
           gh release create "$TAG" "$ASSET_NAME" "$ASSET_NAME.sha256" \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TITLE" --notes-file "$NOTES_FILE"
 
@@ -236,17 +240,26 @@ jobs:
           ASSET_NAME: ${{ steps.manifest.outputs.asset_name }}
           RESULT: ${{ job.status }}
           EXISTED: ${{ steps.existing.outputs.exists }}
+          CANDIDATE_RUN_ID: ${{ steps.manifest.outputs.candidate_run_id }}
+          CANDIDATE_RUN_ATTEMPT: ${{ steps.manifest.outputs.candidate_run_attempt }}
+          CANDIDATE_COMMIT: ${{ steps.manifest.outputs.candidate_commit }}
+          CANDIDATE_SHA256: ${{ steps.manifest.outputs.candidate_sha256 }}
         shell: bash
         run: |
+          set -euo pipefail
           python3 - <<'PY'
-          import json, os, datetime
+          import json,os,datetime
           state={
             'tag':os.environ.get('TAG',''),
             'version':os.environ.get('VERSION',''),
             'asset':os.environ.get('ASSET_NAME',''),
             'result':os.environ.get('RESULT','unknown'),
             'alreadyPublished':os.environ.get('EXISTED','')=='true',
-            'commit':os.environ.get('GITHUB_SHA',''),
+            'releaseCommit':os.environ.get('GITHUB_SHA',''),
+            'candidateRunId':os.environ.get('CANDIDATE_RUN_ID',''),
+            'candidateRunAttempt':os.environ.get('CANDIDATE_RUN_ATTEMPT',''),
+            'candidateCommit':os.environ.get('CANDIDATE_COMMIT',''),
+            'candidateSha256':os.environ.get('CANDIDATE_SHA256',''),
             'recordedAtUtc':datetime.datetime.now(datetime.timezone.utc).isoformat()
           }
           os.makedirs('.release',exist_ok=True)
@@ -256,5 +269,5 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add .release/status.json
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "Record $TAG release status"
+          git commit -m "Record $TAG exact-candidate release status"
           git push
