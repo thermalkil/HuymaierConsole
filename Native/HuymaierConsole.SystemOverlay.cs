@@ -26,6 +26,34 @@ namespace HuymaierConsole.NativeApp
         internal int ProcessId;
     }
 
+    public static class HuymaierForegroundOwnership
+    {
+        [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+        public static int ForegroundProcessId
+        {
+            get
+            {
+                try
+                {
+                    IntPtr foreground = GetForegroundWindow();
+                    if (foreground == IntPtr.Zero) return 0;
+                    uint processId;
+                    GetWindowThreadProcessId(foreground, out processId);
+                    return (int)processId;
+                }
+                catch { return 0; }
+            }
+        }
+
+        public static bool IsCurrentProcessForeground()
+        {
+            int foregroundPid = ForegroundProcessId;
+            return foregroundPid > 0 && foregroundPid == Process.GetCurrentProcess().Id;
+        }
+    }
+
     internal static class SystemWindowCatalog
     {
         private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);

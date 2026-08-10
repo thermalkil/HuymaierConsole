@@ -130,6 +130,19 @@ try{
     foreach($required in @('UseNexusForGameBarEnabled','Get-HcGameInputGuideEdge','Invoke-HcInternalGuide')){if($gameBar -notmatch [regex]::Escape($required)){throw "Game Bar integrity behavior is missing: $required"}}
     foreach($dead in @('HuymaierGuideInput.cs','HuymaierGuideBridge.dll','HuymaierConsoleUpdate.ps1','HuymaierConsoleApplyUpdate.ps1')){if(Test-Path -LiteralPath (Join-Path $StageRoot $dead)){throw "Retired payload is still packaged: $dead"}}
 
+
+    # RC8 runtime ownership invariants: hidden Game Bar cannot steal general
+    # navigation; Win32 foreground ownership decides internal vs external Guide;
+    # Xbox storefront selection cannot be intercepted by the Original Xbox ID.
+    $visibleIndex=$gameBar.IndexOf('$visible=[HuymaierConsole.NativeApp.HuymaierGameBarHost]::IsVisible')
+    $pollIndex=$gameBar.IndexOf('[HuymaierConsole.NativeApp.NativeConsoleNavigation]::Poll()')
+    if($visibleIndex -lt 0 -or $pollIndex -lt 0 -or $pollIndex -lt $visibleIndex){throw 'Game Bar can poll shared navigation before visible-overlay ownership is established.'}
+    foreach($required in @('Test-HcForegroundOwnedByConsole','HuymaierForegroundOwnership','System Guide backend initialized')){if($gameBar -notmatch [regex]::Escape($required)){throw "Game Bar foreground/Guide ownership invariant is missing: $required"}}
+    $emulator=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierEmulatorPlatforms.ps1') -Encoding UTF8
+    if($emulator -notmatch [regex]::Escape('Test-HcEmulatorPlatformMenuName $platform')){throw 'Platform selection is not using strict emulator menu identity.'}
+    $restore=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'Restore-HuymaierWindowsSettings.ps1') -Encoding UTF8
+    if($restore -notmatch [regex]::Escape('foreach($backup in @($rawBackup))')){throw 'Legacy Xbox Game Bar backup-array migration is missing.'}
+
     $validation=Get-Content -Raw -LiteralPath $ValidationPath -Encoding UTF8|ConvertFrom-Json
     $validation|Add-Member -NotePropertyName failureInjectionTests -NotePropertyValue 'success' -Force
     $validation|Add-Member -NotePropertyName lockedIdenticalRepair -NotePropertyValue 'success' -Force

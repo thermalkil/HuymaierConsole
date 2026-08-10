@@ -53,6 +53,14 @@ namespace HuymaierConsole.NativeApp
         }
     }
 
+    public static class HuymaierSystemButtonStatus
+    {
+        public static bool IsAvailable
+        {
+            get { return HuymaierSystemButtonBridge.IsAvailable; }
+        }
+    }
+
     internal static class HuymaierSystemButtonBridge
     {
         private const string BridgeDll = "HuymaierGameInputBridge.dll";

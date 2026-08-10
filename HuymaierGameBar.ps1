@@ -1,4 +1,4 @@
-# Huymaier Console v0.26.1 external game/app overlay and process-wide Guide arbiter.
+﻿# Huymaier Console v0.26.1 external game/app overlay and process-wide Guide arbiter.
 # Quick Access remains inside Huymaier Console. The physical Guide/Home system
 # button is global; local Menu/Start, View/Back, and Share/Create remain distinct.
 
@@ -8,6 +8,8 @@ $script:HcGameBarBackupPath=Join-Path $script:DataDir 'xbox-gamebar-backup.json'
 $script:HcWindowsRestorePath=Join-Path $script:BaseDir 'Restore-HuymaierWindowsSettings.ps1'
 $script:HcSystemGuideType=$null
 $script:HcSystemGuideMethod=$null
+$script:HcForegroundMethod=$null
+$script:HcSystemGuideAvailableProperty=$null
 
 function Get-HcRegistryBackupValue {
     param([string]$Path,[string]$Name)
@@ -101,6 +103,39 @@ function Get-HcActiveConsoleWindow {
     return $null
 }
 
+function Initialize-HcOwnershipReflection {
+    try{
+        $nativeVariable=Get-Variable -Name HuymaierNativeBridge -ErrorAction SilentlyContinue
+        if($null -eq $nativeVariable -or $null -eq $nativeVariable.Value){return}
+        $assembly=$nativeVariable.Value.GetType().Assembly
+        $flags=[Reflection.BindingFlags]::Public -bor [Reflection.BindingFlags]::Static
+        if($null -eq $script:HcForegroundMethod){
+            $foregroundType=$assembly.GetType('HuymaierConsole.NativeApp.HuymaierForegroundOwnership',$false)
+            if($null -ne $foregroundType){$script:HcForegroundMethod=$foregroundType.GetMethod('IsCurrentProcessForeground',$flags)}
+        }
+        if($null -eq $script:HcSystemGuideAvailableProperty){
+            $statusType=$assembly.GetType('HuymaierConsole.NativeApp.HuymaierSystemButtonStatus',$false)
+            if($null -ne $statusType){$script:HcSystemGuideAvailableProperty=$statusType.GetProperty('IsAvailable',$flags)}
+        }
+    }catch{}
+}
+
+function Test-HcForegroundOwnedByConsole {
+    try{
+        Initialize-HcOwnershipReflection
+        if($null -eq $script:HcForegroundMethod){return $false}
+        return [bool]$script:HcForegroundMethod.Invoke($null,$null)
+    }catch{return $false}
+}
+
+function Test-HcGameInputGuideAvailable {
+    try{
+        Initialize-HcOwnershipReflection
+        if($null -eq $script:HcSystemGuideAvailableProperty){return $false}
+        return [bool]$script:HcSystemGuideAvailableProperty.GetValue($null,$null)
+    }catch{return $false}
+}
+
 function Invoke-HcInternalGuide {
     param($ActiveWindow)
     try{
@@ -129,6 +164,9 @@ function Initialize-HuymaierGameBar {
         [HuymaierConsole.NativeApp.HuymaierGameBarHost]::Initialize($script:Window)
         [HuymaierConsole.NativeApp.HuymaierGameBarHost]::SetScalePercent([int](Get-EntryProperty $script:Config 'GameBarScale' 100))
         Initialize-HcSystemGuideReflection
+        Initialize-HcOwnershipReflection
+        $gameInputGuideAvailable=Test-HcGameInputGuideAvailable
+        Write-Log ("System Guide backend initialized: GameInput={0}; RawGameControllerFallback=Enabled." -f $gameInputGuideAvailable)
         Set-HcXboxGameBarSuppression
         if($null -ne $script:HcGameBarTimer){try{$script:HcGameBarTimer.Stop()}catch{}}
 
@@ -138,37 +176,42 @@ function Initialize-HuymaierGameBar {
             try{
                 if($null -eq $script:Window){return}
 
-                # Consume only the dedicated system Guide edge here. D-pad/A/B/
-                # shoulders remain with the currently active local input router.
+                # The hidden watcher observes only the dedicated system Guide/Home
+                # edge. It must never consume D-pad/A/B/shoulder input from the
+                # shared navigation router while the overlay is hidden.
                 $gameInputGuideEdge=Get-HcGameInputGuideEdge
                 $rawGuide=Get-HcRawSystemGuidePressed
                 $rawGuideEdge=($rawGuide -and -not $script:HcExternalGuideDown)
                 $script:HcExternalGuideDown=$rawGuide
                 $guideEdge=$gameInputGuideEdge -or $rawGuideEdge
 
-                $activeInternal=Get-HcActiveConsoleWindow
-                if($null -ne $activeInternal){
-                    if($guideEdge){Invoke-HcInternalGuide -ActiveWindow $activeInternal}
-                    return
-                }
-
-                # No Huymaier window owns foreground focus: the external Game
-                # Bar may consume normal navigation through the shared router.
-                $command=''
-                try{
-                    if('HuymaierConsole.NativeApp.NativeConsoleNavigation' -as [type]){
-                        $native=[HuymaierConsole.NativeApp.NativeConsoleNavigation]::Poll()
-                        $command=[string]$native.Command
-                    }
-                }catch{}
-
                 $visible=[HuymaierConsole.NativeApp.HuymaierGameBarHost]::IsVisible
                 if($visible){
+                    # Once visible, the Game Bar owns normal navigation and may
+                    # poll the shared controller router for D-pad/A/B/etc.
+                    $command=''
+                    try{
+                        if('HuymaierConsole.NativeApp.NativeConsoleNavigation' -as [type]){
+                            $native=[HuymaierConsole.NativeApp.NativeConsoleNavigation]::Poll()
+                            $command=[string]$native.Command
+                        }
+                    }catch{}
                     if($guideEdge){[HuymaierConsole.NativeApp.HuymaierGameBarHost]::ProcessCommand('Guide')}
                     elseif($command){[HuymaierConsole.NativeApp.HuymaierGameBarHost]::ProcessCommand($command)}
                     return
                 }
-                if($guideEdge -or $command -eq 'Guide'){
+
+                # Win32 foreground HWND ownership is authoritative. WPF IsActive
+                # can be false while an owned/native Huymaier interface is active.
+                if(Test-HcForegroundOwnedByConsole){
+                    if($guideEdge){Invoke-HcInternalGuide -ActiveWindow (Get-HcActiveConsoleWindow)}
+                    return
+                }
+
+                # An external process owns foreground focus. Only Guide/Home may
+                # wake the Huymaier Game Bar; all other controller input remains
+                # entirely with the foreground game/application.
+                if($guideEdge){
                     [HuymaierConsole.NativeApp.HuymaierGameBarHost]::Show()
                     Write-Log 'Huymaier Game Bar opened over the foreground game/app.'
                 }

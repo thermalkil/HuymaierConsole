@@ -1,4 +1,4 @@
-# Huymaier Console emulator-platform host.
+﻿# Huymaier Console emulator-platform host.
 # Loaded after the shared game-experience module so emulator platforms can
 # participate in the existing Platforms rail without replacing storefront code.
 
@@ -85,6 +85,29 @@ function Get-HcEmulatorPlatformEntry {
 function Test-HcEmulatorPlatform {
     param([string]$Platform)
     return $null -ne (Get-HcEmulatorPlatformEntry $Platform)
+}
+
+function Get-HcEmulatorPlatformMenuEntry {
+    param([string]$Platform)
+    if([string]::IsNullOrWhiteSpace($Platform)){return $null}
+    foreach($entry in @(Get-HcEmulatorPlatformEntries)){
+        foreach($candidate in @(
+            [string](Get-EntryProperty $entry 'name' ''),
+            [string](Get-EntryProperty $entry 'displayName' ''),
+            [string](Get-EntryProperty $entry 'menuName' '')
+        )){
+            if($candidate -and [string]::Equals($candidate,$Platform,[StringComparison]::OrdinalIgnoreCase)){return $entry}
+        }
+        foreach($alias in @(Get-EntryProperty $entry 'aliases' @())){
+            if([string]::Equals([string]$alias,$Platform,[StringComparison]::OrdinalIgnoreCase)){return $entry}
+        }
+    }
+    return $null
+}
+
+function Test-HcEmulatorPlatformMenuName {
+    param([string]$Platform)
+    return $null -ne (Get-HcEmulatorPlatformMenuEntry $Platform)
 }
 
 function Start-HcEmulatorPlatform {
@@ -241,7 +264,7 @@ function Invoke-Action {
         $index=[int]$matches[1]
         if($index -ge 0 -and $index -lt $script:GameHubPlatforms.Count){
             $platform=[string]$script:GameHubPlatforms[$index]
-            if(Test-HcEmulatorPlatform $platform){
+            if(Test-HcEmulatorPlatformMenuName $platform){
                 $script:SelectedGamePlatform=$platform
                 # Native emulator interfaces scan their own local metadata/artwork
                 # only after selection; do not start the general online worker.
