@@ -1,0 +1,6 @@
+{
+  "batch":"wave1-enable",
+  "requestedAtUtc":"2026-08-10T22:55:00Z",
+  "platforms":["PSP","NDS","DSI","3DS","Dreamcast","Saturn"],
+  "gate":"registry + path/install/settings/storage + PowerShell 5.1 parse + exact x64 native compile"
+}
