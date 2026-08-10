@@ -1,0 +1,38 @@
+name: Apply Huymaier Console v0.26.4 Emulator Settings Core
+
+on:
+  push:
+    branches:
+      - feature/v0.26.4-platform-expansion
+    paths:
+      - '.development/v0.26.4/settings-core-request.json'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Integrate native emulator settings core
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          python .development\v0.26.4\apply_settings_core.py
+          if($LASTEXITCODE -ne 0){throw 'Settings-core materializer failed.'}
+          $parserErrors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path '.\HuymaierConsole.ps1'),[ref]$null,[ref]$parserErrors)
+          if($parserErrors.Count -gt 0){$parserErrors|ForEach-Object{Write-Host $_};throw 'HuymaierConsole.ps1 parse failed.'}
+          $moduleErrors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path '.\HuymaierEmulatorSettings.ps1'),[ref]$null,[ref]$moduleErrors)
+          if($moduleErrors.Count -gt 0){$moduleErrors|ForEach-Object{Write-Host $_};throw 'HuymaierEmulatorSettings.ps1 parse failed.'}
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add HuymaierConsole.ps1
+          if(git diff --cached --quiet){throw 'Settings core produced no production changes.'}
+          git commit -m 'Integrate v0.26.4 native emulator settings core'
+          git push origin HEAD:feature/v0.26.4-platform-expansion
