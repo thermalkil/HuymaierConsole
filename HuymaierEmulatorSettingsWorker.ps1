@@ -6,7 +6,8 @@ param(
     [Parameter(Mandatory=$true)][string]$PlatformSettingsPath,
     [Parameter(Mandatory=$true)][string]$OutputPath,
     [string]$Identity='',
-    [AllowEmptyString()][string]$Value=''
+    [AllowEmptyString()][string]$Value='',
+    [string]$EditRequestPath=''
 )
 Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
@@ -127,6 +128,14 @@ $roots=Get-ConfigRoots -AdapterId $adapterId -Settings $settings
 $configFiles=Get-ExplicitConfigFiles -AdapterId $adapterId -Roots $roots
 $inventory=@(Get-HcCompleteEmulatorSettingsInventory -AdapterId $adapterId -ConfigFiles $configFiles)
 foreach($setting in $inventory){$setting.Category=Get-SettingCategory $setting}
+
+
+if($Mode -eq 'Set' -and -not [string]::IsNullOrWhiteSpace($EditRequestPath)){
+    if(-not(Test-Path -LiteralPath $EditRequestPath -PathType Leaf)){throw 'The native emulator setting edit request is missing.'}
+    $editRequest=Get-Content -Raw -LiteralPath $EditRequestPath -Encoding UTF8|ConvertFrom-Json
+    $Identity=[string](Get-EntryProperty $editRequest 'identity' '')
+    $Value=[string](Get-EntryProperty $editRequest 'value' '')
+}
 
 if($Mode -eq 'Set'){
     if([string]::IsNullOrWhiteSpace($Identity)){throw 'Set mode requires a setting identity.'}
