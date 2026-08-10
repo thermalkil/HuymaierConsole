@@ -1,5 +1,5 @@
 {
-  "batch": "rc12-test-gate-consolidation-1",
-  "script": "apply_rc12_test_gate_consolidation.py",
-  "requested_at": "2026-08-10T10:58:00Z"
+  "batch": "rc13-gamebar-modal-filepicker-1",
+  "script": "apply_rc13_overlay_modal_filepicker.py",
+  "requested_at": "2026-08-10T11:10:00Z"
 }
