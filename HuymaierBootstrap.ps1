@@ -57,14 +57,23 @@ function Assert-HuymaierInstallIntegrity {
     }
     if(-not(Test-Path -LiteralPath $gameInputBridgePath -PathType Leaf)){throw 'The native GameInput system-button bridge is missing. Rerun the installer.'}
 
-    # The native entry executable publishes this bridge object into the hosted
-    # runspace. Resolve required native types through that loaded assembly rather
-    # than relying on PowerShell's type-name resolver.
     $nativeVariable=Get-Variable -Name HuymaierNativeBridge -ErrorAction SilentlyContinue
     if($null -eq $nativeVariable -or $null -eq $nativeVariable.Value){throw 'The Huymaier native host bridge is unavailable. Rerun the installer.'}
     $nativeAssembly=$nativeVariable.Value.GetType().Assembly
+
+    $stampType=$nativeAssembly.GetType('HuymaierConsole.NativeApp.HuymaierBuildStamp',$false)
+    if($null -eq $stampType){throw 'The installed native host has no Huymaier build stamp. Rerun the installer.'}
+    $flags=[Reflection.BindingFlags]::Public -bor [Reflection.BindingFlags]::Static
+    $versionField=$stampType.GetField('Version',$flags)
+    $architectureField=$stampType.GetField('Architecture',$flags)
+    $nativeVersion=if($null -ne $versionField){[string]$versionField.GetValue($null)}else{''}
+    $nativeArchitecture=if($null -ne $architectureField){[string]$architectureField.GetValue($null)}else{''}
+    if(-not [string]::Equals($nativeVersion,$script:ExpectedConsoleVersion,[StringComparison]::OrdinalIgnoreCase) -or -not [string]::Equals($nativeArchitecture,'x64',[StringComparison]::OrdinalIgnoreCase)){
+        throw "Native host build mismatch. Native=$nativeVersion/$nativeArchitecture Expected=$script:ExpectedConsoleVersion/x64. Rerun the installer; mixed native/script installations are blocked."
+    }
+
     if($null -eq $nativeAssembly.GetType('HuymaierConsole.NativeApp.HuymaierGameBarHost',$false)){
-        throw 'The installed native host does not contain the v0.26+ Huymaier Game Bar. Rerun the installer; mixed native/script installations are blocked.'
+        throw 'The installed native host does not contain the Huymaier Game Bar. Rerun the installer.'
     }
     if($null -eq $nativeAssembly.GetType('HuymaierConsole.NativeApp.HuymaierSystemButtonBridge',$false)){
         throw 'The installed native host does not contain the Huymaier system-button bridge. Rerun the installer.'
