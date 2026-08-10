@@ -1,0 +1,41 @@
+name: Audit Huymaier Console v0.26.4 Emulator Settings Coverage
+on:
+  pull_request:
+    branches: [feature/v0.26.3-console-fidelity]
+    paths: ['.development/v0.26.4/settings-audit-request.json','.development/v0.26.4/audit_emulator_settings_coverage.py','.github/workflows/audit-v0264-emulator-settings.yml']
+permissions: {contents: write}
+concurrency: {group: huymaier-v0264-settings-audit, cancel-in-progress: true}
+jobs:
+  audit:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: feature/v0.26.4-platform-expansion, fetch-depth: 0}
+      - name: Generate coverage report
+        run: python .development/v0.26.4/audit_emulator_settings_coverage.py
+      - name: Validate enabled-platform coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          d=json.load(open('.development/v0.26.4/emulator-settings-coverage.json',encoding='utf-8-sig'))
+          missing=d['enabledMissingNativeSettings']
+          print('enabled missing native settings:',missing)
+          # This audit is intentionally strict: an enabled emulator-backed platform
+          # cannot silently have no adapter/settings-default path.
+          if missing: raise SystemExit('Enabled platforms missing complete native settings adapters: '+', '.join(missing))
+          PY
+      - name: Commit audit report
+        shell: bash
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .development/v0.26.4/emulator-settings-coverage.json Docs/EMULATOR-SETTINGS-COVERAGE-v0.26.4.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Record v0.26.4 emulator settings coverage audit'
+          git fetch origin feature/v0.26.4-platform-expansion
+          git rebase origin/feature/v0.26.4-platform-expansion
+          git push origin HEAD:feature/v0.26.4-platform-expansion
