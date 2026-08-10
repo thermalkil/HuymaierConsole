@@ -1,0 +1,5 @@
+{
+  "batch": "next-literal-candidate-gate-fix-1",
+  "script": "apply_next_literal_gate_fix.py",
+  "requested_at": "2026-08-10T12:52:00Z"
+}

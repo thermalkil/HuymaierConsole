@@ -1,0 +1,7 @@
+{
+  "batch": "next-literal-candidate-gate-fix-1",
+  "script": "apply_next_literal_gate_fix.py",
+  "patch_dir": "",
+  "result": "success",
+  "recordedAtUtc": "2026-08-10T12:43:23.852891+00:00"
+}

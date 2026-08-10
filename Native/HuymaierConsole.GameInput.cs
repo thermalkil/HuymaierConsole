@@ -4,6 +4,63 @@ using System.Threading;
 
 namespace HuymaierConsole.NativeApp
 {
+    public static class HuymaierBuildStamp
+    {
+        public const string Version = "0.26.1";
+        public const string Architecture = "x64";
+    }
+
+    public static class HuymaierInstanceGate
+    {
+        private static readonly object Sync = new object();
+        private static Mutex instanceMutex;
+        private static bool ownsMutex;
+
+        public static bool TryAcquire()
+        {
+            lock (Sync)
+            {
+                if (ownsMutex) return true;
+                if (instanceMutex == null)
+                    instanceMutex = new Mutex(false, "Local\\HuymaierConsole.MainInstance");
+                try
+                {
+                    ownsMutex = instanceMutex.WaitOne(0, false);
+                }
+                catch (AbandonedMutexException)
+                {
+                    ownsMutex = true;
+                }
+                return ownsMutex;
+            }
+        }
+
+        public static void Release()
+        {
+            lock (Sync)
+            {
+                if (instanceMutex == null) return;
+                if (ownsMutex)
+                {
+                    try { instanceMutex.ReleaseMutex(); }
+                    catch { }
+                }
+                ownsMutex = false;
+                try { instanceMutex.Dispose(); }
+                catch { }
+                instanceMutex = null;
+            }
+        }
+    }
+
+    public static class HuymaierSystemButtonStatus
+    {
+        public static bool IsAvailable
+        {
+            get { return HuymaierSystemButtonBridge.IsAvailable; }
+        }
+    }
+
     internal static class HuymaierSystemButtonBridge
     {
         private const string BridgeDll = "HuymaierGameInputBridge.dll";

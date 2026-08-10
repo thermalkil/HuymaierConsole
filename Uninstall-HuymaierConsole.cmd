@@ -1,4 +1,6 @@
 @echo off
 setlocal
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$d=Join-Path $env:LOCALAPPDATA 'Huymaier Console'; Get-AppxPackage -Name 'Huymaier.Console.FSE.Home' -ErrorAction SilentlyContinue | Remove-AppxPackage -ErrorAction SilentlyContinue; Remove-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name HuymaierConsole -ErrorAction SilentlyContinue; Remove-Item (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Huymaier Console.lnk') -Force -ErrorAction SilentlyContinue; Remove-Item (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Huymaier Console.lnk') -Force -ErrorAction SilentlyContinue; if(Test-Path $d){Remove-Item $d -Recurse -Force}; Add-Type -AssemblyName PresentationFramework; [System.Windows.MessageBox]::Show('Huymaier Console was removed.','Huymaier Console') | Out-Null"
-endlocal
+cd /d "%~dp0"
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -STA -File "%~dp0Uninstall-HuymaierConsole.ps1"
+set "HC_EXIT=%ERRORLEVEL%"
+endlocal & exit /b %HC_EXIT%

@@ -1,0 +1,10 @@
+{
+  "candidate": "v0.26.1-rc6",
+  "version": "0.26.1",
+  "base_release": "v0.26.0",
+  "base_asset": "HC260.zip",
+  "package_root": "HC261",
+  "asset_name": "HC261.zip",
+  "requested_at": "2026-08-10T10:08:00Z",
+  "focus": "RC6 full integrity candidate from current hotfix head: cleaned production payload, transactional fail-closed installer/update, exact x64 CI artifacts, process-wide Guide ownership, Game Bar input isolation, crash recovery watchdog, and exact-artifact promotion gates"
+}

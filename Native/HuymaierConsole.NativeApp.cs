@@ -203,7 +203,7 @@ namespace HuymaierConsole.NativeApp
 
     public sealed class NativeBridge
     {
-        public string Version { get { return "0.26.0"; } }
+        public string Version { get { return "0.26.1"; } }
 
         public bool ConsumeQuickAccessRequest() { return NativeQuickAccessRequest.Consume(); }
 
@@ -4195,6 +4195,14 @@ namespace HuymaierConsole.NativeApp
 
         internal XmbInputCommand Poll()
         {
+            // The process-wide Game Bar is modal. Native console surfaces must
+            // not react to the same D-pad/face/shoulder press underneath it.
+            if (HuymaierGameBarHost.BlocksNativeNavigation)
+            {
+                hasActiveSource = false;
+                ResetEdges();
+                return XmbInputCommand.None;
+            }
             GetCandidates();
             DateTime now = DateTime.UtcNow;
             foreach (InputCandidate candidate in candidates)
@@ -4366,6 +4374,8 @@ namespace HuymaierConsole.NativeApp
         {
             lock (Sync)
             {
+                if (HuymaierGameBarHost.BlocksNativeNavigation)
+                    return new NativeNavigationCommand();
                 DateTime now = DateTime.UtcNow;
                 if (now < deviceChangeQuietUntilUtc)
                     return new NativeNavigationCommand();
@@ -4405,6 +4415,29 @@ namespace HuymaierConsole.NativeApp
                     result.Name = "DirectInput Controller";
                 }
                 return result;
+            }
+        }
+
+        public static bool ConsumeGuideOnly()
+        {
+            lock (Sync)
+            {
+                DateTime now = DateTime.UtcNow;
+                if (now < deviceChangeQuietUntilUtc) return false;
+
+                // Primary low-level system-button backend.
+                if (HuymaierSystemButtonBridge.ConsumeGuidePress()) return true;
+
+                // Compatibility fallbacks are deliberately Guide-only. They do
+                // not call router.Poll() and therefore cannot clear or steal any
+                // D-pad/A/B/shoulder/direction edge from the foreground owner.
+                if (XInputBridge.ConsumeGuideEdge()) return true;
+                try
+                {
+                    if (HuymaierConsole.Native.RawHidController.ConsumeGuideEdge()) return true;
+                }
+                catch { }
+                return false;
             }
         }
 
@@ -4533,6 +4566,22 @@ namespace HuymaierConsole.NativeApp
                 thread.IsBackground = true;
                 thread.Name = "Huymaier XInput Sampler";
                 thread.Start();
+            }
+        }
+
+        internal static bool ConsumeGuideEdge()
+        {
+            EnsureStarted();
+            lock (Sync)
+            {
+                for (int index = 0; index < Samples.Length; index++)
+                {
+                    Sample sample = Samples[index];
+                    if (!sample.Connected || (sample.PendingButtons & 4) == 0) continue;
+                    sample.PendingButtons &= ~4;
+                    return true;
+                }
+                return false;
             }
         }
 

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [switch]$Windowed
 )
 
@@ -11,7 +11,7 @@ Add-Type -AssemblyName WindowsBase
 Add-Type -AssemblyName System.Xaml
 try { Add-Type -AssemblyName System.Runtime.WindowsRuntime -ErrorAction SilentlyContinue } catch { }
 
-$script:AppVersion = '0.26.0'
+$script:AppVersion = '0.26.1'
 $script:AppName = 'Huymaier Console'
 $script:DataDir = Join-Path $env:LOCALAPPDATA 'Huymaier Console'
 $script:ConfigPath = Join-Path $script:DataDir 'config.json'
@@ -38,6 +38,7 @@ $script:ShellRedesignModulePath = Join-Path $script:BaseDir 'HuymaierShellRedesi
 $script:EmulatorPlatformsModulePath = Join-Path $script:BaseDir 'HuymaierEmulatorPlatforms.ps1'
 $script:WebBrowserModulePath = Join-Path $script:BaseDir 'HuymaierWebBrowser.ps1'
 $script:GameBarModulePath = Join-Path $script:BaseDir 'HuymaierGameBar.ps1'
+$script:CustomizationModulePath = Join-Path $script:BaseDir 'HuymaierCustomization.ps1'
 $script:NavItems = @('Home','Games','Apps','Web','Downloads','Import','File Explorer','Settings','Power')
 $script:SelectedTab = 0
 $script:SelectedAction = 0
@@ -276,7 +277,16 @@ function New-DefaultConfig {
         CustomApps = @()
         MusicEnabled = $true
         MusicVolume = 30
+        UiSoundVolume = 62
         DynamicBackground = $true
+        ConsoleName = 'Huymaier Console'
+        ShellBaseColor = '#09111E'
+        AccentColor = '#E7C45E'
+        AccentHighlightColor = '#FFF0A0'
+        DynamicThemePreset = 'Huymaier'
+        DynamicPrimaryColor = '#D6B64F'
+        DynamicSecondaryColor = '#4474C2'
+        DynamicTertiaryColor = '#315F9D'
         UiSoundsEnabled = $true
         HapticsEnabled = $true
         MusicTheme = 'Orchestral'
@@ -304,7 +314,7 @@ function Load-Config {
     if ( -not (Test-Path $script:ConfigPath)) { return $defaults }
     try {
         $loaded = Get-Content -Raw -Path $script:ConfigPath | ConvertFrom-Json
-        foreach ($name in @('BrowserName','BrowserPath','BrowserMode','PromptOverride','StartWithWindows','CustomGames','CustomApps','MusicEnabled','MusicVolume','DynamicBackground','UiSoundsEnabled','HapticsEnabled','MusicTheme','CustomMusicPath','ImportedGames','RecentGames','RecentApps','StorefrontRoots','StorefrontInstallOverrides','QuickMenuPosition','GameBarScale','ProviderInstallRoots','LibraryScanCompleted','LibrarySchemaVersion','KeyboardTheme','ShowFpsCounter','OnlineArtworkEnabled','PlatformBackgroundsEnabled','FavoriteGames')) {
+        foreach ($name in @('BrowserName','BrowserPath','BrowserMode','PromptOverride','StartWithWindows','CustomGames','CustomApps','MusicEnabled','MusicVolume','UiSoundVolume','DynamicBackground','ConsoleName','ShellBaseColor','AccentColor','AccentHighlightColor','DynamicThemePreset','DynamicPrimaryColor','DynamicSecondaryColor','DynamicTertiaryColor','UiSoundsEnabled','HapticsEnabled','MusicTheme','CustomMusicPath','ImportedGames','RecentGames','RecentApps','StorefrontRoots','StorefrontInstallOverrides','QuickMenuPosition','GameBarScale','ProviderInstallRoots','LibraryScanCompleted','LibrarySchemaVersion','KeyboardTheme','ShowFpsCounter','OnlineArtworkEnabled','PlatformBackgroundsEnabled','FavoriteGames')) {
             if ($null -ne $loaded.PSObject.Properties[$name]) {
                 $defaults.$name = $loaded.$name
             }
@@ -319,6 +329,8 @@ function Load-Config {
         $defaults.$collectionName = Convert-ToStableArray $defaults.$collectionName
     }
     try{$defaults.GameBarScale=[math]::Max(70,[math]::Min(140,[int]$defaults.GameBarScale))}catch{$defaults.GameBarScale=100}
+    try{$defaults.UiSoundVolume=[math]::Max(0,[math]::Min(100,[int]$defaults.UiSoundVolume))}catch{$defaults.UiSoundVolume=62}
+    if([string]::IsNullOrWhiteSpace([string]$defaults.ConsoleName)){$defaults.ConsoleName='Huymaier Console'}
     return $defaults
 }
 
@@ -2253,9 +2265,11 @@ function Start-NativeFilePicker {
         $script:SubPage=''
         Set-Tab 6
     } else {
+        $script:SelectedTab=6
         $script:SubPage='FilePicker'
         $script:SelectedAction=0
         Render-Page
+        Update-NavVisuals
     }
 }
 
@@ -3929,10 +3943,10 @@ function Process-Gamepads {
         return
     }
     if(-not (Test-ConsoleHasInputFocus)){
-        # Do not reset the native router here. While an external game/app or the
-        # Huymaier Game Bar owns focus, the external Guide watcher uses this same
-        # router for A/B/D-pad/shoulder input. Resetting it from the background
-        # Console timer would erase every navigation edge before the overlay sees it.
+        # Do not reset the native router here. While an external game/app owns
+        # focus, the hidden watcher consumes only a dedicated Guide/Home edge.
+        # Once the Huymaier Game Bar is visible, it becomes the owner of normal
+        # A/B/D-pad/shoulder navigation until the overlay closes.
         $script:LastGamepadMask=0;$script:LastDirection='';$script:NextDirectionAt=[datetime]::MinValue
         return
     }
@@ -4167,6 +4181,11 @@ if (Test-Path -LiteralPath $script:GameBarModulePath) {
     catch { Write-Log "Huymaier Game Bar module load failed: $($_.Exception.Message)" 'ERROR' }
 }
 
+if (Test-Path -LiteralPath $script:CustomizationModulePath) {
+    try { . $script:CustomizationModulePath }
+    catch { Write-Log "Customization module load failed: $($_.Exception.Message)" 'ERROR' }
+}
+
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -4185,6 +4204,7 @@ $xaml = @'
     <Window.Resources>
         <Style TargetType="ScrollBar"><Setter Property="Opacity" Value="0"/><Setter Property="Width" Value="0"/><Setter Property="Height" Value="0"/><Setter Property="IsHitTestVisible" Value="False"/></Style>
         <Style x:Key="NavButtonStyle" TargetType="Button">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Width" Value="62"/>
             <Setter Property="Height" Value="58"/>
             <Setter Property="MinWidth" Value="62"/>
@@ -4210,6 +4230,7 @@ $xaml = @'
             </Setter>
         </Style>
         <Style x:Key="ActionButtonStyle" TargetType="Button">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="MinHeight" Value="104"/>
             <Setter Property="Padding" Value="18,16"/>
             <Setter Property="Background" Value="#111A28"/>
@@ -4245,7 +4266,7 @@ $xaml = @'
         <Grid x:Name="DynamicBackdrop" IsHitTestVisible="False" Opacity="0.96" ClipToBounds="True">
             <Viewbox Stretch="Fill">
                 <Canvas Width="1920" Height="1080">
-                    <Rectangle Width="1920" Height="1080">
+                    <Rectangle x:Name="DynamicBase" Width="1920" Height="1080">
                         <Rectangle.Fill>
                             <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                                 <GradientStop Color="#181F3658" Offset="0"/>
@@ -4255,24 +4276,24 @@ $xaml = @'
                         </Rectangle.Fill>
                     </Rectangle>
 
-                    <Ellipse Width="960" Height="960" Canvas.Left="-350" Canvas.Top="-420">
+                    <Ellipse x:Name="DynamicGlowOne" Width="960" Height="960" Canvas.Left="-350" Canvas.Top="-420">
                         <Ellipse.Fill><RadialGradientBrush><GradientStop Color="#70D6B64F" Offset="0"/><GradientStop Color="#28C8A84E" Offset="0.48"/><GradientStop Color="#00C8A84E" Offset="1"/></RadialGradientBrush></Ellipse.Fill>
                         <Ellipse.RenderTransform><TranslateTransform x:Name="GoldGlowTransform"/></Ellipse.RenderTransform>
                     </Ellipse>
-                    <Ellipse Width="1180" Height="1180" Canvas.Left="1100" Canvas.Top="280">
+                    <Ellipse x:Name="DynamicGlowTwo" Width="1180" Height="1180" Canvas.Left="1100" Canvas.Top="280">
                         <Ellipse.Fill><RadialGradientBrush><GradientStop Color="#694474C2" Offset="0"/><GradientStop Color="#24315F9D" Offset="0.55"/><GradientStop Color="#00315F9D" Offset="1"/></RadialGradientBrush></Ellipse.Fill>
                         <Ellipse.RenderTransform><TranslateTransform x:Name="BlueGlowTransform"/></Ellipse.RenderTransform>
                     </Ellipse>
 
-                    <Path Data="M-180,870 C300,350 760,1040 2100,280" StrokeThickness="115" Opacity="0.22">
+                    <Path x:Name="DynamicRibbonOne" Data="M-180,870 C300,350 760,1040 2100,280" StrokeThickness="115" Opacity="0.22">
                         <Path.Stroke><LinearGradientBrush StartPoint="0,0" EndPoint="1,0"><GradientStop Color="#00E7C45E" Offset="0"/><GradientStop Color="#B8E7C45E" Offset="0.42"/><GradientStop Color="#123B73B3" Offset="1"/></LinearGradientBrush></Path.Stroke>
                         <Path.RenderTransform><TranslateTransform x:Name="RibbonOneTransform"/></Path.RenderTransform>
                     </Path>
-                    <Path Data="M-220,260 C420,850 1120,60 2140,700" StrokeThickness="92" Opacity="0.18">
+                    <Path x:Name="DynamicRibbonTwo" Data="M-220,260 C420,850 1120,60 2140,700" StrokeThickness="92" Opacity="0.18">
                         <Path.Stroke><LinearGradientBrush StartPoint="0,0" EndPoint="1,0"><GradientStop Color="#003B73B3" Offset="0"/><GradientStop Color="#A05283D2" Offset="0.54"/><GradientStop Color="#18E7C45E" Offset="1"/></LinearGradientBrush></Path.Stroke>
                         <Path.RenderTransform><TranslateTransform x:Name="RibbonTwoTransform"/></Path.RenderTransform>
                     </Path>
-                    <Path Data="M120,1180 C420,520 930,390 1780,-120" Stroke="#38597DB8" StrokeThickness="38" Opacity="0.22">
+                    <Path x:Name="DynamicRibbonThree" Data="M120,1180 C420,520 930,390 1780,-120" Stroke="#38597DB8" StrokeThickness="38" Opacity="0.22">
                         <Path.RenderTransform><TranslateTransform x:Name="RibbonThreeTransform"/></Path.RenderTransform>
                     </Path>
 
@@ -4358,11 +4379,11 @@ $xaml = @'
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Width="48" Height="48" CornerRadius="24" BorderBrush="#E7C45E" BorderThickness="2" Background="#0D1726">
-                        <TextBlock Text="H" FontSize="25" FontWeight="Bold" Foreground="#E7C45E" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Border x:Name="ConsoleBrandBadge" Width="48" Height="48" CornerRadius="24" BorderBrush="#E7C45E" BorderThickness="2" Background="#0D1726">
+                        <TextBlock x:Name="ConsoleBrandGlyph" Text="H" FontSize="25" FontWeight="Bold" Foreground="#E7C45E" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="HUYMAIER CONSOLE" FontSize="25" FontWeight="Bold"/>
+                        <TextBlock x:Name="ConsoleBrandText" Text="HUYMAIER CONSOLE" FontSize="25" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
                         <TextBlock Text="WINDOWS 11 FULL-SCREEN EXPERIENCE" FontSize="11" Foreground="#99A8BF"/>
                     </StackPanel>
                 </StackPanel>
@@ -4424,7 +4445,7 @@ $xaml = @'
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel x:Name="PromptPanel" Orientation="Horizontal" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="HUYMAIER FSE  v0.26.0" FontSize="12" Foreground="#77869C"/>
+                <TextBlock x:Name="ProductFooterText" Grid.Column="1" VerticalAlignment="Center" Text="HUYMAIER CONSOLE FSE" FontSize="12" Foreground="#77869C"/>
             </Grid>
         </Grid>
 
@@ -4463,7 +4484,7 @@ try {
     $reader = New-Object System.Xml.XmlNodeReader $xml
     $script:Window = [Windows.Markup.XamlReader]::Load($reader)
 
-    foreach ($name in @('ClockText','ControllerText','FpsText','NavPanel','PageTitle','PageSubtitle','ActionPanel','HeroTitle','HeroText','HeroPanel','MainListArea','PromptPanel','DynamicBackdrop','GoldGlowTransform','BlueGlowTransform','RingTransform','RingTwoTransform','RibbonOneTransform','RibbonTwoTransform','RibbonThreeTransform','ConstellationTransform','StarOne','StarTwo','StarThree','StarFour','StarFive','StarSix','StarSeven','StarEight','PlatformBackdrop','PlatformBase','PlatformGlowOne','PlatformGlowTwo','PlatformWaveOne','PlatformWaveTwo','PlatformRing','PlatformBrandText','PlatformMotifText','PlatformGlowOneTransform','PlatformGlowTwoTransform','PlatformWaveOneTransform','PlatformWaveTwoTransform','PlatformRingTransform','PlatformPlayStationGlyphs','ActionScrollViewer','RootGrid','ShellContent','MainMenuOverlay','MainMenuFrame','MainMenuScroll','MainMenuPanel','GameModalOverlay','GameModalTitle','GameModalSubtitle','GameModalPanel')) {
+    foreach ($name in @('ClockText','ControllerText','FpsText','NavPanel','PageTitle','PageSubtitle','ActionPanel','HeroTitle','HeroText','HeroPanel','MainListArea','PromptPanel','DynamicBackdrop','GoldGlowTransform','BlueGlowTransform','RingTransform','RingTwoTransform','RibbonOneTransform','RibbonTwoTransform','RibbonThreeTransform','ConstellationTransform','StarOne','StarTwo','StarThree','StarFour','StarFive','StarSix','StarSeven','StarEight','PlatformBackdrop','PlatformBase','PlatformGlowOne','PlatformGlowTwo','PlatformWaveOne','PlatformWaveTwo','PlatformRing','PlatformBrandText','PlatformMotifText','PlatformGlowOneTransform','PlatformGlowTwoTransform','PlatformWaveOneTransform','PlatformWaveTwoTransform','PlatformRingTransform','PlatformPlayStationGlyphs','ActionScrollViewer','RootGrid','ConsoleBrandBadge','ConsoleBrandGlyph','ConsoleBrandText','ProductFooterText','DynamicBase','DynamicGlowOne','DynamicGlowTwo','DynamicRibbonOne','DynamicRibbonTwo','DynamicRibbonThree','ShellContent','MainMenuOverlay','MainMenuFrame','MainMenuScroll','MainMenuPanel','GameModalOverlay','GameModalTitle','GameModalSubtitle','GameModalPanel')) {
         Set-Variable -Scope Script -Name $name -Value $script:Window.FindName($name)
     }
 
@@ -4778,6 +4799,7 @@ try {
     Set-BackgroundAnimationState
     Set-FpsCounterState
     Initialize-UiFeedback
+    if(Get-Command Apply-HcCustomizationVisuals -ErrorAction SilentlyContinue){Apply-HcCustomizationVisuals}
     Initialize-BackgroundMusic
     Update-NavVisuals
     Render-Page
