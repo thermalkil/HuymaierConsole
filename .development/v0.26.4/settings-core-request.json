@@ -1,0 +1,5 @@
+{
+  "batch":"native-emulator-settings-core",
+  "requestedAtUtc":"2026-08-10T22:11:00Z",
+  "requirements":["preserve unknown settings","backup before write","full raw inventory","global and per-game adapter foundation"]
+}
