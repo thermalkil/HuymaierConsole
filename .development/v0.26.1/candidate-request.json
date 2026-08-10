@@ -1,10 +1,10 @@
 {
-  "candidate": "v0.26.1-rc11",
+  "candidate": "v0.26.1-rc12",
   "version": "0.26.1",
   "base_release": "v0.26.0",
   "base_asset": "HC260.zip",
   "package_root": "HC261",
   "asset_name": "HC261.zip",
-  "requested_at": "2026-08-10T10:55:00Z",
-  "focus": "RC11 combined blocker candidate: deterministic installer wrapper seeds LASTEXITCODE=0 and propagates real core failure codes; hidden external overlay uses dedicated Guide/Home-only arbiter with GameInput plus XInput 0x0400 and PlayStation Raw-HID edge fallbacks while preserving all D-pad/A/B/shoulder pending input; RC8 Win32 foreground ownership and Xbox storefront versus Original Xbox identity separation; transactional fail-closed install/update and cleaned exact x64 package"
+  "requested_at": "2026-08-10T11:00:00Z",
+  "focus": "RC12 consolidated blocker candidate: installer wrapper seeds LASTEXITCODE=0 and propagates real failure codes; hidden external overlay uses dedicated Guide/Home-only arbiter with GameInput plus XInput 0x0400 and PlayStation Raw-HID edge fallbacks while preserving D-pad/A/B/shoulder input; Win32 foreground ownership; Xbox storefront versus Original Xbox identity separation; legacy Game Bar setting migration; transactional fail-closed install/update; cleaned exact x64 package; consolidated candidate gates"
 }
