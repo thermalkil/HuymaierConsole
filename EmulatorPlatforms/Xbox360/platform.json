@@ -1,4 +1,4 @@
-﻿{
+{
   "id": "xbox360",
   "displayName": "Xbox 360",
   "primaryBackend": "Xenia Canary",
@@ -15,5 +15,6 @@
     "brentdc-nz/XBMC-360"
   ],
   "metroReference": "ZivvoZ/dashx360",
-  "xboxGuideOverlay": true
+  "xboxGuideOverlay": true,
+  "adapter": "xenia"
 }

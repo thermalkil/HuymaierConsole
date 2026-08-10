@@ -1,8 +1,9 @@
-﻿{
+{
   "id": "wii",
   "displayName": "Nintendo Wii",
   "primaryBackend": "Dolphin",
   "fallbackBackend": "Dolphin Development",
   "version": "0.25.0",
-  "startupAsset": "Assets/Startup.mp4"
+  "startupAsset": "Assets/Startup.mp4",
+  "adapter": "dolphin"
 }

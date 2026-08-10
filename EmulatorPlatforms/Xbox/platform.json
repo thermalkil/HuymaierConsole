@@ -1,4 +1,4 @@
-﻿{
+{
   "id": "xbox",
   "displayName": "Original Xbox",
   "primaryBackend": "xemu",
@@ -13,5 +13,6 @@
     "music",
     "xbox live",
     "settings"
-  ]
+  ],
+  "adapter": "xemu"
 }
