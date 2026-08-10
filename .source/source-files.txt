@@ -1,5 +1,11 @@
 Docs/EMULATOR-PLATFORMS.md
 Docs/PLATFORM-EXPANSION-v0.26.4.md
+EmulatorPlatforms/3DS/platform.json
+EmulatorPlatforms/3DS/settings.default.json
+EmulatorPlatforms/Dreamcast/platform.json
+EmulatorPlatforms/Dreamcast/settings.default.json
+EmulatorPlatforms/DSI/platform.json
+EmulatorPlatforms/DSI/settings.default.json
 EmulatorPlatforms/emulator-adapters.json
 EmulatorPlatforms/GameCube/Assets/README-STARTUP.txt
 EmulatorPlatforms/GameCube/platform.json
@@ -7,6 +13,8 @@ EmulatorPlatforms/GameCube/settings.default.json
 EmulatorPlatforms/N64/Assets/README-STARTUP.txt
 EmulatorPlatforms/N64/platform.json
 EmulatorPlatforms/N64/settings.default.json
+EmulatorPlatforms/NDS/platform.json
+EmulatorPlatforms/NDS/settings.default.json
 EmulatorPlatforms/platform-registry.json
 EmulatorPlatforms/PS1/Assets/README-STARTUP.txt
 EmulatorPlatforms/PS1/Assets/README.txt
@@ -20,6 +28,10 @@ EmulatorPlatforms/PS3/Assets/README-STARTUP.txt
 EmulatorPlatforms/PS3/Assets/README.txt
 EmulatorPlatforms/PS3/platform.json
 EmulatorPlatforms/PS3/settings.default.json
+EmulatorPlatforms/PSP/platform.json
+EmulatorPlatforms/PSP/settings.default.json
+EmulatorPlatforms/Saturn/platform.json
+EmulatorPlatforms/Saturn/settings.default.json
 EmulatorPlatforms/Shared/Huymaier.P3T.cs
 EmulatorPlatforms/Shared/Huymaier.XInput.cs
 EmulatorPlatforms/Switch/Assets/README-STARTUP.txt
@@ -47,6 +59,7 @@ HuymaierConsoleUpdateWorker.ps1
 HuymaierDriverWorker.ps1
 HuymaierEmulatorPlatforms.ps1
 HuymaierEmulatorSettings.ps1
+HuymaierEmulatorSettingsWorker.ps1
 HuymaierFSEHost.cs
 HuymaierGameExperience.ps1
 HuymaierGameProviders.ps1
