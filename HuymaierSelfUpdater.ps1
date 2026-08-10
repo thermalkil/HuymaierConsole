@@ -39,7 +39,10 @@ function Assert-HcZipEntriesSafe {
             $name=[string]$entry.FullName
             if([string]::IsNullOrWhiteSpace($name)){continue}
             $normalized=$name.Replace('/','\')
-            if([IO.Path]::IsPathRooted($normalized) -or $normalized -match '(^|\)\.\.(\|$)'){throw "Unsafe ZIP entry path: $name"}
+            if([IO.Path]::IsPathRooted($normalized)){throw "Unsafe rooted ZIP entry path: $name"}
+            foreach($segment in @($normalized.Split([char]'\'))){
+                if($segment -eq '..'){throw "Unsafe ZIP entry path traversal: $name"}
+            }
         }
     }finally{$archive.Dispose()}
 }
