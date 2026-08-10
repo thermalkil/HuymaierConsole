@@ -1,10 +1,10 @@
 {
-  "candidate": "v0.26.1-rc8",
+  "candidate": "v0.26.1-rc9",
   "version": "0.26.1",
   "base_release": "v0.26.0",
   "base_asset": "HC260.zip",
   "package_root": "HC261",
   "asset_name": "HC261.zip",
-  "requested_at": "2026-08-10T10:33:00Z",
-  "focus": "RC8 runtime ownership correction: hidden Game Bar Guide-only observation with no shared navigation polling, Win32 foreground-PID routing for Quick Access vs external Game Bar, strict Original Xbox menu identity separate from Xbox storefront, legacy v0.26.0 Game Bar registry-backup migration, Guide backend diagnostics, plus all RC7 transactional/package integrity gates"
+  "requested_at": "2026-08-10T10:41:00Z",
+  "focus": "RC9 installer-wrapper correction: explicit wrapper success exit without LASTEXITCODE, silent core returns through public wrapper so CI exercises the exact success path, plus all RC8 controller ownership, Xbox identity, migration, transactional and package-integrity fixes"
 }
