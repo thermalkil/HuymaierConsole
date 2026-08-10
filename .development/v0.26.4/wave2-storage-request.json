@@ -1,0 +1,6 @@
+{
+  "batch":"wave2-storage-settings",
+  "requestedAtUtc":"2026-08-10T23:31:00Z",
+  "platforms":["Atari2600","NES","SNES","GameBoy","GBC","GBA","Genesis","SegaCD","Sega32X","GameGear","MasterSystem","TurboGrafx16"],
+  "requirements":["console-specific save-memory presentation","safe sidecar and emulator-save scanning","hardware-styled system settings","full backend settings entry","LB/RB first-letter acceleration only","exact x64 compile"]
+}
