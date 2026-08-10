@@ -1,5 +1,5 @@
 {
-  "batch": "candidate-test-consolidation-1",
-  "script": "apply_candidate_test_consolidation.py",
-  "requested_at": "2026-08-10T09:29:00Z"
+  "batch": "package-prune-promotion-zipfix-1",
+  "script": "apply_package_prune_and_promotion_zipfix.py",
+  "requested_at": "2026-08-10T09:36:00Z"
 }
