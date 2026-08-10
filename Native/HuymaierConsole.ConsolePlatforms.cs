@@ -483,6 +483,8 @@ namespace HuymaierConsole.NativeApp
         public string Name { get; set; }
         public string Path { get; set; }
         public string Cover { get; set; }
+        public string TitleId { get; set; }
+        public string ContentRoot { get; set; }
         public ConsolePlatformGame() { Name = String.Empty; Path = String.Empty; Cover = String.Empty; }
     }
 
@@ -3984,6 +3986,7 @@ namespace HuymaierConsole.NativeApp
 
         private void RefreshLibrary(bool showNotice)
         {
+            if (definition.Shell == "PS4" || definition.Shell == "Vita") { RefreshModernPlayStationLibrary(showNotice); return; }
             List<ConsolePlatformGame> found = new List<ConsolePlatformGame>();
             HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (string folder in settings.gameFolders.ToArray())
@@ -4007,6 +4010,70 @@ namespace HuymaierConsole.NativeApp
             if (showNotice) ShowNotice("Library refreshed — " + games.Count.ToString(CultureInfo.InvariantCulture) + " games");
             RenderPage();
             QueueConsoleArtworkRefresh();
+        }
+
+
+        private List<string> GetModernPlayStationContentRoots()
+        {
+            List<string> roots=new List<string>();
+            Action<string> add=delegate(string value){if(String.IsNullOrWhiteSpace(value))return;try{if(File.Exists(value))value=Path.GetDirectoryName(value);if(Directory.Exists(value)&&!roots.Contains(value,StringComparer.OrdinalIgnoreCase))roots.Add(value);}catch{}};
+            foreach(string folder in settings.gameFolders) add(folder); add(settings.emulatorDataPath);
+            string exeRoot=!String.IsNullOrWhiteSpace(settings.emulatorPath)&&File.Exists(settings.emulatorPath)?Path.GetDirectoryName(settings.emulatorPath):String.Empty; add(exeRoot);
+            if(definition.Shell=="Vita")
+            {
+                foreach(string root in roots.ToArray()) { try { add(Path.Combine(root,"ux0","app")); add(Path.Combine(root,"Vita3K","ux0","app")); } catch{} }
+                string app=Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData); string local=Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                add(Path.Combine(app,"Vita3K","Vita3K","ux0","app")); add(Path.Combine(app,"Vita3K","ux0","app")); add(Path.Combine(local,"Vita3K","ux0","app"));
+            }
+            return roots;
+        }
+
+        private ConsolePlatformGame CreateModernPlayStationGame(string ebootPath)
+        {
+            try
+            {
+                string appRoot=Path.GetDirectoryName(ebootPath); if(String.IsNullOrWhiteSpace(appRoot))return null;
+                string sfo=Path.Combine(appRoot,"sce_sys","param.sfo"); if(!File.Exists(sfo))return null;
+                string title=ReadPspSfoString(sfo,"TITLE"); string titleId=ReadPspSfoString(sfo,"TITLE_ID");
+                if(String.IsNullOrWhiteSpace(titleId)) titleId=ReadPspSfoString(sfo,"TITLEID");
+                if(String.IsNullOrWhiteSpace(title)) title=!String.IsNullOrWhiteSpace(titleId)?titleId:Path.GetFileName(appRoot);
+                string icon=Path.Combine(appRoot,"sce_sys","icon0.png"); if(!File.Exists(icon)) icon=Path.Combine(appRoot,"sce_sys","icon0.PNG");
+                string cover=File.Exists(icon)?icon:FindCover(ebootPath);
+                ConsolePlatformGame game=new ConsolePlatformGame { Name=title, Path=ebootPath, Cover=cover };
+                try
+                {
+                    System.Reflection.PropertyInfo idProperty=game.GetType().GetProperty("TitleId"); if(idProperty!=null&&idProperty.CanWrite)idProperty.SetValue(game,titleId,null);
+                    System.Reflection.PropertyInfo rootProperty=game.GetType().GetProperty("ContentRoot"); if(rootProperty!=null&&rootProperty.CanWrite)rootProperty.SetValue(game,appRoot,null);
+                }catch{}
+                return game;
+            }catch{return null;}
+        }
+
+        private void RefreshModernPlayStationLibrary(bool showNotice)
+        {
+            List<ConsolePlatformGame> found=new List<ConsolePlatformGame>(); HashSet<string> seen=new HashSet<string>(StringComparer.OrdinalIgnoreCase); int visited=0;
+            foreach(string rootPath in GetModernPlayStationContentRoots())
+            {
+                if(!Directory.Exists(rootPath))continue;
+                try
+                {
+                    if(definition.Shell=="Vita" && String.Equals(Path.GetFileName(rootPath.TrimEnd(Path.DirectorySeparatorChar)),"app",StringComparison.OrdinalIgnoreCase))
+                    {
+                        foreach(string appRoot in Directory.GetDirectories(rootPath))
+                        {
+                            string eboot=Path.Combine(appRoot,"eboot.bin"); if(!File.Exists(eboot)||!seen.Add(eboot))continue; ConsolePlatformGame game=CreateModernPlayStationGame(eboot); if(game!=null)found.Add(game);
+                        }
+                        continue;
+                    }
+                    foreach(string eboot in Directory.EnumerateFiles(rootPath,"eboot.bin",SearchOption.AllDirectories))
+                    {
+                        if(++visited>12000)break; if(!seen.Add(eboot))continue; ConsolePlatformGame game=CreateModernPlayStationGame(eboot); if(game!=null)found.Add(game);
+                    }
+                }catch{}
+                if(visited>12000)break;
+            }
+            games=found.GroupBy(delegate(ConsolePlatformGame game){return game.Path;},StringComparer.OrdinalIgnoreCase).Select(delegate(IGrouping<string,ConsolePlatformGame> group){return group.First();}).OrderBy(delegate(ConsolePlatformGame game){return game.Name;},StringComparer.CurrentCultureIgnoreCase).ToList();
+            selected=0;SaveCachedGames();if(showNotice)ShowNotice("Installed library refreshed — "+games.Count.ToString(CultureInfo.InvariantCulture)+" applications");RenderPage();QueueConsoleArtworkRefresh();
         }
 
         private static string CleanName(string value)

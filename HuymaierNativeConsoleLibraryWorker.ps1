@@ -25,6 +25,29 @@ function Add-Root([System.Collections.ArrayList]$Target,[string]$Value){
     foreach($existing in @($Target)){if([string]::Equals([string]$existing,$full,[StringComparison]::OrdinalIgnoreCase)){return}}
     [void]$Target.Add($full)
 }
+
+function Count-ModernInstalledApplications([string]$Id,[System.Collections.ArrayList]$Roots){
+    $seen=@{};$visited=0
+    foreach($root in @($Roots)){
+        $candidates=New-Object System.Collections.ArrayList
+        [void]$candidates.Add($root)
+        if($Id -eq 'VITA'){
+            foreach($candidate in @((Join-Path $root 'ux0\app'),(Join-Path $root 'Vita3K\ux0\app'))){if(Test-Path -LiteralPath $candidate -PathType Container){[void]$candidates.Add($candidate)}}
+        }
+        foreach($base in @($candidates)){
+            if(-not(Test-Path -LiteralPath $base -PathType Container)){continue}
+            try{
+                foreach($eboot in Get-ChildItem -LiteralPath $base -Filter 'eboot.bin' -File -Recurse -ErrorAction SilentlyContinue){
+                    if(++$visited -gt 12000){break};$appRoot=$eboot.Directory.FullName;$sfo=Join-Path $appRoot 'sce_sys\param.sfo';if(-not(Test-Path -LiteralPath $sfo -PathType Leaf)){continue};$seen[$eboot.FullName.ToLowerInvariant()]=$true
+                }
+            }catch{}
+            if($visited -gt 12000){break}
+        }
+        if($visited -gt 12000){break}
+    }
+    return [pscustomobject]@{Count=$seen.Count;Visited=$visited}
+}
+
 function Get-Extensions([string]$Id){
     switch($Id.ToUpperInvariant()){
         'PS4' { return @('.pkg','.elf','.bin') }
@@ -72,6 +95,11 @@ foreach($root in @(Get-Prop $settings 'gameFolders' @())){Add-Root $roots ([stri
 $extensions=@(Get-Extensions $PlatformId)
 $seen=@{}
 $filesVisited=0
+if($PlatformId.ToUpperInvariant() -in @('PS4','VITA')){
+    $modern=Count-ModernInstalledApplications $PlatformId $roots
+    $result=[ordered]@{Platform=$PlatformId.ToUpperInvariant();Count=[int]$modern.Count;UpdatedAt=(Get-Date).ToString('o');Error='';Roots=@($roots);FilesVisited=[int]$modern.Visited}
+    $dir=Split-Path -Parent $ResultPath;if($dir){New-Item -ItemType Directory -Force -Path $dir|Out-Null};$result|ConvertTo-Json -Depth 5|Set-Content -LiteralPath $ResultPath -Encoding UTF8;exit 0
+}
 foreach($root in @($roots)){
     try{
         foreach($file in Get-ChildItem -LiteralPath $root -File -Recurse -ErrorAction SilentlyContinue){
