@@ -16,7 +16,11 @@ function Get-PlatformCountSummary {
         $games=@(Get-EntryProperty $node 'Games' @())
         $attempted=[string](Get-EntryProperty $node 'OwnershipAttemptedAt' '')
         $complete=[bool](Get-EntryProperty $node 'OwnershipComplete' $false)
-        if($complete){return [pscustomobject]@{Installed=$installed;Owned=[math]::Max($installed,$games.Count);Pending=$false}}
+        if($complete){
+            $fallbackOwned=@($games|Where-Object{[bool](Get-EntryProperty $_ 'Owned' $false)}).Count
+            $owned=[int](Get-EntryProperty $node 'OwnedCount' $fallbackOwned)
+            return [pscustomobject]@{Installed=$installed;Owned=$owned;Pending=$false}
+        }
         if(-not $attempted){Request-HcSteamCatalogRefresh;return [pscustomobject]@{Installed=$installed;Owned=$installed;Pending=$true}}
         return [pscustomobject]@{Installed=$installed;Owned=$installed;Pending=$false}
     }catch{
