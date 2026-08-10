@@ -1,39 +1,58 @@
-name: v0.26.0 Apply Feature Development Batch
+name: Apply Huymaier Console Development Batch
 
 on:
   push:
     branches:
       - feature/v0.26.0-native-gamebar
+      - hotfix/v0.26.1-installer
     paths:
       - '.development/v0.26.0/apply.json'
+      - '.development/v0.26.1/apply.json'
+      - '.github/workflows/apply-v026-patches.yml'
 
 permissions:
   contents: write
 
 concurrency:
-  group: v026-feature-development
+  group: huymaier-development-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   apply-development:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out feature branch
+      - name: Check out requested branch
         uses: actions/checkout@v4
         with:
-          ref: feature/v0.26.0-native-gamebar
+          ref: ${{ github.ref_name }}
           fetch-depth: 0
 
-      - name: Apply deterministic development batch
+      - name: Resolve development directory
+        id: dev
         shell: bash
         run: |
           set -euo pipefail
-          BATCH="$(python3 -c "import json;print(json.load(open('.development/v0.26.0/apply.json'))['batch'])")"
-          SCRIPT="$(python3 -c "import json;print(json.load(open('.development/v0.26.0/apply.json')).get('script',''))")"
-          PATCH_DIR="$(python3 -c "import json;print(json.load(open('.development/v0.26.0/apply.json')).get('patch_dir',''))")"
+          if [ "$GITHUB_REF_NAME" = "hotfix/v0.26.1-installer" ]; then
+            DIR='.development/v0.26.1'
+          else
+            DIR='.development/v0.26.0'
+          fi
+          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Apply deterministic development batch
+        shell: bash
+        env:
+          DEV_DIR: ${{ steps.dev.outputs.dir }}
+        run: |
+          set -euo pipefail
+          APPLY="$DEV_DIR/apply.json"
+          STATUS="$DEV_DIR/status.json"
+          BATCH="$(python3 -c "import json;print(json.load(open('$APPLY'))['batch'])")"
+          SCRIPT="$(python3 -c "import json;print(json.load(open('$APPLY')).get('script',''))")"
+          PATCH_DIR="$(python3 -c "import json;print(json.load(open('$APPLY')).get('patch_dir',''))")"
           LAST=''
-          if [ -f .development/v0.26.0/status.json ]; then
-            LAST="$(python3 -c "import json;print(json.load(open('.development/v0.26.0/status.json')).get('batch',''))")"
+          if [ -f "$STATUS" ]; then
+            LAST="$(python3 -c "import json;print(json.load(open('$STATUS')).get('batch',''))")"
           fi
           if [ "$LAST" = "$BATCH" ]; then
             echo "Development batch $BATCH is already applied."
@@ -41,11 +60,8 @@ jobs:
           fi
 
           if [ -n "$SCRIPT" ]; then
-            TRANSFORMER=".development/v0.26.0/$SCRIPT"
-            if [ ! -f "$TRANSFORMER" ]; then
-              echo "Transformer not found: $TRANSFORMER"
-              exit 1
-            fi
+            TRANSFORMER="$DEV_DIR/$SCRIPT"
+            test -f "$TRANSFORMER"
             python3 "$TRANSFORMER"
           elif [ -n "$PATCH_DIR" ]; then
             shopt -s nullglob
@@ -62,7 +78,7 @@ jobs:
           fi
 
           python3 - <<PY
-          import json, datetime
+          import json,datetime,os
           state={
             'batch':'$BATCH',
             'script':'$SCRIPT',
@@ -70,7 +86,7 @@ jobs:
             'result':'success',
             'recordedAtUtc':datetime.datetime.now(datetime.timezone.utc).isoformat()
           }
-          open('.development/v0.26.0/status.json','w',encoding='utf-8').write(json.dumps(state,indent=2)+'\n')
+          open('$STATUS','w',encoding='utf-8').write(json.dumps(state,indent=2)+'\n')
           PY
 
           git config user.name 'github-actions[bot]'
@@ -80,5 +96,5 @@ jobs:
             echo 'No source changes to commit.'
             exit 0
           fi
-          git commit -m "Apply v0.26.0 development batch $BATCH"
-          git push origin HEAD:feature/v0.26.0-native-gamebar
+          git commit -m "Apply $GITHUB_REF_NAME development batch $BATCH"
+          git push origin HEAD:$GITHUB_REF_NAME
