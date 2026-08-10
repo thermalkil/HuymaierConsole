@@ -43,7 +43,9 @@ function Get-HcSafeRelativePath {
     if([string]::IsNullOrWhiteSpace($Relative)){throw 'Package manifest contains an empty path.'}
     $relativePath=$Relative.Replace('/','\')
     if([IO.Path]::IsPathRooted($relativePath)){throw "Package manifest contains a rooted path: $Relative"}
-    if($relativePath -match '(^|\)\.\.(\|$)'){throw "Package manifest contains path traversal: $Relative"}
+    foreach($segment in @($relativePath.Split([char]'\'))){
+        if($segment -eq '..'){throw "Package manifest contains path traversal: $Relative"}
+    }
     $rootFull=[IO.Path]::GetFullPath($Root).TrimEnd('\')
     $full=[IO.Path]::GetFullPath((Join-Path $rootFull $relativePath))
     if(-not $full.StartsWith($rootFull+'\',[StringComparison]::OrdinalIgnoreCase)){throw "Package path escapes the package root: $Relative"}
@@ -228,9 +230,6 @@ function Assert-HcRollbackState {
         return
     }
 
-    # With no trustworthy prior manifest, only a genuinely fresh installation
-    # can be safely re-authorized after rollback. If old package files existed,
-    # their integrity cannot be proven, so the marker intentionally remains.
     if($priorFiles.Count -gt 0){throw 'Rollback restored pre-existing program files that have no trustworthy checksum manifest; repair is required before startup.'}
     foreach($relative in $NewMap.Keys){
         if(Test-Path -LiteralPath (Join-Path $InstallRoot $relative)){throw "Rollback verification failed; fresh-install payload remains: $relative"}
@@ -245,7 +244,6 @@ function Restore-HcTransaction {
     $hadPriorMarker=$false
     if($null -ne $Backup){$hadPriorMarker=@($Backup.Files) -contains 'install-incomplete.json'}
 
-    # Never remove the live marker until rollback has been proven safe.
     $remove=@{}
     foreach($relative in @($NewMap.Keys)+@($OldMap.Keys)+@($LegacyPaths)+@('checksums.sha256','SHA256SUMS.txt')){
         if([string]::IsNullOrWhiteSpace([string]$relative)){continue}
@@ -317,8 +315,6 @@ if(-not $script:OwnsInstallerMutex){throw 'Another Huymaier Console installer/up
 $PackageRoot=[IO.Path]::GetFullPath($PackageRoot)
 New-Item -ItemType Directory -Force -Path $script:Destination|Out-Null
 
-# No installed byte is mutated before the complete extracted package passes
-# version, closed-manifest, SHA-256, architecture, and PowerShell parser checks.
 $script:NewMap=Assert-HcPackage -Root $PackageRoot -ExpectedVersion $script:InstallVersion
 Write-InstallerRecord ('Package integrity passed for {0} managed payload files.' -f $script:NewMap.Count)
 
@@ -363,9 +359,6 @@ Remove-Item -LiteralPath $marker -Force -ErrorAction Stop
 $script:TransactionCommitted=$true
 Write-InstallerRecord 'Installed payload verified; installation transaction committed.'
 
-# GameInput runtime installation occurs only after the Console payload transaction
-# is committed. Failure here is non-destructive because Raw HID/XInput fallbacks
-# remain available and the exact Console bytes are already verified.
 $gameInputVersion='3.5.262'
 $gameInputMsi=Join-Path $script:Destination 'Tools\GameInput\GameInputRedist.msi'
 $gameInputMarker=Join-Path $script:Destination 'gameinput-redist.version'
