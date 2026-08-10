@@ -1,16 +1,16 @@
 {
-  "version": "0.26.1",
-  "tag": "v0.26.1",
-  "title": "Huymaier Console v0.26.1",
-  "asset_name": "HC261.zip",
-  "package_root": "HC261",
-  "notes_file": ".release/notes/v0.26.1.md",
-  "candidate_run_id": "31389633299",
+  "version": "0.26.2",
+  "tag": "v0.26.2",
+  "title": "Huymaier Console v0.26.2",
+  "asset_name": "HC262.zip",
+  "package_root": "HC262",
+  "notes_file": ".release/notes/v0.26.2.md",
+  "candidate_run_id": "31402122820",
   "candidate_run_attempt": "1",
-  "candidate_commit": "be962a3e7c156e46f1eff7baaf3d66c2cda801f1",
-  "candidate_sha256": "c881bf453a1d2443552a923a958778a4c8ed879c3f04c07061df3d67bdd51268",
-  "candidate_artifact_name": "v0.26.1-rc19",
+  "candidate_commit": "6d5f816c5ddd4a8f9b136bf50b6d135472a3b250",
+  "candidate_sha256": "d796a3c9f8771a18ec1044d54af0d07241401fd76dd8c14fbafb0203af06d702",
+  "candidate_artifact_name": "v0.26.2-rc4",
   "delete_paths": [],
   "publish": true,
-  "attempt": 2
+  "attempt": 1
 }
