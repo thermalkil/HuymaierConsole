@@ -1,10 +1,10 @@
 {
-  "candidate": "v0.26.1-rc9",
+  "candidate": "v0.26.1-rc10",
   "version": "0.26.1",
   "base_release": "v0.26.0",
   "base_asset": "HC260.zip",
   "package_root": "HC261",
   "asset_name": "HC261.zip",
-  "requested_at": "2026-08-10T10:41:00Z",
-  "focus": "RC9 installer-wrapper correction: explicit wrapper success exit without LASTEXITCODE, silent core returns through public wrapper so CI exercises the exact success path, plus all RC8 controller ownership, Xbox identity, migration, transactional and package-integrity fixes"
+  "requested_at": "2026-08-10T10:49:00Z",
+  "focus": "RC10 combined blocker candidate: explicit installer-wrapper success exit without LASTEXITCODE; hidden external overlay uses dedicated Guide/Home-only arbiter with GameInput plus XInput 0x0400 and PlayStation Raw-HID edge fallbacks while preserving all D-pad/A/B/shoulder pending input; RC8 Win32 foreground ownership and Xbox storefront versus Original Xbox identity separation; transactional fail-closed install/update and cleaned exact x64 package"
 }
