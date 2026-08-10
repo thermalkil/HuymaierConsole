@@ -9,11 +9,32 @@ function Invoke-Installer {
     param([string]$Root,[string]$FakeLocal)
     $installer=Join-Path $Root 'Install-HuymaierConsole.ps1'
     $old=$env:LOCALAPPDATA
+    $stdout=Join-Path $env:RUNNER_TEMP ('hc-installer-'+[guid]::NewGuid().ToString('N')+'.stdout.log')
+    $stderr=Join-Path $env:RUNNER_TEMP ('hc-installer-'+[guid]::NewGuid().ToString('N')+'.stderr.log')
     try{
         $env:LOCALAPPDATA=$FakeLocal
-        $proc=Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList @('-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$installer,'-SilentUpdate') -Wait -PassThru -WindowStyle Hidden
-        return [int]$proc.ExitCode
-    }finally{$env:LOCALAPPDATA=$old}
+        # Match production self-update invocation. Do not add -NonInteractive:
+        # real self-updates are hidden but still run under the user's normal
+        # Windows PowerShell culture/UI environment.
+        $proc=Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',$installer,'-SilentUpdate') -Wait -PassThru -WindowStyle Hidden -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+        $exit=[int]$proc.ExitCode
+        if($exit -ne 0){
+            Write-Host "--- installer child stdout (exit $exit) ---"
+            if(Test-Path -LiteralPath $stdout){Get-Content -LiteralPath $stdout -ErrorAction SilentlyContinue|ForEach-Object{Write-Host $_}}
+            Write-Host '--- installer child stderr ---'
+            if(Test-Path -LiteralPath $stderr){Get-Content -LiteralPath $stderr -ErrorAction SilentlyContinue|ForEach-Object{Write-Host $_}}
+            $logs=Join-Path $FakeLocal 'Huymaier Console\Logs'
+            $latest=@(Get-ChildItem -LiteralPath $logs -Filter 'install-v*.log' -File -ErrorAction SilentlyContinue|Sort-Object LastWriteTimeUtc -Descending|Select-Object -First 1)
+            if($latest.Count -gt 0){
+                Write-Host "--- installer transaction log: $($latest[0].FullName) ---"
+                Get-Content -LiteralPath $latest[0].FullName -ErrorAction SilentlyContinue|ForEach-Object{Write-Host $_}
+            }
+        }
+        return $exit
+    }finally{
+        $env:LOCALAPPDATA=$old
+        Remove-Item -LiteralPath $stdout,$stderr -Force -ErrorAction SilentlyContinue
+    }
 }
 
 $fakeLocal=Join-Path $env:RUNNER_TEMP ('hc-failure-tests-'+[guid]::NewGuid().ToString('N'))
