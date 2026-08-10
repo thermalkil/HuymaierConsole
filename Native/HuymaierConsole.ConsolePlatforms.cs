@@ -10,6 +10,7 @@ using System.Text;
 using System.Web.Script.Serialization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -451,6 +452,15 @@ namespace HuymaierConsole.NativeApp
         private TextBlock xboxPreviewTitle;
         private TextBlock xboxPreviewDetail;
         private Image xboxPreviewImage;
+        private int wiiMenuPage;
+        private int wiiUMenuPage;
+        private int switchZone;
+        private int switchSoftwareIndex;
+        private int switchSystemIndex;
+        private int switchSoftwareActionCount;
+        private int switchSystemActionStart;
+        private bool chromeNavigationActive;
+        private ConsolePlatformGame shellSelectedGame;
 
         public ConsolePlatformWindow(string platformRootValue, string consoleRootValue, string platformId)
         {
@@ -477,6 +487,15 @@ namespace HuymaierConsole.NativeApp
             xboxAchievementsLoaded = false;
             xboxAchievementScanRunning = false;
             xboxArtworkScanRunning = false;
+            wiiMenuPage = 0;
+            wiiUMenuPage = 0;
+            switchZone = 0;
+            switchSoftwareIndex = 0;
+            switchSystemIndex = 0;
+            switchSoftwareActionCount = 0;
+            switchSystemActionStart = 0;
+            chromeNavigationActive = definition.Shell == "Xbox" || (definition.Shell == "Xbox360" && String.Equals(settings.dashboardStyle, "Metro", StringComparison.OrdinalIgnoreCase));
+            shellSelectedGame = null;
             sharedArtworkIndex = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             sharedArtworkIndexLoadedUtc = DateTime.MinValue;
             closing = false;
@@ -497,8 +516,8 @@ namespace HuymaierConsole.NativeApp
 
             root = new Grid();
             root.Background = BuildBackground();
-            bool immersiveDashboard = definition.Shell == "Xbox" || definition.Shell == "Xbox360";
-            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(immersiveDashboard ? 0 : 92) });
+            bool immersiveDashboard = true;
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(0) });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(immersiveDashboard ? 56 : 48) });
 
@@ -516,7 +535,15 @@ namespace HuymaierConsole.NativeApp
             BuildChrome();
 
             Grid footer = new Grid { Margin = new Thickness(28, 0, 28, 0) };
-            string helpText = definition.Shell == "Xbox360" ? "A  Select     X  Fallback emulator     B  Back     GUIDE  Quick Access     LB / RB  Tab" : (definition.Shell == "Xbox" ? "A  Select     X  Fallback emulator     B  Back     LB / RB  Menu" : "A / CROSS  Select     OPTIONS  Fallback emulator     B / CIRCLE  Back     LB / RB  Section");
+            string helpText;
+            if (definition.Shell == "GameCube") helpText = "D-Pad  Menu     A  Select     B  Back     OPTIONS  Alternate emulator     GUIDE  Game Bar";
+            else if (definition.Shell == "Wii") helpText = "D-Pad  Point / Navigate     A  Select     B  Back     GUIDE  Game Bar";
+            else if (definition.Shell == "WiiU") helpText = "D-Pad  Navigate     A  Select     B  Back     GUIDE  Game Bar";
+            else if (definition.Shell == "Switch") helpText = "D-Pad  Navigate     A  OK     B  Back     GUIDE  Game Bar";
+            else if (definition.Shell == "Xbox360" && IsBlades()) helpText = "LEFT / RIGHT  Blade     UP / DOWN  Item     A  Select     B  Back     GUIDE  Game Bar";
+            else if (definition.Shell == "Xbox360") helpText = "D-Pad  Navigate     A  Select     B  Back     GUIDE  Game Bar";
+            else if (definition.Shell == "Xbox") helpText = "UP / DOWN  Menu     A  Select     B  Back     X  Alternate     GUIDE  Game Bar";
+            else helpText = "D-Pad  Navigate     A  Select     B  Back     OPTIONS  Alternate emulator     GUIDE  Game Bar";
             TextBlock help = new TextBlock { Text = helpText, FontSize = 13, VerticalAlignment = VerticalAlignment.Center };
             help.Foreground = IsLightShell() ? new SolidColorBrush(Color.FromRgb(54, 69, 75)) : new SolidColorBrush(Color.FromRgb(218, 224, 230));
             noticeText = new TextBlock { HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, FontSize = 13, Foreground = new SolidColorBrush(definition.Accent) };
@@ -557,9 +584,12 @@ namespace HuymaierConsole.NativeApp
         private bool IsBlades() { return definition.Shell == "Xbox360" && String.Equals(settings.dashboardStyle, "Blades", StringComparison.OrdinalIgnoreCase); }
         private bool IsMetro() { return definition.Shell == "Xbox360" && String.Equals(settings.dashboardStyle, "Metro", StringComparison.OrdinalIgnoreCase); }
         private bool IsGamePage() { return definition.Shell == "Xbox360" ? (IsBlades() ? page == 1 : page == 2) : page == 0; }
-        private int GetPageCount() { return definition.Shell == "Xbox" ? 5 : (definition.Shell == "Xbox360" ? (IsBlades() ? 4 : 7) : 3); }
+        private int GetPageCount() { if (definition.Shell == "GameCube") return 4; return definition.Shell == "Xbox" ? 5 : (definition.Shell == "Xbox360" ? (IsBlades() ? 4 : 7) : 3); }
         private int GetDefaultPageIndex() { return definition.Shell == "Xbox360" && String.Equals(settings == null ? definition.DefaultDashboardStyle : settings.dashboardStyle, "Blades", StringComparison.OrdinalIgnoreCase) ? 1 : 0; }
-        private int GetSettingsPageIndex() { return definition.Shell == "Xbox" ? 4 : (definition.Shell == "Xbox360" ? (IsBlades() ? 3 : 6) : 2); }
+        private int GetSettingsPageIndex() { if (definition.Shell == "GameCube") return 3; return definition.Shell == "Xbox" ? 4 : (definition.Shell == "Xbox360" ? (IsBlades() ? 3 : 6) : 2); }
+        private bool IsRootConsoleSurface() { return String.IsNullOrWhiteSpace(dashboardSubpage); }
+        private bool IsXboxRoot() { return definition.Shell == "Xbox" && IsRootConsoleSurface(); }
+        private bool IsGameCubeHub() { return definition.Shell == "GameCube" && IsRootConsoleSurface(); }
 
         private Brush BuildBackground()
         {
@@ -634,41 +664,32 @@ namespace HuymaierConsole.NativeApp
             Panel oldSubtitleParent = subtitleText.Parent as Panel;
             if (oldSubtitleParent != null) oldSubtitleParent.Children.Remove(subtitleText);
             chrome.Children.Clear();
-            navButtons.Clear();
-            navigation.Children.Clear();
+            chrome.RowDefinitions.Clear(); chrome.ColumnDefinitions.Clear();
+            navButtons.Clear(); navigation.Children.Clear();
             if (definition.Shell == "Xbox") { BuildXboxChrome(); return; }
             if (definition.Shell == "Xbox360") { BuildXbox360Chrome(); return; }
-            bool topNav = definition.Shell == "Wii" || definition.Shell == "WiiU" || definition.Shell == "Switch";
-            if (topNav)
-            {
-                chrome.RowDefinitions.Clear(); chrome.ColumnDefinitions.Clear();
-                chrome.RowDefinitions.Add(new RowDefinition { Height = new GridLength(62) });
-                chrome.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-                navigation.Orientation = Orientation.Horizontal;
-                navigation.HorizontalAlignment = HorizontalAlignment.Center;
-                navigation.Margin = new Thickness(0, 4, 0, 6);
-                chrome.Children.Add(navigation);
-                Border content = BuildContentFrame();
-                Grid.SetRow(content, 1); chrome.Children.Add(content);
-            }
-            else
-            {
-                chrome.RowDefinitions.Clear(); chrome.ColumnDefinitions.Clear();
-                chrome.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(definition.Shell == "Xbox360" ? 310 : 230) });
-                chrome.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                navigation.Orientation = Orientation.Vertical;
-                navigation.Margin = new Thickness(28, 18, 18, 18);
-                chrome.Children.Add(navigation);
-                Border content = BuildContentFrame();
-                Grid.SetColumn(content, 1); chrome.Children.Add(content);
-            }
-            if (definition.Shell == "N64") { AddNav("GAME PAK", 0); AddNav("CONTROLLER PAK", 1); AddNav("OPTIONS", 2); }
-            else if (definition.Shell == "GameCube") { AddNav("GAME PLAY", 0); AddNav("MEMORY CARD", 1); AddNav("OPTIONS", 2); }
-            else if (definition.Shell == "Wii") { AddNav("Wii MENU", 0); AddNav("DATA MANAGEMENT", 1); AddNav("Wii SETTINGS", 2); }
-            else if (definition.Shell == "WiiU") { AddNav("Wii U MENU", 0); AddNav("DATA MANAGEMENT", 1); AddNav("SYSTEM SETTINGS", 2); }
-            else if (definition.Shell == "Switch") { AddNav("ALL SOFTWARE", 0); AddNav("DATA MANAGEMENT", 1); AddNav("SYSTEM SETTINGS", 2); }
-            else { AddNav("Games", 0); AddNav("Saves", 1); AddNav("Settings", 2); }
-            UpdateNavigation();
+
+            // N64, GameCube, Wii, Wii U and Switch no longer inherit a fake common
+            // tab strip. Their real systems used fundamentally different spatial
+            // menus, so the entire center surface belongs to that system renderer.
+            Border content = BuildAuthenticConsoleFrame();
+            chrome.Children.Add(content);
+        }
+
+        private Border BuildAuthenticConsoleFrame()
+        {
+            Border frame = new Border { Margin = new Thickness(18, 16, 18, 8), Padding = new Thickness(20), BorderThickness = new Thickness(0), Background = Brushes.Transparent };
+            Grid inner = new Grid();
+            inner.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            inner.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            StackPanel heading = new StackPanel { Margin = new Thickness(10, 0, 10, 8) };
+            titleText.FontSize = definition.Shell == "GameCube" ? 30 : 28;
+            titleText.FontWeight = FontWeights.Light;
+            titleText.Foreground = IsLightShell() ? new SolidColorBrush(Color.FromRgb(61, 74, 80)) : Brushes.White;
+            subtitleText.FontSize = 12; subtitleText.Margin = new Thickness(1, 2, 0, 8); subtitleText.TextWrapping = TextWrapping.Wrap;
+            subtitleText.Foreground = IsLightShell() ? new SolidColorBrush(Color.FromRgb(100, 115, 121)) : new SolidColorBrush(Color.FromArgb(210, 255, 255, 255));
+            heading.Children.Add(titleText); heading.Children.Add(subtitleText); inner.Children.Add(heading);
+            Grid.SetRow(contentHost, 1); inner.Children.Add(contentHost); frame.Child = inner; return frame;
         }
 
         private void BuildXboxChrome()
@@ -711,7 +732,7 @@ namespace HuymaierConsole.NativeApp
             navigation.Margin = new Thickness(0, 185, 0, 0); scene.Children.Add(navigation); chrome.Children.Add(scene);
 
             Border frame = BuildXboxContentFrame(); Grid.SetColumn(frame, 1); chrome.Children.Add(frame);
-            AddNav("games", 0); AddNav("memory", 1); AddNav("music", 2); AddNav("xbox live", 3); AddNav("settings", 4);
+            AddNav("play game", 0); AddNav("memory", 1); AddNav("music", 2); AddNav("xbox live", 3); AddNav("settings", 4);
             UpdateNavigation();
         }
 
@@ -1087,14 +1108,30 @@ namespace HuymaierConsole.NativeApp
                 if (command == XmbInputCommand.Back || command == XmbInputCommand.Confirm) ToggleDashboardGuide();
                 return;
             }
-            if (command == XmbInputCommand.LeftShoulder) { SwitchPage(-1); return; }
-            if (command == XmbInputCommand.RightShoulder) { SwitchPage(1); return; }
+
+            // Shoulder buttons are never section/page selectors in Huymaier native
+            // console surfaces. Keep them unbound here so controller behavior stays
+            // consistent with the main console and the PlayStation interfaces.
+            if (command == XmbInputCommand.LeftShoulder || command == XmbInputCommand.RightShoulder) return;
+
+            if (IsGameCubeHub()) { ProcessGameCubeHubCommand(command); return; }
+            if (IsXboxRoot()) { ProcessXboxRootCommand(command); return; }
+            if (definition.Shell == "Switch" && IsRootConsoleSurface()) { ProcessSwitchHomeCommand(command); return; }
+            if (definition.Shell == "Xbox360" && IsMetro() && IsRootConsoleSurface() && ProcessMetroNavigationCommand(command)) return;
+            if (definition.Shell == "Xbox360" && IsBlades() && IsRootConsoleSurface() && (command == XmbInputCommand.Left || command == XmbInputCommand.Right))
+            {
+                SwitchPage(command == XmbInputCommand.Left ? -1 : 1); return;
+            }
+            if (definition.Shell == "Wii" && IsRootConsoleSurface() && ProcessWiiPageEdge(command)) return;
+            if (definition.Shell == "WiiU" && IsRootConsoleSurface() && ProcessWiiUPageEdge(command)) return;
+
             if (command == XmbInputCommand.Back)
             {
                 PlayEffect("Back.wav");
                 if (!String.IsNullOrWhiteSpace(dashboardSubpage))
                 {
-                    dashboardSubpage = String.Empty; selectedXboxSave = null; selected = 0; RenderPage(); return;
+                    if (dashboardSubpage == "wii-start") { dashboardSubpage = String.Empty; shellSelectedGame = null; selected = 0; RenderPage(); return; }
+                    dashboardSubpage = String.Empty; selectedXboxSave = null; shellSelectedGame = null; selected = 0; chromeNavigationActive = definition.Shell == "Xbox" || (definition.Shell == "Xbox360" && IsMetro()); RenderPage(); return;
                 }
                 Close(); return;
             }
@@ -1103,13 +1140,12 @@ namespace HuymaierConsole.NativeApp
             {
                 if (IsGamePage() && selected >= 0 && selected < actions.Count && actions[selected].Game != null)
                 {
-                    PlayEffect("Confirm.wav");
-                    LaunchGame(actions[selected].Game, true);
+                    PlayEffect("Confirm.wav"); LaunchGame(actions[selected].Game, true);
                 }
                 return;
             }
             int next = selected;
-            int rowStep = IsGamePage() ? Math.Max(1, columns) : 1;
+            int rowStep = (IsGamePage() && !IsBlades()) ? Math.Max(1, columns) : 1;
             if (command == XmbInputCommand.Left) next--;
             else if (command == XmbInputCommand.Right) next++;
             else if (command == XmbInputCommand.Up) next -= rowStep;
@@ -1123,6 +1159,120 @@ namespace HuymaierConsole.NativeApp
             else return;
             next = Math.Max(0, Math.Min(actions.Count - 1, next));
             if (next != selected) { selected = next; PlayEffect("Navigate.wav"); UpdateActionVisuals(); }
+        }
+
+        private void ProcessGameCubeHubCommand(XmbInputCommand command)
+        {
+            int next = page;
+            if (command == XmbInputCommand.Up) next = 0;          // Game Play
+            else if (command == XmbInputCommand.Right) next = 1; // Calendar
+            else if (command == XmbInputCommand.Down) next = 2;  // Memory Card
+            else if (command == XmbInputCommand.Left) next = 3;  // Options
+            else if (command == XmbInputCommand.Confirm)
+            {
+                dashboardSubpage = "gamecube-section"; selected = 0; PlayEffect("Confirm.wav"); RenderPage(); return;
+            }
+            else if (command == XmbInputCommand.Back) { PlayEffect("Back.wav"); Close(); return; }
+            else return;
+            if (next != page) { page = next; PlayEffect("Navigate.wav"); RenderPage(); }
+        }
+
+        private void ProcessXboxRootCommand(XmbInputCommand command)
+        {
+            if (command == XmbInputCommand.Up || command == XmbInputCommand.Down)
+            {
+                int next = Math.Max(0, Math.Min(GetPageCount() - 1, page + (command == XmbInputCommand.Up ? -1 : 1)));
+                if (next != page) { page = next; PlayEffect("Navigate.wav"); UpdateNavigation(); RenderPage(); }
+                return;
+            }
+            if (command == XmbInputCommand.Confirm)
+            {
+                dashboardSubpage = "xbox-section"; chromeNavigationActive = false; selected = 0; PlayEffect("Confirm.wav"); RenderPage(); return;
+            }
+            if (command == XmbInputCommand.Back) { PlayEffect("Back.wav"); Close(); }
+        }
+
+        private void ProcessSwitchHomeCommand(XmbInputCommand command)
+        {
+            if (switchSoftwareActionCount <= 0 && actions.Count == 0) { if (command == XmbInputCommand.Back) Close(); return; }
+            int systemCount = Math.Max(0, actions.Count - switchSystemActionStart);
+            if (command == XmbInputCommand.Up) { switchZone = 0; }
+            else if (command == XmbInputCommand.Down && systemCount > 0) { switchZone = 1; }
+            else if (command == XmbInputCommand.Left)
+            {
+                if (switchZone == 0) switchSoftwareIndex = Math.Max(0, switchSoftwareIndex - 1);
+                else switchSystemIndex = Math.Max(0, switchSystemIndex - 1);
+            }
+            else if (command == XmbInputCommand.Right)
+            {
+                if (switchZone == 0) switchSoftwareIndex = Math.Min(Math.Max(0, switchSoftwareActionCount - 1), switchSoftwareIndex + 1);
+                else switchSystemIndex = Math.Min(Math.Max(0, systemCount - 1), switchSystemIndex + 1);
+            }
+            else if (command == XmbInputCommand.Confirm)
+            {
+                int index = switchZone == 0 ? switchSoftwareIndex : switchSystemActionStart + switchSystemIndex;
+                if (index >= 0 && index < actions.Count && actions[index].Invoke != null) { selected = index; PlayEffect("Confirm.wav"); actions[index].Invoke(); }
+                return;
+            }
+            else if (command == XmbInputCommand.Back) { PlayEffect("Back.wav"); Close(); return; }
+            else return;
+            selected = switchZone == 0 ? Math.Min(Math.Max(0, switchSoftwareActionCount - 1), switchSoftwareIndex) : Math.Min(actions.Count - 1, switchSystemActionStart + switchSystemIndex);
+            PlayEffect("Navigate.wav"); UpdateActionVisuals();
+        }
+
+        private bool ProcessMetroNavigationCommand(XmbInputCommand command)
+        {
+            if (chromeNavigationActive)
+            {
+                if (command == XmbInputCommand.Left || command == XmbInputCommand.Right)
+                {
+                    SwitchPage(command == XmbInputCommand.Left ? -1 : 1); chromeNavigationActive = true; return true;
+                }
+                if (command == XmbInputCommand.Down || command == XmbInputCommand.Confirm)
+                {
+                    if (actions.Count > 0) { chromeNavigationActive = false; selected = Math.Max(0, Math.Min(selected, actions.Count - 1)); PlayEffect("Navigate.wav"); UpdateActionVisuals(); }
+                    return true;
+                }
+                if (command == XmbInputCommand.Back) { PlayEffect("Back.wav"); Close(); return true; }
+                return command == XmbInputCommand.Up;
+            }
+            if (command == XmbInputCommand.Up && selected < Math.Max(1, columns))
+            {
+                chromeNavigationActive = true; PlayEffect("Navigate.wav"); return true;
+            }
+            if (command == XmbInputCommand.Back)
+            {
+                chromeNavigationActive = true; PlayEffect("Back.wav"); return true;
+            }
+            return false;
+        }
+
+        private bool ProcessWiiPageEdge(XmbInputCommand command)
+        {
+            int totalPages = 4;
+            if (command == XmbInputCommand.Left && selected >= 0 && selected < 12 && selected % 4 == 0 && wiiMenuPage > 0)
+            {
+                wiiMenuPage--; selected = Math.Min(11, Math.Max(0, games.Count - wiiMenuPage * 12 - 1)); PlayEffect("Tab.wav"); RenderPage(); return true;
+            }
+            if (command == XmbInputCommand.Right && selected >= 0 && selected < 12 && selected % 4 == 3 && wiiMenuPage + 1 < totalPages)
+            {
+                wiiMenuPage++; selected = 0; PlayEffect("Tab.wav"); RenderPage(); return true;
+            }
+            return false;
+        }
+
+        private bool ProcessWiiUPageEdge(XmbInputCommand command)
+        {
+            int totalPages = Math.Max(1, (int)Math.Ceiling(Math.Max(1, games.Count) / 15.0));
+            if (command == XmbInputCommand.Left && selected >= 0 && selected < 15 && selected % 5 == 0 && wiiUMenuPage > 0)
+            {
+                wiiUMenuPage--; selected = Math.Min(14, Math.Max(0, games.Count - wiiUMenuPage * 15 - 1)); PlayEffect("Tab.wav"); RenderPage(); return true;
+            }
+            if (command == XmbInputCommand.Right && selected >= 0 && selected < 15 && selected % 5 == 4 && wiiUMenuPage + 1 < totalPages)
+            {
+                wiiUMenuPage++; selected = 0; PlayEffect("Tab.wav"); RenderPage(); return true;
+            }
+            return false;
         }
 
         private void SwitchPage(int delta)
@@ -1157,6 +1307,28 @@ namespace HuymaierConsole.NativeApp
         private void RenderPage()
         {
             UpdateNavigation(); contentHost.Children.Clear(); actions.Clear(); xboxPreviewTitle = null; xboxPreviewDetail = null; xboxPreviewImage = null;
+            if (definition.Shell == "N64" && !IsRootConsoleSurface()) { if (page == 1) RenderN64ControllerPak(FindSaveRoots()); else RenderSettings(); UpdateActionVisuals(); return; }
+            if (definition.Shell == "WiiU" && !IsRootConsoleSurface()) { if (page == 1) RenderWiiUDataManagement(FindSaveRoots()); else RenderSettings(); UpdateActionVisuals(); return; }
+            if (definition.Shell == "Switch" && !IsRootConsoleSurface()) { if (dashboardSubpage == "switch-all") RenderSwitchAllSoftware(); else RenderSettings(); UpdateActionVisuals(); return; }
+            if (definition.Shell == "GameCube")
+            {
+                if (IsRootConsoleSurface()) RenderGameCubeHub();
+                else if (page == 0) RenderGameCubeGamePlay(); else if (page == 1) RenderGameCubeCalendar(); else if (page == 2) RenderGameCubeMemoryCards(FindSaveRoots()); else RenderSettings();
+                UpdateActionVisuals(); return;
+            }
+            if (definition.Shell == "Wii")
+            {
+                if (dashboardSubpage == "wii-start") RenderWiiChannelStart();
+                else if (dashboardSubpage == "wii-options") RenderWiiOptions();
+                else if (dashboardSubpage == "wii-data") RenderWiiDataManagement(FindSaveRoots());
+                else if (dashboardSubpage == "wii-settings") RenderSettings();
+                else RenderWiiMenuAuthentic();
+                UpdateActionVisuals(); return;
+            }
+            if (definition.Shell == "WiiU" && IsRootConsoleSurface()) { RenderWiiUMenuAuthentic(); UpdateActionVisuals(); return; }
+            if (definition.Shell == "Switch" && IsRootConsoleSurface()) { RenderSwitchHomeAuthentic(); UpdateActionVisuals(); return; }
+            if (definition.Shell == "N64" && IsRootConsoleSurface()) { RenderN64GamePakLauncher(); UpdateActionVisuals(); return; }
+            if (definition.Shell == "Xbox" && IsRootConsoleSurface()) { RenderXboxRoot(); UpdateActionVisuals(); return; }
             if (definition.Shell == "Xbox360" && String.Equals(dashboardSubpage, "achievements", StringComparison.OrdinalIgnoreCase)) { RenderXbox360Achievements(); UpdateActionVisuals(); return; }
             if (definition.Shell == "Xbox360" && String.Equals(dashboardSubpage, "settings", StringComparison.OrdinalIgnoreCase)) { RenderSettings(); UpdateActionVisuals(); return; }
             if (IsXboxFamily() && String.Equals(dashboardSubpage, "storage", StringComparison.OrdinalIgnoreCase)) { RenderXboxStorageManager(); UpdateActionVisuals(); return; }
@@ -1189,25 +1361,229 @@ namespace HuymaierConsole.NativeApp
             if (definition.Shell == "Xbox") { RenderXboxGamesAuthentic(); return; }
             if (IsBlades()) { RenderBladesGamesAuthentic(); return; }
             if (IsMetro()) { RenderMetroGamesAuthentic(); return; }
-            titleText.Text = definition.Shell == "N64" ? "GAME PAK" : (definition.Shell == "GameCube" ? "GAME PLAY" : (definition.Shell == "Wii" ? "Wii Menu" : (definition.Shell == "WiiU" ? "Wii U Menu" : (definition.Shell == "Switch" ? "All Software" : (definition.Shell == "Xbox" ? "games" : (definition.Shell == "Xbox360" ? "games" : "Games"))))));
-            subtitleText.Text = games.Count.ToString(CultureInfo.InvariantCulture) + " detected games  •  " + definition.PrimaryBackend + " primary";
+            if (definition.Shell == "N64") { RenderN64GamePakLauncher(); return; }
+            if (definition.Shell == "GameCube") { RenderGameCubeGamePlay(); return; }
+            if (definition.Shell == "Wii") { RenderWiiMenuAuthentic(); return; }
+            if (definition.Shell == "WiiU") { RenderWiiUMenuAuthentic(); return; }
+            if (definition.Shell == "Switch") { RenderSwitchHomeAuthentic(); return; }
+            titleText.Text = "Games"; subtitleText.Text = games.Count.ToString(CultureInfo.InvariantCulture) + " detected games  •  " + definition.PrimaryBackend + " primary";
             ScrollViewer scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
-            WrapPanel wrap = new WrapPanel { Margin = IsXboxFamily() ? new Thickness(10, 2, 10, 14) : new Thickness(18, 4, 18, 18) };
-            scroll.Content = wrap;
-            contentHost.Children.Add(scroll);
+            WrapPanel wrap = new WrapPanel { Margin = new Thickness(18, 4, 18, 18) }; scroll.Content = wrap; contentHost.Children.Add(scroll);
             foreach (ConsolePlatformGame game in games)
             {
-                ConsolePlatformGame captured = game;
-                Button button = CreateGameButton(game, delegate { LaunchGame(captured, false); });
-                wrap.Children.Add(button);
-                actions.Add(new ConsolePlatformAction { Button = button, Invoke = delegate { LaunchGame(captured, false); }, Name = game.Name, Game = captured });
+                ConsolePlatformGame captured = game; Button button = CreateGameButton(game, delegate { LaunchGame(captured, false); }); wrap.Children.Add(button); actions.Add(new ConsolePlatformAction { Button = button, Invoke = delegate { LaunchGame(captured, false); }, Name = game.Name, Game = captured });
+            }
+        }
+
+        private void RenderN64GamePakLauncher()
+        {
+            titleText.Text = "Nintendo 64"; subtitleText.Text = "GAME PAK  •  cartridge-first launcher";
+            Grid body = new Grid { Margin = new Thickness(20, 4, 20, 12) };
+            body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(96) }); contentHost.Children.Add(body);
+            ScrollViewer scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+            WrapPanel shelf = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(8) }; scroll.Content = shelf; body.Children.Add(scroll);
+            foreach (ConsolePlatformGame game in games)
+            {
+                ConsolePlatformGame captured = game; Button cart = CreateN64CartridgeTile(game, delegate { LaunchGame(captured, false); }); shelf.Children.Add(cart); actions.Add(new ConsolePlatformAction { Button = cart, Invoke = delegate { LaunchGame(captured, false); }, Name = game.Name, Game = game });
             }
             if (games.Count == 0)
             {
-                Button empty = CreateActionButton("No games found", "Add a game folder in Settings", delegate { page = GetSettingsPageIndex(); selected = 0; RenderPage(); });
-                wrap.Children.Add(empty);
-                actions.Add(new ConsolePlatformAction { Button = empty, Invoke = delegate { page = GetSettingsPageIndex(); selected = 0; RenderPage(); }, Name = "Settings" });
+                Button empty = CreateN64UtilityButton("INSERT GAME PAK", "Configure a ROM folder", delegate { dashboardSubpage = "n64-settings"; page = 2; selected = 0; RenderPage(); }); shelf.Children.Add(empty); actions.Add(new ConsolePlatformAction { Button = empty, Invoke = delegate { dashboardSubpage = "n64-settings"; page = 2; selected = 0; RenderSettings(); }, Name = "Insert Game Pak" });
             }
+            StackPanel utilities = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            Button pak = CreateN64UtilityButton("CONTROLLER PAK", "Save data", delegate { dashboardSubpage = "n64-pak"; page = 1; selected = 0; contentHost.Children.Clear(); actions.Clear(); RenderN64ControllerPak(FindSaveRoots()); UpdateActionVisuals(); });
+            Button options = CreateN64UtilityButton("OPTIONS", "RMG / ares", delegate { dashboardSubpage = "n64-settings"; page = 2; selected = 0; contentHost.Children.Clear(); actions.Clear(); RenderSettings(); UpdateActionVisuals(); });
+            utilities.Children.Add(pak); utilities.Children.Add(options); Grid.SetRow(utilities, 1); body.Children.Add(utilities);
+            actions.Add(new ConsolePlatformAction { Button = pak, Invoke = delegate { dashboardSubpage = "n64-pak"; page = 1; selected = 0; contentHost.Children.Clear(); actions.Clear(); RenderN64ControllerPak(FindSaveRoots()); UpdateActionVisuals(); }, Name = "Controller Pak" });
+            actions.Add(new ConsolePlatformAction { Button = options, Invoke = delegate { dashboardSubpage = "n64-settings"; page = 2; selected = 0; contentHost.Children.Clear(); actions.Clear(); RenderSettings(); UpdateActionVisuals(); }, Name = "Options" });
+        }
+
+        private Button CreateN64CartridgeTile(ConsolePlatformGame game, Action invoke)
+        {
+            Button button = new Button { Width = 228, Height = 270, Margin = new Thickness(12), Padding = new Thickness(10), Background = new LinearGradientBrush(Color.FromRgb(73, 74, 79), Color.FromRgb(31, 32, 38), 90), BorderBrush = new SolidColorBrush(Color.FromRgb(231, 187, 38)), BorderThickness = new Thickness(2), RenderTransformOrigin = new Point(0.5, 0.5) };
+            Grid grid = new Grid(); grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(34) }); grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(58) });
+            Border ridge = new Border { Background = new SolidColorBrush(Color.FromRgb(104, 105, 110)), CornerRadius = new CornerRadius(5), Margin = new Thickness(20, 1, 20, 6) }; grid.Children.Add(ridge);
+            Border label = new Border { Margin = new Thickness(12, 8, 12, 8), Background = new SolidColorBrush(Color.FromRgb(233, 231, 218)), BorderBrush = new SolidColorBrush(Color.FromRgb(29, 29, 31)), BorderThickness = new Thickness(2) };
+            if (!String.IsNullOrWhiteSpace(game.Cover) && File.Exists(game.Cover)) { try { label.Child = new Image { Source = LoadBitmap(game.Cover), Stretch = Stretch.UniformToFill }; } catch { } }
+            if (label.Child == null) label.Child = new TextBlock { Text = "NINTENDO\n64", TextAlignment = TextAlignment.Center, FontSize = 28, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(34, 35, 39)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetRow(label, 1); grid.Children.Add(label);
+            TextBlock name = new TextBlock { Text = game.Name, FontSize = 13, FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(6, 5, 6, 0) }; Grid.SetRow(name, 2); grid.Children.Add(name); button.Content = grid; button.Click += delegate { invoke(); }; return button;
+        }
+
+        private Button CreateN64UtilityButton(string title, string detail, Action invoke)
+        {
+            Button b = new Button { Width = 240, Height = 68, Margin = new Thickness(8), Background = new SolidColorBrush(Color.FromRgb(36, 37, 44)), BorderBrush = new SolidColorBrush(Color.FromRgb(232, 188, 39)), BorderThickness = new Thickness(2), RenderTransformOrigin = new Point(0.5, 0.5) };
+            StackPanel s = new StackPanel { VerticalAlignment = VerticalAlignment.Center }; s.Children.Add(new TextBlock { Text = title, FontSize = 16, FontWeight = FontWeights.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center }); s.Children.Add(new TextBlock { Text = detail, FontSize = 10, Foreground = new SolidColorBrush(Color.FromRgb(197, 198, 205)), HorizontalAlignment = HorizontalAlignment.Center }); b.Content = s; b.Click += delegate { invoke(); }; return b;
+        }
+
+        private void RenderGameCubeHub()
+        {
+            titleText.Text = String.Empty; subtitleText.Text = String.Empty;
+            Grid hub = new Grid { Margin = new Thickness(70, 20, 70, 20) }; hub.RowDefinitions.Add(new RowDefinition()); hub.RowDefinitions.Add(new RowDefinition()); hub.RowDefinitions.Add(new RowDefinition()); hub.ColumnDefinitions.Add(new ColumnDefinition()); hub.ColumnDefinitions.Add(new ColumnDefinition()); hub.ColumnDefinitions.Add(new ColumnDefinition()); contentHost.Children.Add(hub);
+            Border center = new Border { Width = 250, Height = 250, CornerRadius = new CornerRadius(125), Background = new RadialGradientBrush(Color.FromRgb(168, 152, 255), Color.FromRgb(40, 26, 95)), BorderBrush = new SolidColorBrush(Color.FromRgb(204, 195, 255)), BorderThickness = new Thickness(5), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            center.Child = new TextBlock { Text = "NINTENDO\nGAMECUBE", FontSize = 28, FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }; Grid.SetRow(center, 1); Grid.SetColumn(center, 1); hub.Children.Add(center);
+            AddGameCubeHubNode(hub, "GAME PLAY", "Game Disc", 0, 0, 1, "▲");
+            AddGameCubeHubNode(hub, "CALENDAR", DateTime.Now.ToString("MMM d  yyyy", CultureInfo.CurrentCulture), 1, 1, 2, "▶");
+            AddGameCubeHubNode(hub, "MEMORY CARD", "Slot A / Slot B", 2, 2, 1, "▼");
+            AddGameCubeHubNode(hub, "OPTIONS", "Sound / Display / Emulator", 3, 1, 0, "◀");
+            TextBlock help = new TextBlock { Text = "Move the Control Stick / D-Pad toward a menu • A Select • B Back", FontSize = 13, Foreground = new SolidColorBrush(Color.FromRgb(203, 198, 235)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 4) }; Grid.SetRow(help, 2); Grid.SetColumnSpan(help, 3); hub.Children.Add(help);
+        }
+
+        private void AddGameCubeHubNode(Grid hub, string title, string detail, int index, int row, int column, string arrow)
+        {
+            bool active = page == index; Border node = new Border { Width = 310, Height = 128, CornerRadius = new CornerRadius(54), Background = new SolidColorBrush(active ? Color.FromArgb(235, 112, 88, 211) : Color.FromArgb(175, 51, 39, 106)), BorderBrush = new SolidColorBrush(active ? Color.FromRgb(224, 217, 255) : Color.FromRgb(116, 99, 192)), BorderThickness = new Thickness(active ? 5 : 2), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            StackPanel s = new StackPanel { VerticalAlignment = VerticalAlignment.Center }; s.Children.Add(new TextBlock { Text = arrow + "  " + title, FontSize = 22, FontWeight = FontWeights.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center }); s.Children.Add(new TextBlock { Text = detail, FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(214, 210, 235)), HorizontalAlignment = HorizontalAlignment.Center }); node.Child = s; Grid.SetRow(node, row); Grid.SetColumn(node, column); hub.Children.Add(node);
+        }
+
+        private void RenderGameCubeGamePlay()
+        {
+            titleText.Text = "Game Play"; subtitleText.Text = games.Count == 0 ? "No Game Disc / library title detected" : "Select a Game Disc image • A opens / launches";
+            ScrollViewer scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; WrapPanel wrap = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(20) }; scroll.Content = wrap; contentHost.Children.Add(scroll);
+            foreach (ConsolePlatformGame game in games) { ConsolePlatformGame captured = game; Button b = CreateGameCubeDiscTile(game, delegate { LaunchGame(captured, false); }); wrap.Children.Add(b); actions.Add(new ConsolePlatformAction { Button = b, Invoke = delegate { LaunchGame(captured, false); }, Name = game.Name, Game = game }); }
+            if (games.Count == 0) { Button add = CreateActionButton("No Game Disc", "Open Options to configure a Dolphin game folder", delegate { page = 3; selected = 0; RenderPage(); }); wrap.Children.Add(add); actions.Add(new ConsolePlatformAction { Button = add, Invoke = delegate { page = 3; selected = 0; RenderPage(); }, Name = "Options" }); }
+        }
+
+        private Button CreateGameCubeDiscTile(ConsolePlatformGame game, Action invoke)
+        {
+            Button b = new Button { Width = 260, Height = 260, Margin = new Thickness(18), Padding = new Thickness(12), Background = new RadialGradientBrush(Color.FromRgb(91, 72, 172), Color.FromRgb(32, 22, 76)), BorderBrush = new SolidColorBrush(Color.FromRgb(169, 153, 255)), BorderThickness = new Thickness(3), RenderTransformOrigin = new Point(0.5, 0.5) };
+            Grid g = new Grid(); System.Windows.Shapes.Ellipse disc = new System.Windows.Shapes.Ellipse { Width = 180, Height = 180, Fill = new RadialGradientBrush(Color.FromRgb(233, 234, 239), Color.FromRgb(92, 94, 109)), Stroke = new SolidColorBrush(Color.FromRgb(245, 245, 250)), StrokeThickness = 2, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }; g.Children.Add(disc);
+            if (!String.IsNullOrWhiteSpace(game.Cover) && File.Exists(game.Cover)) { try { Image art = new Image { Source = LoadBitmap(game.Cover), Width = 136, Height = 136, Stretch = Stretch.UniformToFill, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }; art.Clip = new EllipseGeometry(new Point(68,68),68,68); g.Children.Add(art); } catch { } }
+            Border label = new Border { Height = 54, VerticalAlignment = VerticalAlignment.Bottom, Background = new SolidColorBrush(Color.FromArgb(220, 26, 19, 61)), Padding = new Thickness(8) }; label.Child = new TextBlock { Text = game.Name, FontSize = 13, FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextAlignment = TextAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }; g.Children.Add(label); b.Content = g; b.Click += delegate { invoke(); }; return b;
+        }
+
+        private void RenderGameCubeCalendar()
+        {
+            titleText.Text = "Calendar"; subtitleText.Text = "Internal Clock";
+            Grid panel = new Grid { Margin = new Thickness(110, 36, 110, 50) }; panel.ColumnDefinitions.Add(new ColumnDefinition()); panel.ColumnDefinitions.Add(new ColumnDefinition()); contentHost.Children.Add(panel);
+            Border date = CreateGameCubeClockPanel("DATE", DateTime.Now.ToString("MM / dd / yyyy", CultureInfo.CurrentCulture), DateTime.Now.ToString("dddd", CultureInfo.CurrentCulture)); panel.Children.Add(date);
+            Border time = CreateGameCubeClockPanel("TIME", DateTime.Now.ToString("HH : mm", CultureInfo.CurrentCulture), DateTime.Now.ToString("h:mm:ss tt", CultureInfo.CurrentCulture)); Grid.SetColumn(time, 1); panel.Children.Add(time);
+        }
+
+        private Border CreateGameCubeClockPanel(string heading, string value, string detail)
+        {
+            Border box = new Border { Margin = new Thickness(26), CornerRadius = new CornerRadius(48), Background = new SolidColorBrush(Color.FromArgb(220, 52, 39, 111)), BorderBrush = new SolidColorBrush(Color.FromRgb(150, 130, 240)), BorderThickness = new Thickness(4), Padding = new Thickness(30) };
+            StackPanel s = new StackPanel { VerticalAlignment = VerticalAlignment.Center }; s.Children.Add(new TextBlock { Text = heading, FontSize = 18, Foreground = new SolidColorBrush(Color.FromRgb(205, 199, 238)), HorizontalAlignment = HorizontalAlignment.Center }); s.Children.Add(new TextBlock { Text = value, FontSize = 42, FontWeight = FontWeights.Light, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 20, 0, 12) }); s.Children.Add(new TextBlock { Text = detail, FontSize = 14, Foreground = new SolidColorBrush(Color.FromRgb(213, 209, 236)), HorizontalAlignment = HorizontalAlignment.Center }); box.Child = s; return box;
+        }
+
+        private void RenderWiiMenuAuthentic()
+        {
+            titleText.Text = String.Empty; subtitleText.Text = String.Empty; columns = 4;
+            Grid body = new Grid { Margin = new Thickness(42, 18, 42, 6) }; body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(80) }); contentHost.Children.Add(body);
+            UniformGrid channels = new UniformGrid { Columns = 4, Rows = 3, Margin = new Thickness(8, 0, 8, 8) }; body.Children.Add(channels);
+            int start = wiiMenuPage * 12; int count = Math.Min(12, Math.Max(0, games.Count - start));
+            for (int slot = 0; slot < 12; slot++)
+            {
+                int gameIndex = start + slot;
+                if (gameIndex < games.Count)
+                {
+                    ConsolePlatformGame game = games[gameIndex]; ConsolePlatformGame captured = game; Button channel = CreateWiiChannelTile(game, slot == 0, delegate { shellSelectedGame = captured; dashboardSubpage = "wii-start"; selected = 0; RenderPage(); }); channels.Children.Add(channel); actions.Add(new ConsolePlatformAction { Button = channel, Invoke = delegate { shellSelectedGame = captured; dashboardSubpage = "wii-start"; selected = 0; RenderPage(); }, Name = game.Name, Game = game });
+                }
+                else
+                {
+                    Border blank = new Border { Margin = new Thickness(10), CornerRadius = new CornerRadius(16), Background = new SolidColorBrush(Color.FromArgb(135, 250, 252, 253)), BorderBrush = new SolidColorBrush(Color.FromRgb(202, 218, 224)), BorderThickness = new Thickness(2) }; channels.Children.Add(blank);
+                }
+            }
+            Grid bottom = new Grid { Margin = new Thickness(10, 0, 10, 0) }; bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(320) }); bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) });
+            StackPanel leftControls = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
+            Button wii = CreateWiiRoundButton("Wii", "Options", delegate { dashboardSubpage = "wii-options"; selected = 0; RenderPage(); }); wii.Width = 146;
+            Button sd = CreateWiiRoundButton("SD", "SD Card", OpenFirstSaveRoot); sd.Width = 146; leftControls.Children.Add(wii); leftControls.Children.Add(sd); bottom.Children.Add(leftControls);
+            StackPanel clock = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }; clock.Children.Add(new TextBlock { Text = DateTime.Now.ToString("h:mm tt", CultureInfo.CurrentCulture), FontSize = 24, Foreground = new SolidColorBrush(Color.FromRgb(86, 101, 108)), HorizontalAlignment = HorizontalAlignment.Center }); clock.Children.Add(new TextBlock { Text = DateTime.Now.ToString("ddd M/d", CultureInfo.CurrentCulture) + "    " + (wiiMenuPage + 1).ToString(CultureInfo.InvariantCulture) + "/4", FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(126, 139, 145)), HorizontalAlignment = HorizontalAlignment.Center }); Grid.SetColumn(clock, 1); bottom.Children.Add(clock);
+            Button messages = CreateWiiRoundButton("✉", "Wii Message Board", delegate { ShowNotice("Wii Message Board is represented for menu fidelity; Huymaier Console does not emulate Nintendo messaging services."); }); messages.Width = 194; Grid.SetColumn(messages, 2); bottom.Children.Add(messages); Grid.SetRow(bottom, 1); body.Children.Add(bottom);
+            actions.Add(new ConsolePlatformAction { Button = wii, Invoke = delegate { dashboardSubpage = "wii-options"; selected = 0; RenderPage(); }, Name = "Wii Options" }); actions.Add(new ConsolePlatformAction { Button = sd, Invoke = OpenFirstSaveRoot, Name = "SD Card Menu" }); actions.Add(new ConsolePlatformAction { Button = messages, Invoke = delegate { ShowNotice("Wii Message Board is represented for menu fidelity; Huymaier Console does not emulate Nintendo messaging services."); }, Name = "Wii Message Board" });
+            selected = Math.Max(0, Math.Min(actions.Count - 1, selected));
+        }
+
+        private Button CreateWiiChannelTile(ConsolePlatformGame game, bool discSlot, Action invoke)
+        {
+            Button b = new Button { Margin = new Thickness(10), Background = Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(156, 207, 221)), BorderThickness = new Thickness(3), RenderTransformOrigin = new Point(0.5, 0.5), Padding = new Thickness(0) }; Grid g = new Grid();
+            if (!String.IsNullOrWhiteSpace(game.Cover) && File.Exists(game.Cover)) { try { g.Children.Add(new Image { Source = LoadBitmap(game.Cover), Stretch = Stretch.UniformToFill, Margin = new Thickness(5) }); } catch { } }
+            if (g.Children.Count == 0) g.Children.Add(new TextBlock { Text = discSlot ? "Disc Channel" : "Wii", FontSize = discSlot ? 22 : 30, Foreground = new SolidColorBrush(Color.FromRgb(107, 126, 133)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center });
+            Border caption = new Border { Height = 42, VerticalAlignment = VerticalAlignment.Bottom, Background = new SolidColorBrush(Color.FromArgb(230, 248, 251, 252)), Padding = new Thickness(6) }; caption.Child = new TextBlock { Text = discSlot ? "Disc Channel" : game.Name, FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(70, 87, 94)), HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }; g.Children.Add(caption); b.Content = g; b.Click += delegate { invoke(); }; return b;
+        }
+
+        private Button CreateWiiRoundButton(string title, string detail, Action invoke)
+        {
+            Button b = new Button { Width = 180, Height = 58, Margin = new Thickness(4), Background = new SolidColorBrush(Color.FromRgb(246, 249, 250)), BorderBrush = new SolidColorBrush(Color.FromRgb(142, 201, 219)), BorderThickness = new Thickness(2), RenderTransformOrigin = new Point(0.5,0.5) }; StackPanel s = new StackPanel { VerticalAlignment = VerticalAlignment.Center }; s.Children.Add(new TextBlock { Text = title, FontSize = 19, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(69, 86, 92)), HorizontalAlignment = HorizontalAlignment.Center }); s.Children.Add(new TextBlock { Text = detail, FontSize = 9, Foreground = new SolidColorBrush(Color.FromRgb(115, 131, 137)), HorizontalAlignment = HorizontalAlignment.Center }); b.Content = s; b.Click += delegate { invoke(); }; return b;
+        }
+
+        private void RenderWiiChannelStart()
+        {
+            titleText.Text = String.Empty; subtitleText.Text = String.Empty; Grid body = new Grid { Margin = new Thickness(90, 22, 90, 24), Background = Brushes.White }; body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(90) }); contentHost.Children.Add(body);
+            Grid preview = new Grid { Margin = new Thickness(40, 18, 40, 18) }; if (shellSelectedGame != null && !String.IsNullOrWhiteSpace(shellSelectedGame.Cover) && File.Exists(shellSelectedGame.Cover)) { try { preview.Children.Add(new Image { Source = LoadBitmap(shellSelectedGame.Cover), Stretch = Stretch.Uniform }); } catch { } } if (preview.Children.Count == 0) preview.Children.Add(new TextBlock { Text = shellSelectedGame == null ? "Wii" : shellSelectedGame.Name, FontSize = 42, Foreground = new SolidColorBrush(Color.FromRgb(86, 102, 108)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }); body.Children.Add(preview);
+            Grid buttons = new Grid { Margin = new Thickness(60, 8, 60, 8) }; buttons.ColumnDefinitions.Add(new ColumnDefinition()); buttons.ColumnDefinitions.Add(new ColumnDefinition()); Button back = CreateWiiRoundButton("Wii Menu", "Back", delegate { dashboardSubpage = String.Empty; shellSelectedGame = null; selected = 0; RenderPage(); }); back.Width = 300; buttons.Children.Add(back); Button start = CreateWiiRoundButton("Start", shellSelectedGame == null ? "No title" : shellSelectedGame.Name, delegate { if (shellSelectedGame != null) LaunchGame(shellSelectedGame, false); }); start.Width = 300; Grid.SetColumn(start, 1); buttons.Children.Add(start); Grid.SetRow(buttons, 1); body.Children.Add(buttons); actions.Add(new ConsolePlatformAction { Button = back, Invoke = delegate { dashboardSubpage = String.Empty; shellSelectedGame = null; selected = 0; RenderPage(); }, Name = "Wii Menu" }); actions.Add(new ConsolePlatformAction { Button = start, Invoke = delegate { if (shellSelectedGame != null) LaunchGame(shellSelectedGame, false); }, Name = "Start", Game = shellSelectedGame });
+        }
+
+        private void RenderWiiOptions()
+        {
+            titleText.Text = "Wii Options"; subtitleText.Text = ""; Grid grid = new Grid { Margin = new Thickness(150, 70, 150, 70) }; grid.ColumnDefinitions.Add(new ColumnDefinition()); grid.ColumnDefinitions.Add(new ColumnDefinition()); contentHost.Children.Add(grid);
+            Button data = CreateShellAction("Data Management", "Save Data and Channels", delegate { dashboardSubpage = "wii-data"; selected = 0; RenderPage(); }, Color.FromRgb(54, 181, 216)); data.Margin = new Thickness(25); grid.Children.Add(data); actions.Add(new ConsolePlatformAction { Button = data, Invoke = delegate { dashboardSubpage = "wii-data"; selected = 0; RenderPage(); }, Name = "Data Management" });
+            Button settingsButton = CreateShellAction("Wii Settings", "Console and emulator settings", delegate { dashboardSubpage = "wii-settings"; selected = 0; RenderPage(); }, Color.FromRgb(76, 191, 218)); settingsButton.Margin = new Thickness(25); Grid.SetColumn(settingsButton, 1); grid.Children.Add(settingsButton); actions.Add(new ConsolePlatformAction { Button = settingsButton, Invoke = delegate { dashboardSubpage = "wii-settings"; selected = 0; RenderPage(); }, Name = "Wii Settings" });
+        }
+
+        private void RenderWiiUMenuAuthentic()
+        {
+            titleText.Text = "Wii U Menu"; subtitleText.Text = "WaraWara Plaza  •  " + games.Count.ToString(CultureInfo.InvariantCulture) + " software titles"; columns = 5;
+            Grid body = new Grid { Margin = new Thickness(42, 2, 42, 8) }; body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(78) }); contentHost.Children.Add(body);
+            Grid plaza = new Grid(); for (int i = 0; i < 18; i++) { System.Windows.Shapes.Ellipse bubble = new System.Windows.Shapes.Ellipse { Width = 74 + (i % 4) * 18, Height = 48 + (i % 3) * 12, Fill = new SolidColorBrush(Color.FromArgb(35, 35, 158, 205)), HorizontalAlignment = (i % 2 == 0) ? HorizontalAlignment.Left : HorizontalAlignment.Right, VerticalAlignment = (i % 3 == 0) ? VerticalAlignment.Top : VerticalAlignment.Bottom, Margin = new Thickness(20 + (i * 71) % 460, 12 + (i * 47) % 210, 20 + (i * 29) % 320, 12 + (i * 31) % 160) }; plaza.Children.Add(bubble); }
+            UniformGrid icons = new UniformGrid { Columns = 5, Rows = 3, Margin = new Thickness(18, 18, 18, 18) }; plaza.Children.Add(icons); body.Children.Add(plaza);
+            int start = wiiUMenuPage * 15;
+            for (int slot = 0; slot < 15; slot++)
+            {
+                int idx = start + slot;
+                if (idx < games.Count) { ConsolePlatformGame game = games[idx]; ConsolePlatformGame captured = game; Button icon = CreateWiiUSoftwareIcon(game, delegate { LaunchGame(captured, false); }); icons.Children.Add(icon); actions.Add(new ConsolePlatformAction { Button = icon, Invoke = delegate { LaunchGame(captured, false); }, Name = game.Name, Game = game }); }
+                else icons.Children.Add(new Border { Margin = new Thickness(11), CornerRadius = new CornerRadius(16), Background = new SolidColorBrush(Color.FromArgb(120, 255, 255, 255)), BorderBrush = new SolidColorBrush(Color.FromArgb(100, 36, 160, 206)), BorderThickness = new Thickness(1) });
+            }
+            StackPanel sys = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }; Button data = CreateWiiURoundSystemButton("Data Management", delegate { dashboardSubpage = "wiiu-data"; page = 1; selected = 0; RenderWiiUDataManagement(FindSaveRoots()); UpdateActionVisuals(); }); Button settingsButton = CreateWiiURoundSystemButton("System Settings", delegate { dashboardSubpage = "wiiu-settings"; page = 2; selected = 0; contentHost.Children.Clear(); actions.Clear(); RenderSettings(); UpdateActionVisuals(); }); sys.Children.Add(data); sys.Children.Add(settingsButton); Grid.SetRow(sys,1); body.Children.Add(sys); actions.Add(new ConsolePlatformAction { Button=data, Invoke=delegate { dashboardSubpage="wiiu-data"; page=1; selected=0; contentHost.Children.Clear(); actions.Clear(); RenderWiiUDataManagement(FindSaveRoots()); UpdateActionVisuals(); }, Name="Data Management" }); actions.Add(new ConsolePlatformAction { Button=settingsButton, Invoke=delegate { dashboardSubpage="wiiu-settings"; page=2; selected=0; contentHost.Children.Clear(); actions.Clear(); RenderSettings(); UpdateActionVisuals(); }, Name="System Settings" }); selected=Math.Max(0,Math.Min(actions.Count-1,selected));
+        }
+
+        private Button CreateWiiUSoftwareIcon(ConsolePlatformGame game, Action invoke)
+        {
+            Button b = new Button { Margin = new Thickness(11), Background = new SolidColorBrush(Color.FromArgb(245,255,255,255)), BorderBrush = new SolidColorBrush(Color.FromRgb(79, 183, 217)), BorderThickness = new Thickness(2), RenderTransformOrigin = new Point(0.5,0.5), Padding = new Thickness(0) }; Grid g = new Grid(); if (!String.IsNullOrWhiteSpace(game.Cover) && File.Exists(game.Cover)) { try { g.Children.Add(new Image { Source=LoadBitmap(game.Cover), Stretch=Stretch.UniformToFill, Margin=new Thickness(5) }); } catch {} } if (g.Children.Count==0) g.Children.Add(new TextBlock { Text="Wii U", FontSize=26, Foreground=new SolidColorBrush(Color.FromRgb(28,145,190)), HorizontalAlignment=HorizontalAlignment.Center, VerticalAlignment=VerticalAlignment.Center }); Border cap=new Border { Height=38, VerticalAlignment=VerticalAlignment.Bottom, Background=new SolidColorBrush(Color.FromArgb(235,250,253,255)), Padding=new Thickness(5) }; cap.Child=new TextBlock { Text=game.Name, FontSize=10, FontWeight=FontWeights.SemiBold, Foreground=new SolidColorBrush(Color.FromRgb(57,75,82)), TextTrimming=TextTrimming.CharacterEllipsis, HorizontalAlignment=HorizontalAlignment.Center }; g.Children.Add(cap); b.Content=g; b.Click+=delegate { invoke(); }; return b;
+        }
+
+        private Button CreateWiiURoundSystemButton(string text, Action invoke)
+        {
+            Button b = new Button { MinWidth=230, Height=58, Margin=new Thickness(12,4,12,4), Background=Brushes.White, BorderBrush=new SolidColorBrush(Color.FromRgb(44,163,205)), BorderThickness=new Thickness(2), RenderTransformOrigin=new Point(0.5,0.5), Content=new TextBlock { Text=text, FontSize=16, Foreground=new SolidColorBrush(Color.FromRgb(53,79,88)), HorizontalAlignment=HorizontalAlignment.Center } }; b.Click+=delegate { invoke(); }; return b;
+        }
+
+        private void RenderSwitchHomeAuthentic()
+        {
+            titleText.Text = String.Empty; subtitleText.Text = String.Empty; switchSoftwareActionCount=0; switchSystemActionStart=0;
+            Grid body = new Grid { Margin = new Thickness(54, 22, 54, 18) }; body.RowDefinitions.Add(new RowDefinition { Height=new GridLength(72) }); body.RowDefinitions.Add(new RowDefinition { Height=new GridLength(1,GridUnitType.Star) }); body.RowDefinitions.Add(new RowDefinition { Height=new GridLength(112) }); contentHost.Children.Add(body);
+            Grid status=new Grid(); status.ColumnDefinitions.Add(new ColumnDefinition()); status.ColumnDefinitions.Add(new ColumnDefinition()); StackPanel user=new StackPanel { Orientation=Orientation.Horizontal, VerticalAlignment=VerticalAlignment.Center }; Border avatar=new Border { Width=48,Height=48,CornerRadius=new CornerRadius(24),Background=new SolidColorBrush(Color.FromRgb(230,0,18)),Child=new TextBlock { Text=Environment.UserName.Length>0?Environment.UserName.Substring(0,1).ToUpperInvariant():"U",FontSize=23,FontWeight=FontWeights.Bold,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center } }; user.Children.Add(avatar); user.Children.Add(new TextBlock { Text=Environment.UserName,FontSize=16,Foreground=Brushes.White,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(12,0,0,0) }); status.Children.Add(user); TextBlock clock=new TextBlock { Text=DateTime.Now.ToString("h:mm tt",CultureInfo.CurrentCulture)+"   ◉   100%",FontSize=15,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center }; Grid.SetColumn(clock,1); status.Children.Add(clock); body.Children.Add(status);
+            ScrollViewer scroller=new ScrollViewer { HorizontalScrollBarVisibility=ScrollBarVisibility.Hidden,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,Margin=new Thickness(0,10,0,8) }; StackPanel software=new StackPanel { Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center }; scroller.Content=software; Grid.SetRow(scroller,1); body.Children.Add(scroller);
+            int visible=Math.Min(12,games.Count); for(int i=0;i<visible;i++){ConsolePlatformGame game=games[i];ConsolePlatformGame captured=game;Button tile=CreateSwitchSoftwareTile(game,delegate{LaunchGame(captured,false);});software.Children.Add(tile);actions.Add(new ConsolePlatformAction{Button=tile,Invoke=delegate{LaunchGame(captured,false);},Name=game.Name,Game=game});}
+            if(games.Count>12){Button all=CreateSwitchSystemTile("ALL","All Software",delegate{dashboardSubpage="switch-all";selected=0;RenderSwitchAllSoftware();UpdateActionVisuals();},120);software.Children.Add(all);actions.Add(new ConsolePlatformAction{Button=all,Invoke=delegate{dashboardSubpage="switch-all";selected=0;contentHost.Children.Clear();actions.Clear();RenderSwitchAllSoftware();UpdateActionVisuals();},Name="All Software"});}
+            if(actions.Count==0){Button add=CreateSwitchSystemTile("+","No Software",delegate{dashboardSubpage="switch-settings";selected=0;contentHost.Children.Clear();actions.Clear();RenderSettings();UpdateActionVisuals();},180);software.Children.Add(add);actions.Add(new ConsolePlatformAction{Button=add,Invoke=delegate{dashboardSubpage="switch-settings";selected=0;contentHost.Children.Clear();actions.Clear();RenderSettings();UpdateActionVisuals();},Name="No Software"});}
+            switchSoftwareActionCount=actions.Count; switchSystemActionStart=actions.Count;
+            StackPanel system=new StackPanel { Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center }; AddSwitchSystemAction(system,"●","Nintendo Switch Online",delegate{ShowNotice("Nintendo Switch Online is represented for HOME Menu fidelity; online services remain with the emulator/provider.");}); AddSwitchSystemAction(system,"N","News",delegate{ShowNotice("News is not provided by the local emulator shell.");}); AddSwitchSystemAction(system,"▣","eShop",delegate{ShowNotice("Nintendo eShop is not exposed through the local emulator shell.");}); AddSwitchSystemAction(system,"□","Album",OpenFirstSaveRoot); AddSwitchSystemAction(system,"↔","GameShare",delegate{ShowNotice("GameShare is represented for current HOME Menu fidelity; local software sharing is not provided by the emulator shell.");}); AddSwitchSystemAction(system,"◫","Controllers",delegate{ShowNotice("Controller routing is managed by Huymaier Console.");}); AddSwitchSystemAction(system,"▤","Virtual Game Card",delegate{ShowNotice("Virtual Game Cards are represented for current HOME Menu fidelity; installed emulator titles remain managed by Huymaier Console.");}); AddSwitchSystemAction(system,"⚙","System Settings",delegate{dashboardSubpage="switch-settings";selected=0;contentHost.Children.Clear();actions.Clear();RenderSettings();UpdateActionVisuals();}); AddSwitchSystemAction(system,"◐","Sleep Mode",delegate{ShowNotice("Use Huymaier Console Power for Windows sleep and shutdown.");}); Grid.SetRow(system,2);body.Children.Add(system);
+            int sysCount=Math.Max(0,actions.Count-switchSystemActionStart); switchSoftwareIndex=Math.Min(Math.Max(0,switchSoftwareActionCount-1),switchSoftwareIndex); switchSystemIndex=Math.Min(Math.Max(0,sysCount-1),switchSystemIndex); selected=switchZone==0?switchSoftwareIndex:Math.Min(actions.Count-1,switchSystemActionStart+switchSystemIndex);
+        }
+
+        private Button CreateSwitchSoftwareTile(ConsolePlatformGame game, Action invoke)
+        {
+            Button b=new Button { Width=244,Height=244,Margin=new Thickness(9),Padding=new Thickness(0),Background=new SolidColorBrush(Color.FromRgb(55,56,61)),BorderBrush=new SolidColorBrush(Color.FromRgb(100,101,106)),BorderThickness=new Thickness(2),RenderTransformOrigin=new Point(0.5,0.5) };Grid g=new Grid();if(!String.IsNullOrWhiteSpace(game.Cover)&&File.Exists(game.Cover)){try{g.Children.Add(new Image{Source=LoadBitmap(game.Cover),Stretch=Stretch.UniformToFill});}catch{}}if(g.Children.Count==0)g.Children.Add(new TextBlock{Text="Nintendo\nSwitch",FontSize=28,Foreground=Brushes.White,TextAlignment=TextAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center});Border cap=new Border{Height=54,VerticalAlignment=VerticalAlignment.Bottom,Background=new SolidColorBrush(Color.FromArgb(225,27,28,31)),Padding=new Thickness(8)};cap.Child=new TextBlock{Text=game.Name,FontSize=12,Foreground=Brushes.White,TextTrimming=TextTrimming.CharacterEllipsis,HorizontalAlignment=HorizontalAlignment.Center};g.Children.Add(cap);b.Content=g;b.Click+=delegate{invoke();};return b;
+        }
+
+        private Button CreateSwitchSystemTile(string glyph,string title,Action invoke,double size)
+        {
+            Button b=new Button{Width=size,Height=size,Margin=new Thickness(8),Background=Brushes.Transparent,BorderBrush=new SolidColorBrush(Color.FromRgb(129,130,135)),BorderThickness=new Thickness(2),RenderTransformOrigin=new Point(0.5,0.5)};StackPanel s=new StackPanel{VerticalAlignment=VerticalAlignment.Center};s.Children.Add(new TextBlock{Text=glyph,FontSize=Math.Max(24,size*0.32),Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Center});s.Children.Add(new TextBlock{Text=title,FontSize=10,Foreground=new SolidColorBrush(Color.FromRgb(216,217,221)),HorizontalAlignment=HorizontalAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis,MaxWidth=Math.Max(60,size-12)});b.Content=s;b.Click+=delegate{invoke();};return b;
+        }
+
+        private void AddSwitchSystemAction(Panel panel,string glyph,string title,Action invoke)
+        {
+            Button b=CreateSwitchSystemTile(glyph,title,invoke,78);panel.Children.Add(b);actions.Add(new ConsolePlatformAction{Button=b,Invoke=invoke,Name=title});
+        }
+
+        private void RenderSwitchAllSoftware()
+        {
+            titleText.Text="All Software";subtitleText.Text=games.Count.ToString(CultureInfo.InvariantCulture)+" titles";columns=6;ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};WrapPanel wrap=new WrapPanel{Margin=new Thickness(10)};scroll.Content=wrap;contentHost.Children.Add(scroll);foreach(ConsolePlatformGame game in games){ConsolePlatformGame captured=game;Button b=CreateGameButton(game,delegate{LaunchGame(captured,false);});wrap.Children.Add(b);actions.Add(new ConsolePlatformAction{Button=b,Invoke=delegate{LaunchGame(captured,false);},Name=game.Name,Game=game});}
+        }
+
+        private void RenderXboxRoot()
+        {
+            string[] names=new string[]{"play game","memory","music","xbox live","settings"};string[] detail=new string[]{games.Count.ToString(CultureInfo.InvariantCulture)+" titles ready to launch","saved games and storage","soundtracks and dashboard ambience","network and service settings","console and emulator options"};titleText.Text=names[Math.Max(0,Math.Min(page,names.Length-1))];subtitleText.Text=detail[Math.Max(0,Math.Min(page,detail.Length-1))];
+            Grid scene=new Grid{Margin=new Thickness(24,8,24,18)};contentHost.Children.Add(scene);Border glow=new Border{Width=420,Height=240,CornerRadius=new CornerRadius(120),Background=new RadialGradientBrush(Color.FromArgb(220,74,192,30),Color.FromArgb(235,0,20,0)),BorderBrush=new SolidColorBrush(Color.FromRgb(113,238,61)),BorderThickness=new Thickness(3),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};StackPanel s=new StackPanel{VerticalAlignment=VerticalAlignment.Center};s.Children.Add(new TextBlock{Text=names[page].ToUpperInvariant(),FontSize=44,FontWeight=FontWeights.Bold,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Center});s.Children.Add(new TextBlock{Text="A  select",FontSize=14,Foreground=new SolidColorBrush(Color.FromRgb(173,231,145)),HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,16,0,0)});glow.Child=s;scene.Children.Add(glow);
         }
 
         private void RenderXboxGamesAuthentic()
@@ -1260,25 +1636,20 @@ namespace HuymaierConsole.NativeApp
 
         private void RenderBladesGamesAuthentic()
         {
-            titleText.Text = "Games"; subtitleText.Text = games.Count.ToString(CultureInfo.InvariantCulture) + " games  •  " + GetXboxGamerscore().ToString(CultureInfo.InvariantCulture) + " Gamerscore";
-            Grid body = new Grid { Margin = new Thickness(0, 0, 0, 5) }; body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(250) }); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); contentHost.Children.Add(body);
-
-            StackPanel left = new StackPanel { Margin = new Thickness(0, 4, 16, 0) }; body.Children.Add(left);
-            Border profile = new Border { Padding = new Thickness(10), Margin = new Thickness(0, 0, 0, 10), Background = new LinearGradientBrush(Color.FromArgb(224, 247, 248, 247), Color.FromArgb(224, 187, 192, 189), 90), BorderBrush = Brushes.White, BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(5) };
-            Grid pg = new Grid(); pg.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(58) }); pg.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); Border pic = new Border { Width = 50, Height = 50, Background = new SolidColorBrush(Color.FromRgb(83, 156, 44)), BorderBrush = Brushes.White, BorderThickness = new Thickness(2) }; pic.Child = new TextBlock { Text = "X", FontSize = 27, FontWeight = FontWeights.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }; pg.Children.Add(pic); StackPanel pw = new StackPanel { Margin = new Thickness(8, 1, 0, 0) }; pw.Children.Add(new TextBlock { Text = Environment.UserName, FontSize = 17, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(43, 48, 45)) }); pw.Children.Add(new TextBlock { Text = games.Count.ToString(CultureInfo.InvariantCulture) + " Games", FontSize = 12, Foreground = new SolidColorBrush(Color.FromRgb(73, 80, 76)) }); pw.Children.Add(new TextBlock { Text = GetXboxGamerscore().ToString(CultureInfo.InvariantCulture) + " Gamerscore", FontSize = 12, Foreground = new SolidColorBrush(Color.FromRgb(73, 80, 76)) }); Grid.SetColumn(pw, 1); pg.Children.Add(pw); profile.Child = pg; left.Children.Add(profile);
-            foreach (string item in new string[] { "Achievements", "Played Games", "Xbox Live Arcade", "Demos", "Trailers" })
-            {
-                Border menu = new Border { Height = 46, Padding = new Thickness(13, 8, 10, 7), Background = new SolidColorBrush(Color.FromArgb(item == "Played Games" ? (byte)205 : (byte)120, 244, 246, 245)), BorderBrush = new SolidColorBrush(Color.FromArgb(120, 96, 103, 99)), BorderThickness = new Thickness(0, 0, 0, 1) }; menu.Child = new TextBlock { Text = item, FontSize = 17, Foreground = new SolidColorBrush(Color.FromRgb(49, 55, 52)), VerticalAlignment = VerticalAlignment.Center }; left.Children.Add(menu);
-            }
-            Border playBar = new Border { Height = 52, Margin = new Thickness(0, 12, 0, 0), Padding = new Thickness(12, 9, 10, 8), Background = new SolidColorBrush(Color.FromArgb(120, 239, 241, 240)), BorderBrush = new SolidColorBrush(Color.FromArgb(150, 100, 107, 103)), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(24) }; playBar.Child = new TextBlock { Text = "A   Play Selected Game", FontSize = 16, Foreground = new SolidColorBrush(Color.FromRgb(54, 60, 57)), VerticalAlignment = VerticalAlignment.Center }; left.Children.Add(playBar);
-
-            Border galleryFrame = new Border { Background = new SolidColorBrush(Color.FromArgb(168, 238, 241, 239)), BorderBrush = new SolidColorBrush(Color.FromArgb(180, 255, 255, 255)), BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(7), Padding = new Thickness(12) }; Grid.SetColumn(galleryFrame, 1); body.Children.Add(galleryFrame);
-            ScrollViewer scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; WrapPanel gallery = new WrapPanel(); scroll.Content = gallery; galleryFrame.Child = scroll;
+            titleText.Text = "games"; subtitleText.Text = games.Count.ToString(CultureInfo.InvariantCulture) + " titles  •  LEFT / RIGHT changes blade";
+            StackPanel list = new StackPanel { Margin = new Thickness(2, 0, 6, 18) };
+            ScrollViewer scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Content = list }; contentHost.Children.Add(scroll);
             foreach (ConsolePlatformGame game in games)
             {
-                ConsolePlatformGame captured = game; Button tile = CreateBladeCoverTile(game, delegate { LaunchGame(captured, false); }); gallery.Children.Add(tile); actions.Add(new ConsolePlatformAction { Button = tile, Invoke = delegate { LaunchGame(captured, false); }, Name = game.Name, Game = game });
+                ConsolePlatformGame captured = game;
+                Button row = CreateBladePanelButton(game.Name, "A  play     X  alternate emulator", delegate { LaunchGame(captured, false); }, Color.FromRgb(83, 156, 44));
+                list.Children.Add(row); actions.Add(new ConsolePlatformAction { Button = row, Invoke = delegate { LaunchGame(captured, false); }, Name = game.Name, Game = game });
             }
-            if (games.Count == 0) { Button empty = CreateBladePanelButton("No games found", "Open System and add a game folder", delegate { page = 3; selected = 0; BuildChrome(); RenderPage(); }, Color.FromRgb(82, 157, 46)); gallery.Children.Add(empty); actions.Add(new ConsolePlatformAction { Button = empty, Invoke = delegate { page = 3; selected = 0; BuildChrome(); RenderPage(); }, Name = "System" }); }
+            if (games.Count == 0)
+            {
+                Button empty = CreateBladePanelButton("no games found", "configure a game folder in System", delegate { page = 3; selected = 0; BuildChrome(); RenderPage(); }, Color.FromRgb(83, 156, 44));
+                list.Children.Add(empty); actions.Add(new ConsolePlatformAction { Button = empty, Invoke = delegate { page = 3; selected = 0; BuildChrome(); RenderPage(); }, Name = "System" });
+            }
         }
 
         private Button CreateBladeCoverTile(ConsolePlatformGame game, Action invoke)
@@ -1899,9 +2270,13 @@ namespace HuymaierConsole.NativeApp
 
         private void CalculateColumns()
         {
-            double reserved = definition.Shell == "Xbox" ? 760 : (IsBlades() ? 620 : (IsMetro() ? 360 : 340));
+            if (definition.Shell == "Wii") { columns = 4; return; }
+            if (definition.Shell == "WiiU") { columns = 5; return; }
+            if (definition.Shell == "Switch") { columns = 6; return; }
+            if (IsBlades()) { columns = 1; return; }
+            double reserved = definition.Shell == "Xbox" ? 760 : (IsMetro() ? 360 : 340);
             double available = Math.Max(420, ActualWidth - reserved);
-            double cardWidth = IsMetro() ? 224 : (IsBlades() ? 166 : (definition.Shell == "Xbox" ? 184 : 205));
+            double cardWidth = IsMetro() ? 224 : (definition.Shell == "Xbox" ? 184 : 205);
             columns = Math.Max(1, (int)(available / cardWidth));
         }
 

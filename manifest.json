@@ -1,10 +1,12 @@
 {
   "name": "Huymaier Console FSE Shell, Storefront & Artwork Integration",
-  "version": "0.26.2",
-  "baseVersion": "0.26.1",
-  "build": "controller-customization-provider-runtime",
-  "builtFrom": "HC261.zip",
+  "version": "0.26.3",
+  "baseVersion": "0.26.2",
+  "build": "native-console-fidelity",
+  "builtFrom": "HC262.zip",
   "features": [
+    "recreates the N64, GameCube, Wii, Wii U, Switch, Original Xbox, and Xbox 360 native interfaces with console-specific layouts and spatial navigation",
+    "removes LB/RB shoulder-button page and selection switching from Huymaier native console interfaces while preserving D-pad/stick, confirm, back, Guide/Game Bar, launch/return, saves, and alternate-emulator behavior",
     "opens Huymaier Game Bar above external apps and Huymaier-native console surfaces while keeping main-shell Guide mapped to Quick Access",
     "adds controller-first visual color wheels for interface, focus, accent, and dynamic-theme colors without requiring hex entry",
     "adds persistent Games layout editing for storefront/console order, visibility, and per-platform tile sizing",
@@ -14,5 +16,5 @@
     "preserves the v0.26.1 transactional installer, exact-artifact updater, x64 GameInput bridge, and fail-closed mixed-version protection",
     "preserves the v0.26.1 storefront library import/file-browser repair and strict Xbox versus Original Xbox platform identity"
   ],
-  "description": "v0.26.2 expands the controller-first console experience with native-surface Game Bar routing, visual color and layout customization, Steam game management, multi-provider download telemetry, and shared card-rendering fixes while retaining the v0.26.1 integrity architecture."
+  "description": "v0.26.3 is a focused native-console fidelity pass built on the published v0.26.2 baseline. It leaves the PS1, PS2, and PS3 interface implementations unchanged while replacing the generalized non-PlayStation shell behavior with console-specific layouts and controller navigation."
 }

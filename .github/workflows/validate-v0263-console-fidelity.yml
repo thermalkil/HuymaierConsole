@@ -1,0 +1,150 @@
+name: Validate v0.26.3 Console Fidelity
+
+on:
+  push:
+    branches:
+      - feature/v0.26.3-console-fidelity
+    paths:
+      - 'Native/HuymaierConsole.ConsolePlatforms.cs'
+      - 'Native/HuymaierConsole.NativeApp.cs'
+      - 'Native/HuymaierConsole.Ps1.cs'
+      - 'HuymaierConsole.ps1'
+      - 'HuymaierEmulatorPlatforms.ps1'
+      - 'HuymaierEmulatorInstaller.ps1'
+      - 'HuymaierSteamWorker.ps1'
+      - 'HuymaierSteamOwnership.ps1'
+      - 'manifest.json'
+      - '.development/v0.26.3/validation-request.json'
+      - '.github/workflows/validate-v0263-console-fidelity.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v0263-console-fidelity
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - name: Check out exact source SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Verify PlayStation visual assets and platform definitions stay frozen
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $forbidden=@(git diff --name-only v0.26.2 -- 'EmulatorPlatforms/PS1' 'EmulatorPlatforms/PS2' 'EmulatorPlatforms/PS3')
+          if($forbidden.Count){throw ('Frozen PlayStation platform payload changed: '+($forbidden -join ', '))}
+          $ps1=Get-Content -Raw -LiteralPath 'Native\HuymaierConsole.Ps1.cs' -Encoding UTF8
+          $native=Get-Content -Raw -LiteralPath 'Native\HuymaierConsole.NativeApp.cs' -Encoding UTF8
+          foreach($required in @(
+            'HuymaierNativePickerRequest.Request(this, "PS1", "PlayStation", "PrimaryEmulator"',
+            'HuymaierNativePickerRequest.Request(this, "PS1", "PlayStation", "DataRoot"',
+            'HuymaierNativePickerRequest.Request(this, "PS1", "PlayStation", "GameFolder"',
+            'HuymaierNativePickerRequest.Request(this, "PS1", "PlayStation", "InstallPrimaryEmulator"'
+          )){if($ps1 -notmatch [regex]::Escape($required)){throw "PS1 path-only picker invariant missing: $required"}}
+          foreach($required in @(
+            'HuymaierNativePickerRequest.Request(this, "PS2", "PlayStation 2", "PrimaryEmulator"',
+            'HuymaierNativePickerRequest.Request(this, "PS2", "PlayStation 2", "DataRoot"',
+            'HuymaierNativePickerRequest.Request(this, "PS2", "PlayStation 2", "GameFolder"',
+            'HuymaierNativePickerRequest.Request(this, "PS2", "PlayStation 2", "InstallPrimaryEmulator"',
+            'HuymaierNativePickerRequest.Request(this, "PS3", "PlayStation 3", "PrimaryEmulator"',
+            'HuymaierNativePickerRequest.Request(this, "PS3", "PlayStation 3", "DataRoot"',
+            'HuymaierNativePickerRequest.Request(this, "PS3", "PlayStation 3", "GameFolder"',
+            'HuymaierNativePickerRequest.Request(this, "PS3", "PlayStation 3", "InstallPrimaryEmulator"'
+          )){if($native -notmatch [regex]::Escape($required)){throw "PS2/PS3 path-only picker invariant missing: $required"}}
+          Write-Host 'PS1/PS2/PS3 assets/settings remain frozen; core path/install actions use the shared Huymaier picker.'
+
+      - name: Parse production PowerShell with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $files=@(Get-ChildItem -LiteralPath $env:GITHUB_WORKSPACE -Recurse -File | Where-Object {
+            $_.Extension -in @('.ps1','.psm1','.psd1') -and
+            $_.FullName -notmatch '[\\/](\.development|\.source|\.release|\.build|\.github)[\\/]'
+          })
+          $failures=New-Object Collections.Generic.List[string]
+          foreach($file in $files){
+            $tokens=$null;$errors=$null
+            [void][Management.Automation.Language.Parser]::ParseFile($file.FullName,[ref]$tokens,[ref]$errors)
+            foreach($error in @($errors)){[void]$failures.Add("$($file.Name):$($error.Extent.StartLineNumber):$($error.Extent.StartColumnNumber) $($error.Message)")}
+          }
+          if($failures.Count){throw ($failures -join "`r`n")}
+          Write-Host "Parsed $($files.Count) production PowerShell files successfully."
+
+      - name: Compile exact x64 managed host sources
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Windows.Forms,System.Drawing,System.Web.Extensions
+          $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          if(-not(Test-Path -LiteralPath $csc)){throw 'Framework64 csc.exe was not found.'}
+          $automation=[Management.Automation.PSObject].Assembly.Location
+          $refs=@(
+            [Uri].Assembly.Location,[Linq.Enumerable].Assembly.Location,[System.Xaml.XamlReader].Assembly.Location,
+            [Xml.XmlDocument].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,
+            [Windows.Window].Assembly.Location,[Windows.Forms.Form].Assembly.Location,[Drawing.Bitmap].Assembly.Location,
+            [Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,$automation
+          )|Select-Object -Unique
+          $sources=@(
+            'Native\HuymaierConsole.NativeApp.cs','Native\HuymaierConsole.Ps1.cs','Native\HuymaierConsole.ConsolePlatforms.cs',
+            'Native\HuymaierConsole.SystemOverlay.cs','Native\HuymaierConsole.GameInput.cs','HuymaierNativeInput.cs',
+            'HuymaierNativeDisplay.cs','HuymaierNativeAudio.cs','HuymaierPerformance.cs','EmulatorPlatforms\Shared\Huymaier.P3T.cs'
+          )|ForEach-Object{Join-Path $env:GITHUB_WORKSPACE $_}
+          foreach($source in $sources){if(-not(Test-Path -LiteralPath $source -PathType Leaf)){throw "Native source missing: $source"}}
+          $out=Join-Path $env:RUNNER_TEMP 'HuymaierConsole-v0263-fidelity-validation.exe'
+          $args=@('/noconfig','/nologo','/target:winexe','/platform:x64','/optimize+',('/out:'+$out))
+          foreach($ref in $refs){$args+=('/reference:'+$ref)};$args+=$sources
+          & $csc @args
+          if($LASTEXITCODE -ne 0 -or -not(Test-Path -LiteralPath $out -PathType Leaf)){throw 'v0.26.3 x64 managed host compile failed.'}
+
+      - name: Validate authentic console and emulator integration invariants
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $console=Get-Content -Raw -LiteralPath 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8
+          foreach($required in @(
+            'RenderN64GamePakLauncher','ProcessN64MenuCommand',
+            'RenderGameCubeHub','Viewport3D','QuaternionAnimation','CreateGameCubeFace',
+            'RenderWiiMenuAuthentic','RenderWiiChannelStart','ProcessWiiMenuCommand',
+            'RenderWiiUMenuAuthentic','RenderSwitchHomeAuthentic','RenderSwitchAllSoftware','RenderXboxRoot',
+            'ProcessMetroNavigationCommand','ProcessGameCubeHubCommand','ProcessSwitchHomeCommand',
+            'FindEmulatorArtwork','QueueConsoleArtworkRefresh','TryDownloadConsoleCover',
+            'RequestHuymaierPicker','InstallPrimaryEmulator','ExportSave',
+            'if (command == XmbInputCommand.LeftShoulder || command == XmbInputCommand.RightShoulder) return;'
+          )){if($console -notmatch [regex]::Escape($required)){throw "Console integration invariant missing: $required"}}
+          foreach($forbidden in @('OpenFileDialog','FolderBrowserDialog','Wii News','Forecast Channel','Nintendo Switch Online','GameShare','Virtual Game Card','Xbox Live','LB / RB')){
+            if($console -match [regex]::Escape($forbidden)){throw "Dead/generic native-console surface survived: $forbidden"}
+          }
+          if($console -match 'LeftShoulder[^\r\n]{0,120}SwitchPage' -or $console -match 'RightShoulder[^\r\n]{0,120}SwitchPage'){throw 'Shoulder buttons still change native console page/selection state.'}
+
+          $host=Get-Content -Raw -LiteralPath 'HuymaierEmulatorPlatforms.ps1' -Encoding UTF8
+          foreach($required in @('Complete-HcEmulatorPlatformPicker','Invoke-HcNativeConsolePickerRequest','Start-HcEmulatorInstall','ExportSave','InstallPrimaryEmulator')){if($host -notmatch [regex]::Escape($required)){throw "Huymaier picker/install host invariant missing: $required"}}
+          $installer=Get-Content -Raw -LiteralPath 'HuymaierEmulatorInstaller.ps1' -Encoding UTF8
+          foreach($required in @('Install-Latest-DuckStation.ps1','Install-Latest-PCSX2.ps1','Install-Latest-RPCS3.ps1','Rosalie241/RMG','dolphin-emu.org/download/','cemu-project/Cemu','git.eden-emu.dev/api/v1/repos/eden-emu/eden/releases/latest','xemu-project/xemu','xenia-canary/xenia-canary')){if($installer -notmatch [regex]::Escape($required)){throw "Official emulator installer invariant missing: $required"}}
+
+          $steam=Get-Content -Raw -LiteralPath 'HuymaierSteamWorker.ps1' -Encoding UTF8
+          foreach($required in @('library_600x900_2x.jpg','cdn.cloudflare.steamstatic.com','New-SteamFallbackArtwork','Artwork\Steam')){if($steam -notmatch [regex]::Escape($required)){throw "Steam cover invariant missing: $required"}}
+          $ownership=Get-Content -Raw -LiteralPath 'HuymaierSteamOwnership.ps1' -Encoding UTF8
+          if($ownership -notmatch [regex]::Escape('Get-SteamArtwork $root $id $name')){throw 'Owned/uninstalled Steam games do not repair artwork through Steam.'}
+          Write-Host 'Authentic console, Huymaier picker, emulator installer, artwork, and no-bumper invariants passed.'
+
+      - name: Record validation status
+        if: always()
+        shell: powershell
+        env:
+          VALIDATION_RESULT: ${{ job.status }}
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Force -Path '.development\v0.26.3'|Out-Null
+          $state=[ordered]@{result=$env:VALIDATION_RESULT;commit=$env:GITHUB_SHA;runId=$env:GITHUB_RUN_ID;runAttempt=$env:GITHUB_RUN_ATTEMPT;recordedAtUtc=[DateTime]::UtcNow.ToString('o')}
+          $state|ConvertTo-Json|Set-Content -LiteralPath '.development\v0.26.3\validation-status.json' -Encoding UTF8
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add '.development/v0.26.3/validation-status.json'
+          if(-not(git diff --cached --quiet)){git commit -m 'Record v0.26.3 console fidelity validation';git push origin HEAD:feature/v0.26.3-console-fidelity}

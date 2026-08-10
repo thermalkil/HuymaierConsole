@@ -1,11 +1,11 @@
-﻿param(
+param(
     [switch]$Windowed
 )
 
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
-$script:ExpectedConsoleVersion='0.26.2'
+$script:ExpectedConsoleVersion='0.26.3'
 $baseVariable=Get-Variable -Name HuymaierBaseDirectory -ErrorAction SilentlyContinue
 $baseDir=if($null -ne $baseVariable -and -not [string]::IsNullOrWhiteSpace([string]$baseVariable.Value)){[string]$baseVariable.Value}else{Split-Path -Parent $MyInvocation.MyCommand.Path}
 $corePath=Join-Path $baseDir 'HuymaierConsole.ps1'

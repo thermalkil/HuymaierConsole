@@ -1,0 +1,7 @@
+{
+  "batch": "console-fidelity-3-version",
+  "script": "apply_version_bump.py",
+  "patch_dir": "",
+  "result": "success",
+  "recordedAtUtc": "2026-08-10T15:59:34.458563+00:00"
+}

@@ -1,0 +1,10 @@
+{
+  "candidate": "v0.26.3-rc3-source-materialization",
+  "version": "0.26.3",
+  "base_release": "v0.26.2",
+  "base_asset": "HC262.zip",
+  "package_root": "HC263",
+  "asset_name": "HC263.zip",
+  "requested_at": "2026-08-10T19:14:00Z",
+  "focus": "Materialize the reviewed RC3 authentic-console and emulator-integration payload into the feature branch. The workflow must stop before candidate packaging if it creates the production-source commit."
+}
