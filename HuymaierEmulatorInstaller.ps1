@@ -186,6 +186,8 @@ switch($PlatformId){
         $dest=Join-Path $DestinationRoot 'RPCS3';& $script -Destination $dest
         $exe=Get-ChildItem -LiteralPath $dest -Filter 'rpcs3.exe' -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1 -ExpandProperty FullName
     }
+    'PS4' {$exe=Install-GithubArchive 'shadps4-emu/shadPS4' { $_.name -match '(?i)(windows|win).*(x64|64).*\.(zip|7z)$' -or $_.name -match '(?i)shadps4.*windows.*\.(zip|7z)$' } 'shadPS4' @('shadPS4.exe','shadps4.exe')}
+    'VITA' {$exe=Install-GithubArchive 'Vita3K/Vita3K' { $_.name -match '(?i)(windows|win).*(x64|64).*\.(zip|7z)$' -or $_.name -match '(?i)Vita3K.*windows.*\.(zip|7z)$' } 'Vita3K' @('Vita3K.exe','vita3k.exe')}
     'ARCADE' {$exe=Install-MameLatest}
     'FINALBURNNEO' {$exe=Install-GithubArchive 'finalburnneo/FBNeo' { $_.name -match '(?i)(fbneo|finalburn).*(windows|win|x64|64).*\.(zip|7z)$' -and $_.name -notmatch '(?i)(source|debug|symbols|pdb)' } 'FinalBurnNeo' @('fbneo.exe','FinalBurnNeo.exe')}
     'ATARILYNX' {$exe=Install-MednafenLatest}

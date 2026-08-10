@@ -68,6 +68,8 @@ function Get-ConfigRoots {
     $local=[Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
     $docs=[Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments)
     switch($AdapterId.ToLowerInvariant()){
+        'shadps4' {Add-Root $roots $seen (Join-Path $app 'shadPS4');Add-Root $roots $seen (Join-Path $local 'shadPS4');Add-Root $roots $seen (Join-Path $docs 'shadPS4')}
+        'vita3k' {Add-Root $roots $seen (Join-Path $app 'Vita3K');Add-Root $roots $seen (Join-Path $local 'Vita3K');Add-Root $roots $seen (Join-Path $docs 'Vita3K')}
         'fbneo' {Add-Root $roots $seen (Join-Path $app 'FBNeo');Add-Root $roots $seen (Join-Path $local 'FBNeo');Add-Root $roots $seen (Join-Path $app 'FinalBurn Neo')}
         'primehack' {Add-Root $roots $seen (Join-Path $app 'PrimeHack');Add-Root $roots $seen (Join-Path $local 'PrimeHack');Add-Root $roots $seen (Join-Path $docs 'PrimeHack');Add-Root $roots $seen (Join-Path $docs 'Dolphin Emulator')}
         'bigpemu' {Add-Root $roots $seen (Join-Path $app 'BigPEmu');Add-Root $roots $seen (Join-Path $local 'BigPEmu')}
@@ -96,6 +98,8 @@ function Get-ExplicitConfigFiles {
     }
     foreach($root in @($Roots)){
         switch($AdapterId.ToLowerInvariant()){
+            'shadps4' {foreach($rel in @('config.toml','settings.toml','config.json','settings.json','config.ini')){Add-File (Join-Path $root $rel)};try{Get-ChildItem -LiteralPath $root -File -ErrorAction SilentlyContinue|Where-Object{$_.Name -match '(?i)(config|settings).*\.(toml|json|ini|cfg)$'}|Select-Object -First 30|ForEach-Object{Add-File $_.FullName}}catch{}}
+            'vita3k' {foreach($rel in @('config.yml','config.yaml','config\config.yml','config\config.yaml')){Add-File (Join-Path $root $rel)};try{Get-ChildItem -LiteralPath $root -File -ErrorAction SilentlyContinue|Where-Object{$_.Name -match '(?i)(config|settings).*\.(ya?ml|json|ini)$'}|Select-Object -First 30|ForEach-Object{Add-File $_.FullName}}catch{}}
             'fbneo' {foreach($rel in @('config\fbneo.ini','config\fbneo.cfg','fbneo.ini','fbneo.cfg')){Add-File (Join-Path $root $rel)};try{Get-ChildItem -LiteralPath (Join-Path $root 'config') -File -ErrorAction SilentlyContinue|Where-Object{$_.Extension -match '(?i)^\.(ini|cfg)$'}|Select-Object -First 80|ForEach-Object{Add-File $_.FullName}}catch{}}
             'primehack' {foreach($rel in @('Config\Dolphin.ini','Config\GFX.ini','Config\PrimeHack.ini','Config\WiimoteNew.ini','Config\Hotkeys.ini','Config\Logger.ini','Dolphin.ini','GFX.ini','PrimeHack.ini')){Add-File (Join-Path $root $rel)}}
             'bigpemu' {foreach($rel in @('BigPEmu.ini','bigpemu.ini','config.ini','settings.ini','config.json','settings.json')){Add-File (Join-Path $root $rel)};try{Get-ChildItem -LiteralPath $root -File -ErrorAction SilentlyContinue|Where-Object{$_.Name -match '(?i)(bigpemu|config|settings|profile).*\.(ini|cfg|json)$'}|Select-Object -First 40|ForEach-Object{Add-File $_.FullName}}catch{}}

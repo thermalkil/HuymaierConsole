@@ -291,6 +291,18 @@ function Add-HcJsonSettingRecords {
     }
 }
 
+
+function Get-HcTomlScalarSettings {
+    param([Parameter(Mandatory=$true)][string]$Path,[string]$AdapterId='')
+    $lines=Get-HcSettingsFileLines $Path;if($lines.Count -eq 0){return [object[]]@()};$result=New-Object Collections.ArrayList;$section=''
+    for($i=0;$i -lt $lines.Count;$i++){$line=[string]$lines[$i];$trim=$line.Trim();if(-not $trim -or $trim.StartsWith('#')){continue};if($trim -match '^\[(?<section>[^\]]+)\]\s*(?:#.*)?$'){$section=$matches['section'].Trim();continue};$m=[regex]::Match($line,'^\s*(?<key>[A-Za-z0-9_.-]+)\s*=\s*(?<value>.*?)(?:\s+#.*)?$');if($m.Success){[void]$result.Add((New-HcEmulatorSettingRecord -Format 'toml' -FilePath $Path -Section $section -Key $m.Groups['key'].Value -Value $m.Groups['value'].Value.Trim() -LineIndex $i -AdapterId $AdapterId))}}
+    return [object[]]$result.ToArray()
+}
+function Set-HcTomlScalarSetting {
+    param([Parameter(Mandatory=$true)][string]$Path,[Parameter(Mandatory=$true)][int]$LineIndex,[Parameter(Mandatory=$true)][string]$Key,[AllowEmptyString()][string]$Value,[string]$AdapterId='')
+    $lines=Get-HcSettingsFileLines $Path;if($LineIndex -lt 0 -or $LineIndex -ge $lines.Count){throw "TOML setting index is out of range: $LineIndex"};$line=[string]$lines[$LineIndex];$pattern='^(?<prefix>\s*'+[regex]::Escape($Key)+'\s*=\s*)(?<value>.*?)(?<comment>\s+#.*)?$';$m=[regex]::Match($line,$pattern);if(-not $m.Success){throw "TOML setting no longer matches expected key: $Key"};[void](Backup-HcEmulatorConfigFile -Path $Path -AdapterId $AdapterId);$lines[$LineIndex]=$m.Groups['prefix'].Value+$Value+$m.Groups['comment'].Value;Write-HcSettingsFileLines -Path $Path -Lines $lines
+}
+
 function Get-HcJsonSettings {
     param([Parameter(Mandatory=$true)][string]$Path,[string]$AdapterId='')
     if(-not(Test-Path -LiteralPath $Path -PathType Leaf)){return [object[]]@()}
@@ -338,7 +350,7 @@ function Get-HcEmulatorConfigSettings {
     param([Parameter(Mandatory=$true)][string]$AdapterId,[Parameter(Mandatory=$true)][string]$Path,[string]$Format='')
     if(-not $Format){
         $ext=[IO.Path]::GetExtension($Path).ToLowerInvariant()
-        if($ext -in @('.ini','.cfg')){$Format='ini'}elseif($ext -in @('.yml','.yaml')){$Format='yaml'}elseif($ext -eq '.json'){$Format='json'}elseif($ext -eq '.bml'){$Format='bml'}else{$Format='key-value'}
+        if($ext -in @('.ini','.cfg')){$Format='ini'}elseif($ext -in @('.yml','.yaml')){$Format='yaml'}elseif($ext -eq '.json'){$Format='json'}elseif($ext -eq '.toml'){$Format='toml'}elseif($ext -eq '.bml'){$Format='bml'}else{$Format='key-value'}
         if($AdapterId -ieq 'mednafen'){$Format='key-value'}
         if($AdapterId -ieq 'ares'){$Format='bml'}
     }
@@ -346,6 +358,7 @@ function Get-HcEmulatorConfigSettings {
         'ini' { return [object[]](Get-HcIniSettings -Path $Path -AdapterId $AdapterId) }
         'yaml' { return [object[]](Get-HcYamlScalarSettings -Path $Path -AdapterId $AdapterId) }
         'json' { return [object[]](Get-HcJsonSettings -Path $Path -AdapterId $AdapterId) }
+        'toml' { return [object[]](Get-HcTomlScalarSettings -Path $Path -AdapterId $AdapterId) }
         'bml' { return [object[]](Get-HcBmlScalarSettings -Path $Path -AdapterId $AdapterId) }
         default { return [object[]](Get-HcKeyValueSettings -Path $Path -AdapterId $AdapterId) }
     }
@@ -363,6 +376,7 @@ function Set-HcEmulatorConfigSetting {
         'ini' { Set-HcIniSetting -Path $path -Section $section -Key $key -Value $Value -AdapterId $adapter }
         'yaml' { Set-HcYamlScalarSetting -Path $path -LineIndex $line -Key $key -Value $Value -AdapterId $adapter }
         'json' { Set-HcJsonSetting -Path $path -Section $section -Key $key -Value $Value -AdapterId $adapter }
+        'toml' { Set-HcTomlScalarSetting -Path $path -LineIndex $line -Key $key -Value $Value -AdapterId $adapter }
         'bml' { Set-HcBmlScalarSetting -Path $path -LineIndex $line -Key $key -Value $Value -AdapterId $adapter }
         'key-value' { Set-HcKeyValueSetting -Path $path -Key $key -Value $Value -AdapterId $adapter }
         default { throw "Unsupported emulator config format: $format" }
