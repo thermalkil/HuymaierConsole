@@ -1,0 +1,69 @@
+name: Research v0.26.4 Upstream Emulator CLI and Config
+
+on:
+  pull_request:
+    branches: [feature/v0.26.3-console-fidelity]
+    paths:
+      - '.development/v0.26.4/upstream-cli-research-request.json'
+      - '.github/workflows/research-v0264-upstream-cli.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: huymaier-v0264-upstream-cli-research
+  cancel-in-progress: true
+
+jobs:
+  research:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v0.26.4-platform-expansion
+          fetch-depth: 0
+      - name: Inspect current upstream primary sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/hc-upstream"
+          rm -rf "$work" && mkdir -p "$work"
+          git clone --depth 1 https://github.com/shadps4-emu/shadPS4.git "$work/shadPS4"
+          git clone --depth 1 https://github.com/Vita3K/Vita3K.git "$work/Vita3K"
+          git clone --depth 1 https://github.com/LIJI32/SameBoy.git "$work/SameBoy"
+          report='.development/v0.26.4/upstream-cli-config-research.md'
+          {
+            echo '# v0.26.4 upstream CLI/config research'
+            echo
+            echo 'Generated from current upstream primary-source repositories. Snippets are intentionally bounded and are used to drive Huymaier integration, not redistributed runtime code.'
+            echo
+            for repo in shadPS4 Vita3K SameBoy; do
+              echo "## $repo"
+              echo
+              echo "Upstream commit: \`$(git -C "$work/$repo" rev-parse HEAD)\`"
+              echo
+              echo '### CLI / launch / content symbols'
+              echo '```text'
+              grep -RniE --exclude-dir=.git --exclude='*.po' --exclude='*.ts' --exclude='*.json' '(argc|argv|command.?line|QCommandLine|program_options|--help|usage:|eboot\.bin|TITLE_ID|title_id|run_app|run app|game_path|game path)' "$work/$repo" 2>/dev/null | head -n 180 || true
+              echo '```'
+              echo
+              echo '### Config / preferences symbols'
+              echo '```text'
+              grep -RniE --exclude-dir=.git --exclude='*.po' --exclude='*.ts' '(config\.(toml|ya?ml|json|ini)|settings\.(toml|ya?ml|json|ini)|preferences|sqlite|user.?config|ux0/app|sce_sys/param\.sfo)' "$work/$repo" 2>/dev/null | head -n 140 || true
+              echo '```'
+              echo
+            done
+          } > "$report"
+      - name: Commit research record
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .development/v0.26.4/upstream-cli-config-research.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Record v0.26.4 upstream emulator CLI and config research'
+          git fetch origin feature/v0.26.4-platform-expansion
+          git rebase origin/feature/v0.26.4-platform-expansion
+          git push origin HEAD:feature/v0.26.4-platform-expansion
