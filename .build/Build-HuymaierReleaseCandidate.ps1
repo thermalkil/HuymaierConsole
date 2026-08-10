@@ -1,4 +1,4 @@
-﻿param(
+param(
     [Parameter(Mandatory=$true)][string]$TriggerPath
 )
 Set-StrictMode -Version 2.0
@@ -31,6 +31,15 @@ Expand-Archive -LiteralPath $baseZip -DestinationPath $extract -Force
 $roots=@(Get-ChildItem -LiteralPath $extract -Directory)
 $baseRoot=if($roots.Count -eq 1){$roots[0].FullName}else{$extract}
 Copy-Item (Join-Path $baseRoot '*') $stage -Recurse -Force
+
+# Previous release ZIPs may contain historical development/release material.
+# Production candidates start from the runtime/media base only; stale CI/source
+# metadata must never survive merely because it existed in an older package.
+foreach($inheritedDev in @('.development','.source','.release','.github','.build','Docs')){
+    Remove-Item -LiteralPath (Join-Path $stage $inheritedDev) -Recurse -Force -ErrorAction SilentlyContinue
+}
+Get-ChildItem -LiteralPath $stage -File -Filter 'BUILD-VALIDATION*.txt' -ErrorAction SilentlyContinue|Remove-Item -Force -ErrorAction SilentlyContinue
+Get-ChildItem -LiteralPath $stage -File -Filter 'RELEASE_NOTES-v*.txt' -ErrorAction SilentlyContinue|Remove-Item -Force -ErrorAction SilentlyContinue
 
 # Overlay repository-owned production payload only. Developer/release machinery
 # is never allowed into the install ZIP.
@@ -119,6 +128,9 @@ $appx=Get-Content -Raw (Join-Path $stage 'FSEPackage\AppxManifest.xml') -Encodin
 if($appx -notmatch ('Version="'+[regex]::Escape($version)+'.0"')){throw 'FSE AppX version does not match candidate.'}
 foreach($required in @('Install-HuymaierConsole.ps1','HuymaierSelfUpdater.ps1','HuymaierConsoleUpdateWorker.ps1','HuymaierGameInputBridge.dll','HuymaierConsole.exe','Restore-HuymaierWindowsSettings.ps1')){if(-not(Test-Path (Join-Path $stage $required))){throw "Required production payload missing: $required"}}
 foreach($dead in @('HuymaierGuideInput.cs','HuymaierGuideBridge.dll','HuymaierConsoleUpdate.ps1','HuymaierConsoleApplyUpdate.ps1')){if(Test-Path (Join-Path $stage $dead)){throw "Retired payload survived packaging: $dead"}}
+foreach($forbiddenDev in @('.development','.source','.release','.github','.build','Docs')){if(Test-Path -LiteralPath (Join-Path $stage $forbiddenDev)){throw "Developer-only directory survived production staging: $forbiddenDev"}}
+if(@(Get-ChildItem -LiteralPath $stage -File -Filter 'BUILD-VALIDATION*.txt' -ErrorAction SilentlyContinue).Count -gt 0){throw 'Historical BUILD-VALIDATION files survived production staging.'}
+if(@(Get-ChildItem -LiteralPath $stage -File -Filter 'RELEASE_NOTES-v*.txt' -ErrorAction SilentlyContinue).Count -gt 0){throw 'Historical versioned release-note files survived production staging.'}
 
 # Closed internal checksum manifest. No payload exists outside this list except
 # the two checksum files themselves.
