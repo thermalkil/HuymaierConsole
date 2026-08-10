@@ -1,4 +1,4 @@
-# Huymaier Console v0.25.6 shell/provider stabilization.
+﻿# Huymaier Console v0.25.6 shell/provider stabilization.
 # Loaded after HuymaierGameExperience.ps1 and before HuymaierEmulatorPlatforms.ps1.
 # EmulatorPlatforms intentionally gets the final platform-select interception so
 # emulator console cards retain their native direct-entry behavior.
@@ -612,14 +612,7 @@ function Get-PageDefinition {
             $actions=@(
                 (New-Action 'fse-home-settings' 'Xbox Mode / FSE Home'),
                 (New-Action 'prompt-override' "Button prompts: $($script:Config.PromptOverride)"),
-                (New-Action 'background-toggle' $(if($script:Config.DynamicBackground){'Dynamic backgrounds: On'}else{'Dynamic backgrounds: Off'})),
-                (New-Action 'music-toggle' $(if($script:Config.MusicEnabled){'Console music: On'}else{'Console music: Off'})),
-                (New-Action 'music-theme' "Music theme: $($script:Config.MusicTheme)"),
-                (New-Action 'music-import' 'Import background music'),
-                (New-SliderAction 'music-volume-slider' 'Music volume' ([int]$script:Config.MusicVolume)),
-                (New-Action 'ui-sounds-toggle' $(if($script:Config.UiSoundsEnabled){'Interface sounds: On'}else{'Interface sounds: Off'})),
                 (New-Action 'haptics-toggle' $(if($script:Config.HapticsEnabled){'Controller haptics: On'}else{'Controller haptics: Off'})),
-                (New-Action 'keyboard-theme' "Keyboard theme: $($script:Config.KeyboardTheme)"),
                 (New-Action 'platform-background-toggle' $(if($script:Config.PlatformBackgroundsEnabled){'Platform backgrounds: On'}else{'Platform backgrounds: Off'})),
                 (New-Action 'online-artwork-toggle' $(if($script:Config.OnlineArtworkEnabled){'Online box art: On'}else{'Online box art: Off'})),
                 (New-Action 'artwork-refresh' 'Refresh missing box art'),
@@ -628,7 +621,7 @@ function Get-PageDefinition {
                 (New-Action 'startup-toggle' $(if($script:Config.StartWithWindows){'Start with Windows: On'}else{'Start with Windows: Off'})),
                 (New-Action 'subpage-back' 'Back to Settings')
             )
-            return [pscustomobject]@{Title='Huymaier Console';Subtitle='Customize the full-screen console experience.';Hero='CONSOLE EXPERIENCE';HeroText='Visuals, prompts, sound, startup and Quick Access behavior.';Actions=$actions}
+            return [pscustomobject]@{Title='Huymaier Console';Subtitle='Operational console, input, startup, artwork, and Quick Access settings.';Hero='CONSOLE SETTINGS';HeroText='System behavior stays here. Appearance, dynamic theme, music, and navigation sounds are under Customization.';Actions=$actions}
         }
         if($script:SubPage -eq 'UpdatesHub'){
             return [pscustomobject]@{Title='Updates';Subtitle='Windows and hardware maintenance.';Hero='UPDATES';HeroText='Keep Windows and signed device drivers current without leaving Huymaier Console.';Actions=@((New-Action 'windows-update-settings' 'Windows Update'),(New-Action 'driver-settings' 'Driver Updates'),(New-Action 'console-update-settings' 'Huymaier Console Update' 'Check GitHub Releases for a newer Huymaier Console build.'),(New-Action 'subpage-back' 'Back to Settings'))}

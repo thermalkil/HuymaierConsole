@@ -1,7 +1,7 @@
 {
-  "batch": "next-modal-candidate-gate-fix-1",
-  "script": "apply_next_candidate_gate_fix.py",
+  "batch": "next-customization-polish-1",
+  "script": "apply_next_customization_polish.py",
   "patch_dir": "",
   "result": "success",
-  "recordedAtUtc": "2026-08-10T12:31:53.541944+00:00"
+  "recordedAtUtc": "2026-08-10T12:35:58.281933+00:00"
 }

@@ -178,6 +178,13 @@ try{
     if(-not(Test-Path -LiteralPath $customPath -PathType Leaf)){throw 'Customization module is missing from the candidate.'}
     $custom=Get-Content -Raw -LiteralPath $customPath -Encoding UTF8
     foreach($required in @("SubPage -eq 'Customization'",'ConsoleName','DynamicPrimaryColor','DynamicSecondaryColor','UiSoundVolume','Test-HcStorefrontPlatform $Platform','Scaling normal list cards caused selected text/borders to be clipped')){if($custom -notmatch [regex]::Escape($required)){throw "Customization/count/card invariant is missing: $required"}}
+    foreach($required in @('New-HcRadialThemeBrush','Update-HcPageDisplayBrand','Convert-HcDisplayBrandText')){if($custom -notmatch [regex]::Escape($required)){throw "Customization gradient/display-name coverage is missing: $required"}}
+    $shellRedesign=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierShellRedesign.ps1') -Encoding UTF8
+    $consoleSettingsStart=$shellRedesign.IndexOf("if($script:SubPage -eq 'ConsoleSettings')")
+    $updatesStart=$shellRedesign.IndexOf("if($script:SubPage -eq 'UpdatesHub')",$consoleSettingsStart)
+    if($consoleSettingsStart -lt 0 -or $updatesStart -lt 0){throw 'ConsoleSettings test window could not be located.'}
+    $consoleSettings=$shellRedesign.Substring($consoleSettingsStart,$updatesStart-$consoleSettingsStart)
+    foreach($moved in @("'music-toggle'","'music-theme'","'music-import'","'music-volume-slider'","'ui-sounds-toggle'","'background-toggle'","'keyboard-theme'")){if($consoleSettings -match [regex]::Escape($moved)){throw "Personalization setting remains duplicated outside Customization: $moved"}}
     $shell=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierConsole.ps1') -Encoding UTF8
     foreach($required in @('HuymaierCustomization.ps1','FocusVisualStyle','ConsoleBrandText','DynamicGlowOne','Apply-HcCustomizationVisuals')){if($shell -notmatch [regex]::Escape($required)){throw "Shell customization/focus invariant is missing: $required"}}
     $overlay=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'Native\HuymaierConsole.SystemOverlay.cs') -Encoding UTF8

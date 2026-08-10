@@ -12,6 +12,7 @@ $script:HcCustomizationBaseUpdateActionVisuals=${function:Update-ActionVisuals}
 $script:HcCustomizationBaseUpdateNavVisuals=${function:Update-NavVisuals}
 $script:HcCustomizationBaseGetPlatformCountSummary=${function:Get-PlatformCountSummary}
 $script:HcCustomizationBaseInitializeUiFeedback=${function:Initialize-UiFeedback}
+$script:HcCustomizationBaseSetConsoleNotice=${function:Set-ConsoleNotice}
 $script:HcCustomizationBaseMainMenuVisuals=$(if(Get-Command Update-HcMainMenuVisuals -ErrorAction SilentlyContinue){${function:Update-HcMainMenuVisuals}}else{$null})
 
 function Add-HcCustomizationConfigProperty {
@@ -44,6 +45,28 @@ function Get-HcColor { param([string]$Name,[string]$Fallback);$value=[string](Ge
 function Get-HcAccentColor { return Get-HcColor 'AccentColor' '#E7C45E' }
 function Get-HcHighlightColor { return Get-HcColor 'AccentHighlightColor' '#FFF0A0' }
 function New-HcSolidBrush { param([string]$Color);return (New-Object System.Windows.Media.SolidColorBrush -ArgumentList ([System.Windows.Media.ColorConverter]::ConvertFromString($Color)) ) }
+function Get-HcAlphaColor { param([string]$Color,[string]$Alpha);if(-not(Test-HcHexColor $Color)){return '#00000000'};return ('#'+$Alpha+$Color.Substring(1)) }
+function New-HcRadialThemeBrush {
+    param([string]$Color,[string]$CenterAlpha='78',[string]$MidAlpha='30')
+    $brush=New-Object System.Windows.Media.RadialGradientBrush
+    $brush.GradientStops.Add((New-Object System.Windows.Media.GradientStop -ArgumentList ([System.Windows.Media.ColorConverter]::ConvertFromString((Get-HcAlphaColor $Color $CenterAlpha))),0.0))
+    $brush.GradientStops.Add((New-Object System.Windows.Media.GradientStop -ArgumentList ([System.Windows.Media.ColorConverter]::ConvertFromString((Get-HcAlphaColor $Color $MidAlpha))),0.52))
+    $brush.GradientStops.Add((New-Object System.Windows.Media.GradientStop -ArgumentList ([System.Windows.Media.ColorConverter]::ConvertFromString((Get-HcAlphaColor $Color '00'))),1.0))
+    return $brush
+}
+function Convert-HcDisplayBrandText {
+    param([string]$Value)
+    if([string]::IsNullOrEmpty($Value)){return $Value}
+    $name=Get-HcConsoleName
+    if([string]::Equals($name,'Huymaier Console',[StringComparison]::OrdinalIgnoreCase)){return $Value}
+    return ([regex]::Replace($Value,'Huymaier Console',[System.Text.RegularExpressions.MatchEvaluator]{param($m)$name},[System.Text.RegularExpressions.RegexOptions]::IgnoreCase))
+}
+
+
+function Set-ConsoleNotice {
+    param([string]$Message,[string]$Level='INFO')
+    & $script:HcCustomizationBaseSetConsoleNotice (Convert-HcDisplayBrandText $Message) $Level
+}
 
 function Set-HcGameBarBranding {
     try{
@@ -74,12 +97,12 @@ function Apply-HcCustomizationVisuals {
         }
 
         $primary=Get-HcColor 'DynamicPrimaryColor' '#D6B64F';$secondary=Get-HcColor 'DynamicSecondaryColor' '#4474C2';$tertiary=Get-HcColor 'DynamicTertiaryColor' '#315F9D'
-        if($null -ne $script:DynamicBase){$script:DynamicBase.Fill=New-HcSolidBrush $tertiary}
-        if($null -ne $script:DynamicGlowOne){$script:DynamicGlowOne.Fill=New-HcSolidBrush $primary}
-        if($null -ne $script:DynamicGlowTwo){$script:DynamicGlowTwo.Fill=New-HcSolidBrush $secondary}
-        if($null -ne $script:DynamicRibbonOne){$script:DynamicRibbonOne.Stroke=New-HcSolidBrush $primary}
-        if($null -ne $script:DynamicRibbonTwo){$script:DynamicRibbonTwo.Stroke=New-HcSolidBrush $secondary}
-        if($null -ne $script:DynamicRibbonThree){$script:DynamicRibbonThree.Stroke=New-HcSolidBrush $tertiary}
+        if($null -ne $script:DynamicBase){$baseBrush=New-Object System.Windows.Media.LinearGradientBrush;$baseBrush.StartPoint='0,0';$baseBrush.EndPoint='1,1';$baseBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop -ArgumentList ([System.Windows.Media.ColorConverter]::ConvertFromString((Get-HcAlphaColor $tertiary '38'))),0.0));$baseBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop -ArgumentList ([System.Windows.Media.ColorConverter]::ConvertFromString('#00131D2D')),0.46));$baseBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop -ArgumentList ([System.Windows.Media.ColorConverter]::ConvertFromString((Get-HcAlphaColor $secondary '2C'))),1.0));$script:DynamicBase.Fill=$baseBrush}
+        if($null -ne $script:DynamicGlowOne){$script:DynamicGlowOne.Fill=New-HcRadialThemeBrush $primary '70' '28'}
+        if($null -ne $script:DynamicGlowTwo){$script:DynamicGlowTwo.Fill=New-HcRadialThemeBrush $secondary '69' '24'}
+        if($null -ne $script:DynamicRibbonOne){$ribbon=New-Object System.Windows.Media.LinearGradientBrush;$ribbon.StartPoint='0,0';$ribbon.EndPoint='1,0';$ribbon.GradientStops.Add((New-Object System.Windows.Media.GradientStop -ArgumentList ([System.Windows.Media.ColorConverter]::ConvertFromString((Get-HcAlphaColor $primary '00'))),0.0));$ribbon.GradientStops.Add((New-Object System.Windows.Media.GradientStop -ArgumentList ([System.Windows.Media.ColorConverter]::ConvertFromString((Get-HcAlphaColor $primary 'B8'))),0.42));$ribbon.GradientStops.Add((New-Object System.Windows.Media.GradientStop -ArgumentList ([System.Windows.Media.ColorConverter]::ConvertFromString((Get-HcAlphaColor $tertiary '26'))),1.0));$script:DynamicRibbonOne.Stroke=$ribbon}
+        if($null -ne $script:DynamicRibbonTwo){$ribbon=New-Object System.Windows.Media.LinearGradientBrush;$ribbon.StartPoint='0,0';$ribbon.EndPoint='1,0';$ribbon.GradientStops.Add((New-Object System.Windows.Media.GradientStop -ArgumentList ([System.Windows.Media.ColorConverter]::ConvertFromString((Get-HcAlphaColor $tertiary '00'))),0.0));$ribbon.GradientStops.Add((New-Object System.Windows.Media.GradientStop -ArgumentList ([System.Windows.Media.ColorConverter]::ConvertFromString((Get-HcAlphaColor $secondary 'A0'))),0.54));$ribbon.GradientStops.Add((New-Object System.Windows.Media.GradientStop -ArgumentList ([System.Windows.Media.ColorConverter]::ConvertFromString((Get-HcAlphaColor $primary '22'))),1.0));$script:DynamicRibbonTwo.Stroke=$ribbon}
+        if($null -ne $script:DynamicRibbonThree){$script:DynamicRibbonThree.Stroke=New-HcSolidBrush (Get-HcAlphaColor $tertiary '50')}
         foreach($star in @($script:StarOne,$script:StarThree,$script:StarFive,$script:StarSeven)){if($null -ne $star){$star.Fill=New-HcSolidBrush $primary}}
         foreach($star in @($script:StarTwo,$script:StarFour,$script:StarSix,$script:StarEight)){if($null -ne $star){$star.Fill=New-HcSolidBrush $secondary}}
         Set-HcGameBarBranding
@@ -109,12 +132,20 @@ function Cycle-HcDynamicThemePreset {
 }
 function Open-HcCustomizationKeyboard { param([string]$Field,[string]$Title,[string]$Initial);Show-NativeKeyboard -Title $Title -InitialText $Initial -Mode 'CustomizationText' -Context ([pscustomobject]@{Field=$Field}) }
 
+function Update-HcPageDisplayBrand {
+    param($Page)
+    if($null -eq $Page){return $Page}
+    foreach($field in @('Title','Subtitle','Hero','HeroText')){try{if($Page.PSObject.Properties[$field]){$Page.$field=Convert-HcDisplayBrandText ([string]$Page.$field)}}catch{}}
+    foreach($action in @($Page.Actions)){if($null -eq $action){continue};foreach($field in @('Title','Description')){try{if($action.PSObject.Properties[$field]){$action.$field=Convert-HcDisplayBrandText ([string]$action.$field)}}catch{}}}
+    return $Page
+}
+
 function Get-PageDefinition {
     param([int]$Index)
     if($Index -eq 7 -and $script:SubPage -eq 'Customization'){
         Initialize-HcCustomizationConfig
         $name=Get-HcConsoleName;$preset=[string](Get-EntryProperty $script:Config 'DynamicThemePreset' 'Huymaier')
-        return [pscustomobject]@{
+        return (Update-HcPageDisplayBrand ([pscustomobject]@{
             Title='Customization';Subtitle='Console identity, interface colors, dynamic theme, music, and navigation sounds.';Hero=$name.ToUpperInvariant();HeroText="Accent: $(Get-HcAccentColor)  |  Dynamic palette: $preset";Actions=@(
                 (New-Action 'customization-console-name' "Console name: $name" 'Changes the display name throughout the shell and Game Bar. Product files and update identity stay Huymaier Console.'),
                 (New-Action 'customization-preset' "Color preset: $preset" 'Cycles coordinated interface and dynamic-theme palettes.'),
@@ -135,7 +166,7 @@ function Get-PageDefinition {
                 (New-Action 'keyboard-preview' 'Preview native keyboard'),
                 (New-Action 'subpage-back' 'Back to Settings')
             )
-        }
+        }))
     }
     $page=& $script:HcCustomizationBaseGetPageDefinition $Index
     if($Index -eq 7 -and -not $script:SubPage -and $null -ne $page){
@@ -145,7 +176,7 @@ function Get-PageDefinition {
         foreach($action in @($page.Actions)){if($null -ne $action -and ([string](Get-EntryProperty $action 'Id' '')) -notin $moved){[void]$filtered.Add($action)}}
         $page.Actions=[object[]]$filtered.ToArray()
     }
-    return $page
+    return (Update-HcPageDisplayBrand $page)
 }
 
 function Invoke-Action {
