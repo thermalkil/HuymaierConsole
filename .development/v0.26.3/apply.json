@@ -1,0 +1,4 @@
+{
+  "batch": "console-fidelity-1",
+  "script": "apply_console_fidelity.py"
+}
