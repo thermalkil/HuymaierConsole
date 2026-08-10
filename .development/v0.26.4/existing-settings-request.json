@@ -1,0 +1,1 @@
+{"requestedAtUtc":"2026-08-11T01:35:00Z","platforms":["N64","GameCube","Wii","WiiU","Switch","Xbox","Xbox360"],"requirements":["complete native backend settings discovery","Cemu XML preservation","Dolphin/RMG/Eden/xemu/Xenia config discovery","PowerShell 5.1 parse","x64 compile"]}
