@@ -1,0 +1,27 @@
+name: Materialize Huymaier Console v0.26.4 Arcade Operator UI
+on:
+  pull_request:
+    branches: [feature/v0.26.3-console-fidelity]
+    paths: ['.development/v0.26.4/wave4-storage-request.json','.development/v0.26.4/apply_wave4_storage_settings.py','.github/workflows/materialize-v0264-wave4-storage.yml']
+permissions: {contents: write}
+concurrency: {group: huymaier-v0264-wave4-storage, cancel-in-progress: false}
+jobs:
+  materialize:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: feature/v0.26.4-platform-expansion, fetch-depth: 0}
+      - name: Materialize arcade operator UI
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';$n=Get-Content -Raw 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8;if($n -notmatch [regex]::Escape('private void RenderArcadeOperatorSettings()')){python .development\v0.26.4\apply_wave4_storage_settings.py;if($LASTEXITCODE -ne 0){throw 'Arcade operator materializer failed.'}}
+      - name: Validate and compile
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';$n=Get-Content -Raw 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8;foreach($m in @('RenderArcadeOperatorSettings','RenderArcadeStorage','FindArcadeStorageItems','arcadeLibrary =','OpenNativeBackendSettings')){if($n -notmatch [regex]::Escape($m)){throw "Arcade invariant missing: $m"}};if($n -match 'LeftShoulder[^\r\n]{0,200}SwitchPage' -or $n -match 'RightShoulder[^\r\n]{0,200}SwitchPage'){throw 'Shoulders may not switch pages.'}
+          Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Windows.Forms,System.Drawing,System.Web.Extensions;$csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe';$automation=[Management.Automation.PSObject].Assembly.Location;$refs=@([Uri].Assembly.Location,[Linq.Enumerable].Assembly.Location,[System.Xaml.XamlReader].Assembly.Location,[Xml.XmlDocument].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,[Windows.Window].Assembly.Location,[Windows.Forms.Form].Assembly.Location,[Drawing.Bitmap].Assembly.Location,[Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,$automation)|Select-Object -Unique;$sources=@('Native\HuymaierConsole.NativeApp.cs','Native\HuymaierConsole.Ps1.cs','Native\HuymaierConsole.ConsolePlatforms.cs','Native\HuymaierConsole.SystemOverlay.cs','Native\HuymaierConsole.GameInput.cs','HuymaierNativeInput.cs','HuymaierNativeDisplay.cs','HuymaierNativeAudio.cs','HuymaierPerformance.cs','EmulatorPlatforms\Shared\Huymaier.P3T.cs');$out=Join-Path $env:RUNNER_TEMP 'hc-wave4-storage.dll';$args=@('/noconfig','/nologo','/target:library','/platform:x64','/optimize+',('/out:'+$out));foreach($r in $refs){$args+=('/reference:'+$r)};$args+=$sources;& $csc @args;if($LASTEXITCODE -ne 0){throw 'Arcade operator x64 compile failed.'}
+      - name: Commit validated source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com';git add Native/HuymaierConsole.ConsolePlatforms.cs;if(git diff --cached --quiet){exit 0};git commit -m 'Materialize v0.26.4 native arcade operator settings and storage';git fetch origin feature/v0.26.4-platform-expansion;git rebase origin/feature/v0.26.4-platform-expansion;if($LASTEXITCODE -ne 0){throw 'Arcade operator rebase failed.'};git push origin HEAD:feature/v0.26.4-platform-expansion;if($LASTEXITCODE -ne 0){throw 'Arcade operator push failed.'}
