@@ -65,10 +65,15 @@ function Merge-HcSteamOwnedLibrary {
     $root='';foreach($candidate in @(Get-SteamRoots)){if(-not $root){$root=[string]$candidate}}
     foreach($owned in @(Get-Prop $Ownership 'Games' @())){
         $id=[string](Get-Prop $owned 'Id' '');$name=[string](Get-Prop $owned 'Name' '')
-        if(-not $id -or -not $name -or $index.ContainsKey($id)){continue}
+        if(-not $id -or -not $name){continue}
+        if($index.ContainsKey($id)){
+            $existing=$items[[int]$index[$id]]
+            if($null -ne $existing){$existing|Add-Member -NotePropertyName Owned -NotePropertyValue $true -Force}
+            continue
+        }
         $art=$(if($root){Get-SteamArtwork $root $id}else{''})
         [void]$items.Add([pscustomobject]@{
-            Id=$id;Name=$name;Provider='Steam';Source='Steam';Installed=$false;
+            Id=$id;Name=$name;Provider='Steam';Source='Steam';Installed=$false;Owned=$true;
             InstallPath='';Path='';LaunchTarget=("steam://rungameid/"+$id);ArtworkPath=$art;
             Description='Owned Steam library title';SizeText='';InstallSizeBytes=[int64]0;
             UpdateAvailable=$false;BuildId=''
@@ -89,17 +94,18 @@ function Refresh-SteamCatalog {
     }
     $installed=@($games|Where-Object{[bool](Get-Prop $_ 'Installed' $false)}).Count
     $complete=[bool](Get-Prop $ownership 'Available' $false)
-    $status=if($complete){"$($games.Count) owned Steam game(s) loaded; $installed installed."}elseif([bool](Get-Prop $ownership 'Private' $false)){"$installed installed Steam game(s) loaded. Owned-library list is hidden by Steam game-details privacy."}else{"$installed installed Steam game(s) loaded. Owned-library list is currently unavailable; installed count remains authoritative."}
+    $ownedCount=$(if($complete){@($games|Where-Object{[bool](Get-Prop $_ 'Owned' $false)}).Count}else{0})
+    $status=if($complete){"$ownedCount owned Steam game(s) loaded; $installed installed."}elseif([bool](Get-Prop $ownership 'Private' $false)){"$installed installed Steam game(s) loaded. Owned-library list is hidden by Steam game-details privacy."}else{"$installed installed Steam game(s) loaded. Owned-library list is currently unavailable; installed count remains authoritative."}
     $enriched=[pscustomobject]@{
         Id='Steam';Name='Steam';Backend='Steam Client';SchemaVersion=2;
         ToolReady=[bool](Get-Prop $node 'ToolReady' $false);Authenticated=[bool](Get-Prop $node 'Authenticated' $false);
         ToolPath=[string](Get-Prop $node 'ToolPath' '');Status=$status;Error='';Games=[object[]]$games;
-        OwnershipComplete=$complete;OwnershipSource=$(if($complete){'Steam Community'}else{'Installed/known local cache'});
+        OwnershipComplete=$complete;OwnershipSource=$(if($complete){'Steam Community'}else{'Installed/known local cache'});OwnedCount=[int]$ownedCount;
         OwnershipPrivate=[bool](Get-Prop $ownership 'Private' $false);OwnershipError=[string](Get-Prop $ownership 'Error' '');
         AccountSteamId=$steamId;OwnershipAttemptedAt=(Get-Date).ToString('o');Updated=(Get-Date).ToString('o')
     }
     Save-SteamNode $enriched
-    if($complete){Write-LogLine "Steam owned-library enrichment loaded $($games.Count) owned title(s) for $steamId."}
+    if($complete){Write-LogLine "Steam owned-library enrichment loaded $ownedCount owned title(s) for $steamId."}
     elseif([bool](Get-Prop $ownership 'Private' $false)){Write-LogLine 'Steam owned-library enrichment is unavailable because game-details privacy is not public.' 'WARN'}
     elseif([string](Get-Prop $ownership 'Error' '')){Write-LogLine ("Steam owned-library enrichment unavailable: "+[string](Get-Prop $ownership 'Error' '')) 'WARN'}
     return [object[]]$games
