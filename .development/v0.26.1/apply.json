@@ -1,5 +1,5 @@
 {
-  "batch": "package-prune-promotion-zipfix-1",
-  "script": "apply_package_prune_and_promotion_zipfix.py",
-  "requested_at": "2026-08-10T09:36:00Z"
+  "batch": "candidate-history-filter-1",
+  "script": "apply_candidate_history_filter.py",
+  "requested_at": "2026-08-10T10:10:00Z"
 }
