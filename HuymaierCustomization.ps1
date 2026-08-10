@@ -29,7 +29,7 @@ function Initialize-HcCustomizationConfig {
     Add-HcCustomizationConfigProperty 'DynamicTertiaryColor' '#315F9D'
     Add-HcCustomizationConfigProperty 'UiSoundVolume' 62
     try{$script:Config.UiSoundVolume=[math]::Max(0,[math]::Min(100,[int]$script:Config.UiSoundVolume))}catch{$script:Config.UiSoundVolume=62}
-    if([string]::IsNullOrWhiteSpace([string]$script:Config.ConsoleName){$script:Config.ConsoleName='Huymaier Console'}
+    if([string]::IsNullOrWhiteSpace([string]$script:Config.ConsoleName)){$script:Config.ConsoleName='Huymaier Console'}
 }
 
 function Get-HcConsoleName {
