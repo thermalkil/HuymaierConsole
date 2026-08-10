@@ -1,6 +1,6 @@
 ﻿{
-    "batch":  "console-fidelity-rc4-user-feedback",
-    "script":  "apply_rc4_feedback.py",
+    "batch":  "console-fidelity-rc4-final",
+    "script":  "apply_rc4_finalize.py",
     "result":  "success",
-    "recordedAtUtc":  "2026-08-10T21:34:47.6932048Z"
+    "recordedAtUtc":  "2026-08-10T21:41:42.6717428Z"
 }

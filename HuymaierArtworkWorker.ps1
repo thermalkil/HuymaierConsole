@@ -250,7 +250,7 @@ function Try-SteamGridDbArt{
     $gridResponse=$null
     try{
         if($appId){
-            $gridResponse=Invoke-RestMethod -Uri ("https://www.steamgriddb.com/api/v2/grids/steam/"+$appId+"?dimensions=600x900,342x482,660x930&nsfw=false&humor=false") -Headers $headers -TimeoutSec 15
+            $gridResponse=Invoke-RestMethod -Uri ("https://www.steamgriddb.com/api/v2/grids/steam/"+$appId+"?nsfw=false&humor=false") -Headers $headers -TimeoutSec 15
         }else{
             $name=[string](Get-Prop $Game 'Name' '')
             if(-not $name){return ''}
@@ -266,7 +266,7 @@ function Try-SteamGridDbArt{
             if($null -eq $best -or $bestScore -lt .52){return ''}
             $sgdbId=[string](Get-Prop $best 'id' '')
             if(-not $sgdbId){return ''}
-            $gridResponse=Invoke-RestMethod -Uri ("https://www.steamgriddb.com/api/v2/grids/game/"+$sgdbId+"?dimensions=600x900,342x482,660x930&nsfw=false&humor=false") -Headers $headers -TimeoutSec 15
+            $gridResponse=Invoke-RestMethod -Uri ("https://www.steamgriddb.com/api/v2/grids/game/"+$sgdbId+"?nsfw=false&humor=false") -Headers $headers -TimeoutSec 15
         }
         $ranked=@(Get-Prop $gridResponse 'data' @())|Sort-Object @{Expression={ [double](Get-Prop $_ 'score' (Get-Prop $_ 'upvotes' 0)) };Descending=$true}
         foreach($grid in $ranked){

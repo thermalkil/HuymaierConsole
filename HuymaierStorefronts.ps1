@@ -1,4 +1,4 @@
-﻿# Huymaier Console storefront hub and native keyboard module.
+# Huymaier Console storefront hub and native keyboard module.
 # Dot-sourced by HuymaierConsole.ps1 so all functions share the shell script scope.
 
 function Get-StorefrontDefinitions {
@@ -644,7 +644,7 @@ function Show-NativeKeyboard {
     $script:KeyboardActive=$true
     $script:KeyboardMode=$Mode
     $script:KeyboardContext=$Context
-    $script:KeyboardSecure=([string]$Mode -eq 'BrowserInputSecure')
+    $script:KeyboardSecure=([string]$Mode -in @('BrowserInputSecure','SteamGridDbApiKey'))
     $script:KeyboardSecureBuffer=$(if($script:KeyboardSecure){[string]$InitialText}else{''})
     $script:KeyboardShift=$false
     $script:KeyboardPage='Letters'
@@ -702,6 +702,13 @@ function Complete-NativeKeyboardInput {
             }
             Save-Config
             Set-ConsoleNotice "$Value was added." 'INFO'
+            Render-Page
+        }
+        'SteamGridDbApiKey' {
+            $key=([string]$Value).Trim()
+            $script:Config.SteamGridDbApiKey=$key
+            Save-Config
+            Set-ConsoleNotice $(if($key){'SteamGridDB artwork key saved. Refresh missing box art to use it.'}else{'SteamGridDB artwork key cleared.'}) 'INFO'
             Render-Page
         }
         'CreateFolder' {

@@ -2256,7 +2256,7 @@ namespace HuymaierConsole.NativeApp
                 int dir0 = blockSize, dir1 = blockSize * 2, bat0 = blockSize * 3, bat1 = blockSize * 4;
                 int activeDir = ReadBeS16(metadata, dir0 + 0x1FFA) >= ReadBeS16(metadata, dir1 + 0x1FFA) ? dir0 : dir1;
                 int activeBat = ReadBeS16(metadata, bat0 + 0x0004) >= ReadBeS16(metadata, bat1 + 0x0004) ? bat0 : bat1;
-                GameCubeMemoryCardInfo card = new GameCubeMemoryCardInfo { Slot = slot, Path = path, TotalBlocks = (int)(info.Length / blockSize), FreeBlocks = ReadBe16(metadata, activeBat + 0x0006) };
+                GameCubeMemoryCardInfo card = new GameCubeMemoryCardInfo { Slot = slot, Path = path, TotalBlocks = Math.Max(0, (int)(info.Length / blockSize) - 5), FreeBlocks = ReadBe16(metadata, activeBat + 0x0006) };
                 for (int index = 0; index < 127; index++)
                 {
                     int entry = activeDir + index * 0x40;
@@ -2265,7 +2265,7 @@ namespace HuymaierConsole.NativeApp
                     int nameLength = 0; while (nameLength < 0x20 && metadata[entry + 0x08 + nameLength] != 0 && metadata[entry + 0x08 + nameLength] != 0xFF) nameLength++;
                     string fileName = nameLength > 0 ? Encoding.ASCII.GetString(metadata, entry + 0x08, nameLength).Trim() : gameCode;
                     uint seconds = ReadBe32(metadata, entry + 0x28);
-                    DateTime modified = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Local).AddSeconds(Math.Min(seconds, 3155760000U));
+                    double safeSeconds = Math.Min((double)seconds, 3155760000.0); DateTime modified = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Local).AddSeconds(safeSeconds);
                     card.Saves.Add(new GameCubeSaveEntry { Name = String.IsNullOrWhiteSpace(fileName) ? gameCode : fileName, GameCode = gameCode, Blocks = ReadBe16(metadata, entry + 0x38), Modified = modified, CardPath = path });
                 }
                 return card;
