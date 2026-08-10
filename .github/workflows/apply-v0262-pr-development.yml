@@ -2,7 +2,7 @@ name: Apply v0.26.2 PR Development Batch
 
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, edited]
     branches: [main]
 
 permissions:
