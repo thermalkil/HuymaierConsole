@@ -84,6 +84,18 @@ function Install-DolphinLatest {
     try{$archive=Join-Path $work $archiveName;Invoke-WebRequest -UseBasicParsing -Headers $headers -Uri $url -OutFile $archive;New-Item -ItemType Directory -Force -Path $target|Out-Null;Expand-HcArchive $archive $target;$exe=Get-ChildItem -LiteralPath $target -Filter 'Dolphin.exe' -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1;if(-not $exe){throw 'Dolphin.exe was not found after extraction.'};return $exe.FullName}finally{Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue}
 }
 
+
+function Install-StellaLatest {
+    $page=Invoke-WebRequest -UseBasicParsing -Uri 'https://stella-emu.github.io/downloads.html' -Headers @{'User-Agent'='Huymaier-Console/0.26.4'}
+    $html=[string]$page.Content
+    $matches=[regex]::Matches($html,'(?i)href=["''](?<url>[^"'']*Stella-(?<version>[0-9]+(?:\.[0-9]+)+[a-z]?)-windows\.zip)["'']')
+    if($matches.Count -eq 0){throw 'The current official Stella 64-bit Windows ZIP could not be identified.'}
+    $href=[System.Net.WebUtility]::HtmlDecode($matches[0].Groups['url'].Value)
+    $url=$href;if($href -notmatch '^https?://'){$url=(New-Object Uri ([uri]'https://stella-emu.github.io/'),$href).AbsoluteUri}
+    $target=Join-Path $DestinationRoot 'Stella';$work=Join-Path $env:TEMP ('hc-stella-'+[guid]::NewGuid().ToString('N'));New-Item -ItemType Directory -Force -Path $work|Out-Null
+    try{$archive=Join-Path $work 'stella-windows.zip';Invoke-WebRequest -UseBasicParsing -Headers $headers -Uri $url -OutFile $archive;New-Item -ItemType Directory -Force -Path $target|Out-Null;Expand-HcArchive $archive $target;$exe=Get-ChildItem -LiteralPath $target -Filter 'Stella.exe' -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1;if(-not $exe){$exe=Get-ChildItem -LiteralPath $target -Filter 'stella.exe' -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1};if(-not $exe){throw 'Stella.exe was not found after extraction.'};return $exe.FullName}finally{Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue}
+}
+
 function Install-MednafenLatest {
     $releasePage=Invoke-WebRequest -UseBasicParsing -Uri 'https://mednafen.github.io/releases/' -Headers @{'User-Agent'='Huymaier-Console/0.26.4'}
     $html=[string]$releasePage.Content
@@ -144,6 +156,18 @@ switch($PlatformId){
         $dest=Join-Path $DestinationRoot 'RPCS3';& $script -Destination $dest
         $exe=Get-ChildItem -LiteralPath $dest -Filter 'rpcs3.exe' -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1 -ExpandProperty FullName
     }
+    'ATARI2600' {$exe=Install-StellaLatest}
+    'NES' {$exe=Install-GithubArchive 'nesdev-org/MesenCE' { $_.name -match '(?i)(mesen).*(windows|win|x64|64).*\.(zip|7z)$' -and $_.name -notmatch '(?i)(source|symbols|pdb|debug)' } 'MesenCE' @('Mesen.exe','Mesen2.exe')}
+    'SNES' {$exe=Install-GithubArchive 'nesdev-org/MesenCE' { $_.name -match '(?i)(mesen).*(windows|win|x64|64).*\.(zip|7z)$' -and $_.name -notmatch '(?i)(source|symbols|pdb|debug)' } 'MesenCE' @('Mesen.exe','Mesen2.exe')}
+    'GAMEBOY' {$exe=Install-GithubArchive 'LIJI32/SameBoy' { $_.name -match '(?i)(winsdl|windows).*\.zip$' -and $_.name -notmatch '(?i)(source|debug|symbols)' } 'SameBoy' @('sameboy.exe','SameBoy.exe')}
+    'GBC' {$exe=Install-GithubArchive 'LIJI32/SameBoy' { $_.name -match '(?i)(winsdl|windows).*\.zip$' -and $_.name -notmatch '(?i)(source|debug|symbols)' } 'SameBoy' @('sameboy.exe','SameBoy.exe')}
+    'GBA' {$exe=Install-GithubArchive 'mgba-emu/mgba' { $_.name -match '(?i)(windows|win).*(64|x64).*\.zip$' -or $_.name -match '(?i)mGBA.*win64.*\.zip$' } 'mGBA' @('mGBA.exe','mGBA-qt.exe','mgba.exe')}
+    'GENESIS' {$exe=Install-GithubArchive 'ares-emulator/ares' { $_.name -match '(?i)windows.*(x64|64).*\.zip$' -or $_.name -match '(?i)^ares.*windows.*\.zip$' } 'ares' @('ares.exe')}
+    'SEGACD' {$exe=Install-GithubArchive 'ares-emulator/ares' { $_.name -match '(?i)windows.*(x64|64).*\.zip$' -or $_.name -match '(?i)^ares.*windows.*\.zip$' } 'ares' @('ares.exe')}
+    'SEGA32X' {$exe=Install-GithubArchive 'ares-emulator/ares' { $_.name -match '(?i)windows.*(x64|64).*\.zip$' -or $_.name -match '(?i)^ares.*windows.*\.zip$' } 'ares' @('ares.exe')}
+    'GAMEGEAR' {$exe=Install-GithubArchive 'nesdev-org/MesenCE' { $_.name -match '(?i)(mesen).*(windows|win|x64|64).*\.(zip|7z)$' -and $_.name -notmatch '(?i)(source|symbols|pdb|debug)' } 'MesenCE' @('Mesen.exe','Mesen2.exe')}
+    'MASTERSYSTEM' {$exe=Install-GithubArchive 'nesdev-org/MesenCE' { $_.name -match '(?i)(mesen).*(windows|win|x64|64).*\.(zip|7z)$' -and $_.name -notmatch '(?i)(source|symbols|pdb|debug)' } 'MesenCE' @('Mesen.exe','Mesen2.exe')}
+    'TURBOGRAFX16' {$exe=Install-MednafenLatest}
     '3DS' {$exe=Install-GithubArchive 'azahar-emu/azahar' { $_.name -match '(?i)azahar.*windows.*\.(zip|7z)$' -and $_.name -notmatch '(?i)(libretro|symbols|debug|pdb|source)' } 'Azahar' @('azahar.exe','Azahar.exe')}
     'NDS' {$exe=Install-GithubArchive 'melonDS-emu/melonDS' { $_.name -match '(?i)(windows|win).*(x86_64|x64|64).*\.(zip|7z)$' -or $_.name -match '(?i)melonDS.*windows.*\.(zip|7z)$' } 'melonDS' @('melonDS.exe')}
     'DSI' {$exe=Install-GithubArchive 'melonDS-emu/melonDS' { $_.name -match '(?i)(windows|win).*(x86_64|x64|64).*\.(zip|7z)$' -or $_.name -match '(?i)melonDS.*windows.*\.(zip|7z)$' } 'melonDS' @('melonDS.exe')}

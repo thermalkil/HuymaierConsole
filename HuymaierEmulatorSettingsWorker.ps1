@@ -68,6 +68,11 @@ function Get-ConfigRoots {
     $local=[Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
     $docs=[Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments)
     switch($AdapterId.ToLowerInvariant()){
+        'mesence' {Add-Root $roots $seen (Join-Path $app 'Mesen');Add-Root $roots $seen (Join-Path $app 'Mesen2');Add-Root $roots $seen (Join-Path $local 'Mesen');Add-Root $roots $seen (Join-Path $local 'Mesen2')}
+        'sameboy' {Add-Root $roots $seen (Join-Path $app 'SameBoy');Add-Root $roots $seen (Join-Path $local 'SameBoy')}
+        'mgba' {Add-Root $roots $seen (Join-Path $app 'mGBA');Add-Root $roots $seen (Join-Path $local 'mGBA')}
+        'stella' {Add-Root $roots $seen (Join-Path $app 'Stella')}
+        'ares' {Add-Root $roots $seen (Join-Path $app 'ares');Add-Root $roots $seen (Join-Path $local 'ares')}
         'azahar' {Add-Root $roots $seen (Join-Path $app 'Azahar');Add-Root $roots $seen (Join-Path $app 'azahar');Add-Root $roots $seen (Join-Path $local 'Azahar')}
         'melonds' {Add-Root $roots $seen (Join-Path $app 'melonDS');Add-Root $roots $seen (Join-Path $local 'melonDS')}
         'flycast' {Add-Root $roots $seen (Join-Path $app 'flycast');Add-Root $roots $seen (Join-Path $local 'flycast')}
@@ -88,6 +93,10 @@ function Get-ExplicitConfigFiles {
     }
     foreach($root in @($Roots)){
         switch($AdapterId.ToLowerInvariant()){
+            'mesence' {foreach($rel in @('settings.json','Settings.json','config.json','preferences.json','Mesen.json','Mesen2.json')){Add-File (Join-Path $root $rel)};try{Get-ChildItem -LiteralPath $root -File -ErrorAction SilentlyContinue|Where-Object{$_.Name -match '(?i)(settings|config|preferences).*\.(json|ini|cfg)$'}|Select-Object -First 20|ForEach-Object{Add-File $_.FullName}}catch{}}
+            'sameboy' {foreach($rel in @('sameboy.ini','SameBoy.ini','sameboy.cfg','preferences.ini','config.ini')){Add-File (Join-Path $root $rel)};try{Get-ChildItem -LiteralPath $root -File -ErrorAction SilentlyContinue|Where-Object{$_.Name -match '(?i)(sameboy|settings|config|preferences).*\.(ini|cfg|json)$'}|Select-Object -First 20|ForEach-Object{Add-File $_.FullName}}catch{}}
+            'mgba' {foreach($rel in @('config.ini','mGBA.ini','mgba.ini','qt.ini')){Add-File (Join-Path $root $rel)};try{Get-ChildItem -LiteralPath $root -File -ErrorAction SilentlyContinue|Where-Object{$_.Name -match '(?i)(mgba|config|settings).*\.(ini|cfg|json)$'}|Select-Object -First 20|ForEach-Object{Add-File $_.FullName}}catch{}}
+            'stella' {foreach($rel in @('stella.ini','settings.ini','config.ini')){Add-File (Join-Path $root $rel)}}
             'azahar' {foreach($rel in @('config\qt-config.ini','qt-config.ini','config.ini')){Add-File (Join-Path $root $rel)}}
             'melonds' {foreach($rel in @('melonDS.ini','melonDS.toml','config\melonDS.ini')){Add-File (Join-Path $root $rel)}}
             'flycast' {foreach($rel in @('emu.cfg','config\emu.cfg')){Add-File (Join-Path $root $rel)}}

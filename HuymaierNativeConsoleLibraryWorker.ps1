@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][string]$PlatformId,
     [Parameter(Mandatory=$true)][string]$SettingsPath,
@@ -27,6 +27,18 @@ function Add-Root([System.Collections.ArrayList]$Target,[string]$Value){
 }
 function Get-Extensions([string]$Id){
     switch($Id.ToUpperInvariant()){
+        'ATARI2600' { return @('.a26','.bin','.rom','.zip') }
+        'NES' { return @('.nes','.fds','.unf','.unif','.zip') }
+        'SNES' { return @('.sfc','.smc','.fig','.swc','.zip') }
+        'GAMEBOY' { return @('.gb','.sgb','.zip') }
+        'GBC' { return @('.gbc','.gb','.zip') }
+        'GBA' { return @('.gba','.agb','.zip') }
+        'GENESIS' { return @('.md','.gen','.bin','.smd','.zip') }
+        'SEGACD' { return @('.cue','.chd','.iso','.bin') }
+        'SEGA32X' { return @('.32x','.bin','.md','.zip') }
+        'GAMEGEAR' { return @('.gg','.zip') }
+        'MASTERSYSTEM' { return @('.sms','.sg','.zip') }
+        'TURBOGRAFX16' { return @('.pce','.sgx','.cue','.chd','.zip') }
         'N64' { return @('.z64','.n64','.v64','.zip','.7z') }
         'GAMECUBE' { return @('.iso','.gcm','.rvz','.ciso','.gcz') }
         'WII' { return @('.iso','.wbfs','.rvz','.wia','.gcz') }
