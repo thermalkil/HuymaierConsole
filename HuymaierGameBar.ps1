@@ -1,10 +1,11 @@
-# Huymaier Console v0.26.0 external game/app overlay.
+# Huymaier Console v0.26.1 external game/app overlay.
 # Quick Access remains inside Huymaier Console. This module owns only the
 # external-app Game Bar and its Guide-button watcher.
 
 $script:HcGameBarTimer=$null
 $script:HcExternalGuideDown=$false
 $script:HcGameBarBackupPath=Join-Path $script:DataDir 'xbox-gamebar-backup.json'
+$script:HcWindowsRestorePath=Join-Path $script:BaseDir 'Restore-HuymaierWindowsSettings.ps1'
 
 function Get-HcRegistryBackupValue {
     param([string]$Path,[string]$Name)
@@ -18,25 +19,32 @@ function Get-HcRegistryBackupValue {
     return [pscustomobject]@{Path=$Path;Name=$Name;Exists=$exists;Value=$value}
 }
 
+function Restore-HcXboxGameBarSuppression {
+    try{
+        if(Test-Path -LiteralPath $script:HcWindowsRestorePath -PathType Leaf){& $script:HcWindowsRestorePath -Quiet}
+    }catch{Write-Log "Xbox Game Bar controller-setting restore failed: $($_.Exception.Message)" 'WARN'}
+}
+
 function Set-HcXboxGameBarSuppression {
     try{
-        $entries=@(
-            [pscustomobject]@{Path='HKCU:\Software\Microsoft\GameBar';Name='UseNexusForGameBarEnabled';Value=0},
-            [pscustomobject]@{Path='HKCU:\Software\Microsoft\Windows\CurrentVersion\GameDVR';Name='VKMToggleGameBar';Value=0},
-            [pscustomobject]@{Path='HKCU:\Software\Microsoft\Windows\CurrentVersion\GameDVR';Name='AppCaptureEnabled';Value=0},
-            [pscustomobject]@{Path='HKCU:\System\GameConfigStore';Name='GameDVR_Enabled';Value=0}
-        )
-        if(-not(Test-Path -LiteralPath $script:HcGameBarBackupPath -PathType Leaf)){
-            $backup=New-Object System.Collections.ArrayList
-            foreach($entry in $entries){[void]$backup.Add((Get-HcRegistryBackupValue $entry.Path $entry.Name))}
-            $backup|ConvertTo-Json -Depth 5|Set-Content -LiteralPath $script:HcGameBarBackupPath -Encoding UTF8
-        }
-        foreach($entry in $entries){
-            if(-not(Test-Path -LiteralPath $entry.Path)){New-Item -Path $entry.Path -Force|Out-Null}
-            Set-ItemProperty -LiteralPath $entry.Path -Name $entry.Name -Value ([int]$entry.Value) -Type DWord -Force
-        }
-        Write-Log 'Windows Xbox Game Bar controller/shortcut capture was disabled for the Huymaier Game Bar replacement.'
-    }catch{Write-Log "Xbox Game Bar suppression failed: $($_.Exception.Message)" 'WARN'}
+        # First recover a setting left suppressed by an abnormal prior exit.
+        Restore-HcXboxGameBarSuppression
+        $path='HKCU:\Software\Microsoft\GameBar'
+        $name='UseNexusForGameBarEnabled'
+        $backup=Get-HcRegistryBackupValue $path $name
+        $backup|ConvertTo-Json -Depth 4|Set-Content -LiteralPath $script:HcGameBarBackupPath -Encoding UTF8
+        if(-not(Test-Path -LiteralPath $path)){New-Item -Path $path -Force|Out-Null}
+        Set-ItemProperty -LiteralPath $path -Name $name -Value 0 -Type DWord -Force
+
+        # Crash/reboot recovery. Normal shutdown removes this entry after
+        # restoring the original setting; if the process dies, Windows runs the
+        # helper at the next sign-in.
+        $runOnce='HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce'
+        if(-not(Test-Path -LiteralPath $runOnce)){New-Item -Path $runOnce -Force|Out-Null}
+        $cmd='powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "'+$script:HcWindowsRestorePath+'" -Quiet'
+        Set-ItemProperty -LiteralPath $runOnce -Name 'HuymaierConsoleRestoreGameBar' -Value $cmd -Type String -Force
+        Write-Log 'Windows controller-to-Xbox-Game-Bar capture was disabled while Huymaier Console is running.'
+    }catch{Write-Log "Xbox Game Bar controller suppression failed: $($_.Exception.Message)" 'WARN'}
 }
 
 function Get-HcRawSystemGuidePressed {
@@ -64,6 +72,15 @@ function Get-HcRawSystemGuidePressed {
     return $false
 }
 
+function Test-HcAnyConsoleWindowActive {
+    try{
+        foreach($window in @([System.Windows.Application]::Current.Windows)){
+            if($null -ne $window -and [bool]$window.IsActive){return $true}
+        }
+    }catch{}
+    return $false
+}
+
 function Initialize-HuymaierGameBar {
     try{
         if(-not('HuymaierConsole.NativeApp.HuymaierGameBarHost' -as [type])){
@@ -79,10 +96,15 @@ function Initialize-HuymaierGameBar {
         $timer.Add_Tick({
             try{
                 if($null -eq $script:Window){return}
-                if([bool]$script:Window.IsActive){
+
+                # Any active Huymaier WPF surface is internal. This prevents the
+                # external watcher from consuming Guide while a native PS/Xbox-
+                # style child interface owns foreground focus.
+                if(Test-HcAnyConsoleWindowActive){
                     $script:HcExternalGuideDown=$false
                     return
                 }
+
                 $command=''
                 try{
                     if('HuymaierConsole.NativeApp.NativeConsoleNavigation' -as [type]){
@@ -116,4 +138,5 @@ function Stop-HuymaierGameBar {
     try{if($null -ne $script:HcGameBarTimer){$script:HcGameBarTimer.Stop()}}catch{}
     $script:HcGameBarTimer=$null
     try{if('HuymaierConsole.NativeApp.HuymaierGameBarHost' -as [type]){[HuymaierConsole.NativeApp.HuymaierGameBarHost]::Hide()}}catch{}
+    Restore-HcXboxGameBarSuppression
 }
