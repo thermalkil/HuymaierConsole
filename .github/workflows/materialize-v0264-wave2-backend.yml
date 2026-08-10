@@ -1,0 +1,75 @@
+name: Materialize Huymaier Console v0.26.4 Wave 2 Backends
+
+on:
+  pull_request:
+    branches:
+      - feature/v0.26.3-console-fidelity
+    paths:
+      - '.development/v0.26.4/wave2-backend-request.json'
+      - '.development/v0.26.4/apply_json_settings_support.py'
+      - '.development/v0.26.4/apply_wave2_backend.py'
+      - '.github/workflows/materialize-v0264-wave2-backend.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: huymaier-v0264-wave2-backend
+  cancel-in-progress: false
+
+jobs:
+  materialize-and-validate:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v0.26.4-platform-expansion
+          fetch-depth: 0
+      - name: Materialize JSON settings and Wave 2 backend integration
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $settings=Get-Content -Raw 'HuymaierEmulatorSettings.ps1' -Encoding UTF8
+          if($settings -notmatch [regex]::Escape('function Get-HcJsonSettings')){
+            python .development\v0.26.4\apply_json_settings_support.py
+            if($LASTEXITCODE -ne 0){throw 'JSON emulator-settings materializer failed.'}
+          }else{Write-Host 'JSON emulator-settings support already materialized.'}
+          $installer=Get-Content -Raw 'HuymaierEmulatorInstaller.ps1' -Encoding UTF8
+          if($installer -notmatch [regex]::Escape("'ATARI2600' {$exe=Install-StellaLatest}")){
+            python .development\v0.26.4\apply_wave2_backend.py
+            if($LASTEXITCODE -ne 0){throw 'Wave 2 backend materializer failed.'}
+          }else{Write-Host 'Wave 2 backend integration already materialized.'}
+      - name: Parse PowerShell 5.1 source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          foreach($path in @('.\HuymaierEmulatorInstaller.ps1','.\HuymaierEmulatorSettings.ps1','.\HuymaierEmulatorSettingsWorker.ps1','.\HuymaierNativeConsoleLibraryWorker.ps1')){
+            $tokens=$null;$errors=$null;[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path),[ref]$tokens,[ref]$errors)
+            if($errors.Count){$errors|ForEach-Object{Write-Host "$path : $($_.Message)"};throw "$path does not parse in Windows PowerShell 5.1."}
+          }
+      - name: Validate complete settings and latest-emulator contracts
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $settings=Get-Content -Raw 'HuymaierEmulatorSettings.ps1' -Encoding UTF8
+          foreach($required in @('Get-HcJsonSettings','Set-HcJsonSetting','Convert-HcJsonEditedValue',"elseif(`$ext -eq '.json'){`$Format='json'}","'json' { Set-HcJsonSetting")){if($settings -notmatch [regex]::Escape($required)){throw "JSON settings invariant missing: $required"}}
+          $installer=Get-Content -Raw 'HuymaierEmulatorInstaller.ps1' -Encoding UTF8
+          foreach($required in @('function Install-StellaLatest','https://stella-emu.github.io/downloads.html','nesdev-org/MesenCE','LIJI32/SameBoy','mgba-emu/mgba','ares-emulator/ares',"'TURBOGRAFX16' {`$exe=Install-MednafenLatest}")){if($installer -notmatch [regex]::Escape($required)){throw "Wave 2 installer invariant missing: $required"}}
+          $worker=Get-Content -Raw 'HuymaierEmulatorSettingsWorker.ps1' -Encoding UTF8
+          foreach($adapter in @("'mesence'","'sameboy'","'mgba'","'stella'","'ares'")){if($worker -notmatch [regex]::Escape($adapter)){throw "Wave 2 settings discovery missing adapter $adapter"}}
+          $library=Get-Content -Raw 'HuymaierNativeConsoleLibraryWorker.ps1' -Encoding UTF8
+          foreach($id in @("'ATARI2600'","'NES'","'SNES'","'GAMEBOY'","'GBC'","'GBA'","'GENESIS'","'SEGACD'","'SEGA32X'","'GAMEGEAR'","'MASTERSYSTEM'","'TURBOGRAFX16'")){if($library -notmatch [regex]::Escape($id)){throw "Wave 2 count scanner missing $id"}}
+      - name: Compile current exact x64 native source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Windows.Forms,System.Drawing,System.Web.Extensions
+          $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe';$automation=[Management.Automation.PSObject].Assembly.Location;$refs=@([Uri].Assembly.Location,[Linq.Enumerable].Assembly.Location,[System.Xaml.XamlReader].Assembly.Location,[Xml.XmlDocument].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,[Windows.Window].Assembly.Location,[Windows.Forms.Form].Assembly.Location,[Drawing.Bitmap].Assembly.Location,[Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,$automation)|Select-Object -Unique
+          $sources=@('Native\HuymaierConsole.NativeApp.cs','Native\HuymaierConsole.Ps1.cs','Native\HuymaierConsole.ConsolePlatforms.cs','Native\HuymaierConsole.SystemOverlay.cs','Native\HuymaierConsole.GameInput.cs','HuymaierNativeInput.cs','HuymaierNativeDisplay.cs','HuymaierNativeAudio.cs','HuymaierPerformance.cs','EmulatorPlatforms\Shared\Huymaier.P3T.cs');$out=Join-Path $env:RUNNER_TEMP 'HuymaierConsole-v0264-wave2-backend.dll';$args=@('/noconfig','/nologo','/target:library','/platform:x64','/optimize+',('/out:'+$out));foreach($r in $refs){$args+=('/reference:'+$r)};$args+=$sources;& $csc @args;if($LASTEXITCODE -ne 0){throw 'Wave 2 backend x64 native compile failed.'}
+      - name: Commit validated Wave 2 backend integration
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add HuymaierEmulatorInstaller.ps1 HuymaierEmulatorSettings.ps1 HuymaierEmulatorSettingsWorker.ps1 HuymaierNativeConsoleLibraryWorker.ps1
+          if(git diff --cached --quiet){Write-Host 'No Wave 2 backend source changes to commit.';exit 0}
+          git commit -m 'Materialize v0.26.4 Wave 2 emulator backends and full settings discovery';git fetch origin feature/v0.26.4-platform-expansion;git rebase origin/feature/v0.26.4-platform-expansion;if($LASTEXITCODE -ne 0){throw 'Wave 2 backend rebase failed.'};git push origin HEAD:feature/v0.26.4-platform-expansion;if($LASTEXITCODE -ne 0){throw 'Wave 2 backend push failed.'}
