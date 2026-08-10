@@ -69,3 +69,5 @@ function Update-HcActiveDownloadVisuals {
 
 $script:HcV0262HardeningPath=Join-Path $script:BaseDir 'HuymaierV0262Hardening.ps1'
 if(Test-Path -LiteralPath $script:HcV0262HardeningPath -PathType Leaf){. $script:HcV0262HardeningPath}
+$script:HcSteamOwnershipRuntimePath=Join-Path $script:BaseDir 'HuymaierSteamOwnershipRuntime.ps1'
+if(Test-Path -LiteralPath $script:HcSteamOwnershipRuntimePath -PathType Leaf){. $script:HcSteamOwnershipRuntimePath}

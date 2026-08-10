@@ -88,6 +88,9 @@ function Wait-SteamOperation {
     return $false
 }
 
+$script:HcSteamOwnershipModulePath=Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'HuymaierSteamOwnership.ps1'
+if(Test-Path -LiteralPath $script:HcSteamOwnershipModulePath -PathType Leaf){. $script:HcSteamOwnershipModulePath}
+
 try{
     $GameId=$GameId -replace '^(?i)Steam:',''
     switch($Mode){

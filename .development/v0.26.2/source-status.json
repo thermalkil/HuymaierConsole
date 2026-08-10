@@ -1,6 +1,6 @@
 {
-  "batch": "version-0262-1",
-  "script": "apply_version_0262.py",
+  "batch": "steam-ownership-loaders-1",
+  "script": "apply_steam_ownership_loaders.py",
   "result": "success",
-  "recordedAtUtc": "2026-08-10T14:39:58.000899+00:00"
+  "recordedAtUtc": "2026-08-10T15:00:09.015782+00:00"
 }
