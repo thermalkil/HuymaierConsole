@@ -1,5 +1,5 @@
 {
-  "batch": "version-0262-1",
-  "script": "apply_version_0262.py",
-  "requested_at": "2026-08-10T14:41:00Z"
+  "batch": "steam-ownership-loaders-1",
+  "script": "apply_steam_ownership_loaders.py",
+  "requested_at": "2026-08-10T15:03:00Z"
 }
