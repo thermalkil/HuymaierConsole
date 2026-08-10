@@ -97,7 +97,7 @@ insert = anchor + r'''
     if($modalGateCount -lt 2){throw 'Game Bar modal ownership is not enforced in both native router layers.'}
     if($gameBar -notmatch [regex]::Escape('[HuymaierConsole.NativeApp.HuymaierGameBarHost]::PollNavigation()')){throw 'Visible Game Bar does not use its modal-safe navigation poll.'}
     $shell=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierConsole.ps1') -Encoding UTF8
-    if($shell -notmatch '(?s)else\s*\{\s*\$script:SelectedTab=6\s*\$script:SubPage=''FilePicker'''){throw 'Native non-Browse file picker does not enter the File Explorer tab.'}
+    if($shell -notmatch "(?s)else\\s*\\{\\s*\\`$script:SelectedTab=6\\s*\\`$script:SubPage='FilePicker'"){throw 'Native non-Browse file picker does not enter the File Explorer tab.'}
 '''
 t = replace_once(t, anchor, insert, 'RC13 candidate gates')
 
