@@ -1,0 +1,6 @@
+{
+  "batch":"wave3-specialty-stage",
+  "requestedAtUtc":"2026-08-10T23:40:00Z",
+  "platforms":["AtariLynx","NeoGeo","NGPC","Jaguar","PrimeHack"],
+  "gate":"distinct native hardware/visor presentation, disabled until backend/settings/storage pass, exact x64 compile required"
+}
