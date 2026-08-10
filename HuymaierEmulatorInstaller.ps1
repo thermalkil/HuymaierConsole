@@ -85,6 +85,20 @@ function Install-DolphinLatest {
 }
 
 
+
+function Install-BigPEmuLatest {
+    $pageUrl='https://www.richwhitehouse.com/jaguar/index.php?content=download'
+    $page=Invoke-WebRequest -UseBasicParsing -Uri $pageUrl -Headers @{'User-Agent'='Huymaier-Console/0.26.4'}
+    $html=[string]$page.Content
+    $matches=[regex]::Matches($html,'(?i)href=["''](?<url>[^"'']*BigPEmu[^"'']*(?:Win|Windows|x64|64)[^"'']*\.zip)["'']')
+    if($matches.Count -eq 0){$matches=[regex]::Matches($html,'(?i)href=["''](?<url>[^"'']*BigPEmu[^"'']*\.zip)["'']')}
+    if($matches.Count -eq 0){throw 'The current official BigPEmu Windows archive could not be identified from the BigPEmu download page.'}
+    $href=[System.Net.WebUtility]::HtmlDecode($matches[0].Groups['url'].Value)
+    $url=$href;if($href -notmatch '^https?://'){$url=(New-Object Uri ([uri]$pageUrl),$href).AbsoluteUri}
+    $target=Join-Path $DestinationRoot 'BigPEmu';$work=Join-Path $env:TEMP ('hc-bigpemu-'+[guid]::NewGuid().ToString('N'));New-Item -ItemType Directory -Force -Path $work|Out-Null
+    try{$archive=Join-Path $work 'BigPEmu-Windows.zip';Invoke-WebRequest -UseBasicParsing -Headers $headers -Uri $url -OutFile $archive;New-Item -ItemType Directory -Force -Path $target|Out-Null;Expand-HcArchive $archive $target;$exe=Get-ChildItem -LiteralPath $target -Filter 'BigPEmu.exe' -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1;if(-not $exe){$exe=Get-ChildItem -LiteralPath $target -Filter 'bigpemu.exe' -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1};if(-not $exe){throw 'BigPEmu.exe was not found after extraction.'};return $exe.FullName}finally{Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue}
+}
+
 function Install-StellaLatest {
     $page=Invoke-WebRequest -UseBasicParsing -Uri 'https://stella-emu.github.io/downloads.html' -Headers @{'User-Agent'='Huymaier-Console/0.26.4'}
     $html=[string]$page.Content
@@ -156,6 +170,11 @@ switch($PlatformId){
         $dest=Join-Path $DestinationRoot 'RPCS3';& $script -Destination $dest
         $exe=Get-ChildItem -LiteralPath $dest -Filter 'rpcs3.exe' -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1 -ExpandProperty FullName
     }
+    'ATARILYNX' {$exe=Install-MednafenLatest}
+    'NEOGEO' {$exe=Install-GithubArchive 'finalburnneo/FBNeo' { $_.name -match '(?i)(fbneo|finalburn).*(windows|win|x64|64).*\.(zip|7z)$' -and $_.name -notmatch '(?i)(source|debug|symbols|pdb)' } 'FinalBurnNeo' @('fbneo.exe','FinalBurnNeo.exe')}
+    'NGPC' {$exe=Install-MednafenLatest}
+    'JAGUAR' {$exe=Install-BigPEmuLatest}
+    'PRIMEHACK' {$exe=Install-GithubArchive 'shiiion/dolphin' { $_.name -match '(?i)(primehack|dolphin).*(windows|win|x64|64).*\.(zip|7z)$' -and $_.name -notmatch '(?i)(source|symbols|pdb|debug)' } 'PrimeHack' @('PrimeHack.exe','DolphinQt2.exe','Dolphin.exe')}
     'ATARI2600' {$exe=Install-StellaLatest}
     'NES' {$exe=Install-GithubArchive 'nesdev-org/MesenCE' { $_.name -match '(?i)(mesen).*(windows|win|x64|64).*\.(zip|7z)$' -and $_.name -notmatch '(?i)(source|symbols|pdb|debug)' } 'MesenCE' @('Mesen.exe','Mesen2.exe')}
     'SNES' {$exe=Install-GithubArchive 'nesdev-org/MesenCE' { $_.name -match '(?i)(mesen).*(windows|win|x64|64).*\.(zip|7z)$' -and $_.name -notmatch '(?i)(source|symbols|pdb|debug)' } 'MesenCE' @('Mesen.exe','Mesen2.exe')}

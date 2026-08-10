@@ -27,6 +27,11 @@ function Add-Root([System.Collections.ArrayList]$Target,[string]$Value){
 }
 function Get-Extensions([string]$Id){
     switch($Id.ToUpperInvariant()){
+        'ATARILYNX' { return @('.lnx','.lyx','.o','.zip') }
+        'NEOGEO' { return @('.zip','.7z','.neo') }
+        'NGPC' { return @('.ngc','.ngp','.npc','.zip') }
+        'JAGUAR' { return @('.j64','.jag','.rom','.bin','.abs','.cof','.zip') }
+        'PRIMEHACK' { return @('.iso','.rvz','.wbfs','.gcm','.ciso') }
         'ATARI2600' { return @('.a26','.bin','.rom','.zip') }
         'NES' { return @('.nes','.fds','.unf','.unif','.zip') }
         'SNES' { return @('.sfc','.smc','.fig','.swc','.zip') }
