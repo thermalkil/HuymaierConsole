@@ -11,5 +11,9 @@ if(-not(Test-Path -LiteralPath $core -PathType Leaf)){
     exit 1
 }
 
+# HuymaierInstallerCore.ps1 exits 1 itself on a transactional failure. A
+# successful core invocation returns normally, so the public wrapper owns the
+# successful process exit code explicitly. Never depend on $LASTEXITCODE here:
+# PowerShell scripts do not guarantee that automatic variable is initialized.
 & $core -PackageRoot $PSScriptRoot -SilentUpdate:$SilentUpdate
-exit $LASTEXITCODE
+exit 0
