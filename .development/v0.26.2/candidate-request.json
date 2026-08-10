@@ -1,0 +1,10 @@
+{
+  "candidate": "v0.26.2-rc1",
+  "version": "0.26.2",
+  "base_release": "v0.26.1",
+  "base_asset": "HC261.zip",
+  "package_root": "HC262",
+  "asset_name": "HC262.zip",
+  "requested_at": "2026-08-10T14:55:00Z",
+  "focus": "Complete v0.26.2 combined candidate: Game Bar over Huymaier-native console surfaces while main shell Guide remains Quick Access; controller-only visual color wheels; persisted Games platform reorder/hide/show/per-tile size layout editor; shared Manage/action-card typography clipping fix; Steam client unified install/update/verify/uninstall/launch and transfer telemetry; safe GOG/Amazon indeterminate observed-write telemetry; preserved v0.26.1 storefront import and Xbox identity fixes; exact x64 transactional package integrity"
+}
