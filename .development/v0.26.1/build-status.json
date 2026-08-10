@@ -1,8 +1,8 @@
 ﻿{
-    "candidate":  "v0.26.1-rc3",
-    "result":  "failure",
-    "runId":  "31374012219",
+    "candidate":  "v0.26.1-rc4",
+    "result":  "success",
+    "runId":  "31374863826",
     "runAttempt":  "1",
-    "commit":  "0db0add5d15832f5031bbff7b3698fd0c33d68e6",
-    "recordedAtUtc":  "2026-08-10T09:20:07.8461677Z"
+    "commit":  "ac250172adf8c1760a1888d9fa4dcf4d8baf746b",
+    "recordedAtUtc":  "2026-08-10T09:31:43.1544722Z"
 }
