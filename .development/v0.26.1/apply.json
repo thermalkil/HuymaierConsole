@@ -1,0 +1,5 @@
+{
+  "batch": "system-integrity-1",
+  "script": "apply_system_integrity.py",
+  "requested_at": "2026-08-10T08:25:00Z"
+}
