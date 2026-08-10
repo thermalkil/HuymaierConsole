@@ -54,7 +54,9 @@ jobs:
           if(-not(Test-Path -LiteralPath $source)){throw 'HuymaierFSEHost.cs is missing.'}
           & $csc /noconfig /nologo /target:winexe /platform:x64 /optimize+ ('/out:'+$output) $source
           if($LASTEXITCODE -ne 0 -or -not(Test-Path -LiteralPath $output)){throw 'x64 FSE Home host compilation failed.'}
-          git add -f FSEPackage/HuymaierFSEHost.exe
+          # Intent-to-add makes the generated path visible to git ls-files during
+          # staging without placing the generated binary in the commit index.
+          git add -N -f FSEPackage/HuymaierFSEHost.exe
 
       - name: Build and integrity-test release-shaped candidate
         shell: powershell
@@ -92,6 +94,8 @@ jobs:
           STATUS_PATH: ${{ steps.trigger.outputs.status }}
         run: |
           $ErrorActionPreference='Stop'
+          # Never allow generated build outputs into the source-control commit.
+          git reset -- FSEPackage/HuymaierFSEHost.exe 2>$null
           $state=[ordered]@{
             candidate=$env:CANDIDATE
             result=$env:BUILD_RESULT
