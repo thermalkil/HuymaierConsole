@@ -1,5 +1,5 @@
 {
-  "batch": "rc8-runtime-ownership-1",
-  "script": "apply_rc8_runtime_ownership.py",
-  "requested_at": "2026-08-10T10:26:00Z"
+  "batch": "rc9-installer-wrapper-1",
+  "script": "apply_rc9_installer_wrapper.py",
+  "requested_at": "2026-08-10T10:37:00Z"
 }
