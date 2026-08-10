@@ -1,5 +1,5 @@
 {
-  "batch": "next-combined-gamebar-customization-5",
-  "script": "apply_next_combined_customization.py",
-  "requested_at": "2026-08-10T12:15:00Z"
+  "batch": "next-gamebar-native-compile-fix-1",
+  "script": "apply_next_native_compile_fix.py",
+  "requested_at": "2026-08-10T12:24:00Z"
 }
