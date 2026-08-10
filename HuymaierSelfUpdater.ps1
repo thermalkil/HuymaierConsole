@@ -5,64 +5,98 @@ param(
 )
 Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
-$logRoot=Join-Path $env:LOCALAPPDATA 'Huymaier Console\Logs';New-Item -ItemType Directory -Force -Path $logRoot|Out-Null
+
+$logRoot=Join-Path $env:LOCALAPPDATA 'Huymaier Console\Logs'
+New-Item -ItemType Directory -Force -Path $logRoot|Out-Null
 $log=Join-Path $logRoot ('self-update-'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'.log')
-function Log([string]$m){try{Add-Content -LiteralPath $log -Value ((Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff')+' '+$m) -Encoding UTF8}catch{}}
 $temp=Join-Path $env:TEMP ('HuymaierConsoleUpdate-'+[guid]::NewGuid().ToString('N'))
-$backup=Join-Path $env:TEMP ('HuymaierConsoleBackup-'+[guid]::NewGuid().ToString('N'))
-try{
-    Log "Updater waiting for PID $ParentProcessId"
-    try{Wait-Process -Id $ParentProcessId -Timeout 60 -ErrorAction SilentlyContinue}catch{}
-    Start-Sleep -Milliseconds 500
-    if(-not (Test-Path -LiteralPath $PackagePath -PathType Leaf)){throw "Downloaded update package is missing: $PackagePath"}
-    New-Item -ItemType Directory -Force -Path $temp,$backup|Out-Null
-    # Recursive rollback snapshot. Exclude only transient Logs/Updates so a
-    # failed install cannot leave old native binaries mixed with new scripts.
-    $backupInstall=Join-Path $backup 'install'
-    New-Item -ItemType Directory -Force -Path $backupInstall|Out-Null
-    if(Test-Path -LiteralPath $InstallRoot){
-        foreach($dir in @(Get-ChildItem -LiteralPath $InstallRoot -Directory -Recurse -ErrorAction SilentlyContinue)){
-            $relative=$dir.FullName.Substring($InstallRoot.Length).TrimStart('\\')
-            if($relative -match '^(?i)(Logs|Updates)(\\|$)'){continue}
-            New-Item -ItemType Directory -Force -Path (Join-Path $backupInstall $relative)|Out-Null
-        }
-        foreach($f in @(Get-ChildItem -LiteralPath $InstallRoot -File -Recurse -ErrorAction SilentlyContinue)){
-            $relative=$f.FullName.Substring($InstallRoot.Length).TrimStart('\\')
-            if($relative -match '^(?i)(Logs|Updates)(\\|$)'){continue}
-            $target=Join-Path $backupInstall $relative
-            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target)|Out-Null
-            Copy-Item -LiteralPath $f.FullName -Destination $target -Force -ErrorAction SilentlyContinue
-        }
-    }
-    Expand-Archive -LiteralPath $PackagePath -DestinationPath $temp -Force
-    $installer=Get-ChildItem -LiteralPath $temp -Recurse -File -Filter 'Install-HuymaierConsole.ps1'|Select-Object -First 1
-    if($null -eq $installer){throw 'The downloaded GitHub Release does not contain Install-HuymaierConsole.ps1.'}
-    Log "Running installer $($installer.FullName)"
-    $quotedInstaller='"'+$installer.FullName+'"'
-    $arguments="-NoLogo -NoProfile -ExecutionPolicy Bypass -File $quotedInstaller -SilentUpdate"
-    $proc=Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList $arguments -Wait -PassThru -WindowStyle Hidden
-    if($proc.ExitCode -ne 0){throw "Installer exited with code $($proc.ExitCode)."}
-    $exe=Join-Path $InstallRoot 'HuymaierConsole.exe';if(-not (Test-Path -LiteralPath $exe)){throw 'Updated HuymaierConsole.exe was not created.'}
-    Log 'Update installed successfully; relaunching.'
-    Start-Process -FilePath $exe -WorkingDirectory $InstallRoot|Out-Null
-}catch{
-    Log ('ERROR '+$_.Exception.Message)
-    try{
-        $backupInstall=Join-Path $backup 'install'
-        if(Test-Path -LiteralPath $backupInstall){
-            foreach($dir in @(Get-ChildItem -LiteralPath $backupInstall -Directory -Recurse -ErrorAction SilentlyContinue)){
-                $relative=$dir.FullName.Substring($backupInstall.Length).TrimStart('\\')
-                New-Item -ItemType Directory -Force -Path (Join-Path $InstallRoot $relative)|Out-Null
-            }
-            foreach($f in @(Get-ChildItem -LiteralPath $backupInstall -File -Recurse -ErrorAction SilentlyContinue)){
-                $relative=$f.FullName.Substring($backupInstall.Length).TrimStart('\\')
-                $target=Join-Path $InstallRoot $relative
-                New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target)|Out-Null
-                Copy-Item -LiteralPath $f.FullName -Destination $target -Force -ErrorAction SilentlyContinue
-            }
-        }
-        $old=Join-Path $InstallRoot 'HuymaierConsole.exe';if(Test-Path -LiteralPath $old){Start-Process -FilePath $old -WorkingDirectory $InstallRoot|Out-Null}
-    }catch{}
-}finally{
-    Remove-Item -LiteralPath $temp,$backup -Recurse -Force -ErrorAction SilentlyContinue
+$mutex=$null
+$ownsMutex=$false
+$relaunch=''
+$success=$false
+
+function Log([string]$Message,[string]$Level='INFO'){
+    try{Add-Content -LiteralPath $log -Value ((Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff')+" [$Level] "+$Message) -Encoding UTF8}catch{}
 }
+
+function Wait-HcProcessExit {
+    param([int]$Id,[int]$TimeoutSeconds)
+    $deadline=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do{
+        try{[void](Get-Process -Id $Id -ErrorAction Stop)}catch{return}
+        Start-Sleep -Milliseconds 200
+    }while([DateTime]::UtcNow -lt $deadline)
+    throw "Timed out waiting for Huymaier Console PID $Id to exit."
+}
+
+function Assert-HcZipEntriesSafe {
+    param([string]$Path)
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $archive=[IO.Compression.ZipFile]::OpenRead($Path)
+    try{
+        if($archive.Entries.Count -eq 0){throw 'Downloaded update ZIP is empty.'}
+        foreach($entry in $archive.Entries){
+            $name=[string]$entry.FullName
+            if([string]::IsNullOrWhiteSpace($name)){continue}
+            $normalized=$name.Replace('/','\')
+            if([IO.Path]::IsPathRooted($normalized) -or $normalized -match '(^|\)\.\.(\|$)'){throw "Unsafe ZIP entry path: $name"}
+        }
+    }finally{$archive.Dispose()}
+}
+
+try{
+    $created=$false
+    $mutex=New-Object System.Threading.Mutex($true,'Local\HuymaierConsole.Updater',[ref]$created)
+    $ownsMutex=$created
+    if(-not $ownsMutex){throw 'Another Huymaier Console update is already running.'}
+
+    Log "Waiting for Huymaier Console PID $ParentProcessId to exit."
+    Wait-HcProcessExit -Id $ParentProcessId -TimeoutSeconds 90
+    if(-not(Test-Path -LiteralPath $PackagePath -PathType Leaf)){throw "Downloaded update package is missing: $PackagePath"}
+
+    $sidecar=$PackagePath+'.sha256'
+    if(-not(Test-Path -LiteralPath $sidecar -PathType Leaf)){throw 'The published SHA-256 sidecar is missing; update installation is blocked.'}
+    $line=Get-Content -LiteralPath $sidecar -Encoding ASCII|Select-Object -First 1
+    if($line -notmatch '^([0-9a-fA-F]{64})(?:\s+.+)?$'){throw 'The published SHA-256 sidecar is invalid.'}
+    $expected=$Matches[1].ToLowerInvariant()
+    $actual=(Get-FileHash -LiteralPath $PackagePath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if($actual -ne $expected){throw 'Downloaded update ZIP does not match the SHA-256 published with the release.'}
+    Log "Release SHA-256 verified: $actual"
+
+    Assert-HcZipEntriesSafe -Path $PackagePath
+    New-Item -ItemType Directory -Force -Path $temp|Out-Null
+    Expand-Archive -LiteralPath $PackagePath -DestinationPath $temp -Force
+    $installers=@(Get-ChildItem -LiteralPath $temp -Recurse -File -Filter 'Install-HuymaierConsole.ps1')
+    if($installers.Count -ne 1){throw "Expected exactly one installer in the release ZIP; found $($installers.Count)."}
+    $installer=$installers[0]
+
+    # The v0.26.1+ installer owns the complete package transaction and rollback.
+    # The updater deliberately does not maintain a second competing rollback
+    # implementation.
+    Log "Starting verified transactional installer: $($installer.FullName)"
+    $proc=Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',$installer.FullName,'-SilentUpdate') -Wait -PassThru -WindowStyle Hidden
+    if($proc.ExitCode -ne 0){throw "Transactional installer exited with code $($proc.ExitCode)."}
+
+    $exe=Join-Path $InstallRoot 'HuymaierConsole.exe'
+    $marker=Join-Path $InstallRoot 'install-incomplete.json'
+    if(-not(Test-Path -LiteralPath $exe -PathType Leaf)){throw 'Updated HuymaierConsole.exe is missing after installer success.'}
+    if(Test-Path -LiteralPath $marker -PathType Leaf){throw 'Installer returned success while the incomplete-install marker still exists.'}
+    $relaunch=$exe
+    $success=$true
+    Log 'Verified update transaction completed successfully.'
+}catch{
+    Log $_.Exception.Message 'ERROR'
+    $old=Join-Path $InstallRoot 'HuymaierConsole.exe'
+    $marker=Join-Path $InstallRoot 'install-incomplete.json'
+    if((Test-Path -LiteralPath $old -PathType Leaf) -and -not(Test-Path -LiteralPath $marker -PathType Leaf)){$relaunch=$old}
+}finally{
+    Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
+    if($ownsMutex -and $null -ne $mutex){try{$mutex.ReleaseMutex()}catch{};$ownsMutex=$false}
+    if($null -ne $mutex){try{$mutex.Dispose()}catch{};$mutex=$null}
+}
+
+# Release the updater gate before launching the new verified host. This avoids a
+# relaunch race where the new process sees an update still in progress.
+if($relaunch){Start-Sleep -Milliseconds 250;Start-Process -FilePath $relaunch -WorkingDirectory $InstallRoot|Out-Null}
+if(-not $success){exit 1}
+exit 0
