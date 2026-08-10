@@ -1,4 +1,4 @@
 {
-  "batch": "console-fidelity-4-authentic-integration",
+  "batch": "console-fidelity-4-authentic-integration-rerun",
   "script": "apply_authentic_console_integration.py"
 }
