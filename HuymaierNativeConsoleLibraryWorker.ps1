@@ -32,6 +32,12 @@ function Get-Extensions([string]$Id){
         'WII' { return @('.iso','.wbfs','.rvz','.wia','.gcz') }
         'WIIU' { return @('.wua','.wud','.wux','.rpx') }
         'SWITCH' { return @('.nsp','.xci','.nca','.nro') }
+        '3DS' { return @('.3ds','.cci','.cxi','.app','.zcci','.zcxi') }
+        'NDS' { return @('.nds','.srl','.zip') }
+        'DSI' { return @('.nds','.srl','.app') }
+        'DREAMCAST' { return @('.gdi','.cdi','.chd','.cue') }
+        'SATURN' { return @('.cue','.chd','.ccd','.mds','.iso') }
+        'PSP' { return @('.iso','.cso','.pbp','.elf') }
         'XBOX' { return @('.iso','.xiso','.xbe') }
         'XBOX360' { return @('.iso','.xex','.zar') }
         default { return @() }
