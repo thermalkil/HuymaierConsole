@@ -1,10 +1,10 @@
 {
-  "candidate": "v0.26.1-rc1",
+  "candidate": "v0.26.1-rc2",
   "version": "0.26.1",
   "base_release": "v0.26.0",
   "base_asset": "HC260.zip",
   "package_root": "HC261",
   "asset_name": "HC261.zip",
-  "requested_at": "2026-08-10T09:01:00Z",
-  "focus": "release-shaped system-integrity candidate: exact x64 native/FSE artifacts, closed package hashes, transactional fail-closed install/update, locked-file failure injection, global Guide routing, reversible Windows controller setting"
+  "requested_at": "2026-08-10T09:04:00Z",
+  "focus": "RC2 after deterministic FSE host framework-reference repair; retain exact x64 artifacts, closed package hashes, transactional fail-closed install/update, locked-file failure injection, global Guide routing, reversible Windows controller setting"
 }
