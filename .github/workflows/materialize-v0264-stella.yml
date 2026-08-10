@@ -40,7 +40,8 @@ jobs:
           $ErrorActionPreference='Stop'
           foreach($path in @('.\HuymaierEmulatorSettingsWorker.ps1','.\HuymaierEmulatorSettings.ps1')){$t=$null;$e=$null;[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path),[ref]$t,[ref]$e);if($e.Count){$e|ForEach-Object{Write-Host "$path : $($_.Message)"};throw "$path parse failed."}}
           $worker=Get-Content -Raw 'HuymaierEmulatorSettingsWorker.ps1' -Encoding UTF8
-          foreach($required in @('Get-StellaHelpText','Arguments='' -help'''.Replace(''' ','''') ,'Get-StellaCliSettings','Set-StellaCliOverride','stella-command-line-overrides.json','Only entries with an argument placeholder are persistent settings')){if($worker -notmatch [regex]::Escape($required)){throw "Stella settings invariant missing: $required"}}
+          foreach($required in @('Get-StellaHelpText','Get-StellaCliSettings','Set-StellaCliOverride','stella-command-line-overrides.json','Only entries with an argument placeholder are persistent settings')){if($worker -notmatch [regex]::Escape($required)){throw "Stella settings invariant missing: $required"}}
+          if($worker -notmatch [regex]::Escape("`$psi.Arguments='-help'")){throw 'Stella settings inventory is not dynamically sourced from the installed Stella -help output.'}
           if($worker -match 'stella\.sqlite3[^\r\n]*(Set|Write|Remove|Delete)'){throw 'Huymaier must not write Stella 7 SQLite configuration directly.'}
           $native=Get-Content -Raw 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8
           foreach($required in @('BuildStellaOverrideArguments','stella-command-line-overrides.json','definition.Shell == "Atari2600" && exe.IndexOf("stella"')){if($native -notmatch [regex]::Escape($required)){throw "Stella launch override invariant missing: $required"}}
