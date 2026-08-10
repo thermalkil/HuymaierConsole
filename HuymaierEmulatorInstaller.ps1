@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][string]$PlatformId,
     [Parameter(Mandatory=$true)][string]$DestinationRoot,
@@ -13,7 +13,7 @@ $DestinationRoot=[IO.Path]::GetFullPath($DestinationRoot)
 New-Item -ItemType Directory -Force -Path $DestinationRoot|Out-Null
 if(-not $ConsoleRoot){$ConsoleRoot=Split-Path -Parent $MyInvocation.MyCommand.Path}
 $ConsoleRoot=[IO.Path]::GetFullPath($ConsoleRoot)
-$headers=@{'User-Agent'='Huymaier-Console/0.26.3';'Accept'='application/vnd.github+json'}
+$headers=@{'User-Agent'='Huymaier-Console/0.26.4';'Accept'='application/vnd.github+json'}
 
 function Expand-HcArchive {
     param([Parameter(Mandatory=$true)][string]$Archive,[Parameter(Mandatory=$true)][string]$Destination)
@@ -53,8 +53,11 @@ function Install-GithubArchive {
     try{
         $archive=Join-Path $work ([string]$asset.name)
         Invoke-WebRequest -UseBasicParsing -Headers $headers -Uri ([string]$asset.browser_download_url) -OutFile $archive
+        if($asset.PSObject.Properties['digest'] -and [string]$asset.digest -match '(?i)^sha256:(?<hash>[0-9a-f]{64})$'){
+            $actual=(Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()
+            if($actual -ne $matches['hash'].ToLowerInvariant()){throw "The downloaded release asset failed SHA-256 verification: $($asset.name)"}
+        }
         $stage=Join-Path $work 'stage';Expand-HcArchive $archive $stage
-        Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
         New-Item -ItemType Directory -Force -Path $target|Out-Null
         $roots=@(Get-ChildItem -LiteralPath $stage -Directory -ErrorAction SilentlyContinue)
         $source=$stage
@@ -66,7 +69,7 @@ function Install-GithubArchive {
 }
 
 function Install-DolphinLatest {
-    $page=Invoke-WebRequest -UseBasicParsing -Uri 'https://dolphin-emu.org/download/' -Headers @{'User-Agent'='Huymaier-Console/0.26.3'}
+    $page=Invoke-WebRequest -UseBasicParsing -Uri 'https://dolphin-emu.org/download/' -Headers @{'User-Agent'='Huymaier-Console/0.26.4'}
     $html=[string]$page.Content
     $links=[regex]::Matches($html,'(?i)href=["''](?<url>[^"'']*dolphin-(?<version>[0-9A-Za-z._-]+)-x64\.7z)["'']')
     if($links.Count -eq 0){throw 'The current official Dolphin Windows x64 release link could not be identified.'}
@@ -78,10 +81,40 @@ function Install-DolphinLatest {
     $archiveName="dolphin-$version-x64.7z"
     $target=Join-Path $DestinationRoot 'Dolphin'
     $work=Join-Path $env:TEMP ('hc-dolphin-'+[guid]::NewGuid().ToString('N'));New-Item -ItemType Directory -Force -Path $work|Out-Null
-    try{$archive=Join-Path $work $archiveName;Invoke-WebRequest -UseBasicParsing -Headers $headers -Uri $url -OutFile $archive;Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue;Expand-HcArchive $archive $target;$exe=Get-ChildItem -LiteralPath $target -Filter 'Dolphin.exe' -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1;if(-not $exe){throw 'Dolphin.exe was not found after extraction.'};return $exe.FullName}finally{Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue}
+    try{$archive=Join-Path $work $archiveName;Invoke-WebRequest -UseBasicParsing -Headers $headers -Uri $url -OutFile $archive;New-Item -ItemType Directory -Force -Path $target|Out-Null;Expand-HcArchive $archive $target;$exe=Get-ChildItem -LiteralPath $target -Filter 'Dolphin.exe' -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1;if(-not $exe){throw 'Dolphin.exe was not found after extraction.'};return $exe.FullName}finally{Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue}
 }
+
+function Install-MednafenLatest {
+    $releasePage=Invoke-WebRequest -UseBasicParsing -Uri 'https://mednafen.github.io/releases/' -Headers @{'User-Agent'='Huymaier-Console/0.26.4'}
+    $html=[string]$releasePage.Content
+    $matches=[regex]::Matches($html,'(?i)href=["''](?<url>[^"'']*mednafen-(?<version>[0-9]+(?:\.[0-9]+)+)-win64\.zip)["'']')
+    if($matches.Count -eq 0){throw 'The current official Mednafen 64-bit Windows release could not be identified.'}
+    $href=[System.Net.WebUtility]::HtmlDecode($matches[0].Groups['url'].Value)
+    $version=$matches[0].Groups['version'].Value
+    $fileName="mednafen-$version-win64.zip"
+    $url=$href
+    if($href -notmatch '^https?://'){$url=(New-Object Uri ([uri]'https://mednafen.github.io/releases/'),$href).AbsoluteUri}
+    $target=Join-Path $DestinationRoot 'Mednafen'
+    $work=Join-Path $env:TEMP ('hc-mednafen-'+[guid]::NewGuid().ToString('N'));New-Item -ItemType Directory -Force -Path $work|Out-Null
+    try{
+        $archive=Join-Path $work $fileName
+        Invoke-WebRequest -UseBasicParsing -Headers $headers -Uri $url -OutFile $archive
+        try{
+            $home=Invoke-WebRequest -UseBasicParsing -Uri 'https://mednafen.github.io/?lang=en' -Headers @{'User-Agent'='Huymaier-Console/0.26.4'}
+            $pattern=[regex]::Escape($fileName)+'\s*(?:<[^>]+>|\s)*SHA-256:\s*(?<sha>[0-9a-fA-F]{64})'
+            $shaMatch=[regex]::Match([string]$home.Content,$pattern,[Text.RegularExpressions.RegexOptions]::Singleline)
+            if($shaMatch.Success){$actual=(Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant();if($actual -ne $shaMatch.Groups['sha'].Value.ToLowerInvariant()){throw 'The official Mednafen archive failed SHA-256 verification.'}}
+        }catch{if($_.Exception.Message -match 'failed SHA-256'){throw}}
+        New-Item -ItemType Directory -Force -Path $target|Out-Null
+        Expand-HcArchive $archive $target
+        $exe=Get-ChildItem -LiteralPath $target -Filter 'mednafen.exe' -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1
+        if(-not $exe){throw 'mednafen.exe was not found after extraction.'}
+        return $exe.FullName
+    }finally{Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue}
+}
+
 function Install-EdenLatest {
-    $release=Invoke-RestMethod -Headers @{'User-Agent'='Huymaier-Console/0.26.3'} -Uri 'https://git.eden-emu.dev/api/v1/repos/eden-emu/eden/releases/latest'
+    $release=Invoke-RestMethod -Headers @{'User-Agent'='Huymaier-Console/0.26.4'} -Uri 'https://git.eden-emu.dev/api/v1/repos/eden-emu/eden/releases/latest'
     $asset=@($release.assets|Where-Object{$_.name -match '(?i)(windows|win).*(x64|amd64).*\.(zip|7z)$' -or $_.name -match '(?i)(x64|amd64).*(windows|win).*\.(zip|7z)$'}|Select-Object -First 1)
     if(-not $asset){$asset=@($release.assets|Where-Object{$_.name -match '(?i)windows.*\.(zip|7z)$'}|Select-Object -First 1)}
     if(-not $asset){throw 'The latest Eden Windows archive could not be identified.'}
@@ -111,6 +144,12 @@ switch($PlatformId){
         $dest=Join-Path $DestinationRoot 'RPCS3';& $script -Destination $dest
         $exe=Get-ChildItem -LiteralPath $dest -Filter 'rpcs3.exe' -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1 -ExpandProperty FullName
     }
+    '3DS' {$exe=Install-GithubArchive 'azahar-emu/azahar' { $_.name -match '(?i)azahar.*windows.*\.(zip|7z)$' -and $_.name -notmatch '(?i)(libretro|symbols|debug|pdb|source)' } 'Azahar' @('azahar.exe','Azahar.exe')}
+    'NDS' {$exe=Install-GithubArchive 'melonDS-emu/melonDS' { $_.name -match '(?i)(windows|win).*(x86_64|x64|64).*\.(zip|7z)$' -or $_.name -match '(?i)melonDS.*windows.*\.(zip|7z)$' } 'melonDS' @('melonDS.exe')}
+    'DSI' {$exe=Install-GithubArchive 'melonDS-emu/melonDS' { $_.name -match '(?i)(windows|win).*(x86_64|x64|64).*\.(zip|7z)$' -or $_.name -match '(?i)melonDS.*windows.*\.(zip|7z)$' } 'melonDS' @('melonDS.exe')}
+    'DREAMCAST' {$exe=Install-GithubArchive 'flyinghead/flycast' { $_.name -match '(?i)(windows|win).*(x64|64).*\.(zip|7z)$' -or $_.name -match '(?i)flycast.*(windows|win).*\.(zip|7z)$' } 'Flycast' @('flycast.exe','Flycast.exe')}
+    'SATURN' {$exe=Install-MednafenLatest}
+    'PSP' {$exe=Install-GithubArchive 'hrydgard/ppsspp' { $_.name -match '(?i)PPSSPP.*Windows.*64.*\.zip$' -or $_.name -match '(?i)Windows64.*\.zip$' } 'PPSSPP' @('PPSSPPWindows64.exe','PPSSPPWindows.exe','PPSSPPQt.exe')}
     'N64' {$exe=Install-GithubArchive 'Rosalie241/RMG' { $_.name -match '(?i)(windows|win).*(x64|64).*\.(zip|7z)$' -or $_.name -match '(?i)RMG.*Windows.*\.(zip|7z)$' } 'RMG' @('RMG.exe',"Rosalie's Mupen GUI.exe")}
     'GAMECUBE' {$exe=Install-DolphinLatest}
     'WII' {$exe=Install-DolphinLatest}

@@ -3730,6 +3730,30 @@ namespace HuymaierConsole.NativeApp
                 AddExisting(roots, Path.Combine(exeRoot, "User", "Wii"));
             }
             else if (definition.Shell == "WiiU") { AddExisting(roots, Path.Combine(exeRoot, "mlc01", "usr", "save")); AddExisting(roots, Path.Combine(local, "Cemu", "mlc01", "usr", "save")); }
+            else if (definition.Shell == "3DS")
+            {
+                string azaharData=settings.emulatorDataPath; AddExisting(roots, Path.Combine(azaharData,"sdmc")); AddExisting(roots, Path.Combine(azaharData,"nand")); AddExisting(roots,Path.Combine(app,"Azahar","sdmc")); AddExisting(roots,Path.Combine(app,"azahar","sdmc"));
+            }
+            else if (definition.Shell == "NDS")
+            {
+                AddExisting(roots, settings.emulatorDataPath); AddExisting(roots, Path.Combine(app,"melonDS")); AddExisting(roots, Path.Combine(local,"melonDS"));
+            }
+            else if (definition.Shell == "DSI")
+            {
+                AddExisting(roots, settings.emulatorDataPath); AddExisting(roots, Path.Combine(settings.emulatorDataPath,"NAND")); AddExisting(roots, Path.Combine(app,"melonDS")); AddExisting(roots, Path.Combine(local,"melonDS"));
+            }
+            else if (definition.Shell == "Dreamcast")
+            {
+                AddExisting(roots, settings.emulatorDataPath); AddExisting(roots, Path.Combine(exeRoot,"data")); AddExisting(roots, exeRoot); AddExisting(roots, Path.Combine(app,"flycast")); AddExisting(roots, Path.Combine(local,"flycast"));
+            }
+            else if (definition.Shell == "Saturn")
+            {
+                AddExisting(roots, Path.Combine(settings.emulatorDataPath,"sav")); AddExisting(roots, Path.Combine(exeRoot,"sav")); AddExisting(roots, Path.Combine(docs,"Mednafen","sav")); AddExisting(roots, Path.Combine(app,"Mednafen","sav"));
+            }
+            else if (definition.Shell == "PSP")
+            {
+                AddExisting(roots, Path.Combine(settings.emulatorDataPath,"PSP","SAVEDATA")); AddExisting(roots, Path.Combine(settings.emulatorDataPath,"memstick","PSP","SAVEDATA")); AddExisting(roots, Path.Combine(exeRoot,"memstick","PSP","SAVEDATA")); AddExisting(roots, Path.Combine(docs,"PPSSPP","PSP","SAVEDATA"));
+            }
             else if (definition.Shell == "Switch") { AddExisting(roots, Path.Combine(app, "Ryujinx", "bis", "user", "save")); AddExisting(roots, Path.Combine(app, "Eden", "nand", "user", "save")); }
             else if (definition.Shell == "Xbox") { AddExisting(roots, Path.Combine(app, "xemu")); AddExisting(roots, Path.Combine(local, "xemu")); }
             else if (definition.Shell == "Xbox360") { AddExisting(roots, Path.Combine(exeRoot, "content")); AddExisting(roots, Path.Combine(docs, "Xenia", "content")); }
