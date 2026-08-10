@@ -4222,6 +4222,13 @@ namespace HuymaierConsole.NativeApp
         }
 
 
+
+        private string BuildMameOverrideArguments()
+        {
+            string path=Path.Combine(dataRoot,"mame-command-line-overrides.json");if(!File.Exists(path))return String.Empty;
+            try{Dictionary<string,object> values=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(path,Encoding.UTF8));if(values==null)return String.Empty;StringBuilder result=new StringBuilder();foreach(KeyValuePair<string,object> pair in values.OrderBy(delegate(KeyValuePair<string,object> item){return item.Key;},StringComparer.OrdinalIgnoreCase)){string key=pair.Key??String.Empty;if(!System.Text.RegularExpressions.Regex.IsMatch(key,"^[A-Za-z0-9_.-]+$"))continue;string value=pair.Value==null?String.Empty:Convert.ToString(pair.Value,CultureInfo.InvariantCulture);if(String.IsNullOrWhiteSpace(value))continue;if(result.Length>0)result.Append(' ');result.Append('-').Append(key).Append(' ').Append(QuoteProcessArgument(value));}return result.ToString();}catch(Exception ex){WritePlatformLog("Could not read MAME launch overrides: "+ex.Message,"WARN");return String.Empty;}
+        }
+
         private string BuildStellaOverrideArguments()
         {
             string path = Path.Combine(dataRoot, "stella-command-line-overrides.json");
@@ -4246,6 +4253,7 @@ namespace HuymaierConsole.NativeApp
         {
             string exe = Path.GetFileName(executable).ToLowerInvariant();
             string quoted = "\"" + gamePath.Replace("\"", String.Empty) + "\"";
+            if (definition.Shell == "Arcade" && exe.IndexOf("mame", StringComparison.OrdinalIgnoreCase) >= 0) { string driver=Path.GetFileNameWithoutExtension(gamePath); string romDir=Path.GetDirectoryName(gamePath); string overrides=BuildMameOverrideArguments(); StringBuilder mame=new StringBuilder(); if(!String.IsNullOrWhiteSpace(overrides))mame.Append(overrides).Append(' '); if(!String.IsNullOrWhiteSpace(romDir))mame.Append("-rompath ").Append(QuoteProcessArgument(romDir)).Append(' '); mame.Append(driver); return mame.ToString(); }
             if (definition.Shell == "Atari2600" && exe.IndexOf("stella", StringComparison.OrdinalIgnoreCase) >= 0) { string overrides = BuildStellaOverrideArguments(); return (String.IsNullOrWhiteSpace(overrides) ? String.Empty : overrides + " ") + quoted; }
             if (definition.Shell == "GameCube" || definition.Shell == "Wii") return "-b -e " + quoted;
             if (definition.Shell == "3DS") return quoted;

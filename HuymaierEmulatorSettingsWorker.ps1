@@ -132,6 +132,25 @@ function Get-SettingCategory {
 }
 
 
+
+function Get-MameOverridePath {
+    $dir=Split-Path -Parent $PlatformSettingsPath;if([string]::IsNullOrWhiteSpace($dir)){$dir=Join-Path (Join-Path $env:LOCALAPPDATA 'Huymaier Console\EmulatorPlatforms') 'ARCADE'};New-Item -ItemType Directory -Force -Path $dir|Out-Null;return Join-Path $dir 'mame-command-line-overrides.json'
+}
+function Read-MameOverrides {
+    $path=Get-MameOverridePath;$map=[ordered]@{};if(Test-Path -LiteralPath $path){try{$loaded=Get-Content -Raw $path -Encoding UTF8|ConvertFrom-Json;foreach($property in @($loaded.PSObject.Properties)){$map[[string]$property.Name]=[string]$property.Value}}catch{}};return $map
+}
+function Get-MameConfigText {
+    param($Settings);$exe=[string](Get-EntryProperty $Settings 'emulatorPath' '');if(-not(Test-Path $exe)){return ''}
+    try{$psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName=$exe;$psi.Arguments='-showconfig';$psi.UseShellExecute=$false;$psi.CreateNoWindow=$true;$psi.RedirectStandardOutput=$true;$psi.RedirectStandardError=$true;$process=[Diagnostics.Process]::Start($psi);if($null -eq $process){return ''};$stdout=$process.StandardOutput.ReadToEnd();$stderr=$process.StandardError.ReadToEnd();if(-not $process.WaitForExit(10000)){try{$process.Kill()}catch{};return ''};return (($stdout+[Environment]::NewLine+$stderr).Trim())}catch{return ''}
+}
+function Get-MameCliSettings {
+    param($Settings);$text=Get-MameConfigText $Settings;if([string]::IsNullOrWhiteSpace($text)){return [object[]]@()};$overrides=Read-MameOverrides;$path=Get-MameOverridePath;$result=New-Object Collections.ArrayList
+    foreach($line in ($text -split "`r?`n")){$raw=([string]$line).Trim();if(-not $raw -or $raw.StartsWith('#')){continue};$m=[regex]::Match($raw,'^(?<key>[A-Za-z0-9_.-]+)\s+(?<value>.*)$');if(-not $m.Success){continue};$key=$m.Groups['key'].Value;$value=$(if($overrides.Contains($key)){[string]$overrides[$key]}else{[string]$m.Groups['value'].Value.Trim()});$record=New-HcEmulatorSettingRecord -Format 'mame-cli' -FilePath $path -Section '' -Key $key -Value $value -LineIndex -1 -AdapterId 'mame';$record.DisplayName=$key;$record.Category=Get-SettingCategory $record;[void]$result.Add($record)};return [object[]]$result.ToArray()
+}
+function Set-MameCliOverride {
+    param([string]$Key,[AllowEmptyString()][string]$Value);if($Key -notmatch '^[A-Za-z0-9_.-]+$'){throw 'The MAME option name is invalid.'};$path=Get-MameOverridePath;$map=Read-MameOverrides;if(Test-Path $path){[void](Backup-HcEmulatorConfigFile -Path $path -AdapterId 'mame-cli')};if([string]::IsNullOrWhiteSpace($Value)){if($map.Contains($Key)){$map.Remove($Key)}}else{$map[$Key]=$Value};$object=New-Object psobject;foreach($name in @($map.Keys|Sort-Object)){Add-Member -InputObject $object -MemberType NoteProperty -Name ([string]$name) -Value ([string]$map[$name])};$object|ConvertTo-Json -Depth 4|Set-Content $path -Encoding UTF8
+}
+
 function Get-StellaOverridePath {
     $dir=Split-Path -Parent $PlatformSettingsPath
     if([string]::IsNullOrWhiteSpace($dir)){$dir=Join-Path (Join-Path $env:LOCALAPPDATA 'Huymaier Console\EmulatorPlatforms') 'ATARI2600'}
@@ -212,7 +231,7 @@ if([string]::IsNullOrWhiteSpace($adapterId)){
 }
 $roots=Get-ConfigRoots -AdapterId $adapterId -Settings $settings
 $configFiles=Get-ExplicitConfigFiles -AdapterId $adapterId -Roots $roots
-$inventory=$(if($adapterId -ieq 'stella'){@(Get-StellaCliSettings -Settings $settings)}else{@(Get-HcCompleteEmulatorSettingsInventory -AdapterId $adapterId -ConfigFiles $configFiles)})
+$inventory=$(if($adapterId -ieq 'stella'){@(Get-StellaCliSettings -Settings $settings)}elseif($adapterId -ieq 'mame'){@(Get-MameCliSettings -Settings $settings)}else{@(Get-HcCompleteEmulatorSettingsInventory -AdapterId $adapterId -ConfigFiles $configFiles)})
 foreach($setting in @($inventory)){$setting.Category=Get-SettingCategory $setting}
 
 
@@ -227,9 +246,9 @@ if($Mode -eq 'Set'){
     if([string]::IsNullOrWhiteSpace($Identity)){throw 'Set mode requires a setting identity.'}
     $target=@($inventory|Where-Object{[string]::Equals([string]$_.Identity,$Identity,[StringComparison]::Ordinal)}|Select-Object -First 1)
     if(-not $target){throw 'The requested emulator setting is no longer present. Refresh the native settings list.'}
-    if([string](Get-EntryProperty $target[0] 'Format' '') -eq 'stella-cli'){Set-StellaCliOverride -Key ([string](Get-EntryProperty $target[0] 'Key' '')) -Value $Value}else{Set-HcEmulatorConfigSetting -Setting $target[0] -Value $Value}
+    if([string](Get-EntryProperty $target[0] 'Format' '') -eq 'stella-cli'){Set-StellaCliOverride -Key ([string](Get-EntryProperty $target[0] 'Key' '')) -Value $Value}elseif([string](Get-EntryProperty $target[0] 'Format' '') -eq 'mame-cli'){Set-MameCliOverride -Key ([string](Get-EntryProperty $target[0] 'Key' '')) -Value $Value}else{Set-HcEmulatorConfigSetting -Setting $target[0] -Value $Value}
     $configFiles=Get-ExplicitConfigFiles -AdapterId $adapterId -Roots $roots
-    $inventory=$(if($adapterId -ieq 'stella'){@(Get-StellaCliSettings -Settings $settings)}else{@(Get-HcCompleteEmulatorSettingsInventory -AdapterId $adapterId -ConfigFiles $configFiles)})
+    $inventory=$(if($adapterId -ieq 'stella'){@(Get-StellaCliSettings -Settings $settings)}elseif($adapterId -ieq 'mame'){@(Get-MameCliSettings -Settings $settings)}else{@(Get-HcCompleteEmulatorSettingsInventory -AdapterId $adapterId -ConfigFiles $configFiles)})
     foreach($setting in @($inventory)){$setting.Category=Get-SettingCategory $setting}
 }
 

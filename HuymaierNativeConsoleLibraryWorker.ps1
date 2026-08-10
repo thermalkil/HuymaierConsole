@@ -27,6 +27,8 @@ function Add-Root([System.Collections.ArrayList]$Target,[string]$Value){
 }
 function Get-Extensions([string]$Id){
     switch($Id.ToUpperInvariant()){
+        'ARCADE' { return @('.zip','.7z','.chd') }
+        'FINALBURNNEO' { return @('.zip','.7z','.chd') }
         'ATARILYNX' { return @('.lnx','.lyx','.o','.zip') }
         'NEOGEO' { return @('.zip','.7z','.neo') }
         'NGPC' { return @('.ngc','.ngp','.npc','.zip') }

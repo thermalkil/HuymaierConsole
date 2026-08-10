@@ -86,6 +86,22 @@ function Install-DolphinLatest {
 
 
 
+
+function Install-MameLatest {
+    $assets=Get-GithubLatestAssets 'mamedev/mame'
+    $asset=@($assets|Where-Object{$_.name -match '(?i)^mame[0-9]+b?_64bit\.exe$' -or $_.name -match '(?i)mame.*64.*\.exe$'}|Select-Object -First 1)
+    if(-not $asset){throw 'The latest official MAME GitHub release did not expose a 64-bit Windows self-extracting archive.'}
+    $target=Join-Path $DestinationRoot 'MAME';$work=Join-Path $env:TEMP ('hc-mame-'+[guid]::NewGuid().ToString('N'));New-Item -ItemType Directory -Force -Path $work|Out-Null
+    try{
+        $archive=Join-Path $work ([string]$asset.name);Invoke-WebRequest -UseBasicParsing -Headers $headers -Uri ([string]$asset.browser_download_url) -OutFile $archive
+        if($asset.PSObject.Properties['digest'] -and [string]$asset.digest -match '(?i)^sha256:(?<hash>[0-9a-f]{64})$'){$actual=(Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant();if($actual -ne $matches['hash'].ToLowerInvariant()){throw 'The official MAME archive failed SHA-256 verification.'}}
+        New-Item -ItemType Directory -Force -Path $target|Out-Null
+        $process=Start-Process -FilePath $archive -ArgumentList @('-y',('-o'+$target)) -Wait -PassThru -WindowStyle Hidden
+        if($process.ExitCode -ne 0){throw "MAME self-extractor exited with code $($process.ExitCode)."}
+        $exe=Get-ChildItem -LiteralPath $target -Filter 'mame.exe' -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1;if(-not $exe){$exe=Get-ChildItem -LiteralPath $target -Filter 'mame64.exe' -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1};if(-not $exe){throw 'mame.exe was not found after extraction.'};return $exe.FullName
+    }finally{Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue}
+}
+
 function Install-BigPEmuLatest {
     $pageUrl='https://www.richwhitehouse.com/jaguar/index.php?content=download'
     $page=Invoke-WebRequest -UseBasicParsing -Uri $pageUrl -Headers @{'User-Agent'='Huymaier-Console/0.26.4'}
@@ -170,6 +186,8 @@ switch($PlatformId){
         $dest=Join-Path $DestinationRoot 'RPCS3';& $script -Destination $dest
         $exe=Get-ChildItem -LiteralPath $dest -Filter 'rpcs3.exe' -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1 -ExpandProperty FullName
     }
+    'ARCADE' {$exe=Install-MameLatest}
+    'FINALBURNNEO' {$exe=Install-GithubArchive 'finalburnneo/FBNeo' { $_.name -match '(?i)(fbneo|finalburn).*(windows|win|x64|64).*\.(zip|7z)$' -and $_.name -notmatch '(?i)(source|debug|symbols|pdb)' } 'FinalBurnNeo' @('fbneo.exe','FinalBurnNeo.exe')}
     'ATARILYNX' {$exe=Install-MednafenLatest}
     'NEOGEO' {$exe=Install-GithubArchive 'finalburnneo/FBNeo' { $_.name -match '(?i)(fbneo|finalburn).*(windows|win|x64|64).*\.(zip|7z)$' -and $_.name -notmatch '(?i)(source|debug|symbols|pdb)' } 'FinalBurnNeo' @('fbneo.exe','FinalBurnNeo.exe')}
     'NGPC' {$exe=Install-MednafenLatest}
