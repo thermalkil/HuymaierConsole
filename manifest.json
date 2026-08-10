@@ -2,7 +2,7 @@
   "name": "Huymaier Console FSE Shell, Storefront & Artwork Integration",
   "version": "0.26.3",
   "baseVersion": "0.26.2",
-  "build": "platform-expansion-stage1",
+  "build": "platform-expansion-wave1",
   "builtFrom": "HC262.zip",
   "features": [
     "rebuilds N64 as an original Huymaier cartridge-console surface inspired by the supplied classic-mini reference without redistributing third-party theme assets",
@@ -14,7 +14,8 @@
     "repairs Steam artwork so installed and owned entries prefer Steam local art, then Steam-hosted portrait art, then a deterministic cached nonblank fallback",
     "preserves v0.26.2 Game Bar and Guide ownership, launch-return behavior, storefront/provider fixes, installer integrity, and controller navigation while keeping PS1, PS2, and PS3 visuals frozen except for shared path/install handoff",
     "keeps LB/RB out of ordinary page and selection navigation while using LB/RB only as a first-letter library accelerator on N64, GameCube, and Wii",
-    "adds a prominent Settings > Artwork & Metadata surface for SteamGridDB, provider artwork, online artwork refresh and platform backgrounds"
+    "adds a prominent Settings > Artwork & Metadata surface for SteamGridDB, provider artwork, online artwork refresh and platform backgrounds",
+    "enables the first researched expansion wave: PSP, Nintendo DS, Nintendo DSi, Nintendo 3DS, Dreamcast and Saturn native platform surfaces with native settings, install and storage integration"
   ],
-  "description": "v0.26.4 development branch stage 1: exposes Artwork & Metadata prominently and begins the researched full-platform native console expansion from the successful v0.26.3 RC4 source."
+  "description": "v0.26.4 development Wave 1 enables six researched native platform surfaces on top of the successful v0.26.3 RC4 source while preserving the existing console interfaces."
 }

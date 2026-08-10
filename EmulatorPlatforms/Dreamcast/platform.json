@@ -6,8 +6,20 @@
   "adapter": "flycast",
   "interface": "Native Dreamcast BIOS-style Play / File / Music / Settings interface",
   "version": "0.26.4-dev",
-  "enabled": false,
-  "gameExtensions": [".gdi", ".cdi", ".chd", ".cue"],
-  "authenticSurfaces": ["Play", "File/VMU", "Music", "Settings", "Clock", "Game Library"],
+  "enabled": true,
+  "gameExtensions": [
+    ".gdi",
+    ".cdi",
+    ".chd",
+    ".cue"
+  ],
+  "authenticSurfaces": [
+    "Play",
+    "File/VMU",
+    "Music",
+    "Settings",
+    "Clock",
+    "Game Library"
+  ],
   "deadServicesOmitted": []
 }

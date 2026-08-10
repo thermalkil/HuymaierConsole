@@ -1,4 +1,4 @@
-﻿{
+{
   "schemaVersion": 1,
   "platforms": [
     {
@@ -136,6 +136,45 @@
       "nativeType": "HuymaierConsole.NativeApp.Ps3XmbWindow"
     },
     {
+      "id": "psp",
+      "name": "PlayStation Portable",
+      "kind": "native-platform-view",
+      "enabled": true,
+      "sortOrder": 305,
+      "backend": "PPSSPP",
+      "fallbackBackend": "PPSSPP Development",
+      "interface": "Native PSP XMB",
+      "displayName": "PlayStation Portable",
+      "menuName": "PSP",
+      "aliases": [
+        "PlayStation Portable",
+        "Sony PlayStation Portable",
+        "PSP",
+        "PPSSPP"
+      ],
+      "version": "0.26.4-dev",
+      "nativeType": "HuymaierConsole.NativeApp.ConsolePlatformWindow",
+      "capabilities": [
+        "library",
+        "cached-library",
+        "direct-launch",
+        "launch-return",
+        "controller-navigation",
+        "startup-video",
+        "cover-art",
+        "compiled-native-host",
+        "in-process-platform-view",
+        "huymaier-native-path-picker",
+        "latest-emulator-install",
+        "emulator-first-cover-art",
+        "native-full-emulator-settings",
+        "unknown-setting-preservation",
+        "native-save-management",
+        "saved-data-utility",
+        "xmb-navigation"
+      ]
+    },
+    {
       "id": "n64",
       "name": "Nintendo 64",
       "kind": "native-platform-view",
@@ -168,6 +207,123 @@
         "huymaier-native-path-picker",
         "latest-emulator-install",
         "emulator-first-cover-art"
+      ]
+    },
+    {
+      "id": "nds",
+      "name": "Nintendo DS",
+      "kind": "native-platform-view",
+      "enabled": true,
+      "sortOrder": 312,
+      "backend": "melonDS",
+      "fallbackBackend": "melonDS Development",
+      "interface": "Native Nintendo DS firmware-menu interface",
+      "displayName": "Nintendo DS",
+      "menuName": "Nintendo DS",
+      "aliases": [
+        "Nintendo DS",
+        "NDS",
+        "DS",
+        "melonDS"
+      ],
+      "version": "0.26.4-dev",
+      "nativeType": "HuymaierConsole.NativeApp.ConsolePlatformWindow",
+      "capabilities": [
+        "library",
+        "cached-library",
+        "direct-launch",
+        "launch-return",
+        "controller-navigation",
+        "startup-video",
+        "cover-art",
+        "compiled-native-host",
+        "in-process-platform-view",
+        "huymaier-native-path-picker",
+        "latest-emulator-install",
+        "emulator-first-cover-art",
+        "native-full-emulator-settings",
+        "unknown-setting-preservation",
+        "native-save-management",
+        "dual-screen-menu",
+        "game-save-management"
+      ]
+    },
+    {
+      "id": "dsi",
+      "name": "Nintendo DSi",
+      "kind": "native-platform-view",
+      "enabled": true,
+      "sortOrder": 314,
+      "backend": "melonDS",
+      "fallbackBackend": "melonDS Development",
+      "interface": "Native Nintendo DSi Menu interface",
+      "displayName": "Nintendo DSi",
+      "menuName": "Nintendo DSi",
+      "aliases": [
+        "Nintendo DSi",
+        "DSi",
+        "DSI",
+        "melonDS DSi"
+      ],
+      "version": "0.26.4-dev",
+      "nativeType": "HuymaierConsole.NativeApp.ConsolePlatformWindow",
+      "capabilities": [
+        "library",
+        "cached-library",
+        "direct-launch",
+        "launch-return",
+        "controller-navigation",
+        "startup-video",
+        "cover-art",
+        "compiled-native-host",
+        "in-process-platform-view",
+        "huymaier-native-path-picker",
+        "latest-emulator-install",
+        "emulator-first-cover-art",
+        "native-full-emulator-settings",
+        "unknown-setting-preservation",
+        "native-save-management",
+        "dual-screen-menu",
+        "dsi-system-memory"
+      ]
+    },
+    {
+      "id": "3ds",
+      "name": "Nintendo 3DS",
+      "kind": "native-platform-view",
+      "enabled": true,
+      "sortOrder": 316,
+      "backend": "Azahar",
+      "fallbackBackend": "Azahar Nightly",
+      "interface": "Native dual-screen Nintendo 3DS HOME Menu",
+      "displayName": "Nintendo 3DS",
+      "menuName": "Nintendo 3DS",
+      "aliases": [
+        "Nintendo 3DS",
+        "3DS",
+        "Azahar"
+      ],
+      "version": "0.26.4-dev",
+      "nativeType": "HuymaierConsole.NativeApp.ConsolePlatformWindow",
+      "capabilities": [
+        "library",
+        "cached-library",
+        "direct-launch",
+        "launch-return",
+        "controller-navigation",
+        "startup-video",
+        "cover-art",
+        "compiled-native-host",
+        "in-process-platform-view",
+        "huymaier-native-path-picker",
+        "latest-emulator-install",
+        "emulator-first-cover-art",
+        "native-full-emulator-settings",
+        "unknown-setting-preservation",
+        "native-save-management",
+        "dual-screen-menu",
+        "sdmc-data-management",
+        "nand-data-management"
       ]
     },
     {
@@ -381,6 +537,83 @@
       "dashboardStyles": [
         "Blades",
         "Metro"
+      ]
+    },
+    {
+      "id": "dreamcast",
+      "name": "Sega Dreamcast",
+      "kind": "native-platform-view",
+      "enabled": true,
+      "sortOrder": 380,
+      "backend": "Flycast",
+      "fallbackBackend": "Flycast Development",
+      "interface": "Native Dreamcast BIOS Play / File / Music / Settings interface",
+      "displayName": "Sega Dreamcast",
+      "menuName": "Dreamcast",
+      "aliases": [
+        "Sega Dreamcast",
+        "Dreamcast",
+        "Flycast"
+      ],
+      "version": "0.26.4-dev",
+      "nativeType": "HuymaierConsole.NativeApp.ConsolePlatformWindow",
+      "capabilities": [
+        "library",
+        "cached-library",
+        "direct-launch",
+        "launch-return",
+        "controller-navigation",
+        "startup-video",
+        "cover-art",
+        "compiled-native-host",
+        "in-process-platform-view",
+        "huymaier-native-path-picker",
+        "latest-emulator-install",
+        "emulator-first-cover-art",
+        "native-full-emulator-settings",
+        "unknown-setting-preservation",
+        "native-save-management",
+        "vmu-management",
+        "bios-style-menu"
+      ]
+    },
+    {
+      "id": "saturn",
+      "name": "Sega Saturn",
+      "kind": "native-platform-view",
+      "enabled": true,
+      "sortOrder": 390,
+      "backend": "Mednafen",
+      "fallbackBackend": "Kronos",
+      "interface": "Native Sega Saturn BIOS-style system menu",
+      "displayName": "Sega Saturn",
+      "menuName": "Saturn",
+      "aliases": [
+        "Sega Saturn",
+        "Saturn",
+        "Mednafen Saturn",
+        "Kronos"
+      ],
+      "version": "0.26.4-dev",
+      "nativeType": "HuymaierConsole.NativeApp.ConsolePlatformWindow",
+      "capabilities": [
+        "library",
+        "cached-library",
+        "direct-launch",
+        "launch-return",
+        "controller-navigation",
+        "startup-video",
+        "cover-art",
+        "compiled-native-host",
+        "in-process-platform-view",
+        "huymaier-native-path-picker",
+        "latest-emulator-install",
+        "emulator-first-cover-art",
+        "native-full-emulator-settings",
+        "unknown-setting-preservation",
+        "native-save-management",
+        "backup-memory-management",
+        "cd-player-style-menu"
       ]
     }
   ]
