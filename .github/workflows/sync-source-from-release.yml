@@ -73,11 +73,26 @@ jobs:
 
           allowed={'.ps1','.cmd','.cs','.json','.txt','.md','.xml','.sccd'}
           excluded={'SHA256SUMS.txt','checksums.sha256'}
+          obsolete_exact={
+              'BUILD-VALIDATION.txt',
+              'Docs/BUILD-VALIDATION.txt',
+              'Docs/TEST-CHECKLIST.txt',
+              'README.txt',
+              'EmulatorPlatforms/GameCube/README.txt',
+              'EmulatorPlatforms/N64/README.txt',
+              'EmulatorPlatforms/Switch/README.txt',
+              'EmulatorPlatforms/Wii/README.txt',
+              'EmulatorPlatforms/WiiU/README.txt',
+              'EmulatorPlatforms/Xbox/README.txt',
+              'EmulatorPlatforms/Xbox360/README.txt',
+          }
           copied=[]
           for p in src.rglob('*'):
               if not p.is_file(): continue
               rel=p.relative_to(src).as_posix()
-              if rel in excluded: continue
+              if rel in excluded or rel in obsolete_exact: continue
+              if rel.startswith('BUILD-VALIDATION-v') and rel.endswith('.txt'): continue
+              if rel.startswith('RELEASE_NOTES-v') and rel.endswith('.txt'): continue
               if p.suffix.lower() not in allowed and p.name != '.keep': continue
               # Release-management files belong to the repository, not the packaged runtime.
               if rel.startswith('.github/') or rel.startswith('.release/') or rel.startswith('.source/'): continue
