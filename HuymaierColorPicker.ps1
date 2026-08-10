@@ -8,6 +8,7 @@ $script:HcColorPickerVectorX=0.0
 $script:HcColorPickerVectorY=0.0
 $script:HcColorPickerValue=1.0
 $script:HcColorPickerApplied=$false
+$script:HcColorPickerSwatchIndex=0
 
 function Convert-HcHsvToHex {
     param([double]$Hue,[double]$Saturation,[double]$Value)
@@ -115,7 +116,7 @@ function Update-HcColorPickerVisuals {
         $Wheel.Shade.Opacity=1.0-$script:HcColorPickerValue
         $hex=Get-HcColorPickerHex
         $Preview.Background=New-HcSolidBrush $hex
-        $HexText.Text="HEX  $hex  (reference)"
+        $HexText.Text="HEX  $hex  (reference only)"
         $BrightnessText.Text=('Brightness  {0}%' -f [int][math]::Round($script:HcColorPickerValue*100.0))
     }catch{}
 }
@@ -161,10 +162,11 @@ function Show-HcColorPicker {
 
     $footer=New-Object System.Windows.Controls.TextBlock;$footer.Text='D-PAD / LEFT STICK  Move      LB / RB  Brightness      A / ENTER  Apply      B / ESC  Cancel';$footer.FontSize=14;$footer.FontWeight='SemiBold';$footer.Foreground='#F0F4FA';$footer.Margin='0,18,0,0';[System.Windows.Controls.Grid]::SetRow($footer,2);[System.Windows.Controls.Grid]::SetColumnSpan($footer,2);$root.Children.Add($footer)|Out-Null
     $window.Content=$root
+    $window.Add_Activated({try{$window.Focus()}catch{}})
 
     $swatches=@('#E7C45E','#FFFFFF','#72D54A','#55B5FF','#8A4FFF','#D06BFF','#FF7A59','#E53E3E','#52E5FF','#00C2D8','#FFB84D','#F45B9C')
-    $swatchIndex=0
-    for($i=0;$i -lt $swatches.Count;$i++){if([string]::Equals($swatches[$i],$InitialColor,[StringComparison]::OrdinalIgnoreCase)){$swatchIndex=$i;break}}
+    $script:HcColorPickerSwatchIndex=0
+    for($i=0;$i -lt $swatches.Count;$i++){if([string]::Equals($swatches[$i],$InitialColor,[StringComparison]::OrdinalIgnoreCase)){$script:HcColorPickerSwatchIndex=$i;break}}
 
     $refresh={Update-HcColorPickerVisuals $wheel $preview $hex $brightness}
     & $refresh
@@ -179,8 +181,8 @@ function Show-HcColorPicker {
     }
     $cancel={$window.Close()}
     $jumpSwatch={param([int]$delta)
-        $swatchIndex=($swatchIndex+$delta+$swatches.Count)%$swatches.Count
-        Set-HcColorPickerVectorFromHex $swatches[$swatchIndex]
+        $script:HcColorPickerSwatchIndex=($script:HcColorPickerSwatchIndex+$delta+$swatches.Count)%$swatches.Count
+        Set-HcColorPickerVectorFromHex $swatches[$script:HcColorPickerSwatchIndex]
         & $refresh
     }
     $commandHandler={param([string]$command)
@@ -229,3 +231,11 @@ function Show-HcColorPicker {
         if($script:HcColorPickerApplied){Render-Page;Update-NavVisuals}
     }
 }
+
+# v0.26.2 feature runtime is intentionally loaded from the already-loaded
+# Customization chain so v0.26.1 remains untouched and all wrappers see the
+# final v0.26.1 shell/game-provider functions before layering new behavior.
+$script:HcV0262RuntimePath=Join-Path $script:BaseDir 'HuymaierV0262Runtime.ps1'
+if(Test-Path -LiteralPath $script:HcV0262RuntimePath -PathType Leaf){. $script:HcV0262RuntimePath}
+$script:HcV0262ProviderRuntimePath=Join-Path $script:BaseDir 'HuymaierV0262ProviderRuntime.ps1'
+if(Test-Path -LiteralPath $script:HcV0262ProviderRuntimePath -PathType Leaf){. $script:HcV0262ProviderRuntimePath}
