@@ -77,6 +77,14 @@ jobs:
           $validation=Join-Path $env:HC_CANDIDATE_OUTPUT 'candidate-validation.json'
           & .\.build\Test-HuymaierV0262Candidate.ps1 -StageRoot $stage -ValidationPath $validation
 
+      - name: Run Steam owned-library behavior tests
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $stage=Join-Path $env:RUNNER_TEMP ('hc-stage\${{ steps.request.outputs.package_root }}')
+          $validation=Join-Path $env:HC_CANDIDATE_OUTPUT 'candidate-validation.json'
+          & .\.build\Test-HuymaierV0262SteamOwnership.ps1 -StageRoot $stage -ValidationPath $validation
+
       - name: Upload exact candidate bytes
         uses: actions/upload-artifact@v4
         with:
