@@ -7,6 +7,7 @@ on:
     paths:
       - '.development/v0.26.4/wave2-stage-request.json'
       - '.development/v0.26.4/apply_wave2_stage.py'
+      - '.development/v0.26.4/apply_wave2_compile_fixes.py'
       - '.github/workflows/materialize-v0264-wave2-stage.yml'
 
 permissions:
@@ -34,6 +35,8 @@ jobs:
             python .development\v0.26.4\apply_wave2_stage.py
             if($LASTEXITCODE -ne 0){throw 'Wave 2 staging materializer failed.'}
           }else{Write-Host 'Wave 2 staging already materialized.'}
+          python .development\v0.26.4\apply_wave2_compile_fixes.py
+          if($LASTEXITCODE -ne 0){throw 'Wave 2 compile correction overlay failed.'}
       - name: Validate Wave 2 definitions
         shell: powershell
         run: |
@@ -42,6 +45,7 @@ jobs:
           foreach($folder in $folders){$p=Join-Path (Join-Path 'EmulatorPlatforms' $folder) 'platform.json';$s=Join-Path (Join-Path 'EmulatorPlatforms' $folder) 'settings.default.json';if(-not(Test-Path $p) -or -not(Test-Path $s)){throw "Wave 2 platform package missing: $folder"};$d=Get-Content -Raw $p -Encoding UTF8|ConvertFrom-Json;if([bool]$d.enabled){throw "$folder must remain disabled during staging."};if([string]::IsNullOrWhiteSpace([string]$d.primaryBackend) -or [string]::IsNullOrWhiteSpace([string]$d.adapter)){throw "$folder backend/adapter metadata is incomplete."}}
           $native=Get-Content -Raw 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8
           foreach($marker in @('RenderAtari2600Deck','RenderNesDeck','RenderSnesDeck','RenderGameBoyHandheld','RenderGbaHandheld','RenderGenesisDeck','RenderSegaCdDeck','RenderGameGearHandheld','RenderMasterSystemDeck','RenderTurboGrafxDeck')){if($native -notmatch [regex]::Escape($marker)){throw "Wave 2 native shell missing: $marker"}}
+          if($native -match [regex]::Escape('WrapPanel cards=new WrapPanel;')){throw 'Wave 2 still contains invalid WrapPanel constructor syntax.'}
       - name: Compile exact x64 native source
         shell: powershell
         run: |
