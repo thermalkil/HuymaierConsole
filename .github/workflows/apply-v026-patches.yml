@@ -6,10 +6,12 @@ on:
       - feature/v0.26.0-native-gamebar
       - hotfix/v0.26.1-installer
       - feature/v0.26.2-customization-runtime
+      - feature/v0.26.3-console-fidelity
     paths:
       - '.development/v0.26.0/apply.json'
       - '.development/v0.26.1/apply.json'
       - '.development/v0.26.2/apply.json'
+      - '.development/v0.26.3/apply.json'
       - '.github/workflows/apply-v026-patches.yml'
 
 permissions:
@@ -40,6 +42,9 @@ jobs:
               ;;
             feature/v0.26.2-customization-runtime)
               DIR='.development/v0.26.2'
+              ;;
+            feature/v0.26.3-console-fidelity)
+              DIR='.development/v0.26.3'
               ;;
             *)
               DIR='.development/v0.26.0'
