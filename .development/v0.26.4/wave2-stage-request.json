@@ -1,0 +1,6 @@
+{
+  "batch":"wave2-hardware-shell-stage",
+  "requestedAtUtc":"2026-08-10T23:05:00Z",
+  "platforms":["Atari2600","NES","SNES","GameBoy","GBC","GBA","Genesis","SegaCD","Sega32X","GameGear","MasterSystem","TurboGrafx16"],
+  "gate":"platform definitions remain disabled until backend install/settings/storage work follows; exact x64 native compile required before commit"
+}
