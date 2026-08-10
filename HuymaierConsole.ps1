@@ -304,6 +304,7 @@ function New-DefaultConfig {
         KeyboardTheme = 'Huymaier'
         ShowFpsCounter = $false
         OnlineArtworkEnabled = $true
+        SteamGridDbApiKey = ''
         PlatformBackgroundsEnabled = $true
         FavoriteGames = @()
     }
@@ -314,7 +315,7 @@ function Load-Config {
     if ( -not (Test-Path $script:ConfigPath)) { return $defaults }
     try {
         $loaded = Get-Content -Raw -Path $script:ConfigPath | ConvertFrom-Json
-        foreach ($name in @('BrowserName','BrowserPath','BrowserMode','PromptOverride','StartWithWindows','CustomGames','CustomApps','MusicEnabled','MusicVolume','UiSoundVolume','DynamicBackground','ConsoleName','ShellBaseColor','AccentColor','AccentHighlightColor','DynamicThemePreset','DynamicPrimaryColor','DynamicSecondaryColor','DynamicTertiaryColor','UiSoundsEnabled','HapticsEnabled','MusicTheme','CustomMusicPath','ImportedGames','RecentGames','RecentApps','StorefrontRoots','StorefrontInstallOverrides','QuickMenuPosition','GameBarScale','ProviderInstallRoots','LibraryScanCompleted','LibrarySchemaVersion','KeyboardTheme','ShowFpsCounter','OnlineArtworkEnabled','PlatformBackgroundsEnabled','FavoriteGames')) {
+        foreach ($name in @('BrowserName','BrowserPath','BrowserMode','PromptOverride','StartWithWindows','CustomGames','CustomApps','MusicEnabled','MusicVolume','UiSoundVolume','DynamicBackground','ConsoleName','ShellBaseColor','AccentColor','AccentHighlightColor','DynamicThemePreset','DynamicPrimaryColor','DynamicSecondaryColor','DynamicTertiaryColor','UiSoundsEnabled','HapticsEnabled','MusicTheme','CustomMusicPath','ImportedGames','RecentGames','RecentApps','StorefrontRoots','StorefrontInstallOverrides','QuickMenuPosition','GameBarScale','ProviderInstallRoots','LibraryScanCompleted','LibrarySchemaVersion','KeyboardTheme','ShowFpsCounter','OnlineArtworkEnabled','SteamGridDbApiKey','PlatformBackgroundsEnabled','FavoriteGames')) {
             if ($null -ne $loaded.PSObject.Properties[$name]) {
                 $defaults.$name = $loaded.$name
             }

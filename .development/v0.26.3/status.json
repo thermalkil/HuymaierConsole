@@ -1,7 +1,6 @@
 ﻿{
-    "batch":  "console-fidelity-4-authentic-integration-v2",
-    "script":  "apply_rc3_patch_v2.py",
-    "patchSha256":  "f6ca760aade9136b9c830b61d7eec34473e50a24a64c245e450d0be1e5b9a98c",
+    "batch":  "console-fidelity-rc4-user-feedback",
+    "script":  "apply_rc4_feedback.py",
     "result":  "success",
-    "recordedAtUtc":  "2026-08-10T20:46:57.8174171Z"
+    "recordedAtUtc":  "2026-08-10T21:34:47.6932048Z"
 }

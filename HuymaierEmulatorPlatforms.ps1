@@ -1,4 +1,4 @@
-﻿# Huymaier Console emulator-platform host.
+# Huymaier Console emulator-platform host.
 # Loaded after the shared game-experience module so emulator platforms can
 # participate in the existing Platforms rail without replacing storefront code.
 
@@ -351,8 +351,9 @@ function Start-HcEmulatorInstall {
     $root=Join-Path (Join-Path $env:LOCALAPPDATA 'Huymaier Console') 'Emulators'
     try{
         Set-ConsoleNotice "Installing the latest supported $display emulator…" 'INFO';Render-Page
-        $output=@(& $installer -PlatformId $id -DestinationRoot $root -ConsoleRoot $script:BaseDir)
-        if($LASTEXITCODE -ne 0){throw "Installer exited with code $LASTEXITCODE."}
+        $output=@()
+        try{$output=@(& $installer -PlatformId $id -DestinationRoot $root -ConsoleRoot $script:BaseDir)}catch{throw}
+        if(-not $?){throw 'The emulator installer script did not complete successfully.'}
         $json=$null
         foreach($line in @($output|ForEach-Object{[string]$_}|Where-Object{$_ -match '^\s*\{.*\}\s*$'})){
             try{$json=$line|ConvertFrom-Json}catch{}

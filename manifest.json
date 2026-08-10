@@ -2,7 +2,7 @@
   "name": "Huymaier Console FSE Shell, Storefront & Artwork Integration",
   "version": "0.26.3",
   "baseVersion": "0.26.2",
-  "build": "native-console-fidelity-rc3",
+  "build": "native-console-fidelity-rc4",
   "builtFrom": "HC262.zip",
   "features": [
     "rebuilds N64 as an original Huymaier cartridge-console surface inspired by the supplied classic-mini reference without redistributing third-party theme assets",
