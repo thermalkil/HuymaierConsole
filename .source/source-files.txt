@@ -57,6 +57,7 @@ HuymaierBootstrap.ps1
 HuymaierConsole.ps1
 HuymaierConsoleUpdateWorker.ps1
 HuymaierDriverWorker.ps1
+HuymaierEmulatorInstaller.ps1
 HuymaierEmulatorPlatforms.ps1
 HuymaierEmulatorSettings.ps1
 HuymaierEmulatorSettingsWorker.ps1
