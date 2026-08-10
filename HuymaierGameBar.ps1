@@ -1,4 +1,4 @@
-﻿# Huymaier Console v0.26.1 external game/app overlay and process-wide Guide arbiter.
+﻿# Huymaier Console v0.26.2 external/native-surface overlay and process-wide Guide arbiter.
 # Quick Access remains inside Huymaier Console. The physical Guide/Home system
 # button is global; local Menu/Start, View/Back, and Share/Create remain distinct.
 
@@ -201,10 +201,24 @@ function Initialize-HuymaierGameBar {
                     return
                 }
 
-                # Win32 foreground HWND ownership is authoritative. WPF IsActive
-                # can be false while an owned/native Huymaier interface is active.
+                # Win32 foreground process ownership is authoritative, but the main
+                # shell and Huymaier-native console surfaces intentionally have different
+                # Guide behavior. Main shell => Quick Access. PS3/PS2/PS1/Original Xbox/
+                # Xbox 360/etc. modal/native surface => Game Bar above that surface.
                 if(Test-HcForegroundOwnedByConsole){
-                    if($guideEdge){Invoke-HcInternalGuide -ActiveWindow (Get-HcActiveConsoleWindow)}
+                    if($guideEdge){
+                        $activeWindow=Get-HcActiveConsoleWindow
+                        $mainShellActive=$false
+                        try{
+                            $mainShellActive=($null -ne $activeWindow -and $null -ne $script:Window -and [object]::ReferenceEquals($activeWindow,$script:Window)) -or [bool]$script:Window.IsActive
+                        }catch{}
+                        if($mainShellActive){
+                            Invoke-HcInternalGuide -ActiveWindow $script:Window
+                        }else{
+                            [HuymaierConsole.NativeApp.HuymaierGameBarHost]::Show()
+                            Write-Log 'Huymaier Game Bar opened over a Huymaier-native console surface.'
+                        }
+                    }
                     return
                 }
 
