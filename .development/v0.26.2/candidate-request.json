@@ -1,10 +1,10 @@
 {
-  "candidate": "v0.26.2-rc3",
+  "candidate": "v0.26.2-rc4",
   "version": "0.26.2",
   "base_release": "v0.26.1",
   "base_asset": "HC261.zip",
   "package_root": "HC262",
   "asset_name": "HC262.zip",
-  "requested_at": "2026-08-10T15:14:00Z",
-  "focus": "RC3 complete v0.26.2 candidate with native-surface Game Bar routing, visual controller color wheels, persistent Games layout editing, Manage/action-card typography repair, Steam unified game management/transfer telemetry, fresh signed-in Steam owned-library enrichment from visible Steam Community game details with privacy-safe installed-count fallback, GOG/Amazon safe observed-write telemetry, preserved v0.26.1 storefront import/Xbox identity fixes, and inherited transactional installer integrity."
+  "requested_at": "2026-08-10T15:24:00Z",
+  "focus": "RC4 complete v0.26.2 candidate with native-surface Game Bar routing, visual controller color wheels, persistent Games layout editing, Manage/action-card typography repair, Steam unified game management/transfer telemetry, signed-in visible Steam owned-library enrichment with authoritative owned AppID count distinct from installed state and privacy-safe installed-only fallback, GOG/Amazon safe observed-write telemetry, preserved v0.26.1 storefront import/Xbox identity fixes, and inherited transactional installer integrity."
 }
