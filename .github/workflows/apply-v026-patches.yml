@@ -5,9 +5,11 @@ on:
     branches:
       - feature/v0.26.0-native-gamebar
       - hotfix/v0.26.1-installer
+      - feature/v0.26.2-customization-runtime
     paths:
       - '.development/v0.26.0/apply.json'
       - '.development/v0.26.1/apply.json'
+      - '.development/v0.26.2/apply.json'
       - '.github/workflows/apply-v026-patches.yml'
 
 permissions:
@@ -32,11 +34,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ "$GITHUB_REF_NAME" = "hotfix/v0.26.1-installer" ]; then
-            DIR='.development/v0.26.1'
-          else
-            DIR='.development/v0.26.0'
-          fi
+          case "$GITHUB_REF_NAME" in
+            hotfix/v0.26.1-installer)
+              DIR='.development/v0.26.1'
+              ;;
+            feature/v0.26.2-customization-runtime)
+              DIR='.development/v0.26.2'
+              ;;
+            *)
+              DIR='.development/v0.26.0'
+              ;;
+          esac
           echo "dir=$DIR" >> "$GITHUB_OUTPUT"
 
       - name: Apply deterministic development batch
