@@ -1,0 +1,16 @@
+{
+  "id": "gbc",
+  "displayName": "Nintendo Game Boy Color",
+  "primaryBackend": "SameBoy",
+  "fallbackBackend": "Mesen Community Edition",
+  "adapter": "sameboy",
+  "interface": "Game Boy Color handheld and cartridge interface",
+  "version": "0.26.4-dev",
+  "enabled": false,
+  "gameExtensions": [
+    ".gbc",
+    ".gb",
+    ".zip"
+  ],
+  "dashboardStyle": "CGB"
+}

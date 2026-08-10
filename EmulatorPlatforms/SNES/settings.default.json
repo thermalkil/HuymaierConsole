@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 7,
+  "emulatorPath": "",
+  "fallbackEmulatorPath": "",
+  "emulatorDataPath": "",
+  "gameFolders": [],
+  "startupEnabled": true,
+  "startupVolume": 1.0,
+  "ambienceEnabled": false,
+  "ambiencePath": "",
+  "ambienceVolume": 0.6,
+  "soundVolume": 1.0,
+  "dashboardStyle": "SNES Control Deck",
+  "fullscreen": true
+}

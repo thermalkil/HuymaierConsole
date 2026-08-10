@@ -1,0 +1,18 @@
+{
+  "id": "genesis",
+  "displayName": "Sega Genesis",
+  "primaryBackend": "ares",
+  "fallbackBackend": "BlastEm",
+  "adapter": "ares",
+  "interface": "Genesis / Mega Drive control-deck and cartridge interface",
+  "version": "0.26.4-dev",
+  "enabled": false,
+  "gameExtensions": [
+    ".md",
+    ".gen",
+    ".bin",
+    ".smd",
+    ".zip"
+  ],
+  "dashboardStyle": "Genesis Model 1"
+}

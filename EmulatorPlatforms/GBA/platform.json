@@ -1,0 +1,16 @@
+{
+  "id": "gba",
+  "displayName": "Nintendo Game Boy Advance",
+  "primaryBackend": "mGBA",
+  "fallbackBackend": "Mesen Community Edition",
+  "adapter": "mgba",
+  "interface": "Game Boy Advance handheld and cartridge interface",
+  "version": "0.26.4-dev",
+  "enabled": false,
+  "gameExtensions": [
+    ".gba",
+    ".agb",
+    ".zip"
+  ],
+  "dashboardStyle": "AGB-001"
+}

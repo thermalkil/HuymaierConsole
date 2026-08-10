@@ -1,0 +1,16 @@
+{
+  "id": "mastersystem",
+  "displayName": "Sega Master System",
+  "primaryBackend": "Mesen Community Edition",
+  "fallbackBackend": "ares",
+  "adapter": "mesence",
+  "interface": "Master System control-deck / card / cartridge interface",
+  "version": "0.26.4-dev",
+  "enabled": false,
+  "gameExtensions": [
+    ".sms",
+    ".sg",
+    ".zip"
+  ],
+  "dashboardStyle": "Master System"
+}

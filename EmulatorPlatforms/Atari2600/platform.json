@@ -1,0 +1,17 @@
+{
+  "id": "atari2600",
+  "displayName": "Atari 2600",
+  "primaryBackend": "Stella",
+  "fallbackBackend": "ares",
+  "adapter": "stella",
+  "interface": "Atari VCS control-deck and cartridge interface",
+  "version": "0.26.4-dev",
+  "enabled": false,
+  "gameExtensions": [
+    ".a26",
+    ".bin",
+    ".rom",
+    ".zip"
+  ],
+  "dashboardStyle": "VCS Control Deck"
+}
