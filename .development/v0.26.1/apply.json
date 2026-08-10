@@ -1,5 +1,5 @@
 {
-  "batch": "next-modal-candidate-gate-fix-1",
-  "script": "apply_next_candidate_gate_fix.py",
-  "requested_at": "2026-08-10T12:33:00Z"
+  "batch": "next-customization-polish-1",
+  "script": "apply_next_customization_polish.py",
+  "requested_at": "2026-08-10T12:38:00Z"
 }
