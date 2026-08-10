@@ -1,10 +1,10 @@
 {
-  "candidate": "v0.26.3-rc4-materialize",
+  "candidate": "v0.26.3-rc4-finalize",
   "version": "0.26.3",
   "base_release": "v0.26.2",
   "base_asset": "HC262.zip",
   "package_root": "HC263",
   "asset_name": "HC263.zip",
-  "requested_at": "2026-08-10T21:19:00Z",
-  "focus": "Materialize the RC4 user feedback pass from the exact tested RC3 source: smaller adjustable GameCube cube, native GameCube/Wii save interfaces, strict GC/Wii storage separation, Wii front cleanup, N64 focus fix, N64/GameCube/Wii alphabet fast-jump, emulator-install routing repair, and SteamGridDB artwork integration."
+  "requested_at": "2026-08-10T21:39:00Z",
+  "focus": "Finalize the RC4 user feedback source before packaging: compile-safe GameCube raw-card parsing, accurate user-block counts, controller-first masked SteamGridDB API-key settings, broad SGDB API grid retrieval with local portrait filtering, and all previously materialized RC4 scale/save/navigation/install fixes."
 }
