@@ -17,35 +17,70 @@ $manifest=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'manifest.json') -
 if([string]$manifest.version -ne '0.26.3'){throw 'Packaged manifest is not v0.26.3.'}
 if([string]$manifest.baseVersion -ne '0.26.2'){throw 'v0.26.3 does not identify v0.26.2 as its stable base.'}
 if([string]$manifest.builtFrom -ne 'HC262.zip'){throw 'v0.26.3 is not staged from HC262.zip.'}
+if([string]$manifest.build -ne 'native-console-fidelity-rc3'){throw 'v0.26.3 candidate is not the RC3 authentic-console integration build.'}
 
-[void](Require-Text (Join-Path $StageRoot 'HuymaierConsole.ps1') @("`$script:AppVersion = '0.26.3'") 'Main shell')
+[void](Require-Text (Join-Path $StageRoot 'HuymaierConsole.ps1') @("`$script:AppVersion = '0.26.3'",'Complete-HcEmulatorPlatformPicker') 'Main shell')
 [void](Require-Text (Join-Path $StageRoot 'HuymaierBootstrap.ps1') @("`$script:ExpectedConsoleVersion='0.26.3'") 'Bootstrap')
 [void](Require-Text (Join-Path $StageRoot 'HuymaierInstallerCore.ps1') @("`$script:InstallVersion='0.26.3'") 'Installer core')
 [void](Require-Text (Join-Path $StageRoot 'Native\HuymaierConsole.GameInput.cs') @('public const string Version = "0.26.3";','public const string Architecture = "x64";') 'Native build stamp')
-[void](Require-Text (Join-Path $StageRoot 'Native\HuymaierConsole.NativeApp.cs') @('return "0.26.3";') 'Native bridge')
+[void](Require-Text (Join-Path $StageRoot 'Native\HuymaierConsole.NativeApp.cs') @('return "0.26.3";','internal static class HuymaierNativePickerRequest') 'Native bridge')
 [void](Require-Text (Join-Path $StageRoot 'FSEPackage\AppxManifest.xml') @('Version="0.26.3.0"','ProcessorArchitecture="x64"') 'FSE package manifest')
 
 $console=Require-Text (Join-Path $StageRoot 'Native\HuymaierConsole.ConsolePlatforms.cs') @(
-    'RenderN64GamePakLauncher','RenderGameCubeHub','RenderGameCubeCalendar',
-    'RenderWiiMenuAuthentic','RenderWiiChannelStart','RenderWiiUMenuAuthentic',
-    'RenderSwitchHomeAuthentic','RenderSwitchAllSoftware','RenderXboxRoot',
+    'RenderN64GamePakLauncher','ProcessN64MenuCommand',
+    'RenderGameCubeHub','Viewport3D','QuaternionAnimation','CreateGameCubeFace','RenderGameCubeCalendar',
+    'RenderWiiMenuAuthentic','RenderWiiChannelStart','ProcessWiiMenuCommand',
+    'RenderWiiUMenuAuthentic','RenderSwitchHomeAuthentic','RenderSwitchAllSoftware','RenderXboxRoot',
     'ProcessMetroNavigationCommand','ProcessGameCubeHubCommand','ProcessSwitchHomeCommand',
-    'if (command == XmbInputCommand.LeftShoulder || command == XmbInputCommand.RightShoulder) return;',
-    'int totalPages = 4;','Disc Channel','Wii Message Board','GameShare','Virtual Game Card','play game'
+    'FindEmulatorArtwork','QueueConsoleArtworkRefresh','TryDownloadConsoleCover',
+    'RequestHuymaierPicker','InstallPrimaryEmulator','ExportSave',
+    'if (command == XmbInputCommand.LeftShoulder || command == XmbInputCommand.RightShoulder) return;'
 ) 'Native console fidelity renderer'
-if($console -match [regex]::Escape('LB / RB')){throw 'Native console UI still advertises LB/RB navigation.'}
+foreach($forbidden in @('OpenFileDialog','FolderBrowserDialog','Wii News','Forecast Channel','Nintendo Switch Online','GameShare','Virtual Game Card','Xbox Live','LB / RB')){
+    if($console -match [regex]::Escape($forbidden)){throw "Dead/generic native-console surface survived: $forbidden"}
+}
 if($console -match 'LeftShoulder[^\r\n]{0,120}SwitchPage' -or $console -match 'RightShoulder[^\r\n]{0,120}SwitchPage'){
     throw 'Shoulder buttons still change native console page/selection state.'
 }
 
-# PS1/PS2/PS3 are frozen for this pass. NativeApp contains PS2/PS3 host classes,
-# so allow only the shared NativeBridge version stamp to differ from v0.26.2.
-$forbidden=@(git diff --name-only v0.26.2 -- 'Native/HuymaierConsole.Ps1.cs' 'EmulatorPlatforms/PS1' 'EmulatorPlatforms/PS2' 'EmulatorPlatforms/PS3')
-if($forbidden.Count){throw ('Frozen PlayStation implementation changed: '+($forbidden -join ', '))}
-$baseNative=((& git show 'v0.26.2:Native/HuymaierConsole.NativeApp.cs') -join "`n").TrimEnd()
-$currentNative=([IO.File]::ReadAllText((Join-Path $StageRoot 'Native\HuymaierConsole.NativeApp.cs'),[Text.Encoding]::UTF8) -replace "`r`n","`n").TrimStart([char]0xFEFF).TrimEnd()
-$currentNative=$currentNative.Replace('public string Version { get { return "0.26.3"; } }','public string Version { get { return "0.26.2"; } }')
-if($currentNative -ne $baseNative){throw 'NativeApp changed beyond the shared v0.26.3 version stamp; PS2/PS3 freeze cannot be proven.'}
+$emulatorHost=Require-Text (Join-Path $StageRoot 'HuymaierEmulatorPlatforms.ps1') @(
+    'Complete-HcEmulatorPlatformPicker','Invoke-HcNativeConsolePickerRequest','Start-HcEmulatorInstall',
+    'InstallPrimaryEmulator','ExportSave','picker-request.json'
+) 'Emulator picker/install host'
+$emulatorInstaller=Require-Text (Join-Path $StageRoot 'HuymaierEmulatorInstaller.ps1') @(
+    'Install-Latest-DuckStation.ps1','Install-Latest-PCSX2.ps1','Install-Latest-RPCS3.ps1',
+    'Rosalie241/RMG','dolphin-emu.org/download/','cemu-project/Cemu',
+    'git.eden-emu.dev/api/v1/repos/eden-emu/eden/releases/latest','xemu-project/xemu','xenia-canary/xenia-canary',
+    'dolphin-$version-x64.7z'
+) 'Official emulator installer'
+
+$steam=Require-Text (Join-Path $StageRoot 'HuymaierSteamWorker.ps1') @(
+    'library_600x900_2x.jpg','cdn.cloudflare.steamstatic.com','New-SteamFallbackArtwork','Artwork\Steam'
+) 'Steam artwork repair'
+$ownership=Require-Text (Join-Path $StageRoot 'HuymaierSteamOwnership.ps1') @('Get-SteamArtwork $root $id $name') 'Steam owned-library artwork repair'
+
+# PlayStation visual payload directories remain byte-for-byte source-frozen. The
+# existing PS1/PS2/PS3 native visual/navigation classes are allowed only the
+# requested core path/install handoff so every emulator uses Huymaier's picker.
+$forbiddenPs=@(git diff --name-only v0.26.2 -- 'EmulatorPlatforms/PS1' 'EmulatorPlatforms/PS2' 'EmulatorPlatforms/PS3')
+if($forbiddenPs.Count){throw ('Frozen PlayStation platform payload changed: '+($forbiddenPs -join ', '))}
+$ps1=Require-Text (Join-Path $StageRoot 'Native\HuymaierConsole.Ps1.cs') @(
+    'HuymaierNativePickerRequest.Request(this, "PS1", "PlayStation", "PrimaryEmulator"',
+    'HuymaierNativePickerRequest.Request(this, "PS1", "PlayStation", "DataRoot"',
+    'HuymaierNativePickerRequest.Request(this, "PS1", "PlayStation", "GameFolder"',
+    'HuymaierNativePickerRequest.Request(this, "PS1", "PlayStation", "InstallPrimaryEmulator"'
+) 'PS1 path-only integration'
+$native=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'Native\HuymaierConsole.NativeApp.cs') -Encoding UTF8
+foreach($required in @(
+    'HuymaierNativePickerRequest.Request(this, "PS2", "PlayStation 2", "PrimaryEmulator"',
+    'HuymaierNativePickerRequest.Request(this, "PS2", "PlayStation 2", "DataRoot"',
+    'HuymaierNativePickerRequest.Request(this, "PS2", "PlayStation 2", "GameFolder"',
+    'HuymaierNativePickerRequest.Request(this, "PS2", "PlayStation 2", "InstallPrimaryEmulator"',
+    'HuymaierNativePickerRequest.Request(this, "PS3", "PlayStation 3", "PrimaryEmulator"',
+    'HuymaierNativePickerRequest.Request(this, "PS3", "PlayStation 3", "DataRoot"',
+    'HuymaierNativePickerRequest.Request(this, "PS3", "PlayStation 3", "GameFolder"',
+    'HuymaierNativePickerRequest.Request(this, "PS3", "PlayStation 3", "InstallPrimaryEmulator"'
+)){if($native -notmatch [regex]::Escape($required)){throw "PS2/PS3 path-only integration invariant missing: $required"}}
 
 # Keep every v0.26.2 feature gate release-blocking. Run its exact test against a
 # temporary compatibility mirror whose version-only fields are normalized back
@@ -79,8 +114,12 @@ try {
 $validation=Get-Content -Raw -LiteralPath $ValidationPath -Encoding UTF8|ConvertFrom-Json
 $validation|Add-Member -NotePropertyName nativeConsoleFidelityGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName noBumperConsoleNavigationGate -NotePropertyValue 'success' -Force
-$validation|Add-Member -NotePropertyName frozenPlayStationInterfacesGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName emulatorNativePickerGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName officialEmulatorInstallGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName emulatorFirstConsoleArtworkGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName steamNeverBlankArtworkGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName playStationVisualFreezePathIntegrationGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName inheritedV0262RegressionGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName version0263ConsistencyGate -NotePropertyValue 'success' -Force
 $validation|ConvertTo-Json -Depth 8|Set-Content -LiteralPath $ValidationPath -Encoding UTF8
-Write-Host 'v0.26.3 console-fidelity and inherited v0.26.2 release gates passed.'
+Write-Host 'v0.26.3 authentic-console, emulator-integration, artwork, and inherited v0.26.2 release gates passed.'
