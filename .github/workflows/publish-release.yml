@@ -107,6 +107,7 @@ jobs:
       - name: Verify exact candidate provenance and closed package
         if: steps.manifest.outputs.publish == 'true' && steps.existing.outputs.exists != 'true'
         env:
+          CANDIDATE_DIR: /tmp/hc-candidate
           VERSION: ${{ steps.manifest.outputs.version }}
           ASSET_NAME: ${{ steps.manifest.outputs.asset_name }}
           PACKAGE_ROOT: ${{ steps.manifest.outputs.package_root }}
@@ -117,105 +118,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import hashlib,json,os,pathlib,re,struct,zipfile
-          root=pathlib.Path('/tmp/hc-candidate')
-          asset_name=os.environ['ASSET_NAME']
-          zip_matches=list(root.rglob(asset_name))
-          side_matches=list(root.rglob(asset_name+'.sha256'))
-          validation_matches=list(root.rglob('candidate-validation.json'))
-          if len(zip_matches)!=1 or len(side_matches)!=1 or len(validation_matches)!=1:
-              raise SystemExit(f'Candidate artifact must contain exactly one ZIP, sidecar, and validation record; found zip={len(zip_matches)} sidecar={len(side_matches)} validation={len(validation_matches)}')
-          zp,side,vp=zip_matches[0],side_matches[0],validation_matches[0]
-
-          def sha256(path):
-              h=hashlib.sha256()
-              with open(path,'rb') as f:
-                  for chunk in iter(lambda:f.read(1024*1024),b''):
-                      h.update(chunk)
-              return h.hexdigest()
-
-          actual=sha256(zp)
-          expected=os.environ['EXPECTED_SHA'].lower()
-          if actual!=expected:
-              raise SystemExit(f'Candidate ZIP SHA-256 mismatch: expected {expected}, found {actual}')
-          line=side.read_text(encoding='ascii').strip()
-          m=re.match(r'^([0-9a-fA-F]{64})(?:\s+.+)?$',line)
-          if not m or m.group(1).lower()!=actual:
-              raise SystemExit('Candidate SHA-256 sidecar does not match the candidate ZIP.')
-
-          validation=json.loads(vp.read_text(encoding='utf-8-sig'))
-          required={
-              'version':os.environ['VERSION'],
-              'asset':asset_name,
-              'sha256':actual,
-              'sourceCommit':os.environ['SOURCE_COMMIT'],
-              'architecture':'x64',
-              'failureInjectionTests':'success',
-              'lockedIdenticalRepair':'success',
-              'lockedChangedFailClosedRepair':'success',
-              'unmanagedDataPreservation':'success',
-          }
-          for key,value in required.items():
-              if str(validation.get(key,''))!=str(value):
-                  raise SystemExit(f'Candidate validation mismatch for {key}: expected {value!r}, found {validation.get(key)!r}')
-          if int(validation.get('runId') or 0)!=int(os.environ['RUN_ID']):
-              raise SystemExit('candidate-validation.json runId does not match the pinned release run.')
-          if int(validation.get('runAttempt') or 0)!=int(os.environ['RUN_ATTEMPT']):
-              raise SystemExit('candidate-validation.json runAttempt does not match the pinned release attempt.')
-
-          package_root=os.environ['PACKAGE_ROOT'].rstrip('/')
-          with zipfile.ZipFile(zp,'r') as z:
-              names=[n.replace('\\','/') for n in z.namelist() if not n.endswith('/')]
-              if not names:
-                  raise SystemExit('Candidate ZIP has no files.')
-              prefix=package_root+'/'
-              for name in names:
-                  p=pathlib.PurePosixPath(name)
-                  if p.is_absolute() or '..' in p.parts or not name.startswith(prefix):
-                      raise SystemExit(f'Unsafe or unexpected ZIP entry: {name}')
-              manifest_name=prefix+'manifest.json'
-              checks_name=prefix+'checksums.sha256'
-              compat_name=prefix+'SHA256SUMS.txt'
-              for req in (manifest_name,checks_name,compat_name):
-                  if req not in names:
-                      raise SystemExit(f'Candidate ZIP is missing {req}')
-              manifest=json.loads(z.read(manifest_name).decode('utf-8-sig'))
-              if str(manifest.get('version',''))!=os.environ['VERSION']:
-                  raise SystemExit('Packaged manifest version does not match release version.')
-              checks=z.read(checks_name).decode('utf-8')
-              compat=z.read(compat_name).decode('utf-8')
-              if checks!=compat:
-                  raise SystemExit('Internal checksum manifests disagree.')
-              expected_files={}
-              for line in checks.splitlines():
-                  if not line.strip(): continue
-                  m=re.match(r'^([0-9a-fA-F]{64})  (.+)$',line)
-                  if not m: raise SystemExit(f'Invalid internal checksum row: {line}')
-                  rel=m.group(2).replace('\\','/')
-                  if rel in expected_files: raise SystemExit(f'Duplicate internal checksum path: {rel}')
-                  expected_files[rel]=m.group(1).lower()
-              actual_rel={n[len(prefix):] for n in names if n not in (checks_name,compat_name)}
-              if actual_rel!=set(expected_files):
-                  missing=set(expected_files)-actual_rel
-                  extra=actual_rel-set(expected_files)
-                  raise SystemExit(f'Closed package mismatch. missing={sorted(missing)} extra={sorted(extra)}')
-              for rel,expected_hash in expected_files.items():
-                  data=z.read(prefix+rel)
-                  if hashlib.sha256(data).hexdigest()!=expected_hash:
-                      raise SystemExit(f'Internal checksum mismatch: {rel}')
-              for rel in ('HuymaierConsole.exe','HuymaierGameInputBridge.dll','FSEPackage/HuymaierFSEHost.exe'):
-                  data=z.read(prefix+rel)
-                  if len(data)<0x40 or data[:2]!=b'MZ': raise SystemExit(f'Invalid PE file: {rel}')
-                  peoff=struct.unpack_from('<I',data,0x3c)[0]
-                  if data[peoff:peoff+4]!=b'PE\0\0': raise SystemExit(f'Invalid PE signature: {rel}')
-                  machine=struct.unpack_from('<H',data,peoff+4)[0]
-                  if machine!=0x8664: raise SystemExit(f'{rel} is not x64: machine=0x{machine:04x}')
-
-          pathlib.Path(os.environ['GITHUB_WORKSPACE'],asset_name).write_bytes(zp.read_bytes())
-          pathlib.Path(os.environ['GITHUB_WORKSPACE'],asset_name+'.sha256').write_bytes(side.read_bytes())
-          print(f'Exact candidate promotion verified: {asset_name} sha256={actual}')
-          PY
+          python3 .release/verify_candidate.py
 
       - name: Publish exact candidate as GitHub Release
         if: steps.manifest.outputs.publish == 'true' && steps.existing.outputs.exists != 'true'
@@ -270,4 +173,5 @@ jobs:
           git add .release/status.json
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "Record $TAG exact-candidate release status"
+          git pull --rebase origin main
           git push
