@@ -51,6 +51,12 @@ jobs:
           python .development\v0.26.4\apply_wave1_compile_fixes.py
           if($LASTEXITCODE -ne 0){throw 'Wave 1 compile correction overlay failed.'}
 
+          $native=Get-Content -Raw -LiteralPath 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8
+          if($native -notmatch [regex]::Escape('private void OpenNativeBackendSettings()')){
+            python .development\v0.26.4\apply_backend_settings_ui.py
+            if($LASTEXITCODE -ne 0){throw 'Controller-native backend settings materializer failed.'}
+          }else{Write-Host 'Controller-native backend settings editor already materialized.'}
+
       - name: Parse Windows PowerShell source
         shell: powershell
         run: |
@@ -61,7 +67,7 @@ jobs:
             if($errors.Count){$errors|ForEach-Object{Write-Host "$path : $($_.Message)"};throw "$path does not parse in Windows PowerShell 5.1."}
           }
 
-      - name: Validate expansion registries
+      - name: Validate expansion registries and full-settings contract
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
@@ -75,7 +81,10 @@ jobs:
             if([bool]$definition.enabled){throw "$platform must remain disabled until launch/storage/settings integration is complete."}
           }
           $worker=Get-Content -Raw 'HuymaierEmulatorSettingsWorker.ps1' -Encoding UTF8
-          foreach($required in @("[ValidateSet('Inventory','Set')]",'Get-HcCompleteEmulatorSettingsInventory','Set-HcEmulatorConfigSetting','configFiles=[string[]]$configFiles')){if($worker -notmatch [regex]::Escape($required)){throw "Native emulator settings worker invariant missing: $required"}}
+          foreach($required in @("[ValidateSet('Inventory','Set')]",'Get-HcCompleteEmulatorSettingsInventory','Set-HcEmulatorConfigSetting','configFiles=[string[]]$configFiles','$EditRequestPath')){if($worker -notmatch [regex]::Escape($required)){throw "Native emulator settings worker invariant missing: $required"}}
+          $native=Get-Content -Raw 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8
+          foreach($required in @('OpenNativeBackendSettings','RenderBackendSettingsCategories','RenderBackendSettingsList','RenderBackendSettingDetail','ApplyBackendSettingValue','ProcessBackendValueEditorCommand','GetBackendEditorKeyLabel','RunBackendSettingsWorker("Set"')){if($native -notmatch [regex]::Escape($required)){throw "Controller-native full-settings UI invariant missing: $required"}}
+          if($native -match [regex]::Escape('RequestHuymaierPicker("OpenNativeEmulatorSettings")')){throw 'Wave 1 full emulator settings still delegates to the obsolete picker stub.'}
 
       - name: Compile exact x64 native host source
         shell: powershell
@@ -102,6 +111,6 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add HuymaierConsole.ps1 HuymaierEmulatorSettings.ps1 HuymaierEmulatorSettingsWorker.ps1 Native/HuymaierConsole.ConsolePlatforms.cs
           if(git diff --cached --quiet){Write-Host 'No pending materialized source changes.';exit 0}
-          git commit -m 'Materialize validated v0.26.4 settings core and Wave 1 native surfaces'
+          git commit -m 'Materialize validated v0.26.4 native full-emulator-settings editor'
           git push origin HEAD:feature/v0.26.4-platform-expansion
           if($LASTEXITCODE -ne 0){throw 'Could not push validated v0.26.4 materialized source.'}
