@@ -1,13 +1,13 @@
 {
-  "tag": "v0.26.1",
-  "version": "0.26.1",
-  "asset": "HC261.zip",
+  "tag": "v0.26.2",
+  "version": "0.26.2",
+  "asset": "HC262.zip",
   "result": "success",
   "alreadyPublished": false,
-  "releaseCommit": "542f46ee6172b5794693b67f4121525e499bb77a",
-  "candidateRunId": "31389633299",
+  "releaseCommit": "ce7b93573b1218442bb8a53a25d8698073b492b3",
+  "candidateRunId": "31402122820",
   "candidateRunAttempt": "1",
-  "candidateCommit": "be962a3e7c156e46f1eff7baaf3d66c2cda801f1",
-  "candidateSha256": "c881bf453a1d2443552a923a958778a4c8ed879c3f04c07061df3d67bdd51268",
-  "recordedAtUtc": "2026-08-10T13:16:54.779138+00:00"
+  "candidateCommit": "6d5f816c5ddd4a8f9b136bf50b6d135472a3b250",
+  "candidateSha256": "d796a3c9f8771a18ec1044d54af0d07241401fd76dd8c14fbafb0203af06d702",
+  "recordedAtUtc": "2026-08-10T15:31:21.406403+00:00"
 }
