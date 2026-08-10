@@ -1,0 +1,67 @@
+name: Apply v0.26.3 Authentic Console Integration
+
+on:
+  push:
+    branches:
+      - feature/v0.26.3-console-fidelity
+    paths:
+      - '.github/workflows/apply-v0263-authentic.yml'
+      - '.development/v0.26.3/authentic-request.json'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v0263-authentic-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/v0.26.3-console-fidelity
+          fetch-depth: 0
+
+      - name: Apply exact production payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .development/v0.26.3/apply_authentic_console_integration.py
+          python3 - <<'PY'
+          import json, datetime
+          state={
+            'batch':'console-fidelity-4-authentic-integration',
+            'script':'apply_authentic_console_integration.py',
+            'result':'success',
+            'recordedAtUtc':datetime.datetime.now(datetime.timezone.utc).isoformat()
+          }
+          open('.development/v0.26.3/status.json','w',encoding='utf-8').write(json.dumps(state,indent=2)+'\n')
+          PY
+
+      - name: Commit only intended production batch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            HuymaierConsole.ps1 \
+            HuymaierEmulatorPlatforms.ps1 \
+            HuymaierEmulatorInstaller.ps1 \
+            HuymaierSteamWorker.ps1 \
+            HuymaierSteamOwnership.ps1 \
+            Native/HuymaierConsole.ConsolePlatforms.cs \
+            Native/HuymaierConsole.NativeApp.cs \
+            Native/HuymaierConsole.Ps1.cs \
+            manifest.json \
+            RELEASE_NOTES.txt \
+            .development/v0.26.3/status.json
+          if git diff --cached --quiet; then
+            echo 'Authentic console integration already applied.'
+            exit 0
+          fi
+          git commit -m 'Apply v0.26.3 authentic console and emulator integration'
+          git push origin HEAD:feature/v0.26.3-console-fidelity
