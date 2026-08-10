@@ -1,449 +1,332 @@
 param([switch]$SilentUpdate)
 Set-StrictMode -Version 2.0
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference='Stop'
 
-$script:InstallVersion = '0.26.1'
-$script:InstallStartedUtc = [DateTime]::UtcNow
-$script:InstallLogRoot = Join-Path $env:LOCALAPPDATA 'Huymaier Console\Logs'
-New-Item -ItemType Directory -Force -Path $script:InstallLogRoot | Out-Null
-$script:InstallLogPath = Join-Path $script:InstallLogRoot ('install-v{0}-{1}.log' -f $script:InstallVersion,(Get-Date -Format 'yyyyMMdd-HHmmss'))
-$script:TranscriptStarted = $false
-$script:TranscriptLogPath = Join-Path $script:InstallLogRoot ('transcript-v{0}-{1}.log' -f $script:InstallVersion,(Get-Date -Format 'yyyyMMdd-HHmmss'))
+$script:InstallVersion='0.26.1'
+$script:InstallLogRoot=Join-Path $env:LOCALAPPDATA 'Huymaier Console\Logs'
+New-Item -ItemType Directory -Force -Path $script:InstallLogRoot|Out-Null
+$script:InstallLogPath=Join-Path $script:InstallLogRoot ('install-v{0}-{1}.log' -f $script:InstallVersion,(Get-Date -Format 'yyyyMMdd-HHmmss'))
+$script:TranscriptLogPath=Join-Path $script:InstallLogRoot ('transcript-v{0}-{1}.log' -f $script:InstallVersion,(Get-Date -Format 'yyyyMMdd-HHmmss'))
+$script:TranscriptStarted=$false
+$script:TransactionCommitted=$false
+$script:TransactionStarted=$false
+$script:BackupRoot=$null
+$script:BackupFiles=@()
+$script:NewMap=@{}
+$script:OldMap=@{}
+$script:InstallerMutex=$null
+$script:OwnsInstallerMutex=$false
 
 function Write-InstallerRecord {
     param([string]$Message,[string]$Level='INFO')
-    $line = '{0} [{1}] {2}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'),$Level,$Message
-    try { Add-Content -LiteralPath $script:InstallLogPath -Value $line -Encoding UTF8 } catch { }
-    try {
-        if($Level -eq 'ERROR'){ Write-Host $line -ForegroundColor Red }
-        elseif($Level -eq 'WARN'){ Write-Host $line -ForegroundColor Yellow }
-        else { Write-Host $line }
-    } catch { }
-}
-
-trap {
-    $failure = $_
-    $position = ''
-    try { $position = [string]$failure.InvocationInfo.PositionMessage } catch { }
-    $details = [string]$failure.Exception.Message
-    if(-not [string]::IsNullOrWhiteSpace($position)){ $details += "`r`n`r`n$position" }
-    try {
-        if($failure.ScriptStackTrace){ $details += "`r`n`r`nScript stack:`r`n$($failure.ScriptStackTrace)" }
-    } catch { }
-    Write-InstallerRecord -Level 'ERROR' -Message $details
-    try {
-        Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
-        [System.Windows.Forms.MessageBox]::Show(
-            "Huymaier Console installation failed.`r`n`r`n$details`r`n`r`nInstall log:`r`n$script:InstallLogPath`r`n`r`nTranscript:`r`n$script:TranscriptLogPath",
-            'Huymaier Console Installer',
-            [System.Windows.Forms.MessageBoxButtons]::OK,
-            [System.Windows.Forms.MessageBoxIcon]::Error
-        ) | Out-Null
-    } catch { }
-    if($script:TranscriptStarted){ try { Stop-Transcript | Out-Null } catch { } }
-    exit 1
-}
-
-try {
-    Start-Transcript -LiteralPath $script:TranscriptLogPath -Force | Out-Null
-    $script:TranscriptStarted = $true
-} catch { }
-Write-InstallerRecord "Installer v$script:InstallVersion started from $PSScriptRoot"
-
-Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Windows.Forms,System.Drawing,System.Web.Extensions
-
-$source = Split-Path -Parent $MyInvocation.MyCommand.Path
-
-# Validate every packaged PowerShell source before copying or compiling. This
-# catches both real syntax mistakes and Windows PowerShell 5.1 encoding issues.
-$scriptFiles = @(Get-ChildItem -LiteralPath $source -Filter '*.ps1' -File -Recurse -ErrorAction Stop)
-$parseFailures = New-Object System.Collections.Generic.List[string]
-foreach($scriptFile in $scriptFiles){
-    $tokens = $null
-    $parseErrors = $null
-    [void][System.Management.Automation.Language.Parser]::ParseFile($scriptFile.FullName,[ref]$tokens,[ref]$parseErrors)
-    foreach($parseError in @($parseErrors)){
-        [void]$parseFailures.Add(('{0} line {1}, column {2}: {3}' -f $scriptFile.Name,$parseError.Extent.StartLineNumber,$parseError.Extent.StartColumnNumber,$parseError.Message))
-    }
-}
-if($parseFailures.Count -gt 0){
-    throw "PowerShell source validation failed:`r`n$($parseFailures -join "`r`n")"
-}
-Write-InstallerRecord ('PowerShell source validation passed for {0} script(s).' -f $scriptFiles.Count)
-
-$destination = Join-Path $env:LOCALAPPDATA 'Huymaier Console'
-# Browser authorization requests are transient. v0.25.2 removes a stale
-# v0.18.0-v0.18.4 request so installing the update cannot reopen a trapped
-# sign-in screen. Credentials, cookies, and browser profile data are untouched.
-$staleBrowserRequest = Join-Path $env:LOCALAPPDATA 'Huymaier Console\browser-auth-request.json'
-Remove-Item -LiteralPath $staleBrowserRequest -Force -ErrorAction SilentlyContinue
-
-New-Item -ItemType Directory -Force -Path $destination | Out-Null
-
-function Test-HcInstallFilesIdentical {
-    param([string]$SourcePath,[string]$DestinationPath)
-    if(-not (Test-Path -LiteralPath $SourcePath -PathType Leaf) -or -not (Test-Path -LiteralPath $DestinationPath -PathType Leaf)){return $false}
+    $line='{0} [{1}] {2}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'),$Level,$Message
+    try{Add-Content -LiteralPath $script:InstallLogPath -Value $line -Encoding UTF8}catch{}
     try{
-        $srcInfo=Get-Item -LiteralPath $SourcePath -ErrorAction Stop
-        $dstInfo=Get-Item -LiteralPath $DestinationPath -ErrorAction Stop
-        if($srcInfo.Length -ne $dstInfo.Length){return $false}
-        $srcHash=(Get-FileHash -LiteralPath $SourcePath -Algorithm SHA256 -ErrorAction Stop).Hash
-        $dstHash=(Get-FileHash -LiteralPath $DestinationPath -Algorithm SHA256 -ErrorAction Stop).Hash
-        return [string]::Equals($srcHash,$dstHash,[StringComparison]::OrdinalIgnoreCase)
+        if($Level -eq 'ERROR'){Write-Host $line -ForegroundColor Red}
+        elseif($Level -eq 'WARN'){Write-Host $line -ForegroundColor Yellow}
+        else{Write-Host $line}
+    }catch{}
+}
+
+function Get-HcSafeRelativePath {
+    param([string]$Root,[string]$Relative)
+    if([string]::IsNullOrWhiteSpace($Relative)){throw 'Package manifest contains an empty path.'}
+    $relativePath=$Relative.Replace('/','\')
+    if([IO.Path]::IsPathRooted($relativePath)){throw "Package manifest contains a rooted path: $Relative"}
+    if($relativePath -match '(^|\)\.\.(\|$)'){throw "Package manifest contains path traversal: $Relative"}
+    $rootFull=[IO.Path]::GetFullPath($Root).TrimEnd('\')
+    $full=[IO.Path]::GetFullPath((Join-Path $rootFull $relativePath))
+    $prefix=$rootFull+'\'
+    if(-not $full.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)){throw "Package path escapes the package root: $Relative"}
+    return $relativePath
+}
+
+function Get-HcChecksumMap {
+    param([string]$Root)
+    $primary=Join-Path $Root 'checksums.sha256'
+    $compat=Join-Path $Root 'SHA256SUMS.txt'
+    if(-not(Test-Path -LiteralPath $primary -PathType Leaf) -or -not(Test-Path -LiteralPath $compat -PathType Leaf)){throw 'Package checksum manifests are missing.'}
+    $primaryText=Get-Content -Raw -LiteralPath $primary -Encoding UTF8
+    $compatText=Get-Content -Raw -LiteralPath $compat -Encoding UTF8
+    if($primaryText -ne $compatText){throw 'checksums.sha256 and SHA256SUMS.txt do not agree.'}
+    $map=@{}
+    foreach($line in @($primaryText -split "`r?`n")){
+        if([string]::IsNullOrWhiteSpace($line)){continue}
+        if($line -notmatch '^([0-9a-fA-F]{64})\s{2}(.+)$'){throw "Invalid checksum row: $line"}
+        $relative=Get-HcSafeRelativePath -Root $Root -Relative $Matches[2]
+        if($map.ContainsKey($relative)){throw "Duplicate package path in checksum manifest: $relative"}
+        $map[$relative]=$Matches[1].ToLowerInvariant()
+    }
+    if($map.Count -eq 0){throw 'Package checksum manifest is empty.'}
+    return $map
+}
+
+function Get-HcPeMachine {
+    param([string]$Path)
+    $stream=[IO.File]::Open($Path,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::ReadWrite)
+    try{
+        $reader=New-Object IO.BinaryReader($stream)
+        if($stream.Length -lt 64){throw "PE file is too small: $Path"}
+        $stream.Position=0x3c
+        $peOffset=$reader.ReadInt32()
+        if($peOffset -lt 0 -or ($peOffset+6) -gt $stream.Length){throw "Invalid PE header offset: $Path"}
+        $stream.Position=$peOffset
+        if($reader.ReadUInt32() -ne 0x00004550){throw "Invalid PE signature: $Path"}
+        return $reader.ReadUInt16()
+    }finally{$stream.Dispose()}
+}
+
+function Assert-HcPackage {
+    param([string]$Root,[string]$ExpectedVersion)
+    $manifestPath=Join-Path $Root 'manifest.json'
+    if(-not(Test-Path -LiteralPath $manifestPath -PathType Leaf)){throw 'manifest.json is missing from the package.'}
+    $manifest=Get-Content -Raw -LiteralPath $manifestPath -Encoding UTF8|ConvertFrom-Json
+    $actualVersion=[string]$manifest.version
+    if(-not [string]::Equals($actualVersion,$ExpectedVersion,[StringComparison]::OrdinalIgnoreCase)){throw "Package version mismatch: expected $ExpectedVersion, found $actualVersion"}
+
+    $map=Get-HcChecksumMap -Root $Root
+    foreach($relative in $map.Keys){
+        $path=Join-Path $Root $relative
+        if(-not(Test-Path -LiteralPath $path -PathType Leaf)){throw "Checksummed package payload is missing: $relative"}
+        $actual=(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+        if($actual -ne $map[$relative]){throw "Package checksum mismatch: $relative"}
+    }
+
+    foreach($file in @(Get-ChildItem -LiteralPath $Root -Recurse -File -ErrorAction Stop)){
+        $relative=$file.FullName.Substring($Root.TrimEnd('\').Length).TrimStart('\')
+        if($relative -in @('checksums.sha256','SHA256SUMS.txt')){continue}
+        if(-not $map.ContainsKey($relative)){throw "Unchecksummed package payload is not allowed: $relative"}
+    }
+
+    foreach($required in @('HuymaierConsole.exe','HuymaierGameInputBridge.dll','HuymaierBootstrap.ps1','HuymaierConsole.ps1','HuymaierGameBar.ps1','HuymaierSelfUpdater.ps1','HuymaierConsoleUpdateWorker.ps1','Restore-HuymaierWindowsSettings.ps1','manifest.json')){
+        if(-not $map.ContainsKey($required)){throw "Required managed payload is missing from the checksum manifest: $required"}
+    }
+    foreach($binary in @('HuymaierConsole.exe','HuymaierGameInputBridge.dll')){
+        $machine=Get-HcPeMachine -Path (Join-Path $Root $binary)
+        if($machine -ne 0x8664){throw ('{0} is not x64 (PE machine 0x{1:X4}).' -f $binary,$machine)}
+    }
+
+    $parseFailures=New-Object System.Collections.Generic.List[string]
+    foreach($scriptFile in @(Get-ChildItem -LiteralPath $Root -Recurse -File|Where-Object{$_.Extension -in @('.ps1','.psm1','.psd1')})){
+        $tokens=$null;$parseErrors=$null
+        [void][System.Management.Automation.Language.Parser]::ParseFile($scriptFile.FullName,[ref]$tokens,[ref]$parseErrors)
+        foreach($parseError in @($parseErrors)){[void]$parseFailures.Add(('{0} line {1}, column {2}: {3}' -f $scriptFile.FullName,$parseError.Extent.StartLineNumber,$parseError.Extent.StartColumnNumber,$parseError.Message))}
+    }
+    if($parseFailures.Count -gt 0){throw "PowerShell source validation failed:`r`n$($parseFailures -join "`r`n")"}
+    return $map
+}
+
+function Test-HcFilesIdentical {
+    param([string]$Source,[string]$Destination)
+    if(-not(Test-Path -LiteralPath $Source -PathType Leaf) -or -not(Test-Path -LiteralPath $Destination -PathType Leaf)){return $false}
+    try{
+        if((Get-Item -LiteralPath $Source).Length -ne (Get-Item -LiteralPath $Destination).Length){return $false}
+        return ((Get-FileHash -LiteralPath $Source -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $Destination -Algorithm SHA256).Hash)
     }catch{return $false}
 }
 
-function Copy-HcInstallFile {
-    param([Parameter(Mandatory=$true)][string]$SourcePath,[Parameter(Mandatory=$true)][string]$DestinationPath)
-    if(Test-HcInstallFilesIdentical $SourcePath $DestinationPath){
-        Write-InstallerRecord "Unchanged payload already installed: $([IO.Path]::GetFileName($DestinationPath))"
+function Copy-HcFileWithRetry {
+    param([string]$Source,[string]$Destination)
+    if(Test-HcFilesIdentical -Source $Source -Destination $Destination){
+        Write-InstallerRecord "Unchanged managed payload retained: $Destination"
         return
     }
-    $parent=Split-Path -Parent $DestinationPath
+    $parent=Split-Path -Parent $Destination
     if($parent){New-Item -ItemType Directory -Force -Path $parent|Out-Null}
-    $lastError=$null
-    for($attempt=1;$attempt -le 30;$attempt++){
-        try{
-            Copy-Item -LiteralPath $SourcePath -Destination $DestinationPath -Force -ErrorAction Stop
-            return
-        }catch{
-            $lastError=$_.Exception
-            if($attempt -lt 30){Start-Sleep -Milliseconds 250}
+    $last=$null
+    for($attempt=1;$attempt -le 40;$attempt++){
+        try{Copy-Item -LiteralPath $Source -Destination $Destination -Force -ErrorAction Stop;return}catch{$last=$_.Exception;if($attempt -lt 40){Start-Sleep -Milliseconds 250}}
+    }
+    throw "Could not replace managed file after 10 seconds: $Destination. $($last.Message)"
+}
+
+function Stop-HcConsoleProcesses {
+    $processes=@(Get-Process -Name 'HuymaierConsole' -ErrorAction SilentlyContinue|Where-Object{$_.Id -ne $PID})
+    if($processes.Count -eq 0){return}
+    Write-InstallerRecord ('Closing {0} running Huymaier Console process(es) before transaction.' -f $processes.Count)
+    $processes|Stop-Process -Force -ErrorAction SilentlyContinue
+    $deadline=[DateTime]::UtcNow.AddSeconds(10)
+    do{Start-Sleep -Milliseconds 150;$remaining=@(Get-Process -Name 'HuymaierConsole' -ErrorAction SilentlyContinue|Where-Object{$_.Id -ne $PID})}while($remaining.Count -gt 0 -and [DateTime]::UtcNow -lt $deadline)
+    if($remaining.Count -gt 0){throw 'HuymaierConsole.exe is still running and the installation cannot be changed safely.'}
+}
+
+function Read-HcInstalledMap {
+    param([string]$Root)
+    try{
+        if(Test-Path -LiteralPath (Join-Path $Root 'checksums.sha256') -PathType Leaf){return Get-HcChecksumMap -Root $Root}
+    }catch{Write-InstallerRecord "Previous installed checksum manifest could not be trusted; repair will use the new manifest plus known legacy paths. $($_.Exception.Message)" 'WARN'}
+    return @{}
+}
+
+function Backup-HcManagedFiles {
+    param([string]$InstallRoot,[hashtable]$NewMap,[hashtable]$OldMap,[string[]]$LegacyPaths)
+    $backupRoot=Join-Path $env:TEMP ('HuymaierConsoleInstallBackup-'+[guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Force -Path $backupRoot|Out-Null
+    $seen=@{}
+    $paths=New-Object System.Collections.Generic.List[string]
+    foreach($relative in @($NewMap.Keys)+@($OldMap.Keys)+@($LegacyPaths)+@('checksums.sha256','SHA256SUMS.txt')){
+        if([string]::IsNullOrWhiteSpace([string]$relative)){continue}
+        $key=([string]$relative).ToLowerInvariant()
+        if($seen.ContainsKey($key)){continue};$seen[$key]=$true
+        $src=Join-Path $InstallRoot ([string]$relative)
+        if(Test-Path -LiteralPath $src -PathType Leaf){
+            $dst=Join-Path $backupRoot ([string]$relative)
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst)|Out-Null
+            Copy-Item -LiteralPath $src -Destination $dst -Force -ErrorAction Stop
+            [void]$paths.Add([string]$relative)
         }
     }
-    throw "Could not replace installed file after 7.5 seconds: $DestinationPath. $($lastError.Message)"
+    return [pscustomobject]@{Root=$backupRoot;Files=[string[]]$paths.ToArray()}
 }
 
-function Copy-HcInstallTree {
-    param([Parameter(Mandatory=$true)][string]$SourceRoot,[Parameter(Mandatory=$true)][string]$DestinationRoot)
-    if(-not (Test-Path -LiteralPath $SourceRoot -PathType Container)){return}
-    New-Item -ItemType Directory -Force -Path $DestinationRoot|Out-Null
-    foreach($dir in @(Get-ChildItem -LiteralPath $SourceRoot -Directory -Recurse -ErrorAction Stop)){
-        $relative=$dir.FullName.Substring($SourceRoot.Length).TrimStart('\\')
-        New-Item -ItemType Directory -Force -Path (Join-Path $DestinationRoot $relative)|Out-Null
+function Restore-HcTransaction {
+    param([string]$InstallRoot,[hashtable]$NewMap,[hashtable]$OldMap,[string[]]$LegacyPaths,$Backup)
+    Write-InstallerRecord 'Rolling back incomplete installation transaction.' 'WARN'
+    Stop-HcConsoleProcesses
+    $remove=@{}
+    foreach($relative in @($NewMap.Keys)+@($OldMap.Keys)+@($LegacyPaths)+@('checksums.sha256','SHA256SUMS.txt','install-incomplete.json')){
+        if([string]::IsNullOrWhiteSpace([string]$relative)){continue};$remove[([string]$relative).ToLowerInvariant()]=[string]$relative
     }
-    foreach($file in @(Get-ChildItem -LiteralPath $SourceRoot -File -Recurse -ErrorAction Stop)){
-        $relative=$file.FullName.Substring($SourceRoot.Length).TrimStart('\\')
-        Copy-HcInstallFile -SourcePath $file.FullName -DestinationPath (Join-Path $DestinationRoot $relative)
+    foreach($relative in $remove.Values){Remove-Item -LiteralPath (Join-Path $InstallRoot $relative) -Force -Recurse -ErrorAction SilentlyContinue}
+    if($null -ne $Backup -and (Test-Path -LiteralPath $Backup.Root)){
+        foreach($relative in @($Backup.Files)){
+            $src=Join-Path $Backup.Root $relative
+            $dst=Join-Path $InstallRoot $relative
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst)|Out-Null
+            Copy-Item -LiteralPath $src -Destination $dst -Force -ErrorAction Stop
+        }
     }
+    Write-InstallerRecord 'Rollback completed.' 'WARN'
 }
 
-# Stop every native Console host before replacing *any* payload file. The old
-# installer performed this step after copying scripts/assets, allowing a single
-# locked file to leave a mixed-version installation.
-$runningConsole = @(Get-Process -Name 'HuymaierConsole' -ErrorAction SilentlyContinue)
-if($runningConsole.Count -gt 0){
-    Write-InstallerRecord ('Closing {0} running Huymaier Console process(es) before payload replacement.' -f $runningConsole.Count)
-    $runningConsole | Stop-Process -Force -ErrorAction SilentlyContinue
-    $deadline = [DateTime]::UtcNow.AddSeconds(10)
-    do {
-        Start-Sleep -Milliseconds 150
-        $stillRunning = @(Get-Process -Name 'HuymaierConsole' -ErrorAction SilentlyContinue)
-    } while($stillRunning.Count -gt 0 -and [DateTime]::UtcNow -lt $deadline)
-    if($stillRunning.Count -gt 0){ throw 'HuymaierConsole.exe is still running and installed files cannot be replaced safely.' }
-}
-
-$files = @(
-    'HuymaierBootstrap.ps1',
-    'HuymaierConsole.ps1',
-    'HuymaierNativeDisplay.cs',
-    'HuymaierNativeAudio.cs',
-    'HuymaierNativeInput.cs',
-    'HuymaierPerformance.cs',
-    'HuymaierFSEHost.cs',
-    'Register-HuymaierFSEHome.ps1',
-    'HuymaierUpdateWorker.ps1',
-    'HuymaierConsoleUpdateWorker.ps1',
-    'HuymaierSelfUpdater.ps1',
-    'HuymaierDriverWorker.ps1',
-    'HuymaierLibraryWorker.ps1',
-    'HuymaierStorefronts.ps1',
-    'HuymaierStorefrontWorker.ps1',
-    'HuymaierGameProviders.ps1',
-    'HuymaierGameProviderWorker.ps1',
-    'HuymaierGameExperience.ps1',
-    'HuymaierShellRedesign.ps1',
-    'HuymaierGameBar.ps1',
-    'HuymaierGameInputBridge.dll',
-    'HuymaierEmulatorPlatforms.ps1',
-    'HuymaierArtworkWorker.ps1',
-    'HuymaierPs3LibraryWorker.ps1',
-    'HuymaierPs2LibraryWorker.ps1',
-    'HuymaierPs1LibraryWorker.ps1',
-    'HuymaierNativeConsoleLibraryWorker.ps1',
-    'HuymaierWebBrowser.ps1',
-    'Launch-HuymaierConsole.cmd',
-    'Launch-Windowed.cmd',
-    'HuymaierConsole.ico',
-    'README.txt',
-    'Uninstall-HuymaierConsole.cmd',
-    'RELEASE_NOTES.txt',
-    'THIRD_PARTY_NOTICES.txt'
-)
-foreach ($file in $files) {
-    $src = Join-Path $source $file
-    if (Test-Path -LiteralPath $src -PathType Leaf) { Copy-HcInstallFile -SourcePath $src -DestinationPath (Join-Path $destination $file) }
-}
-
-
-$fseSource=Join-Path $source 'FSEPackage'
-$fseDestination=Join-Path $destination 'FSEPackage'
-if(Test-Path $fseSource){Copy-HcInstallTree -SourceRoot $fseSource -DestinationRoot $fseDestination}
-
-$assetSource = Join-Path $source 'Assets'
-$assetDestination = Join-Path $destination 'Assets'
-if (Test-Path $assetSource) {Copy-HcInstallTree -SourceRoot $assetSource -DestinationRoot $assetDestination}
-
-
-$emulatorSource=Join-Path $source 'EmulatorPlatforms'
-$emulatorDestination=Join-Path $destination 'EmulatorPlatforms'
-if(Test-Path $emulatorSource){Copy-HcInstallTree -SourceRoot $emulatorSource -DestinationRoot $emulatorDestination}
-$toolsSource=Join-Path $source 'Tools'
-$toolsDestination=Join-Path $destination 'Tools'
-if(Test-Path $toolsSource){Copy-HcInstallTree -SourceRoot $toolsSource -DestinationRoot $toolsDestination}
-
-# Microsoft GameInput is the primary Xbox system-button path for v0.26+.
-# The official redistributable does not downgrade a newer installed runtime.
-$gameInputRedistVersion='3.5.262'
-$gameInputRedist=Join-Path $toolsDestination 'GameInput\GameInputRedist.msi'
-$gameInputMarker=Join-Path $destination 'gameinput-redist.version'
-$installedGameInputVersion=''
-try{if(Test-Path -LiteralPath $gameInputMarker -PathType Leaf){$installedGameInputVersion=(Get-Content -Raw -LiteralPath $gameInputMarker).Trim()}}catch{}
-if((Test-Path -LiteralPath $gameInputRedist -PathType Leaf) -and $installedGameInputVersion -ne $gameInputRedistVersion){
+trap {
+    $failure=$_
+    $details=[string]$failure.Exception.Message
+    try{if($failure.InvocationInfo.PositionMessage){$details+="`r`n`r`n$($failure.InvocationInfo.PositionMessage)"}}catch{}
+    try{if($failure.ScriptStackTrace){$details+="`r`n`r`nScript stack:`r`n$($failure.ScriptStackTrace)"}}catch{}
+    Write-InstallerRecord $details 'ERROR'
+    if($script:TransactionStarted -and -not $script:TransactionCommitted){
+        try{Restore-HcTransaction -InstallRoot $script:Destination -NewMap $script:NewMap -OldMap $script:OldMap -LegacyPaths $script:LegacyManagedPaths -Backup $script:Backup}catch{Write-InstallerRecord "ROLLBACK FAILED: $($_.Exception.Message)" 'ERROR'}
+    }
     try{
-        Write-InstallerRecord "Installing Microsoft GameInput redistributable $gameInputRedistVersion. Windows may request administrator approval."
-        $msiArgs='/i "'+$gameInputRedist+'" /qn /norestart'
-        $gameInputInstall=Start-Process -FilePath "$env:SystemRoot\System32\msiexec.exe" -ArgumentList $msiArgs -Verb RunAs -Wait -PassThru
-        if($gameInputInstall.ExitCode -notin @(0,3010,1638)){throw "GameInput redistributable installer exited with code $($gameInputInstall.ExitCode)."}
-        Set-Content -LiteralPath $gameInputMarker -Value $gameInputRedistVersion -Encoding ASCII
-        Write-InstallerRecord 'Microsoft GameInput redistributable is ready.'
-    }catch{Write-InstallerRecord "Microsoft GameInput redistributable could not be installed; controller input will fall back to Raw HID/XInput where available. $($_.Exception.Message)" 'WARN'}
+        Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
+        [System.Windows.Forms.MessageBox]::Show("Huymaier Console installation failed safely.`r`n`r`n$details`r`n`r`nLog:`r`n$script:InstallLogPath",'Huymaier Console Installer',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Error)|Out-Null
+    }catch{}
+    if($script:TranscriptStarted){try{Stop-Transcript|Out-Null}catch{}}
+    if($script:OwnsInstallerMutex -and $null -ne $script:InstallerMutex){try{$script:InstallerMutex.ReleaseMutex()}catch{}}
+    if($null -ne $script:InstallerMutex){try{$script:InstallerMutex.Dispose()}catch{}}
+    exit 1
 }
 
-$nativeSourceRoot=Join-Path $source 'Native'
-$nativeDestinationRoot=Join-Path $destination 'Native'
-if(Test-Path $nativeSourceRoot){Copy-HcInstallTree -SourceRoot $nativeSourceRoot -DestinationRoot $nativeDestinationRoot}
+try{Start-Transcript -LiteralPath $script:TranscriptLogPath -Force|Out-Null;$script:TranscriptStarted=$true}catch{}
+Write-InstallerRecord "Installer v$script:InstallVersion started from $PSScriptRoot"
 
-# Remove Mark-of-the-Web from installed local files so the compiled host can
-# relaunch even when Windows PowerShell is configured for RemoteSigned.
-try { Get-ChildItem -LiteralPath $destination -Recurse -File -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue } catch { }
+$created=$false
+$script:InstallerMutex=New-Object System.Threading.Mutex($true,'Local\HuymaierConsole.Installer',[ref]$created)
+$script:OwnsInstallerMutex=$created
+if(-not $script:OwnsInstallerMutex){throw 'Another Huymaier Console installer/update transaction is already running.'}
 
-# Build the normal-use Windows GUI executable. PowerShell is used only here as
-# an installer/compiler host; HuymaierConsole.exe owns the runtime process and
-# loads the existing modules in-process with no visible shell window.
-$nativeExe=Join-Path $destination 'HuymaierConsole.exe'
-$nativeTemp=Join-Path $destination 'HuymaierConsole.native.new.exe'
-$nativeAppSource=Join-Path $nativeDestinationRoot 'HuymaierConsole.NativeApp.cs'
-$nativePs1Source=Join-Path $nativeDestinationRoot 'HuymaierConsole.Ps1.cs'
-$nativeConsolePlatformsSource=Join-Path $nativeDestinationRoot 'HuymaierConsole.ConsolePlatforms.cs'
-$nativeSystemOverlaySource=Join-Path $nativeDestinationRoot 'HuymaierConsole.SystemOverlay.cs'
-$nativeGameInputSource=Join-Path $nativeDestinationRoot 'HuymaierConsole.GameInput.cs'
-$nativeInputSource=Join-Path $destination 'HuymaierNativeInput.cs'
-$nativeDisplaySource=Join-Path $destination 'HuymaierNativeDisplay.cs'
-$nativeAudioSource=Join-Path $destination 'HuymaierNativeAudio.cs'
-$nativePerformanceSource=Join-Path $destination 'HuymaierPerformance.cs'
-$p3tSource=Join-Path $destination 'EmulatorPlatforms\Shared\Huymaier.P3T.cs'
-foreach($requiredSource in @($nativeAppSource,$nativePs1Source,$nativeConsolePlatformsSource,$nativeSystemOverlaySource,$nativeGameInputSource,$nativeInputSource,$nativeDisplaySource,$nativeAudioSource,$nativePerformanceSource,$p3tSource)){
-    if(-not (Test-Path -LiteralPath $requiredSource)){throw "Native application source is missing: $requiredSource"}
-}
-Remove-Item -LiteralPath $nativeTemp -Force -ErrorAction SilentlyContinue
-$cscCandidates=@(
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'),
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe')
-)
-$csc=$cscCandidates|Where-Object{Test-Path -LiteralPath $_ -PathType Leaf}|Select-Object -First 1
-if(-not $csc){throw 'The Windows .NET Framework C# compiler was not found.'}
-$automationAssembly=[System.Management.Automation.PSObject].Assembly.Location
-# Compile without csc.rsp so standard .NET assemblies are not imported a
-# second time behind the installer. Resolve every required framework reference
-# from assemblies already loaded by Windows PowerShell, using full paths.
-$frameworkReferences=@(
-    [System.Uri].Assembly.Location,
-    [System.Linq.Enumerable].Assembly.Location,
-    [System.Xaml.XamlReader].Assembly.Location,
-    [System.Xml.XmlDocument].Assembly.Location,
-    [System.Windows.DependencyObject].Assembly.Location,
-    [System.Windows.Media.Visual].Assembly.Location,
-    [System.Windows.Window].Assembly.Location,
-    [System.Windows.Forms.Form].Assembly.Location,
-    [System.Drawing.Bitmap].Assembly.Location,
-    [System.Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,
-    $automationAssembly
-) | Select-Object -Unique
-foreach($frameworkReference in $frameworkReferences){
-    if([string]::IsNullOrWhiteSpace([string]$frameworkReference) -or -not (Test-Path -LiteralPath $frameworkReference -PathType Leaf)){
-        throw "Required compiler reference could not be resolved: $frameworkReference"
-    }
-    Write-InstallerRecord "Compiler reference: $frameworkReference"
-}
-$compilerArgs=@(
-    '/noconfig',
-    '/nologo',
-    '/target:winexe',
-    '/platform:anycpu',
-    '/optimize+',
-    ('/out:'+ $nativeTemp),
-    ('/win32icon:'+ (Join-Path $destination 'HuymaierConsole.ico'))
-)
-foreach($frameworkReference in $frameworkReferences){
-    $compilerArgs += ('/reference:'+ $frameworkReference)
-}
-$compilerArgs += @(
-    $nativeAppSource,
-    $nativePs1Source,
-    $nativeConsolePlatformsSource,
-    $nativeSystemOverlaySource,
-    $nativeGameInputSource,
-    $nativeInputSource,
-    $nativeDisplaySource,
-    $nativeAudioSource,
-    $nativePerformanceSource,
-    $p3tSource
-)
-$compilerStamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$compilerStdOut = Join-Path $script:InstallLogRoot ('compiler-v{0}-{1}.stdout.log' -f $script:InstallVersion,$compilerStamp)
-$compilerStdErr = Join-Path $script:InstallLogRoot ('compiler-v{0}-{1}.stderr.log' -f $script:InstallVersion,$compilerStamp)
+$source=Split-Path -Parent $MyInvocation.MyCommand.Path
+$script:Destination=Join-Path $env:LOCALAPPDATA 'Huymaier Console'
+New-Item -ItemType Directory -Force -Path $script:Destination|Out-Null
+
+# No installed files are touched before the complete extracted package passes
+# closed-manifest, hash, architecture, version, and PowerShell parser checks.
+$script:NewMap=Assert-HcPackage -Root $source -ExpectedVersion $script:InstallVersion
+Write-InstallerRecord ('Package integrity passed for {0} managed payload files.' -f $script:NewMap.Count)
+
+Stop-HcConsoleProcesses
 try{
-    Write-InstallerRecord "Compiling native application with $csc"
-    Push-Location $destination
+    $restore=Join-Path $source 'Restore-HuymaierWindowsSettings.ps1'
+    if(Test-Path -LiteralPath $restore -PathType Leaf){& $restore -Quiet}
+}catch{Write-InstallerRecord "Prior Windows-setting recovery reported: $($_.Exception.Message)" 'WARN'}
+
+$script:OldMap=Read-HcInstalledMap -Root $script:Destination
+$script:LegacyManagedPaths=@(
+    'HuymaierGuideInput.cs',
+    'HuymaierGuideBridge.dll',
+    'HuymaierConsoleUpdate.ps1',
+    'HuymaierConsoleApplyUpdate.ps1',
+    'Native\GuideBridge\HuymaierGuideBridge.cpp'
+)
+$script:Backup=Backup-HcManagedFiles -InstallRoot $script:Destination -NewMap $script:NewMap -OldMap $script:OldMap -LegacyPaths $script:LegacyManagedPaths
+$script:BackupRoot=$script:Backup.Root
+Write-InstallerRecord ('Rollback snapshot captured {0} existing managed files.' -f @($script:Backup.Files).Count)
+
+$marker=Join-Path $script:Destination 'install-incomplete.json'
+[ordered]@{version=$script:InstallVersion;startedAtUtc=[DateTime]::UtcNow.ToString('o');source=$source}|ConvertTo-Json|Set-Content -LiteralPath $marker -Encoding UTF8
+$script:TransactionStarted=$true
+Write-InstallerRecord 'Persistent installation-incomplete marker created.'
+
+# Retire package-owned files that no longer exist in the new closed manifest.
+foreach($relative in $script:OldMap.Keys){if(-not $script:NewMap.ContainsKey($relative)){Remove-Item -LiteralPath (Join-Path $script:Destination $relative) -Force -Recurse -ErrorAction SilentlyContinue}}
+foreach($relative in $script:LegacyManagedPaths){if(-not $script:NewMap.ContainsKey($relative)){Remove-Item -LiteralPath (Join-Path $script:Destination $relative) -Force -Recurse -ErrorAction SilentlyContinue}}
+
+# Install exactly the files described by the verified checksum manifest.
+foreach($relative in @($script:NewMap.Keys|Sort-Object)){
+    Copy-HcFileWithRetry -Source (Join-Path $source $relative) -Destination (Join-Path $script:Destination $relative)
+}
+Copy-HcFileWithRetry -Source (Join-Path $source 'checksums.sha256') -Destination (Join-Path $script:Destination 'checksums.sha256')
+Copy-HcFileWithRetry -Source (Join-Path $source 'SHA256SUMS.txt') -Destination (Join-Path $script:Destination 'SHA256SUMS.txt')
+
+# Verify installed bytes before committing the transaction.
+foreach($relative in $script:NewMap.Keys){
+    $path=Join-Path $script:Destination $relative
+    if(-not(Test-Path -LiteralPath $path -PathType Leaf)){throw "Installed managed payload is missing: $relative"}
+    $actual=(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+    if($actual -ne $script:NewMap[$relative]){throw "Installed managed payload checksum mismatch: $relative"}
+}
+if((Get-Content -Raw -LiteralPath (Join-Path $script:Destination 'checksums.sha256') -Encoding UTF8) -ne (Get-Content -Raw -LiteralPath (Join-Path $script:Destination 'SHA256SUMS.txt') -Encoding UTF8)){throw 'Installed checksum manifests diverged.'}
+Remove-Item -LiteralPath $marker -Force -ErrorAction Stop
+$script:TransactionCommitted=$true
+Write-InstallerRecord 'Installed payload verified; installation transaction committed.'
+
+# GameInput is a dependency enhancement, not a reason to corrupt or roll back an
+# otherwise verified Console install. A failure here leaves Raw HID/XInput
+# fallback available and is clearly logged for repair.
+$gameInputVersion='3.5.262'
+$gameInputMsi=Join-Path $script:Destination 'Tools\GameInput\GameInputRedist.msi'
+$gameInputMarker=Join-Path $script:Destination 'gameinput-redist.version'
+$installedGameInput=''
+try{if(Test-Path -LiteralPath $gameInputMarker -PathType Leaf){$installedGameInput=(Get-Content -Raw -LiteralPath $gameInputMarker).Trim()}}catch{}
+if((Test-Path -LiteralPath $gameInputMsi -PathType Leaf) -and $installedGameInput -ne $gameInputVersion){
     try{
-        $compilerOutput = @(& $csc @compilerArgs 2>&1 | ForEach-Object { [string]$_ })
-        $compilerExitCode = $LASTEXITCODE
-    } finally {
-        Pop-Location
+        Write-InstallerRecord "Installing Microsoft GameInput redistributable $gameInputVersion. Windows may request administrator approval."
+        $args='/i "'+$gameInputMsi+'" /qn /norestart'
+        $proc=Start-Process -FilePath "$env:SystemRoot\System32\msiexec.exe" -ArgumentList $args -Verb RunAs -Wait -PassThru
+        if($proc.ExitCode -notin @(0,3010,1638)){throw "GameInput installer returned $($proc.ExitCode)."}
+        Set-Content -LiteralPath $gameInputMarker -Value $gameInputVersion -Encoding ASCII
+        Write-InstallerRecord 'Microsoft GameInput redistributable is ready.'
+    }catch{Write-InstallerRecord "Microsoft GameInput redistributable was not installed; system-button input will use available fallbacks. $($_.Exception.Message)" 'WARN'}
+}
+
+# Remove Mark-of-the-Web from the locally installed managed payload.
+try{foreach($relative in $script:NewMap.Keys){Unblock-File -LiteralPath (Join-Path $script:Destination $relative) -ErrorAction SilentlyContinue}}catch{}
+
+# Refresh per-user shortcuts only after the verified transaction is committed.
+try{
+    $wsh=New-Object -ComObject WScript.Shell
+    $nativeExe=Join-Path $script:Destination 'HuymaierConsole.exe'
+    foreach($folder in @([Environment]::GetFolderPath('Desktop'),(Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'))){
+        $shortcut=$wsh.CreateShortcut((Join-Path $folder 'Huymaier Console.lnk'))
+        $shortcut.TargetPath=$nativeExe
+        $shortcut.Arguments=''
+        $shortcut.WorkingDirectory=$script:Destination
+        $icon=Join-Path $script:Destination 'HuymaierConsole.ico';if(Test-Path $icon){$shortcut.IconLocation=$icon}
+        $shortcut.Description='Huymaier Console Windows 11 FSE'
+        $shortcut.Save()
     }
-    $compilerOutput | Set-Content -LiteralPath $compilerStdOut -Encoding UTF8
-    if(-not (Test-Path -LiteralPath $compilerStdErr)){ New-Item -ItemType File -Path $compilerStdErr -Force | Out-Null }
-    foreach($compilerLine in $compilerOutput){ if(-not [string]::IsNullOrWhiteSpace([string]$compilerLine)){ Write-InstallerRecord ([string]$compilerLine) 'COMPILER' } }
-    if($compilerExitCode -ne 0){
-        $summary = ($compilerOutput | Select-Object -Last 30) -join "`r`n"
-        throw "C# compiler exited with code $compilerExitCode.`r`n$summary"
-    }
-    if(-not (Test-Path -LiteralPath $nativeTemp -PathType Leaf)){throw 'The native compiler did not create HuymaierConsole.exe.'}
-    Move-Item -LiteralPath $nativeTemp -Destination $nativeExe -Force
-    Write-InstallerRecord "Native application installed at $nativeExe"
-}catch{
-    Remove-Item -LiteralPath $nativeTemp -Force -ErrorAction SilentlyContinue
-    throw "The native Huymaier Console application could not be compiled or installed. $($_.Exception.Message)"
-}
+}catch{Write-InstallerRecord "Shortcut refresh failed without affecting the verified installation: $($_.Exception.Message)" 'WARN'}
 
-# v0.25.2 keeps the Console-side HES integration retired while leaving the separate
-# Huymaier Entertainment System server project untouched.
-Remove-Item -LiteralPath (Join-Path $assetDestination 'Platforms\hes.png') -Force -ErrorAction SilentlyContinue
-Remove-Item -LiteralPath (Join-Path $destination 'GameProviders\Config\HES') -Recurse -Force -ErrorAction SilentlyContinue
-Remove-Item -LiteralPath (Join-Path $destination 'GameProviders\Artwork\HES') -Recurse -Force -ErrorAction SilentlyContinue
-foreach($legacy in @('hes.json','hes-auth.json','hes-token.json','hes-platforms.json','hes-cache.json')){
-    Remove-Item -LiteralPath (Join-Path $destination $legacy) -Force -ErrorAction SilentlyContinue
-}
-$configFile=Join-Path $destination 'config.json'
-if(Test-Path -LiteralPath $configFile){
-    try{
-        $cfg=Get-Content -Raw -LiteralPath $configFile|ConvertFrom-Json
-        foreach($property in @('HesServerUrl','HesApiUrl')){if($cfg.PSObject.Properties[$property]){$cfg.PSObject.Properties.Remove($property)}}
-        foreach($collection in @('ImportedGames','RecentGames','FavoriteGames')){
-            if($cfg.PSObject.Properties[$collection]){
-                $cfg.$collection=[object[]]@($cfg.$collection|Where-Object{
-                    -not [string]::Equals([string]$_.Source,'HES',[StringComparison]::OrdinalIgnoreCase) -and
-                    -not [string]::Equals([string]$_.Provider,'HES',[StringComparison]::OrdinalIgnoreCase)
-                })
-            }
-        }
-        $cfg|ConvertTo-Json -Depth 10|Set-Content -LiteralPath $configFile -Encoding UTF8
-    }catch{}
-}
-$catalogFile=Join-Path $destination 'GameProviders\provider-catalog.json'
-if(Test-Path -LiteralPath $catalogFile){
-    try{
-        $catalog=Get-Content -Raw -LiteralPath $catalogFile|ConvertFrom-Json
-        $catalog.Providers=[object[]]@($catalog.Providers|Where-Object{-not [string]::Equals([string]$_.Id,'HES',[StringComparison]::OrdinalIgnoreCase)})
-        $catalog|ConvertTo-Json -Depth 12|Set-Content -LiteralPath $catalogFile -Encoding UTF8
-    }catch{}
-}
+Write-InstallerRecord "Installation completed successfully at $script:Destination"
+if($script:TranscriptStarted){try{Stop-Transcript|Out-Null;$script:TranscriptStarted=$false}catch{}}
+if($script:BackupRoot){Remove-Item -LiteralPath $script:BackupRoot -Recurse -Force -ErrorAction SilentlyContinue}
+if($script:OwnsInstallerMutex -and $null -ne $script:InstallerMutex){try{$script:InstallerMutex.ReleaseMutex()}catch{};$script:OwnsInstallerMutex=$false}
+if($null -ne $script:InstallerMutex){try{$script:InstallerMutex.Dispose()}catch{};$script:InstallerMutex=$null}
 
-
-# Install the app-local WebView2 WPF SDK. The Evergreen browser Runtime remains
-# maintained by Microsoft; only the small managed SDK and x64 loader are stored
-# with Huymaier Console.
-$webViewFolder=Join-Path $destination 'WebView2'
-$webViewReady=(Test-Path (Join-Path $webViewFolder 'Microsoft.Web.WebView2.Core.dll')) -and
-              (Test-Path (Join-Path $webViewFolder 'Microsoft.Web.WebView2.Wpf.dll')) -and
-              (Test-Path (Join-Path $webViewFolder 'WebView2Loader.dll'))
-if(-not $webViewReady){
-    $tempRoot=Join-Path $env:TEMP ('Huymaier-WebView2-'+[guid]::NewGuid().ToString('N'))
-    try{
-        [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
-        New-Item -ItemType Directory -Force -Path $tempRoot,$webViewFolder|Out-Null
-        $package=Join-Path $tempRoot 'webview2.nupkg'
-        $archive=Join-Path $tempRoot 'webview2.zip'
-        Invoke-WebRequest -UseBasicParsing -Uri 'https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/1.0.4078.44' -OutFile $package
-        Copy-Item $package $archive -Force
-        $expanded=Join-Path $tempRoot 'expanded';Expand-Archive -LiteralPath $archive -DestinationPath $expanded -Force
-        $core=Get-ChildItem -LiteralPath (Join-Path $expanded 'lib') -Recurse -Filter 'Microsoft.Web.WebView2.Core.dll'|Where-Object{$_.FullName -match 'net462|net48|net45'}|Sort-Object @{Expression={if($_.FullName -match 'net462'){0}elseif($_.FullName -match 'net48'){1}else{2}}},FullName|Select-Object -First 1
-        $wpf=Get-ChildItem -LiteralPath (Join-Path $expanded 'lib') -Recurse -Filter 'Microsoft.Web.WebView2.Wpf.dll'|Where-Object{$_.FullName -match 'net462|net48|net45'}|Sort-Object @{Expression={if($_.FullName -match 'net462'){0}elseif($_.FullName -match 'net48'){1}else{2}}},FullName|Select-Object -First 1
-        $loader=Get-ChildItem -LiteralPath (Join-Path $expanded 'runtimes') -Recurse -Filter 'WebView2Loader.dll'|Where-Object{$_.FullName -match 'win-x64'}|Select-Object -First 1
-        if($null -eq $core -or $null -eq $wpf -or $null -eq $loader){throw 'The official WebView2 SDK package did not contain the required WPF x64 files.'}
-        Copy-Item $core.FullName (Join-Path $webViewFolder $core.Name) -Force
-        Copy-Item $wpf.FullName (Join-Path $webViewFolder $wpf.Name) -Force
-        Copy-Item $loader.FullName (Join-Path $webViewFolder $loader.Name) -Force
-        $webViewReady=$true
-    }catch{
-        [System.Windows.MessageBox]::Show("The native browser SDK could not be downloaded.`n`n$($_.Exception.Message)`n`nHuymaier Console will still install, but browser-based sign-in will require rerunning this installer while online.",'Huymaier Console','OK','Warning')|Out-Null
-    }finally{Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue}
-}
-
-# Ensure the Microsoft Evergreen Runtime is available. Windows 11 commonly has
-# it already; the official bootstrapper is invoked only when version discovery
-# fails after loading the app-local SDK.
-if($webViewReady){
-    $runtimeAvailable=$false
-    try{
-        $oldPath=$env:PATH;$env:PATH=$webViewFolder+';'+$env:PATH
-        Add-Type -Path (Join-Path $webViewFolder 'Microsoft.Web.WebView2.Core.dll') -ErrorAction Stop
-        $version=[Microsoft.Web.WebView2.Core.CoreWebView2Environment]::GetAvailableBrowserVersionString()
-        $runtimeAvailable=-not [string]::IsNullOrWhiteSpace([string]$version)
-    }catch{}finally{$env:PATH=$oldPath}
-    if(-not $runtimeAvailable){
-        $bootstrapper=Join-Path $env:TEMP ('MicrosoftEdgeWebview2Setup-'+[guid]::NewGuid().ToString('N')+'.exe')
-        try{
-            Invoke-WebRequest -UseBasicParsing -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $bootstrapper
-            $runtimeInstall=Start-Process -FilePath $bootstrapper -ArgumentList '/silent','/install' -Wait -PassThru
-            if($runtimeInstall.ExitCode -ne 0){throw "WebView2 Runtime installer exited with code $($runtimeInstall.ExitCode)."}
-        }catch{
-            [System.Windows.MessageBox]::Show("The Microsoft WebView2 Runtime could not be installed.`n`n$($_.Exception.Message)`n`nThe rest of Huymaier Console remains available.",'Huymaier Console','OK','Warning')|Out-Null
-        }finally{Remove-Item -LiteralPath $bootstrapper -Force -ErrorAction SilentlyContinue}
-    }
-}
-try { Get-ChildItem -LiteralPath $destination -Recurse -File -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue } catch { }
-
-$legacyTheme = Join-Path $assetDestination 'HuymaierTheme.wav'
-if (Test-Path $legacyTheme) { Remove-Item $legacyTheme -Force -ErrorAction SilentlyContinue }
-
-$wsh = New-Object -ComObject WScript.Shell
-$nativeExe = Join-Path $destination 'HuymaierConsole.exe'
-$arguments = ''
-
-$desktop = [Environment]::GetFolderPath('Desktop')
-$startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
-foreach ($folder in @($desktop,$startMenu)) {
-    $shortcutPath = Join-Path $folder 'Huymaier Console.lnk'
-    $shortcut = $wsh.CreateShortcut($shortcutPath)
-    $shortcut.TargetPath = $nativeExe
-    $shortcut.Arguments = $arguments
-    $shortcut.WorkingDirectory = $destination
-    $icon = Join-Path $destination 'HuymaierConsole.ico'
-    if (Test-Path $icon) { $shortcut.IconLocation = $icon }
-    $shortcut.Description = 'Huymaier Console Windows 11 FSE'
-    $shortcut.Save()
-}
-
-Write-InstallerRecord "Installation completed successfully at $destination"
-if($script:TranscriptStarted){ try { Stop-Transcript | Out-Null; $script:TranscriptStarted=$false } catch { } }
-
-if($SilentUpdate){
-    Write-InstallerRecord 'Silent self-update installation completed; relaunch is delegated to HuymaierSelfUpdater.ps1.'
-    exit 0
-}
-$result = [System.Windows.MessageBox]::Show("Huymaier Console v0.26.1 was installed for this Windows account.`n`nLocation:`n$destination`n`nLaunch it now?", 'Huymaier Console', 'YesNo', 'Information')
-if ($result -eq 'Yes') {
-    Start-Process $nativeExe -WorkingDirectory $destination
-}
+if($SilentUpdate){exit 0}
+try{
+    Add-Type -AssemblyName PresentationFramework
+    $result=[System.Windows.MessageBox]::Show("Huymaier Console v$script:InstallVersion was installed and verified for this Windows account.`n`nLocation:`n$script:Destination`n`nLaunch it now?",'Huymaier Console','YesNo','Information')
+    if($result -eq 'Yes'){Start-Process -FilePath (Join-Path $script:Destination 'HuymaierConsole.exe') -WorkingDirectory $script:Destination|Out-Null}
+}catch{}
