@@ -1,7 +1,7 @@
 {
-  "batch": "next-gamebar-native-compile-fix-1",
-  "script": "apply_next_native_compile_fix.py",
+  "batch": "next-modal-candidate-gate-fix-1",
+  "script": "apply_next_candidate_gate_fix.py",
   "patch_dir": "",
   "result": "success",
-  "recordedAtUtc": "2026-08-10T12:24:25.245643+00:00"
+  "recordedAtUtc": "2026-08-10T12:31:53.541944+00:00"
 }

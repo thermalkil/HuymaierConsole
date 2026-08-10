@@ -131,12 +131,13 @@ try{
     foreach($dead in @('HuymaierGuideInput.cs','HuymaierGuideBridge.dll','HuymaierConsoleUpdate.ps1','HuymaierConsoleApplyUpdate.ps1')){if(Test-Path -LiteralPath (Join-Path $StageRoot $dead)){throw "Retired payload is still packaged: $dead"}}
 
 
-    # RC8 runtime ownership invariants: hidden Game Bar cannot steal general
-    # navigation; Win32 foreground ownership decides internal vs external Guide;
-    # Xbox storefront selection cannot be intercepted by the Original Xbox ID.
+    # Runtime ownership invariant: the hidden watcher must never call the shared
+    # normal-navigation poller directly. Once the overlay is visibly active, the
+    # Game-Bar-owned modal bypass is the only permitted D-pad/A/B/etc. poll path.
     $visibleIndex=$gameBar.IndexOf('$visible=[HuymaierConsole.NativeApp.HuymaierGameBarHost]::IsVisible')
-    $pollIndex=$gameBar.IndexOf('[HuymaierConsole.NativeApp.NativeConsoleNavigation]::Poll()')
-    if($visibleIndex -lt 0 -or $pollIndex -lt 0 -or $pollIndex -lt $visibleIndex){throw 'Game Bar can poll shared navigation before visible-overlay ownership is established.'}
+    $safePollIndex=$gameBar.IndexOf('[HuymaierConsole.NativeApp.HuymaierGameBarHost]::PollNavigation()')
+    if($gameBar -match [regex]::Escape('[HuymaierConsole.NativeApp.NativeConsoleNavigation]::Poll()')){throw 'Game Bar module directly polls shared normal navigation instead of using modal ownership.'}
+    if($visibleIndex -lt 0 -or $safePollIndex -lt 0 -or $safePollIndex -lt $visibleIndex){throw 'Game Bar modal navigation polling is not confined to the visible-overlay path.'}
     foreach($required in @('Test-HcForegroundOwnedByConsole','HuymaierForegroundOwnership','System Guide backend initialized')){if($gameBar -notmatch [regex]::Escape($required)){throw "Game Bar foreground/Guide ownership invariant is missing: $required"}}
     $emulator=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierEmulatorPlatforms.ps1') -Encoding UTF8
     if($emulator -notmatch [regex]::Escape('Test-HcEmulatorPlatformMenuName $platform')){throw 'Platform selection is not using strict emulator menu identity.'}
