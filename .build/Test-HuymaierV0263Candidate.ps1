@@ -53,7 +53,7 @@ if($currentNative -ne $baseNative){throw 'NativeApp changed beyond the shared v0
 $compat=Join-Path $env:RUNNER_TEMP ('hc-v0262-compat-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $compat|Out-Null
 try {
-    Copy-Item -LiteralPath (Join-Path $StageRoot '*') -Destination $compat -Recurse -Force
+    Copy-Item -Path (Join-Path $StageRoot '*') -Destination $compat -Recurse -Force
     $compatManifestPath=Join-Path $compat 'manifest.json'
     $compatManifest=Get-Content -Raw -LiteralPath $compatManifestPath -Encoding UTF8|ConvertFrom-Json
     $compatManifest.version='0.26.2';$compatManifest.baseVersion='0.26.1'
