@@ -25,16 +25,21 @@ jobs:
           ref: feature/v0.26.3-console-fidelity
           fetch-depth: 0
 
-      - name: Apply checksum-verified production patch
+      - name: Apply checksum-verified RC3 production patch
         shell: bash
         run: |
           set -euo pipefail
-          python3 .development/v0.26.3/apply_authentic_console_patch.py
+          if grep -q '"build": "native-console-fidelity-rc3"' manifest.json; then
+            echo 'RC3 production source is already materialized.'
+            exit 0
+          fi
+          python3 .development/v0.26.3/apply_rc3_patch_v2.py
           python3 - <<'PY'
           import json, datetime
           state={
-            'batch':'console-fidelity-4-authentic-integration',
-            'script':'apply_authentic_console_patch.py',
+            'batch':'console-fidelity-4-authentic-integration-v2',
+            'script':'apply_rc3_patch_v2.py',
+            'patchSha256':'f6ca760aade9136b9c830b61d7eec34473e50a24a64c245e450d0be1e5b9a98c',
             'result':'success',
             'recordedAtUtc':datetime.datetime.now(datetime.timezone.utc).isoformat()
           }
@@ -51,11 +56,20 @@ jobs:
             HuymaierConsole.ps1 \
             HuymaierEmulatorPlatforms.ps1 \
             HuymaierEmulatorInstaller.ps1 \
+            HuymaierLibraryWorker.ps1 \
             HuymaierSteamWorker.ps1 \
             HuymaierSteamOwnership.ps1 \
             Native/HuymaierConsole.ConsolePlatforms.cs \
             Native/HuymaierConsole.NativeApp.cs \
             Native/HuymaierConsole.Ps1.cs \
+            EmulatorPlatforms/N64/settings.default.json \
+            EmulatorPlatforms/GameCube/settings.default.json \
+            EmulatorPlatforms/Wii/settings.default.json \
+            EmulatorPlatforms/WiiU/settings.default.json \
+            EmulatorPlatforms/Switch/settings.default.json \
+            EmulatorPlatforms/Xbox/settings.default.json \
+            EmulatorPlatforms/Xbox360/settings.default.json \
+            EmulatorPlatforms/platform-registry.json \
             manifest.json \
             RELEASE_NOTES.txt \
             .development/v0.26.3/status.json
