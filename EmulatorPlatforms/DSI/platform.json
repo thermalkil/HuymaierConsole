@@ -1,0 +1,13 @@
+{
+  "id": "dsi",
+  "displayName": "Nintendo DSi",
+  "primaryBackend": "melonDS",
+  "fallbackBackend": "melonDS Development",
+  "adapter": "melonds",
+  "interface": "Native Nintendo DSi Menu",
+  "version": "0.26.4-dev",
+  "enabled": false,
+  "gameExtensions": [".nds", ".srl", ".app"],
+  "authenticSurfaces": ["DSi Menu software ribbon", "System Settings", "Data Management", "Camera configuration", "DS Download Play when locally functional", "NAND title library"],
+  "deadServicesOmitted": ["Nintendo DSi Shop", "inactive network-service tiles"]
+}
