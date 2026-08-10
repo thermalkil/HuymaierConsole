@@ -1,4 +1,4 @@
 {
-  "batch": "console-fidelity-1",
-  "script": "apply_console_fidelity.py"
+  "batch": "console-fidelity-2",
+  "script": "apply_console_fidelity_pass2.py"
 }
