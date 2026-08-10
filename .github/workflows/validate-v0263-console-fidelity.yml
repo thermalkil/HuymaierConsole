@@ -6,6 +6,14 @@ on:
       - feature/v0.26.3-console-fidelity
     paths:
       - 'Native/HuymaierConsole.ConsolePlatforms.cs'
+      - 'Native/HuymaierConsole.NativeApp.cs'
+      - 'Native/HuymaierConsole.Ps1.cs'
+      - 'HuymaierConsole.ps1'
+      - 'HuymaierEmulatorPlatforms.ps1'
+      - 'HuymaierEmulatorInstaller.ps1'
+      - 'HuymaierSteamWorker.ps1'
+      - 'HuymaierSteamOwnership.ps1'
+      - 'manifest.json'
       - '.development/v0.26.3/validation-request.json'
       - '.github/workflows/validate-v0263-console-fidelity.yml'
 
@@ -26,18 +34,31 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
 
-      - name: Verify PlayStation interfaces are untouched
+      - name: Verify PlayStation visual assets and platform definitions stay frozen
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
-          git fetch origin main --depth=1
-          $changed=@(git diff --name-only origin/main...HEAD)
-          $forbidden=@($changed|Where-Object{
-            $_ -match '(^|/)(PS1|PS2|PS3)(/|$)' -or
-            $_ -match 'Ps1|Ps2|Ps3|PS1|PS2|PS3'
-          })
-          if($forbidden.Count){throw ('v0.26.3 changed frozen PlayStation files: '+($forbidden -join ', '))}
-          Write-Host 'PS1, PS2, and PS3 production surfaces remain untouched.'
+          $forbidden=@(git diff --name-only v0.26.2 -- 'EmulatorPlatforms/PS1' 'EmulatorPlatforms/PS2' 'EmulatorPlatforms/PS3')
+          if($forbidden.Count){throw ('Frozen PlayStation platform payload changed: '+($forbidden -join ', '))}
+          $ps1=Get-Content -Raw -LiteralPath 'Native\HuymaierConsole.Ps1.cs' -Encoding UTF8
+          $native=Get-Content -Raw -LiteralPath 'Native\HuymaierConsole.NativeApp.cs' -Encoding UTF8
+          foreach($required in @(
+            'HuymaierNativePickerRequest.Request(this, "PS1", "PlayStation", "PrimaryEmulator"',
+            'HuymaierNativePickerRequest.Request(this, "PS1", "PlayStation", "DataRoot"',
+            'HuymaierNativePickerRequest.Request(this, "PS1", "PlayStation", "GameFolder"',
+            'HuymaierNativePickerRequest.Request(this, "PS1", "PlayStation", "InstallPrimaryEmulator"'
+          )){if($ps1 -notmatch [regex]::Escape($required)){throw "PS1 path-only picker invariant missing: $required"}}
+          foreach($required in @(
+            'HuymaierNativePickerRequest.Request(this, "PS2", "PlayStation 2", "PrimaryEmulator"',
+            'HuymaierNativePickerRequest.Request(this, "PS2", "PlayStation 2", "DataRoot"',
+            'HuymaierNativePickerRequest.Request(this, "PS2", "PlayStation 2", "GameFolder"',
+            'HuymaierNativePickerRequest.Request(this, "PS2", "PlayStation 2", "InstallPrimaryEmulator"',
+            'HuymaierNativePickerRequest.Request(this, "PS3", "PlayStation 3", "PrimaryEmulator"',
+            'HuymaierNativePickerRequest.Request(this, "PS3", "PlayStation 3", "DataRoot"',
+            'HuymaierNativePickerRequest.Request(this, "PS3", "PlayStation 3", "GameFolder"',
+            'HuymaierNativePickerRequest.Request(this, "PS3", "PlayStation 3", "InstallPrimaryEmulator"'
+          )){if($native -notmatch [regex]::Escape($required)){throw "PS2/PS3 path-only picker invariant missing: $required"}}
+          Write-Host 'PS1/PS2/PS3 assets/settings remain frozen; core path/install actions use the shared Huymaier picker.'
 
       - name: Parse production PowerShell with Windows PowerShell 5.1
         shell: powershell
@@ -82,27 +103,36 @@ jobs:
           & $csc @args
           if($LASTEXITCODE -ne 0 -or -not(Test-Path -LiteralPath $out -PathType Leaf)){throw 'v0.26.3 x64 managed host compile failed.'}
 
-      - name: Validate console fidelity and navigation invariants
+      - name: Validate authentic console and emulator integration invariants
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
-          $path='Native\HuymaierConsole.ConsolePlatforms.cs'
-          $source=Get-Content -Raw -LiteralPath $path -Encoding UTF8
+          $console=Get-Content -Raw -LiteralPath 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8
           foreach($required in @(
-            'RenderN64GamePakLauncher','RenderGameCubeHub','RenderGameCubeCalendar',
-            'RenderWiiMenuAuthentic','RenderWiiChannelStart','RenderWiiUMenuAuthentic',
-            'RenderSwitchHomeAuthentic','RenderSwitchAllSoftware','RenderXboxRoot',
+            'RenderN64GamePakLauncher','ProcessN64MenuCommand',
+            'RenderGameCubeHub','Viewport3D','QuaternionAnimation','CreateGameCubeFace',
+            'RenderWiiMenuAuthentic','RenderWiiChannelStart','ProcessWiiMenuCommand',
+            'RenderWiiUMenuAuthentic','RenderSwitchHomeAuthentic','RenderSwitchAllSoftware','RenderXboxRoot',
             'ProcessMetroNavigationCommand','ProcessGameCubeHubCommand','ProcessSwitchHomeCommand',
-            'using System.Windows.Controls.Primitives;'
-          )){if($source -notmatch [regex]::Escape($required)){throw "Console fidelity invariant missing: $required"}}
-          if($source -match [regex]::Escape('LB / RB')){throw 'A native console surface still advertises bumper-based selection/page navigation.'}
-          if($source -match 'LeftShoulder[^\r\n]{0,120}SwitchPage' -or $source -match 'RightShoulder[^\r\n]{0,120}SwitchPage'){
-            throw 'Shoulder buttons still change native console page/selection state.'
+            'FindEmulatorArtwork','QueueConsoleArtworkRefresh','TryDownloadConsoleCover',
+            'RequestHuymaierPicker','InstallPrimaryEmulator','ExportSave',
+            'if (command == XmbInputCommand.LeftShoulder || command == XmbInputCommand.RightShoulder) return;'
+          )){if($console -notmatch [regex]::Escape($required)){throw "Console integration invariant missing: $required"}}
+          foreach($forbidden in @('OpenFileDialog','FolderBrowserDialog','Wii News','Forecast Channel','Nintendo Switch Online','GameShare','Virtual Game Card','Xbox Live','LB / RB')){
+            if($console -match [regex]::Escape($forbidden)){throw "Dead/generic native-console surface survived: $forbidden"}
           }
-          if($source -notmatch [regex]::Escape('if (command == XmbInputCommand.LeftShoulder || command == XmbInputCommand.RightShoulder) return;')){
-            throw 'Shared native-console shoulder no-op gate is missing.'
-          }
-          Write-Host 'Console fidelity and no-bumper navigation invariants passed.'
+          if($console -match 'LeftShoulder[^\r\n]{0,120}SwitchPage' -or $console -match 'RightShoulder[^\r\n]{0,120}SwitchPage'){throw 'Shoulder buttons still change native console page/selection state.'}
+
+          $host=Get-Content -Raw -LiteralPath 'HuymaierEmulatorPlatforms.ps1' -Encoding UTF8
+          foreach($required in @('Complete-HcEmulatorPlatformPicker','Invoke-HcNativeConsolePickerRequest','Start-HcEmulatorInstall','ExportSave','InstallPrimaryEmulator')){if($host -notmatch [regex]::Escape($required)){throw "Huymaier picker/install host invariant missing: $required"}}
+          $installer=Get-Content -Raw -LiteralPath 'HuymaierEmulatorInstaller.ps1' -Encoding UTF8
+          foreach($required in @('Install-Latest-DuckStation.ps1','Install-Latest-PCSX2.ps1','Install-Latest-RPCS3.ps1','Rosalie241/RMG','dolphin-emu.org/download/','cemu-project/Cemu','git.eden-emu.dev/api/v1/repos/eden-emu/eden/releases/latest','xemu-project/xemu','xenia-canary/xenia-canary')){if($installer -notmatch [regex]::Escape($required)){throw "Official emulator installer invariant missing: $required"}}
+
+          $steam=Get-Content -Raw -LiteralPath 'HuymaierSteamWorker.ps1' -Encoding UTF8
+          foreach($required in @('library_600x900_2x.jpg','cdn.cloudflare.steamstatic.com','New-SteamFallbackArtwork','Artwork\Steam')){if($steam -notmatch [regex]::Escape($required)){throw "Steam cover invariant missing: $required"}}
+          $ownership=Get-Content -Raw -LiteralPath 'HuymaierSteamOwnership.ps1' -Encoding UTF8
+          if($ownership -notmatch [regex]::Escape('Get-SteamArtwork $root $id $name')){throw 'Owned/uninstalled Steam games do not repair artwork through Steam.'}
+          Write-Host 'Authentic console, Huymaier picker, emulator installer, artwork, and no-bumper invariants passed.'
 
       - name: Record validation status
         if: always()
