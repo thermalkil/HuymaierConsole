@@ -1,11 +1,13 @@
-# Huymaier Console v0.26.1 external game/app overlay.
-# Quick Access remains inside Huymaier Console. This module owns only the
-# external-app Game Bar and its Guide-button watcher.
+# Huymaier Console v0.26.1 external game/app overlay and process-wide Guide arbiter.
+# Quick Access remains inside Huymaier Console. The physical Guide/Home system
+# button is global; local Menu/Start, View/Back, and Share/Create remain distinct.
 
 $script:HcGameBarTimer=$null
 $script:HcExternalGuideDown=$false
 $script:HcGameBarBackupPath=Join-Path $script:DataDir 'xbox-gamebar-backup.json'
 $script:HcWindowsRestorePath=Join-Path $script:BaseDir 'Restore-HuymaierWindowsSettings.ps1'
+$script:HcSystemGuideType=$null
+$script:HcSystemGuideMethod=$null
 
 function Get-HcRegistryBackupValue {
     param([string]$Path,[string]$Name)
@@ -27,7 +29,6 @@ function Restore-HcXboxGameBarSuppression {
 
 function Set-HcXboxGameBarSuppression {
     try{
-        # First recover a setting left suppressed by an abnormal prior exit.
         Restore-HcXboxGameBarSuppression
         $path='HKCU:\Software\Microsoft\GameBar'
         $name='UseNexusForGameBarEnabled'
@@ -36,15 +37,34 @@ function Set-HcXboxGameBarSuppression {
         if(-not(Test-Path -LiteralPath $path)){New-Item -Path $path -Force|Out-Null}
         Set-ItemProperty -LiteralPath $path -Name $name -Value 0 -Type DWord -Force
 
-        # Crash/reboot recovery. Normal shutdown removes this entry after
-        # restoring the original setting; if the process dies, Windows runs the
-        # helper at the next sign-in.
         $runOnce='HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce'
         if(-not(Test-Path -LiteralPath $runOnce)){New-Item -Path $runOnce -Force|Out-Null}
         $cmd='powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "'+$script:HcWindowsRestorePath+'" -Quiet'
         Set-ItemProperty -LiteralPath $runOnce -Name 'HuymaierConsoleRestoreGameBar' -Value $cmd -Type String -Force
         Write-Log 'Windows controller-to-Xbox-Game-Bar capture was disabled while Huymaier Console is running.'
     }catch{Write-Log "Xbox Game Bar controller suppression failed: $($_.Exception.Message)" 'WARN'}
+}
+
+function Initialize-HcSystemGuideReflection {
+    if($null -ne $script:HcSystemGuideMethod){return}
+    try{
+        $nativeVariable=Get-Variable -Name HuymaierNativeBridge -ErrorAction SilentlyContinue
+        if($null -eq $nativeVariable -or $null -eq $nativeVariable.Value){return}
+        $assembly=$nativeVariable.Value.GetType().Assembly
+        $type=$assembly.GetType('HuymaierConsole.NativeApp.HuymaierSystemButtonBridge',$false)
+        if($null -eq $type){return}
+        $flags=[Reflection.BindingFlags]::Static -bor [Reflection.BindingFlags]::NonPublic
+        $method=$type.GetMethod('ConsumeGuidePress',$flags)
+        if($null -ne $method){$script:HcSystemGuideType=$type;$script:HcSystemGuideMethod=$method}
+    }catch{}
+}
+
+function Get-HcGameInputGuideEdge {
+    try{
+        Initialize-HcSystemGuideReflection
+        if($null -eq $script:HcSystemGuideMethod){return $false}
+        return [bool]$script:HcSystemGuideMethod.Invoke($null,$null)
+    }catch{return $false}
 }
 
 function Get-HcRawSystemGuidePressed {
@@ -72,13 +92,32 @@ function Get-HcRawSystemGuidePressed {
     return $false
 }
 
-function Test-HcAnyConsoleWindowActive {
+function Get-HcActiveConsoleWindow {
     try{
         foreach($window in @([System.Windows.Application]::Current.Windows)){
-            if($null -ne $window -and [bool]$window.IsActive){return $true}
+            if($null -ne $window -and [bool]$window.IsActive){return $window}
         }
     }catch{}
-    return $false
+    return $null
+}
+
+function Invoke-HcInternalGuide {
+    param($ActiveWindow)
+    try{
+        # Guide escapes one native/modal layer, matching the established console
+        # navigation model, then opens/focuses Huymaier Quick Access. It never
+        # substitutes for the local Menu/Start command.
+        if($null -ne $ActiveWindow -and $null -ne $script:Window -and -not [object]::ReferenceEquals($ActiveWindow,$script:Window)){
+            try{$ActiveWindow.Close()}catch{}
+            try{
+                $null=$script:Window.Dispatcher.BeginInvoke([Action]{
+                    try{if(Get-Command Show-HcMainMenu -ErrorAction SilentlyContinue){Show-HcMainMenu}else{Focus-TopNavigation}}catch{}
+                })
+            }catch{}
+            return
+        }
+        if(Get-Command Show-HcMainMenu -ErrorAction SilentlyContinue){Show-HcMainMenu}else{Focus-TopNavigation}
+    }catch{Write-Log "Global Guide to Quick Access recovered: $($_.Exception.Message)" 'WARN'}
 }
 
 function Initialize-HuymaierGameBar {
@@ -89,22 +128,32 @@ function Initialize-HuymaierGameBar {
         }
         [HuymaierConsole.NativeApp.HuymaierGameBarHost]::Initialize($script:Window)
         [HuymaierConsole.NativeApp.HuymaierGameBarHost]::SetScalePercent([int](Get-EntryProperty $script:Config 'GameBarScale' 100))
+        Initialize-HcSystemGuideReflection
         Set-HcXboxGameBarSuppression
         if($null -ne $script:HcGameBarTimer){try{$script:HcGameBarTimer.Stop()}catch{}}
+
         $timer=New-Object System.Windows.Threading.DispatcherTimer
         $timer.Interval=[TimeSpan]::FromMilliseconds(24)
         $timer.Add_Tick({
             try{
                 if($null -eq $script:Window){return}
 
-                # Any active Huymaier WPF surface is internal. This prevents the
-                # external watcher from consuming Guide while a native PS/Xbox-
-                # style child interface owns foreground focus.
-                if(Test-HcAnyConsoleWindowActive){
-                    $script:HcExternalGuideDown=$false
+                # Consume only the dedicated system Guide edge here. D-pad/A/B/
+                # shoulders remain with the currently active local input router.
+                $gameInputGuideEdge=Get-HcGameInputGuideEdge
+                $rawGuide=Get-HcRawSystemGuidePressed
+                $rawGuideEdge=($rawGuide -and -not $script:HcExternalGuideDown)
+                $script:HcExternalGuideDown=$rawGuide
+                $guideEdge=$gameInputGuideEdge -or $rawGuideEdge
+
+                $activeInternal=Get-HcActiveConsoleWindow
+                if($null -ne $activeInternal){
+                    if($guideEdge){Invoke-HcInternalGuide -ActiveWindow $activeInternal}
                     return
                 }
 
+                # No Huymaier window owns foreground focus: the external Game
+                # Bar may consume normal navigation through the shared router.
                 $command=''
                 try{
                     if('HuymaierConsole.NativeApp.NativeConsoleNavigation' -as [type]){
@@ -112,25 +161,22 @@ function Initialize-HuymaierGameBar {
                         $command=[string]$native.Command
                     }
                 }catch{}
-                $rawGuide=Get-HcRawSystemGuidePressed
-                $rawGuideEdge=($rawGuide -and -not $script:HcExternalGuideDown)
-                $script:HcExternalGuideDown=$rawGuide
 
                 $visible=[HuymaierConsole.NativeApp.HuymaierGameBarHost]::IsVisible
                 if($visible){
-                    if($command){[HuymaierConsole.NativeApp.HuymaierGameBarHost]::ProcessCommand($command)}
-                    elseif($rawGuideEdge){[HuymaierConsole.NativeApp.HuymaierGameBarHost]::ProcessCommand('Guide')}
+                    if($guideEdge){[HuymaierConsole.NativeApp.HuymaierGameBarHost]::ProcessCommand('Guide')}
+                    elseif($command){[HuymaierConsole.NativeApp.HuymaierGameBarHost]::ProcessCommand($command)}
                     return
                 }
-                if($command -eq 'Guide' -or $rawGuideEdge){
+                if($guideEdge -or $command -eq 'Guide'){
                     [HuymaierConsole.NativeApp.HuymaierGameBarHost]::Show()
                     Write-Log 'Huymaier Game Bar opened over the foreground game/app.'
                 }
-            }catch{Write-Log "Huymaier Game Bar input watcher recovered: $($_.Exception.Message)" 'WARN'}
+            }catch{Write-Log "Huymaier Game Bar/global Guide watcher recovered: $($_.Exception.Message)" 'WARN'}
         })
         $timer.Start()
         $script:HcGameBarTimer=$timer
-        Write-Log 'Huymaier Game Bar external Guide-button watcher started.'
+        Write-Log 'Huymaier Game Bar and process-wide Guide watcher started.'
     }catch{Write-Log "Huymaier Game Bar initialization failed: $($_.Exception.Message)" 'ERROR'}
 }
 
