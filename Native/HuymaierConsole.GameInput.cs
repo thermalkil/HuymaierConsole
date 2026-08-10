@@ -4,6 +4,12 @@ using System.Threading;
 
 namespace HuymaierConsole.NativeApp
 {
+    public static class HuymaierBuildStamp
+    {
+        public const string Version = "0.26.1";
+        public const string Architecture = "x64";
+    }
+
     internal static class HuymaierSystemButtonBridge
     {
         private const string BridgeDll = "HuymaierGameInputBridge.dll";
