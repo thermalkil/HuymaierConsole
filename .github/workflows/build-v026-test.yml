@@ -52,7 +52,15 @@ jobs:
           $source=Join-Path $env:GITHUB_WORKSPACE 'HuymaierFSEHost.cs'
           $output=Join-Path $env:GITHUB_WORKSPACE 'FSEPackage\HuymaierFSEHost.exe'
           if(-not(Test-Path -LiteralPath $source)){throw 'HuymaierFSEHost.cs is missing.'}
-          & $csc /noconfig /nologo /target:winexe /platform:x64 /optimize+ ('/out:'+$output) $source
+
+          # /noconfig intentionally ignores csc.rsp, so every non-mscorlib
+          # framework dependency is resolved explicitly. This avoids hidden
+          # compiler-machine defaults while still supporting ProcessStartInfo.
+          $systemAssembly=[System.Diagnostics.Process].Assembly.Location
+          if([string]::IsNullOrWhiteSpace([string]$systemAssembly) -or -not(Test-Path -LiteralPath $systemAssembly -PathType Leaf)){
+            throw 'System.dll could not be resolved for the deterministic FSE host compile.'
+          }
+          & $csc /noconfig /nologo /target:winexe /platform:x64 /optimize+ ('/reference:'+$systemAssembly) ('/out:'+$output) $source
           if($LASTEXITCODE -ne 0 -or -not(Test-Path -LiteralPath $output)){throw 'x64 FSE Home host compilation failed.'}
           # Intent-to-add makes the generated path visible to git ls-files during
           # staging without placing the generated binary in the commit index.
