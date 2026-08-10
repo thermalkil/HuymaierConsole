@@ -1,10 +1,10 @@
 {
-  "candidate": "v0.26.3-rc4-finalize",
+  "candidate": "v0.26.3-rc4",
   "version": "0.26.3",
   "base_release": "v0.26.2",
   "base_asset": "HC262.zip",
   "package_root": "HC263",
   "asset_name": "HC263.zip",
-  "requested_at": "2026-08-10T21:39:00Z",
-  "focus": "Finalize the RC4 user feedback source before packaging: compile-safe GameCube raw-card parsing, accurate user-block counts, controller-first masked SteamGridDB API-key settings, broad SGDB API grid retrieval with local portrait filtering, and all previously materialized RC4 scale/save/navigation/install fixes."
+  "requested_at": "2026-08-10T21:45:00Z",
+  "focus": "Build the immutable RC4 candidate from the finalized user-feedback source. Gate the smaller adjustable GameCube IPL cube, native GameCube raw-card and Wii system-memory save interfaces, strict GC/Wii separation, Wii front cleanup, N64 focus correction, N64/GameCube/Wii LB/RB first-letter library jumps, repaired emulator installation routing, optional masked SteamGridDB artwork key, Steam AppID matching, non-Steam title matching, repo/package cleanup, frozen PlayStation presentation, and every inherited v0.26.2 regression."
 }
