@@ -1,0 +1,1 @@
+{"requestedAtUtc":"2026-08-11T01:47:00Z","platforms":["Atari2600","NES","SNES","GameBoy","GBC","GBA","Genesis","SegaCD","Sega32X","GameGear","MasterSystem","TurboGrafx16"],"policy":"single attached primary backend only until every optional fallback also has a complete native settings adapter; GB/GBC use Mesen CE so native full settings are complete"}
