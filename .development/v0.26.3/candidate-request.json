@@ -1,10 +1,10 @@
 {
-  "candidate": "v0.26.3-rc3-source-materialization-2",
+  "candidate": "v0.26.3-rc3-source-materialization-3",
   "version": "0.26.3",
   "base_release": "v0.26.2",
   "base_asset": "HC262.zip",
   "package_root": "HC263",
   "asset_name": "HC263.zip",
-  "requested_at": "2026-08-10T20:08:00Z",
-  "focus": "Materialize the reviewed RC3 authentic-console and emulator-integration payload with the checksum-verified patcher. Stop before candidate packaging if this run creates the production-source commit."
+  "requested_at": "2026-08-10T20:12:00Z",
+  "focus": "Materialize the reviewed RC3 authentic-console and emulator-integration payload using the padded per-file decoder. Stop before candidate packaging if this run creates the production-source commit."
 }
