@@ -1,0 +1,14 @@
+{
+  "id": "saturn",
+  "displayName": "Sega Saturn",
+  "primaryBackend": "Mednafen",
+  "fallbackBackend": "Kronos",
+  "adapter": "mednafen",
+  "fallbackAdapter": "kronos",
+  "interface": "Native Sega Saturn BIOS-style system menu",
+  "version": "0.26.4-dev",
+  "enabled": false,
+  "gameExtensions": [".cue", ".chd", ".ccd", ".mds", ".iso"],
+  "authenticSurfaces": ["CD Player", "Start Application", "Memory Manager", "System Settings", "Game Library"],
+  "deadServicesOmitted": []
+}
