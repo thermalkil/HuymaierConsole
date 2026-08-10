@@ -1,0 +1,112 @@
+name: Build Huymaier Console v0.26.2 Requested Candidate
+
+on:
+  push:
+    branches:
+      - feature/v0.26.2-customization-runtime
+    paths:
+      - '.development/v0.26.2/candidate-request.json'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: huymaier-v0262-requested-candidate
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Check out exact requested source SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Read request
+        id: request
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $path='.development\v0.26.2\candidate-request.json'
+          $data=Get-Content -Raw -LiteralPath $path -Encoding UTF8|ConvertFrom-Json
+          foreach($required in @('candidate','version','base_release','base_asset','package_root','asset_name')){if([string]::IsNullOrWhiteSpace([string]$data.$required)){throw "Candidate request is missing $required"}}
+          if([string]$data.version -ne '0.26.2'){throw 'v0.26.2 candidate workflow received a different version.'}
+          if([string]$data.base_release -ne 'v0.26.1' -or [string]$data.base_asset -ne 'HC261.zip'){throw 'v0.26.2 must stage from the published v0.26.1 / HC261.zip baseline.'}
+          "path=$path"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "candidate=$([string]$data.candidate)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "asset=$([string]$data.asset_name)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "package_root=$([string]$data.package_root)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Build exact x64 FSE Home host
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          if(-not(Test-Path -LiteralPath $csc)){throw 'Framework64 csc.exe was not found.'}
+          $source=Join-Path $env:GITHUB_WORKSPACE 'HuymaierFSEHost.cs'
+          $output=Join-Path $env:GITHUB_WORKSPACE 'FSEPackage\HuymaierFSEHost.exe'
+          $systemAssembly=[System.Diagnostics.Process].Assembly.Location
+          if(-not(Test-Path -LiteralPath $source -PathType Leaf) -or -not(Test-Path -LiteralPath $systemAssembly -PathType Leaf)){throw 'Deterministic FSE compile dependency is missing.'}
+          & $csc /noconfig /nologo /target:winexe /platform:x64 /optimize+ ('/reference:'+$systemAssembly) ('/out:'+$output) $source
+          if($LASTEXITCODE -ne 0 -or -not(Test-Path -LiteralPath $output -PathType Leaf)){throw 'x64 FSE Home host compilation failed.'}
+          git add -N -f FSEPackage/HuymaierFSEHost.exe
+
+      - name: Build exact release-shaped candidate
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference='Stop'
+          & .\.build\Build-HuymaierReleaseCandidate.ps1 -TriggerPath '${{ steps.request.outputs.path }}'
+
+      - name: Run inherited installer and integrity failure-injection suite
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $stage=Join-Path $env:RUNNER_TEMP ('hc-stage\${{ steps.request.outputs.package_root }}')
+          $validation=Join-Path $env:HC_CANDIDATE_OUTPUT 'candidate-validation.json'
+          & .\.build\Test-HuymaierCandidate.ps1 -StageRoot $stage -ValidationPath $validation
+
+      - name: Run v0.26.2 feature and regression gates
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $stage=Join-Path $env:RUNNER_TEMP ('hc-stage\${{ steps.request.outputs.package_root }}')
+          $validation=Join-Path $env:HC_CANDIDATE_OUTPUT 'candidate-validation.json'
+          & .\.build\Test-HuymaierV0262Candidate.ps1 -StageRoot $stage -ValidationPath $validation
+
+      - name: Upload exact candidate bytes
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.request.outputs.candidate }}
+          path: |
+            ${{ env.HC_CANDIDATE_OUTPUT }}\${{ steps.request.outputs.asset }}
+            ${{ env.HC_CANDIDATE_OUTPUT }}\${{ steps.request.outputs.asset }}.sha256
+            ${{ env.HC_CANDIDATE_OUTPUT }}\candidate-validation.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Record requested candidate status
+        if: always()
+        shell: powershell
+        env:
+          BUILD_RESULT: ${{ job.status }}
+          CANDIDATE: ${{ steps.request.outputs.candidate }}
+        run: |
+          $ErrorActionPreference='Stop'
+          git reset -- FSEPackage/HuymaierFSEHost.exe 2>$null
+          $status=[ordered]@{
+            candidate=$env:CANDIDATE
+            result=$env:BUILD_RESULT
+            runId=$env:GITHUB_RUN_ID
+            runAttempt=$env:GITHUB_RUN_ATTEMPT
+            commit=$env:GITHUB_SHA
+            recordedAtUtc=[DateTime]::UtcNow.ToString('o')
+          }
+          $status|ConvertTo-Json|Set-Content -LiteralPath '.development\v0.26.2\candidate-status.json' -Encoding UTF8
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add '.development\v0.26.2\candidate-status.json'
+          if(-not(git diff --cached --quiet)){git commit -m "Record $env:CANDIDATE requested candidate status";git push origin HEAD:feature/v0.26.2-customization-runtime}
