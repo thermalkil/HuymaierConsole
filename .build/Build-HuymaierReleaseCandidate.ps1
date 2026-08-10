@@ -43,7 +43,7 @@ Get-ChildItem -LiteralPath $stage -File -Filter 'RELEASE_NOTES-v*.txt' -ErrorAct
 
 # Overlay repository-owned production payload only. Developer/release machinery
 # is never allowed into the install ZIP.
-$excludeRegex='^(\.github/|\.development/|\.release/|\.source/|\.build/|Docs/|\.gitignore$|README\.md$|RELEASING\.md$|GITHUB-RELEASES\.md$)'
+$excludeRegex='^(\.github/|\.development/|\.release/|\.source/|\.build/|Docs/|\.gitignore$|README\.md$|RELEASING\.md$|GITHUB-RELEASES\.md$|BUILD-VALIDATION[^/]*\.txt$|RELEASE_NOTES-v[^/]*\.txt$)'
 foreach($relative in @(& git ls-files)){
     if([string]::IsNullOrWhiteSpace($relative) -or $relative -match $excludeRegex){continue}
     $src=Join-Path $workspace ($relative -replace '/','\')

@@ -1,7 +1,7 @@
 {
-  "batch": "candidate-test-consolidation-1",
-  "script": "apply_candidate_test_consolidation.py",
+  "batch": "candidate-history-filter-1",
+  "script": "apply_candidate_history_filter.py",
   "patch_dir": "",
   "result": "success",
-  "recordedAtUtc": "2026-08-10T09:29:20.531066+00:00"
+  "recordedAtUtc": "2026-08-10T10:10:50.757856+00:00"
 }
