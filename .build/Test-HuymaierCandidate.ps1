@@ -124,18 +124,10 @@ try{
         if(Test-Path -LiteralPath (Join-Path $extraLocal 'Huymaier Console\HuymaierConsole.exe')){throw 'Unchecksummed package mutated the install root before rejection.'}
     }finally{Remove-Item -LiteralPath $extraRoot,$extraLocal -Recurse -Force -ErrorAction SilentlyContinue}
 
-    # Public installer wrapper invariant. The wrapper must own the success
-    # process exit code explicitly; $LASTEXITCODE is not guaranteed to exist
-    # after invoking another PowerShell script under StrictMode.
-    $wrapper=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'Install-HuymaierConsole.ps1') -Encoding UTF8
-    if($wrapper -match [regex]::Escape('$LASTEXITCODE')){throw 'Public installer wrapper still depends on undefined $LASTEXITCODE.'}
-    $coreText=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierInstallerCore.ps1') -Encoding UTF8
-    if($coreText -match [regex]::Escape('if($SilentUpdate){exit 0}')){throw 'Installer core still bypasses the public wrapper success path during CI.'}
-
     # Static conflict gates for Windows/Game Bar ownership and dead paths.
     $gameBar=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierGameBar.ps1') -Encoding UTF8
     foreach($forbidden in @('AppCaptureEnabled','GameDVR_Enabled','VKMToggleGameBar')){if($gameBar -match [regex]::Escape($forbidden)){throw "Game Bar module still changes broad Windows setting: $forbidden"}}
-    foreach($required in @('UseNexusForGameBarEnabled','Get-HcGameInputGuideEdge','Invoke-HcInternalGuide')){if($gameBar -notmatch [regex]::Escape($required)){throw "Game Bar integrity behavior is missing: $required"}}
+    foreach($required in @('UseNexusForGameBarEnabled','Get-HcSystemGuideEdge','Invoke-HcInternalGuide')){if($gameBar -notmatch [regex]::Escape($required)){throw "Game Bar integrity behavior is missing: $required"}}
     foreach($dead in @('HuymaierGuideInput.cs','HuymaierGuideBridge.dll','HuymaierConsoleUpdate.ps1','HuymaierConsoleApplyUpdate.ps1')){if(Test-Path -LiteralPath (Join-Path $StageRoot $dead)){throw "Retired payload is still packaged: $dead"}}
 
 
@@ -153,7 +145,7 @@ try{
 
 
     # RC9: external Guide fallback must be strictly Guide-only, and the public
-    # installer wrapper must own success without relying on $LASTEXITCODE.
+    # installer wrapper must seed success state while propagating real failures.
     foreach($required in @('ConsumeGuideOnly','Get-HcSystemGuideEdge')){if($gameBar -notmatch [regex]::Escape($required)){throw "Guide-only external Game Bar wake path is missing: $required"}}
     $nativeApp=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'Native\\HuymaierConsole.NativeApp.cs') -Encoding UTF8
     foreach($required in @('public static bool ConsumeGuideOnly()','XInputBridge.ConsumeGuideEdge()','RawHidController.ConsumeGuideEdge()')){if($nativeApp -notmatch [regex]::Escape($required)){throw "Native Guide-only fallback invariant is missing: $required"}}
@@ -162,12 +154,16 @@ try{
     $wrapper=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'Install-HuymaierConsole.ps1') -Encoding UTF8
     if($wrapper -notmatch [regex]::Escape('$global:LASTEXITCODE=0')){throw 'Public installer wrapper does not seed a deterministic success exit state.'}
     if($wrapper -notmatch [regex]::Escape('exit ([int]$global:LASTEXITCODE)')){throw 'Public installer wrapper does not propagate the core transaction exit state.'}
+    $coreText=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierInstallerCore.ps1') -Encoding UTF8
+    if($coreText -notmatch [regex]::Escape('if($SilentUpdate){return}')){throw 'Installer core does not return through the public wrapper on silent success.'}
 
     $validation=Get-Content -Raw -LiteralPath $ValidationPath -Encoding UTF8|ConvertFrom-Json
     $validation|Add-Member -NotePropertyName failureInjectionTests -NotePropertyValue 'success' -Force
     $validation|Add-Member -NotePropertyName lockedIdenticalRepair -NotePropertyValue 'success' -Force
     $validation|Add-Member -NotePropertyName lockedChangedFailClosedRepair -NotePropertyValue 'success' -Force
     $validation|Add-Member -NotePropertyName unmanagedDataPreservation -NotePropertyValue 'success' -Force
+    $validation|Add-Member -NotePropertyName guideOnlyWakeGate -NotePropertyValue 'success' -Force
+    $validation|Add-Member -NotePropertyName installerWrapperExitGate -NotePropertyValue 'success' -Force
     $validation|ConvertTo-Json -Depth 8|Set-Content -LiteralPath $ValidationPath -Encoding UTF8
     Write-Host 'Huymaier candidate failure-injection tests passed.'
 }finally{
