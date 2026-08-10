@@ -125,5 +125,8 @@ jobs:
           git add HuymaierConsole.ps1 HuymaierEmulatorInstaller.ps1 HuymaierEmulatorSettings.ps1 HuymaierEmulatorSettingsWorker.ps1 Native/HuymaierConsole.ConsolePlatforms.cs
           if(git diff --cached --quiet){Write-Host 'No pending materialized source changes.';exit 0}
           git commit -m 'Materialize validated v0.26.4 Wave 1 emulator install and storage integration'
+          git fetch origin feature/v0.26.4-platform-expansion
+          git rebase origin/feature/v0.26.4-platform-expansion
+          if($LASTEXITCODE -ne 0){throw 'Could not rebase validated materialized source onto the latest expansion branch.'}
           git push origin HEAD:feature/v0.26.4-platform-expansion
           if($LASTEXITCODE -ne 0){throw 'Could not push validated v0.26.4 materialized source.'}
