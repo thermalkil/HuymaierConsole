@@ -1,0 +1,81 @@
+name: Apply v0.26.1 System Integrity Batch
+
+on:
+  push:
+    branches:
+      - hotfix/v0.26.1-installer
+    paths:
+      - '.development/v0.26.1/apply.json'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v0261-integrity-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out hotfix branch
+        uses: actions/checkout@v4
+        with:
+          ref: hotfix/v0.26.1-installer
+          fetch-depth: 0
+
+      - name: Read requested batch
+        id: request
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "batch=$(python3 -c \"import json;print(json.load(open('.development/v0.26.1/apply.json'))['batch'])\")" >> "$GITHUB_OUTPUT"
+          echo "script=$(python3 -c \"import json;print(json.load(open('.development/v0.26.1/apply.json'))['script'])\")" >> "$GITHUB_OUTPUT"
+
+      - name: Apply deterministic transformer
+        shell: bash
+        env:
+          SCRIPT: ${{ steps.request.outputs.script }}
+        run: |
+          set -euo pipefail
+          test -f ".development/v0.26.1/$SCRIPT"
+          python3 ".development/v0.26.1/$SCRIPT"
+
+      - name: Static integrity assertions
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq "0.26.1" manifest.json
+          grep -Fq "Assert-HuymaierInstallIntegrity" HuymaierBootstrap.ps1
+          grep -Fq "install-incomplete.json" Install-HuymaierConsole.ps1
+          grep -Fq "release-verified" HuymaierConsoleUpdateWorker.ps1
+          grep -Fq "Restore-HcXboxGameBarSuppression" HuymaierGameBar.ps1
+          grep -Fq "Version=\"0.26.1.0\"" FSEPackage/AppxManifest.xml
+          test -f Restore-HuymaierWindowsSettings.ps1
+          test ! -e HuymaierGuideInput.cs
+          test ! -e Native/GuideBridge/HuymaierGuideBridge.cpp
+          test ! -e HuymaierConsoleUpdate.ps1
+          test ! -e HuymaierConsoleApplyUpdate.ps1
+
+      - name: Record and commit applied batch
+        shell: bash
+        env:
+          BATCH: ${{ steps.request.outputs.batch }}
+          SCRIPT: ${{ steps.request.outputs.script }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os,datetime
+          state={
+            'batch':os.environ['BATCH'],
+            'script':os.environ['SCRIPT'],
+            'result':'success',
+            'recordedAtUtc':datetime.datetime.now(datetime.timezone.utc).isoformat()
+          }
+          open('.development/v0.26.1/status.json','w',encoding='utf-8').write(json.dumps(state,indent=2)+'\n')
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m "Apply v0.26.1 system integrity batch $BATCH"
+          git push origin HEAD:hotfix/v0.26.1-installer
