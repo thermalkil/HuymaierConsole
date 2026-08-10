@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -203,7 +203,7 @@ namespace HuymaierConsole.NativeApp
 
     public sealed class NativeBridge
     {
-        public string Version { get { return "0.26.2"; } }
+        public string Version { get { return "0.26.3"; } }
 
         public bool ConsumeQuickAccessRequest() { return NativeQuickAccessRequest.Consume(); }
 
