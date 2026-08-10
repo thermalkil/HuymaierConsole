@@ -663,7 +663,7 @@ namespace HuymaierConsole.NativeApp
                 }
                 else { Activate(); Focus(); }
                 IInputElement content = Content as IInputElement;
-                if (content != null) Keyboard.Focus(content);
+                if (content != null) System.Windows.Input.Keyboard.Focus(content);
             }
             catch { }
         }
