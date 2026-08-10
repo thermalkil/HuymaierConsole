@@ -1,0 +1,1 @@
+{"requestedAtUtc":"2026-08-11T02:05:00Z","enable":["AtariLynx","NeoGeo","NGPC","PrimeHack"],"keepStaged":["Jaguar"],"reason":"BigPEmu full persistent-settings behavior remains under audit; all enabled Wave3 platforms use primary backends with complete native settings discovery."}
