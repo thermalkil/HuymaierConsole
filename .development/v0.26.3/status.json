@@ -1,0 +1,7 @@
+{
+  "batch": "console-fidelity-1",
+  "script": "apply_console_fidelity.py",
+  "patch_dir": "",
+  "result": "success",
+  "recordedAtUtc": "2026-08-10T15:49:05.150513+00:00"
+}
