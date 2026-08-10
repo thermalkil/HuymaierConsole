@@ -22,4 +22,16 @@ once(
     'settings module load'
 )
 path.write_text(text,encoding='utf-8')
-print('integrated HuymaierEmulatorSettings.ps1')
+
+# Windows PowerShell 5.1 parses "$Path:" as a scoped-variable expression.
+# Delimit the variable explicitly without changing the user-visible log text.
+module=ROOT/'HuymaierEmulatorSettings.ps1'
+module_text=module.read_text(encoding='utf-8-sig')
+old='Write-Log "Could not back up emulator config $Path: $($_.Exception.Message)" \'WARN\''
+new='Write-Log "Could not back up emulator config ${Path}: $($_.Exception.Message)" \'WARN\''
+count=module_text.count(old)
+if count != 1:
+    raise SystemExit(f'emulator settings parser fix: expected one match, found {count}')
+module.write_text(module_text.replace(old,new,1),encoding='utf-8')
+
+print('integrated and parser-hardened HuymaierEmulatorSettings.ps1')
