@@ -1,5 +1,5 @@
 {
-  "batch": "next-filepicker-candidate-gate-fix-1",
-  "script": "apply_next_filepicker_gate_fix.py",
-  "requested_at": "2026-08-10T12:46:00Z"
+  "batch": "next-literal-candidate-gate-fix-1",
+  "script": "apply_next_literal_gate_fix.py",
+  "requested_at": "2026-08-10T12:52:00Z"
 }
