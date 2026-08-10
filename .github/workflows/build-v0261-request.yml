@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: huymaier-requested-candidate
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -21,7 +21,7 @@ jobs:
       - name: Check out exact requested source
         uses: actions/checkout@v4
         with:
-          ref: hotfix/v0.26.1-installer
+          ref: ${{ github.sha }}
           fetch-depth: 0
 
       - name: Read request
@@ -29,6 +29,8 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
+          $actual=(git rev-parse HEAD).Trim()
+          if(-not [string]::Equals($actual,$env:GITHUB_SHA,[StringComparison]::OrdinalIgnoreCase)){throw "Candidate checkout drifted: expected $env:GITHUB_SHA, got $actual"}
           $path='.development\v0.26.1\candidate-request.json'
           $data=Get-Content -Raw -LiteralPath $path -Encoding UTF8|ConvertFrom-Json
           "path=$path"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
@@ -94,6 +96,12 @@ jobs:
             commit=$env:GITHUB_SHA
             recordedAtUtc=[DateTime]::UtcNow.ToString('o')
           }
+
+          # Build/test always uses the immutable push SHA above. Status recording is
+          # intentionally separate: update only the latest hotfix branch metadata
+          # so a detached exact-source checkout can never overwrite newer source.
+          git fetch origin hotfix/v0.26.1-installer
+          git checkout -B candidate-status refs/remotes/origin/hotfix/v0.26.1-installer
           $status|ConvertTo-Json|Set-Content -LiteralPath '.development\v0.26.1\candidate-status.json' -Encoding UTF8
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
