@@ -1,0 +1,90 @@
+name: Consolidate Huymaier Console v0.26.4 Expansion Source
+
+on:
+  pull_request:
+    branches: [feature/v0.26.3-console-fidelity]
+    paths:
+      - '.development/v0.26.4/consolidate-request.json'
+      - '.github/workflows/materialize-v0264-consolidated.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: huymaier-v0264-consolidated
+  cancel-in-progress: false
+
+jobs:
+  materialize-and-validate:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v0.26.4-platform-expansion
+          fetch-depth: 0
+
+      - name: Materialize every missing validated expansion layer
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          function Has([string]$Path,[string]$Marker){if(-not(Test-Path -LiteralPath $Path)){return $false};return ((Get-Content -Raw -LiteralPath $Path -Encoding UTF8) -match [regex]::Escape($Marker))}
+          if(-not(Has 'HuymaierEmulatorSettings.ps1' 'function Get-HcJsonSettings')){python .development\v0.26.4\apply_json_settings_support.py;if($LASTEXITCODE){throw 'JSON settings materializer failed'}}
+          if(-not(Has 'HuymaierEmulatorSettings.ps1' 'function Get-HcTomlScalarSettings')){python .development\v0.26.4\apply_toml_settings_support.py;if($LASTEXITCODE){throw 'TOML settings materializer failed'}}
+          if(-not(Has 'HuymaierEmulatorSettingsWorker.ps1' 'function Get-StellaCliSettings')){python .development\v0.26.4\apply_stella_cli_adapter.py;if($LASTEXITCODE){throw 'Stella settings materializer failed'}}
+          if(-not(Has 'Native\HuymaierConsole.ConsolePlatforms.cs' 'private void RenderWave2Settings()')){python .development\v0.26.4\apply_wave2_storage_settings.py;if($LASTEXITCODE){throw 'Wave2 storage/settings materializer failed'}}
+
+          if(-not(Test-Path 'EmulatorPlatforms\AtariLynx\platform.json') -or -not(Has 'Native\HuymaierConsole.ConsolePlatforms.cs' 'private bool IsWave3Shell()')){python .development\v0.26.4\apply_wave3_stage.py;if($LASTEXITCODE){throw 'Wave3 stage materializer failed'}}
+          if(-not(Has 'HuymaierEmulatorInstaller.ps1' 'function Install-BigPEmuLatest')){python .development\v0.26.4\apply_wave3_backend.py;if($LASTEXITCODE){throw 'Wave3 backend materializer failed'}}
+          if(-not(Has 'Native\HuymaierConsole.ConsolePlatforms.cs' 'private void RenderWave3Settings()')){python .development\v0.26.4\apply_wave3_storage_settings.py;if($LASTEXITCODE){throw 'Wave3 storage/settings materializer failed'}}
+
+          if(-not(Test-Path 'EmulatorPlatforms\Arcade\platform.json') -or -not(Has 'Native\HuymaierConsole.ConsolePlatforms.cs' 'private bool IsWave45Shell()')){python .development\v0.26.4\apply_wave45_stage.py;if($LASTEXITCODE){throw 'Wave4/5 stage materializer failed'}}
+          python .development\v0.26.4\apply_wave45_compile_fixes.py;if($LASTEXITCODE){throw 'Wave4/5 compile overlay failed'}
+          if(-not(Has 'HuymaierEmulatorInstaller.ps1' 'function Install-MameLatest')){python .development\v0.26.4\apply_wave4_backend.py;if($LASTEXITCODE){throw 'Wave4 backend materializer failed'}}
+          if(-not(Has 'Native\HuymaierConsole.ConsolePlatforms.cs' 'private void RenderArcadeOperatorSettings()')){python .development\v0.26.4\apply_wave4_storage_settings.py;if($LASTEXITCODE){throw 'Wave4 operator materializer failed'}}
+
+          if(-not(Has 'HuymaierEmulatorInstaller.ps1' "'PS4' {`$exe=Install-GithubArchive 'shadps4-emu/shadPS4'")){python .development\v0.26.4\apply_wave5_backend.py;if($LASTEXITCODE){throw 'Wave5 backend materializer failed'}}
+          if(-not(Has 'Native\HuymaierConsole.ConsolePlatforms.cs' 'RefreshModernPlayStationLibrary(showNotice)')){python .development\v0.26.4\apply_wave5_installed_content.py;if($LASTEXITCODE){throw 'Wave5 installed-content materializer failed'}}
+          python .development\v0.26.4\apply_source_manifest.py;if($LASTEXITCODE){throw 'Source manifest synchronizer failed'}
+
+      - name: Parse every production PowerShell file with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $files=@(Get-ChildItem -LiteralPath . -File -Filter '*.ps1')+@(Get-ChildItem -LiteralPath '.\Tools' -File -Filter '*.ps1' -ErrorAction SilentlyContinue)
+          foreach($file in $files){$tokens=$null;$errors=$null;[void][Management.Automation.Language.Parser]::ParseFile($file.FullName,[ref]$tokens,[ref]$errors);if($errors.Count){$errors|ForEach-Object{Write-Host "$($file.Name): $($_.Message)"};throw "PowerShell parse failed: $($file.Name)"}}
+
+      - name: Validate combined expansion invariants
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $settings=Get-Content -Raw 'HuymaierEmulatorSettings.ps1' -Encoding UTF8
+          foreach($m in @('Get-HcJsonSettings','Set-HcJsonSetting','Get-HcTomlScalarSettings','Set-HcTomlScalarSetting')){if($settings -notmatch [regex]::Escape($m)){throw "Combined settings marker missing: $m"}}
+          $worker=Get-Content -Raw 'HuymaierEmulatorSettingsWorker.ps1' -Encoding UTF8
+          foreach($m in @('Get-StellaCliSettings','Set-StellaCliOverride','Get-MameCliSettings','Set-MameCliOverride')){if($worker -notmatch [regex]::Escape($m)){throw "Special settings adapter missing: $m"}}
+          $installer=Get-Content -Raw 'HuymaierEmulatorInstaller.ps1' -Encoding UTF8
+          foreach($m in @('Install-MameLatest','Install-BigPEmuLatest','azahar-emu/azahar','melonDS-emu/melonDS','flyinghead/flycast','hrydgard/ppsspp','shadps4-emu/shadPS4','Vita3K/Vita3K')){if($installer -notmatch [regex]::Escape($m)){throw "Expansion installer marker missing: $m"}}
+          $native=Get-Content -Raw 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8
+          foreach($m in @('RenderWave2Settings','RenderWave2Storage','RenderWave3Settings','RenderWave3Storage','RenderArcadeOperatorSettings','RenderArcadeStorage','RenderPs4DynamicMenu','RenderVitaLiveArea','RefreshModernPlayStationLibrary','BuildStellaOverrideArguments','BuildMameOverrideArguments')){if($native -notmatch [regex]::Escape($m)){throw "Combined native marker missing: $m"}}
+          if($native -match 'LeftShoulder[^\r\n]{0,200}SwitchPage' -or $native -match 'RightShoulder[^\r\n]{0,200}SwitchPage'){throw 'Shoulder buttons still switch pages.'}
+          foreach($folder in @('Atari2600','NES','SNES','GameBoy','GBC','GBA','Genesis','SegaCD','Sega32X','GameGear','MasterSystem','TurboGrafx16','AtariLynx','NeoGeo','NGPC','Jaguar','PrimeHack','Arcade','FinalBurnNeo','PS4','Vita')){$p=Join-Path (Join-Path 'EmulatorPlatforms' $folder) 'platform.json';if(-not(Test-Path $p)){throw "Missing staged platform: $folder"};$d=Get-Content -Raw $p -Encoding UTF8|ConvertFrom-Json;if([bool]$d.enabled){throw "$folder was enabled before its graduation gate."}}
+
+      - name: Compile exact combined x64 native host source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Windows.Forms,System.Drawing,System.Web.Extensions
+          $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe';if(-not(Test-Path $csc)){throw 'Framework64 csc.exe missing.'};$automation=[Management.Automation.PSObject].Assembly.Location;$refs=@([Uri].Assembly.Location,[Linq.Enumerable].Assembly.Location,[System.Xaml.XamlReader].Assembly.Location,[Xml.XmlDocument].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,[Windows.Window].Assembly.Location,[Windows.Forms.Form].Assembly.Location,[Drawing.Bitmap].Assembly.Location,[Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,$automation)|Select-Object -Unique
+          $sources=@('Native\HuymaierConsole.NativeApp.cs','Native\HuymaierConsole.Ps1.cs','Native\HuymaierConsole.ConsolePlatforms.cs','Native\HuymaierConsole.SystemOverlay.cs','Native\HuymaierConsole.GameInput.cs','HuymaierNativeInput.cs','HuymaierNativeDisplay.cs','HuymaierNativeAudio.cs','HuymaierPerformance.cs','EmulatorPlatforms\Shared\Huymaier.P3T.cs');$out=Join-Path $env:RUNNER_TEMP 'HuymaierConsole-v0264-consolidated.dll';$args=@('/noconfig','/nologo','/target:library','/platform:x64','/optimize+',('/out:'+$out));foreach($r in $refs){$args+=('/reference:'+$r)};$args+=$sources;& $csc @args;if($LASTEXITCODE -ne 0 -or -not(Test-Path $out)){throw 'Consolidated expansion x64 compile failed.'}
+
+      - name: Commit exact validated consolidated source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if(git diff --cached --quiet){Write-Host 'Expansion source already consolidated.';exit 0}
+          git commit -m 'Consolidate validated v0.26.4 expansion production source'
+          git fetch origin feature/v0.26.4-platform-expansion
+          git rebase origin/feature/v0.26.4-platform-expansion
+          if($LASTEXITCODE -ne 0){throw 'Consolidated expansion rebase failed.'}
+          git push origin HEAD:feature/v0.26.4-platform-expansion
+          if($LASTEXITCODE -ne 0){throw 'Consolidated expansion push failed.'}
