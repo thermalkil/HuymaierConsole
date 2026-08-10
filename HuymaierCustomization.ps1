@@ -1,4 +1,4 @@
-# Huymaier Console customization layer.
+﻿# Huymaier Console customization layer.
 # Loaded after the shell, emulator platforms, browser, and Game Bar modules so
 # personalization can decorate every shared surface without changing product/file
 # identity. User-facing console branding is intentionally separate from install

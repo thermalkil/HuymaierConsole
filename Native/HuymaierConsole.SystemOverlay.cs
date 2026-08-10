@@ -468,17 +468,40 @@ namespace HuymaierConsole.NativeApp
         private static Window consoleWindow;
         private static HuymaierGameBarWindow gameBar;
         private static int scalePercent = 100;
+        private static string displayName = "Huymaier Console";
+        private static string accentColor = "#E7C45E";
+        [ThreadStatic] private static bool navigationPollBypass;
         public static bool IsVisible { get { return gameBar != null && gameBar.IsVisible; } }
+        internal static bool BlocksNativeNavigation { get { return IsVisible && !navigationPollBypass; } }
         public static void Initialize(Window mainConsoleWindow) { consoleWindow = mainConsoleWindow; }
         public static void SetScalePercent(int value) { scalePercent = Math.Max(70, Math.Min(140, value)); if (gameBar != null) gameBar.SetScalePercent(scalePercent); }
-        public static void Show() { if (consoleWindow == null) return; if (gameBar == null) gameBar = new HuymaierGameBarWindow(consoleWindow); gameBar.SetScalePercent(scalePercent); gameBar.ShowForForegroundWindow(); }
+        public static void SetDisplayName(string value) { displayName = String.IsNullOrWhiteSpace(value) ? "Huymaier Console" : value.Trim(); if (gameBar != null) gameBar.SetBrand(displayName, accentColor); }
+        public static void SetAccentColor(string value) { accentColor = String.IsNullOrWhiteSpace(value) ? "#E7C45E" : value.Trim(); if (gameBar != null) gameBar.SetBrand(displayName, accentColor); }
+        public static void Show() { if (consoleWindow == null) return; if (gameBar == null) gameBar = new HuymaierGameBarWindow(consoleWindow); gameBar.SetScalePercent(scalePercent); gameBar.SetBrand(displayName, accentColor); gameBar.ShowForForegroundWindow(); }
         public static void Hide() { if (gameBar != null) gameBar.HideBar(); }
         public static void Toggle() { if (IsVisible) Hide(); else Show(); }
+        public static NativeNavigationCommand PollNavigation()
+        {
+            navigationPollBypass = true;
+            try { return NativeConsoleNavigation.Poll(); }
+            finally { navigationPollBypass = false; }
+        }
         public static void ProcessCommand(string command) { if (gameBar == null || !gameBar.IsVisible || String.IsNullOrWhiteSpace(command)) return; gameBar.ProcessControllerCommand(command); }
     }
 
     internal sealed class HuymaierGameBarWindow : Window
     {
+        private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+        private const uint SWP_NOSIZE = 0x0001;
+        private const uint SWP_NOMOVE = 0x0002;
+        private const uint SWP_SHOWWINDOW = 0x0040;
+        [DllImport("user32.dll", SetLastError = true)] private static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);
+        [DllImport("user32.dll")] private static extern bool BringWindowToTop(IntPtr hWnd);
+        [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);
+        [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+        [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
+        [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool attach);
+
         private const int PageHome = 0;
         private const int PageSwitcher = 1;
         private const int PageAudio = 2;
@@ -489,6 +512,7 @@ namespace HuymaierConsole.NativeApp
 
         private readonly Window consoleWindow;
         private readonly Grid root;
+        private readonly TextBlock brandText;
         private readonly TextBlock contextText;
         private readonly TextBlock tabsText;
         private readonly TextBlock pageText;
@@ -552,7 +576,7 @@ namespace HuymaierConsole.NativeApp
             layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             StackPanel header = new StackPanel(); header.Orientation = Orientation.Horizontal;
-            TextBlock brand = new TextBlock(); brand.Text = "HUYMAIER GAME BAR"; brand.FontSize = 18; brand.FontWeight = FontWeights.Bold; brand.Foreground = new SolidColorBrush(Color.FromRgb(231, 196, 94)); header.Children.Add(brand);
+            brandText = new TextBlock(); brandText.Text = "HUYMAIER CONSOLE GAME BAR"; brandText.FontSize = 18; brandText.FontWeight = FontWeights.Bold; brandText.Foreground = new SolidColorBrush(Color.FromRgb(231, 196, 94)); header.Children.Add(brandText);
             contextText = new TextBlock(); contextText.Margin = new Thickness(14, 3, 0, 0); contextText.FontSize = 11; contextText.Foreground = new SolidColorBrush(Color.FromRgb(164, 177, 196)); header.Children.Add(contextText);
             Grid.SetRow(header, 0); layout.Children.Add(header);
 
@@ -573,6 +597,21 @@ namespace HuymaierConsole.NativeApp
             telemetryTimer.Tick += delegate { if (IsVisible && (page == PagePerformance || page == PageControllers)) Refresh(); };
         }
 
+        internal void SetBrand(string name, string accent)
+        {
+            try
+            {
+                string safeName = String.IsNullOrWhiteSpace(name) ? "Huymaier Console" : name.Trim();
+                if (safeName.Length > 48) safeName = safeName.Substring(0, 48).Trim();
+                Color color = (Color)ColorConverter.ConvertFromString(String.IsNullOrWhiteSpace(accent) ? "#E7C45E" : accent);
+                SolidColorBrush brush = new SolidColorBrush(color); brush.Freeze();
+                brandText.Text = safeName.ToUpperInvariant() + " GAME BAR";
+                brandText.Foreground = brush;
+                statusText.Foreground = brush;
+            }
+            catch { }
+        }
+
         internal void ShowForForegroundWindow()
         {
             IntPtr foreground = SystemWindowCatalog.GetForegroundWindow();
@@ -582,7 +621,51 @@ namespace HuymaierConsole.NativeApp
             PositionOnTargetMonitor(targetWindow);
             page = PageHome; selected = 0; closeConfirmation = false; lastStatus = String.Empty; Refresh();
             if (!IsVisible) Show();
-            WindowState = WindowState.Normal; Activate(); Focus(); telemetryTimer.Start();
+            WindowState = WindowState.Normal;
+            PromoteOverlayToFront();
+            telemetryTimer.Start();
+
+            // WPF can briefly reinsert a transparent topmost window below the
+            // previous fullscreen/maximized owner during activation. Retry after
+            // the dispatcher completes this show cycle so Alt-Tab is never needed.
+            Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(delegate
+            {
+                if (IsVisible) PromoteOverlayToFront();
+            }));
+        }
+
+        private void PromoteOverlayToFront()
+        {
+            try
+            {
+                Topmost = true;
+                IntPtr handle = new WindowInteropHelper(this).EnsureHandle();
+                if (handle != IntPtr.Zero)
+                {
+                    IntPtr foreground = SystemWindowCatalog.GetForegroundWindow();
+                    uint foregroundPid;
+                    uint foregroundThread = foreground == IntPtr.Zero ? 0 : GetWindowThreadProcessId(foreground, out foregroundPid);
+                    uint currentThread = GetCurrentThreadId();
+                    bool attached = false;
+                    try
+                    {
+                        if (foregroundThread != 0 && foregroundThread != currentThread) attached = AttachThreadInput(currentThread, foregroundThread, true);
+                        SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+                        BringWindowToTop(handle);
+                        SetForegroundWindow(handle);
+                        Activate();
+                        Focus();
+                    }
+                    finally
+                    {
+                        if (attached) try { AttachThreadInput(currentThread, foregroundThread, false); } catch { }
+                    }
+                }
+                else { Activate(); Focus(); }
+                IInputElement content = Content as IInputElement;
+                if (content != null) Keyboard.Focus(content);
+            }
+            catch { }
         }
 
         internal void SetScalePercent(int value)

@@ -157,6 +157,31 @@ try{
     $coreText=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierInstallerCore.ps1') -Encoding UTF8
     if($coreText -notmatch [regex]::Escape('if($SilentUpdate){return}')){throw 'Installer core does not return through the public wrapper on silent success.'}
 
+
+    # RC13: Game Bar must raise itself above fullscreen/maximized surfaces, own
+    # Huymaier controller navigation modally while visible, and native folder
+    # pickers must actually enter the File Explorer surface before returning.
+    $overlay=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'Native\\HuymaierConsole.SystemOverlay.cs') -Encoding UTF8
+    foreach($required in @('SetWindowPos(handle, HWND_TOPMOST','PromoteOverlayToFront()','BlocksNativeNavigation','PollNavigation()')){if($overlay -notmatch [regex]::Escape($required)){throw "Game Bar z-order/modal ownership invariant is missing: $required"}}
+    $nativeApp=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'Native\\HuymaierConsole.NativeApp.cs') -Encoding UTF8
+    $modalGateCount=([regex]::Matches($nativeApp,[regex]::Escape('HuymaierGameBarHost.BlocksNativeNavigation'))).Count
+    if($modalGateCount -lt 2){throw 'Game Bar modal ownership is not enforced in both native router layers.'}
+    if($gameBar -notmatch [regex]::Escape('[HuymaierConsole.NativeApp.HuymaierGameBarHost]::PollNavigation()')){throw 'Visible Game Bar does not use its modal-safe navigation poll.'}
+    $shell=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierConsole.ps1') -Encoding UTF8
+    if($shell -notmatch "(?s)else\\s*\\{\\s*\\`$script:SelectedTab=6\\s*\\`$script:SubPage='FilePicker'"){throw 'Native non-Browse file picker does not enter the File Explorer tab.'}
+
+    # Combined next-build gates: customization is persisted and controller-first,
+    # storefront Xbox counts by storefront display identity, custom WPF focus
+    # rectangles are removed, and the Game Bar receives the selected branding.
+    $customPath=Join-Path $StageRoot 'HuymaierCustomization.ps1'
+    if(-not(Test-Path -LiteralPath $customPath -PathType Leaf)){throw 'Customization module is missing from the candidate.'}
+    $custom=Get-Content -Raw -LiteralPath $customPath -Encoding UTF8
+    foreach($required in @("SubPage -eq 'Customization'",'ConsoleName','DynamicPrimaryColor','DynamicSecondaryColor','UiSoundVolume','Test-HcStorefrontPlatform $Platform','Scaling normal list cards caused selected text/borders to be clipped')){if($custom -notmatch [regex]::Escape($required)){throw "Customization/count/card invariant is missing: $required"}}
+    $shell=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierConsole.ps1') -Encoding UTF8
+    foreach($required in @('HuymaierCustomization.ps1','FocusVisualStyle','ConsoleBrandText','DynamicGlowOne','Apply-HcCustomizationVisuals')){if($shell -notmatch [regex]::Escape($required)){throw "Shell customization/focus invariant is missing: $required"}}
+    $overlay=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'Native\HuymaierConsole.SystemOverlay.cs') -Encoding UTF8
+    foreach($required in @('SetDisplayName','SetAccentColor','SetBrand(displayName, accentColor)','AttachThreadInput','SetWindowPos(handle, HWND_TOPMOST')){if($overlay -notmatch [regex]::Escape($required)){throw "Game Bar branding/focus invariant is missing: $required"}}
+
     $validation=Get-Content -Raw -LiteralPath $ValidationPath -Encoding UTF8|ConvertFrom-Json
     $validation|Add-Member -NotePropertyName failureInjectionTests -NotePropertyValue 'success' -Force
     $validation|Add-Member -NotePropertyName lockedIdenticalRepair -NotePropertyValue 'success' -Force
@@ -164,6 +189,13 @@ try{
     $validation|Add-Member -NotePropertyName unmanagedDataPreservation -NotePropertyValue 'success' -Force
     $validation|Add-Member -NotePropertyName guideOnlyWakeGate -NotePropertyValue 'success' -Force
     $validation|Add-Member -NotePropertyName installerWrapperExitGate -NotePropertyValue 'success' -Force
+    $validation|Add-Member -NotePropertyName gameBarZOrderGate -NotePropertyValue 'success' -Force
+    $validation|Add-Member -NotePropertyName gameBarModalInputGate -NotePropertyValue 'success' -Force
+    $validation|Add-Member -NotePropertyName nativeFilePickerRoutingGate -NotePropertyValue 'success' -Force
+    $validation|Add-Member -NotePropertyName customizationGate -NotePropertyValue 'success' -Force
+    $validation|Add-Member -NotePropertyName cardFocusVisualGate -NotePropertyValue 'success' -Force
+    $validation|Add-Member -NotePropertyName xboxStorefrontCountGate -NotePropertyValue 'success' -Force
+    $validation|Add-Member -NotePropertyName gameBarForegroundFocusGate -NotePropertyValue 'success' -Force
     $validation|ConvertTo-Json -Depth 8|Set-Content -LiteralPath $ValidationPath -Encoding UTF8
     Write-Host 'Huymaier candidate failure-injection tests passed.'
 }finally{

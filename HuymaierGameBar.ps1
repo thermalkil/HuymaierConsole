@@ -192,7 +192,7 @@ function Initialize-HuymaierGameBar {
                     $command=''
                     try{
                         if('HuymaierConsole.NativeApp.NativeConsoleNavigation' -as [type]){
-                            $native=[HuymaierConsole.NativeApp.NativeConsoleNavigation]::Poll()
+                            $native=[HuymaierConsole.NativeApp.HuymaierGameBarHost]::PollNavigation()
                             $command=[string]$native.Command
                         }
                     }catch{}

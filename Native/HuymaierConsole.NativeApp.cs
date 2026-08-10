@@ -4195,6 +4195,14 @@ namespace HuymaierConsole.NativeApp
 
         internal XmbInputCommand Poll()
         {
+            // The process-wide Game Bar is modal. Native console surfaces must
+            // not react to the same D-pad/face/shoulder press underneath it.
+            if (HuymaierGameBarHost.BlocksNativeNavigation)
+            {
+                hasActiveSource = false;
+                ResetEdges();
+                return XmbInputCommand.None;
+            }
             GetCandidates();
             DateTime now = DateTime.UtcNow;
             foreach (InputCandidate candidate in candidates)
@@ -4366,6 +4374,8 @@ namespace HuymaierConsole.NativeApp
         {
             lock (Sync)
             {
+                if (HuymaierGameBarHost.BlocksNativeNavigation)
+                    return new NativeNavigationCommand();
                 DateTime now = DateTime.UtcNow;
                 if (now < deviceChangeQuietUntilUtc)
                     return new NativeNavigationCommand();
