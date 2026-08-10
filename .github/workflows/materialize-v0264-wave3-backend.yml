@@ -1,0 +1,52 @@
+name: Materialize Huymaier Console v0.26.4 Wave 3 Backends
+
+on:
+  pull_request:
+    branches:
+      - feature/v0.26.3-console-fidelity
+    paths:
+      - '.development/v0.26.4/wave3-backend-request.json'
+      - '.development/v0.26.4/apply_wave3_backend.py'
+      - '.github/workflows/materialize-v0264-wave3-backend.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: huymaier-v0264-wave3-backend
+  cancel-in-progress: false
+
+jobs:
+  materialize-and-validate:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v0.26.4-platform-expansion
+          fetch-depth: 0
+      - name: Materialize Wave 3 backend integration
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $installer=Get-Content -Raw 'HuymaierEmulatorInstaller.ps1' -Encoding UTF8
+          if($installer -notmatch [regex]::Escape("'ATARILYNX' {$exe=Install-MednafenLatest}")){python .development\v0.26.4\apply_wave3_backend.py;if($LASTEXITCODE -ne 0){throw 'Wave 3 backend materializer failed.'}}
+      - name: Parse PowerShell 5.1 source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';foreach($path in @('.\HuymaierEmulatorInstaller.ps1','.\HuymaierEmulatorSettingsWorker.ps1','.\HuymaierNativeConsoleLibraryWorker.ps1')){$t=$null;$e=$null;[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path),[ref]$t,[ref]$e);if($e.Count){$e|ForEach-Object{Write-Host "$path : $($_.Message)"};throw "$path parse failed."}}
+      - name: Validate Wave 3 backend contracts
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';$installer=Get-Content -Raw 'HuymaierEmulatorInstaller.ps1' -Encoding UTF8
+          foreach($required in @('function Install-BigPEmuLatest','https://www.richwhitehouse.com/jaguar/index.php?content=download','finalburnneo/FBNeo','shiiion/dolphin',"'NGPC' {`$exe=Install-MednafenLatest}")){if($installer -notmatch [regex]::Escape($required)){throw "Wave 3 installer invariant missing: $required"}}
+          $worker=Get-Content -Raw 'HuymaierEmulatorSettingsWorker.ps1' -Encoding UTF8;foreach($adapter in @("'fbneo'","'primehack'","'bigpemu'")){if($worker -notmatch [regex]::Escape($adapter)){throw "Wave 3 settings discovery missing $adapter"}}
+          $library=Get-Content -Raw 'HuymaierNativeConsoleLibraryWorker.ps1' -Encoding UTF8;foreach($id in @("'ATARILYNX'","'NEOGEO'","'NGPC'","'JAGUAR'","'PRIMEHACK'")){if($library -notmatch [regex]::Escape($id)){throw "Wave 3 count scanner missing $id"}}
+      - name: Compile exact x64 native source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Windows.Forms,System.Drawing,System.Web.Extensions;$csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe';$automation=[Management.Automation.PSObject].Assembly.Location;$refs=@([Uri].Assembly.Location,[Linq.Enumerable].Assembly.Location,[System.Xaml.XamlReader].Assembly.Location,[Xml.XmlDocument].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,[Windows.Window].Assembly.Location,[Windows.Forms.Form].Assembly.Location,[Drawing.Bitmap].Assembly.Location,[Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,$automation)|Select-Object -Unique;$sources=@('Native\HuymaierConsole.NativeApp.cs','Native\HuymaierConsole.Ps1.cs','Native\HuymaierConsole.ConsolePlatforms.cs','Native\HuymaierConsole.SystemOverlay.cs','Native\HuymaierConsole.GameInput.cs','HuymaierNativeInput.cs','HuymaierNativeDisplay.cs','HuymaierNativeAudio.cs','HuymaierPerformance.cs','EmulatorPlatforms\Shared\Huymaier.P3T.cs');$out=Join-Path $env:RUNNER_TEMP 'HuymaierConsole-v0264-wave3-backend.dll';$args=@('/noconfig','/nologo','/target:library','/platform:x64','/optimize+',('/out:'+$out));foreach($r in $refs){$args+=('/reference:'+$r)};$args+=$sources;& $csc @args;if($LASTEXITCODE -ne 0){throw 'Wave 3 backend x64 compile failed.'}
+      - name: Commit validated Wave 3 backend source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com';git add HuymaierEmulatorInstaller.ps1 HuymaierEmulatorSettingsWorker.ps1 HuymaierNativeConsoleLibraryWorker.ps1;if(git diff --cached --quiet){Write-Host 'No Wave 3 backend changes.';exit 0};git commit -m 'Materialize v0.26.4 Wave 3 emulator backends';git fetch origin feature/v0.26.4-platform-expansion;git rebase origin/feature/v0.26.4-platform-expansion;if($LASTEXITCODE -ne 0){throw 'Wave 3 backend rebase failed.'};git push origin HEAD:feature/v0.26.4-platform-expansion;if($LASTEXITCODE -ne 0){throw 'Wave 3 backend push failed.'}
