@@ -1,10 +1,10 @@
 {
-  "candidate": "v0.26.1-rc3",
+  "candidate": "v0.26.1-rc4",
   "version": "0.26.1",
   "base_release": "v0.26.0",
   "base_asset": "HC260.zip",
   "package_root": "HC261",
   "asset_name": "HC261.zip",
-  "requested_at": "2026-08-10T09:13:00Z",
-  "focus": "RC3 with deterministic FSE references, segment-based traversal gates, and byte-verified rollback authorization; retain exact x64 artifacts, closed package hashes, locked-file failure injection, global Guide routing, reversible Windows controller setting"
+  "requested_at": "2026-08-10T09:30:00Z",
+  "focus": "RC4 after mutex hardening, native single-instance gate, Guide ownership cleanup, diagnostic test consolidation, segment-based traversal gates, and byte-verified rollback authorization"
 }
