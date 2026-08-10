@@ -1,5 +1,5 @@
 {
-  "batch": "candidate-history-filter-1",
-  "script": "apply_candidate_history_filter.py",
-  "requested_at": "2026-08-10T10:10:00Z"
+  "batch": "rc8-runtime-ownership-1",
+  "script": "apply_rc8_runtime_ownership.py",
+  "requested_at": "2026-08-10T10:26:00Z"
 }
