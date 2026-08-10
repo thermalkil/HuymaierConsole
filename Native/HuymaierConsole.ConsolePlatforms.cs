@@ -4036,10 +4036,32 @@ namespace HuymaierConsole.NativeApp
             }
         }
 
+
+        private string BuildStellaOverrideArguments()
+        {
+            string path = Path.Combine(dataRoot, "stella-command-line-overrides.json");
+            if (!File.Exists(path)) return String.Empty;
+            try
+            {
+                Dictionary<string, object> values = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(File.ReadAllText(path, Encoding.UTF8));
+                if (values == null || values.Count == 0) return String.Empty;
+                StringBuilder result = new StringBuilder();
+                foreach (KeyValuePair<string, object> pair in values.OrderBy(delegate(KeyValuePair<string, object> item) { return item.Key; }, StringComparer.OrdinalIgnoreCase))
+                {
+                    string key = pair.Key ?? String.Empty; if (!System.Text.RegularExpressions.Regex.IsMatch(key, "^[A-Za-z0-9_.-]+$")) continue;
+                    string value = pair.Value == null ? String.Empty : Convert.ToString(pair.Value, CultureInfo.InvariantCulture); if (String.IsNullOrWhiteSpace(value)) continue;
+                    if (result.Length > 0) result.Append(' '); result.Append('-').Append(key).Append(' ').Append(QuoteProcessArgument(value));
+                }
+                return result.ToString();
+            }
+            catch (Exception ex) { WritePlatformLog("Could not read Stella launch overrides: " + ex.Message, "WARN"); return String.Empty; }
+        }
+
         private string BuildLaunchArguments(string executable, string gamePath)
         {
             string exe = Path.GetFileName(executable).ToLowerInvariant();
             string quoted = "\"" + gamePath.Replace("\"", String.Empty) + "\"";
+            if (definition.Shell == "Atari2600" && exe.IndexOf("stella", StringComparison.OrdinalIgnoreCase) >= 0) { string overrides = BuildStellaOverrideArguments(); return (String.IsNullOrWhiteSpace(overrides) ? String.Empty : overrides + " ") + quoted; }
             if (definition.Shell == "GameCube" || definition.Shell == "Wii") return "-b -e " + quoted;
             if (definition.Shell == "3DS") return quoted;
             if (definition.Shell == "NDS" || definition.Shell == "DSI") return quoted;

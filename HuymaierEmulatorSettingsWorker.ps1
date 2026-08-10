@@ -125,6 +125,77 @@ function Get-SettingCategory {
     return 'Other'
 }
 
+
+function Get-StellaOverridePath {
+    $dir=Split-Path -Parent $PlatformSettingsPath
+    if([string]::IsNullOrWhiteSpace($dir)){$dir=Join-Path (Join-Path $env:LOCALAPPDATA 'Huymaier Console\EmulatorPlatforms') 'ATARI2600'}
+    New-Item -ItemType Directory -Force -Path $dir|Out-Null
+    return Join-Path $dir 'stella-command-line-overrides.json'
+}
+
+function Read-StellaOverrides {
+    $path=Get-StellaOverridePath
+    $map=[ordered]@{}
+    if(Test-Path -LiteralPath $path -PathType Leaf){
+        try{
+            $loaded=Get-Content -Raw -LiteralPath $path -Encoding UTF8|ConvertFrom-Json
+            foreach($property in @($loaded.PSObject.Properties)){if($null -ne $property){$map[[string]$property.Name]=[string]$property.Value}}
+        }catch{}
+    }
+    return $map
+}
+
+function Get-StellaHelpText {
+    param($Settings)
+    $exe=[string](Get-EntryProperty $Settings 'emulatorPath' '')
+    if(-not(Test-Path -LiteralPath $exe -PathType Leaf)){return ''}
+    try{
+        $psi=New-Object Diagnostics.ProcessStartInfo
+        $psi.FileName=$exe;$psi.Arguments='-help';$psi.UseShellExecute=$false;$psi.CreateNoWindow=$true;$psi.RedirectStandardOutput=$true;$psi.RedirectStandardError=$true
+        $process=[Diagnostics.Process]::Start($psi)
+        if($null -eq $process){return ''}
+        $stdout=$process.StandardOutput.ReadToEnd();$stderr=$process.StandardError.ReadToEnd()
+        if(-not $process.WaitForExit(6000)){try{$process.Kill()}catch{};return ''}
+        return (($stdout+[Environment]::NewLine+$stderr).Trim())
+    }catch{return ''}
+}
+
+function Get-StellaCliSettings {
+    param($Settings)
+    $help=Get-StellaHelpText $Settings
+    if([string]::IsNullOrWhiteSpace($help)){return [object[]]@()}
+    $overrides=Read-StellaOverrides;$overridePath=Get-StellaOverridePath
+    $result=New-Object Collections.ArrayList;$seen=@{}
+    foreach($line in ($help -split "`r?`n")){
+        # Stella's runtime -help is authoritative for the installed version.
+        # Only entries with an argument placeholder are persistent settings;
+        # action flags such as -help are intentionally omitted.
+        $match=[regex]::Match([string]$line,'^\s*-(?<key>[A-Za-z0-9_.-]+)\s+(?<arg><[^>]+>|\[[^\]]+\])(?:\s+(?<desc>.*))?$')
+        if(-not $match.Success){continue}
+        $key=$match.Groups['key'].Value
+        if($seen.ContainsKey($key)){continue};$seen[$key]=$true
+        $value='';if($overrides.Contains($key)){$value=[string]$overrides[$key]}
+        $record=New-HcEmulatorSettingRecord -Format 'stella-cli' -FilePath $overridePath -Section '' -Key $key -Value $value -LineIndex -1 -AdapterId 'stella'
+        $record.DisplayName=('-'+$key+' '+$match.Groups['arg'].Value)
+        $record.Category=Get-SettingCategory $record
+        [void]$result.Add($record)
+    }
+    return [object[]]$result.ToArray()
+}
+
+function Set-StellaCliOverride {
+    param([Parameter(Mandatory=$true)][string]$Key,[AllowEmptyString()][string]$Value)
+    if($Key -notmatch '^[A-Za-z0-9_.-]+$'){throw 'The Stella setting name is invalid.'}
+    $path=Get-StellaOverridePath;$map=Read-StellaOverrides
+    if(Test-Path -LiteralPath $path -PathType Leaf){[void](Backup-HcEmulatorConfigFile -Path $path -AdapterId 'stella-cli')}
+    if([string]::IsNullOrWhiteSpace($Value)){
+        if($map.Contains($Key)){$map.Remove($Key)}
+    }else{$map[$Key]=[string]$Value}
+    $object=New-Object psobject
+    foreach($name in @($map.Keys|Sort-Object)){Add-Member -InputObject $object -MemberType NoteProperty -Name ([string]$name) -Value ([string]$map[$name])}
+    $object|ConvertTo-Json -Depth 4|Set-Content -LiteralPath $path -Encoding UTF8
+}
+
 $definition=Get-PlatformDefinition $PlatformId
 $settings=Read-PlatformSettings
 $adapterId=[string](Get-EntryProperty $definition 'adapter' '')
@@ -135,8 +206,8 @@ if([string]::IsNullOrWhiteSpace($adapterId)){
 }
 $roots=Get-ConfigRoots -AdapterId $adapterId -Settings $settings
 $configFiles=Get-ExplicitConfigFiles -AdapterId $adapterId -Roots $roots
-$inventory=@(Get-HcCompleteEmulatorSettingsInventory -AdapterId $adapterId -ConfigFiles $configFiles)
-foreach($setting in $inventory){$setting.Category=Get-SettingCategory $setting}
+$inventory=$(if($adapterId -ieq 'stella'){@(Get-StellaCliSettings -Settings $settings)}else{@(Get-HcCompleteEmulatorSettingsInventory -AdapterId $adapterId -ConfigFiles $configFiles)})
+foreach($setting in @($inventory)){$setting.Category=Get-SettingCategory $setting}
 
 
 if($Mode -eq 'Set' -and -not [string]::IsNullOrWhiteSpace($EditRequestPath)){
@@ -150,10 +221,10 @@ if($Mode -eq 'Set'){
     if([string]::IsNullOrWhiteSpace($Identity)){throw 'Set mode requires a setting identity.'}
     $target=@($inventory|Where-Object{[string]::Equals([string]$_.Identity,$Identity,[StringComparison]::Ordinal)}|Select-Object -First 1)
     if(-not $target){throw 'The requested emulator setting is no longer present. Refresh the native settings list.'}
-    Set-HcEmulatorConfigSetting -Setting $target[0] -Value $Value
+    if([string](Get-EntryProperty $target[0] 'Format' '') -eq 'stella-cli'){Set-StellaCliOverride -Key ([string](Get-EntryProperty $target[0] 'Key' '')) -Value $Value}else{Set-HcEmulatorConfigSetting -Setting $target[0] -Value $Value}
     $configFiles=Get-ExplicitConfigFiles -AdapterId $adapterId -Roots $roots
-    $inventory=@(Get-HcCompleteEmulatorSettingsInventory -AdapterId $adapterId -ConfigFiles $configFiles)
-    foreach($setting in $inventory){$setting.Category=Get-SettingCategory $setting}
+    $inventory=$(if($adapterId -ieq 'stella'){@(Get-StellaCliSettings -Settings $settings)}else{@(Get-HcCompleteEmulatorSettingsInventory -AdapterId $adapterId -ConfigFiles $configFiles)})
+    foreach($setting in @($inventory)){$setting.Category=Get-SettingCategory $setting}
 }
 
 $result=[ordered]@{
