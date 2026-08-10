@@ -1,0 +1,6 @@
+{
+  "batch": "version-0262-1",
+  "script": "apply_version_0262.py",
+  "result": "success",
+  "recordedAtUtc": "2026-08-10T14:39:58.000899+00:00"
+}

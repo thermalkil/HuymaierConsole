@@ -1,11 +1,11 @@
-param(
+﻿param(
     [switch]$Windowed
 )
 
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
-$script:ExpectedConsoleVersion='0.26.1'
+$script:ExpectedConsoleVersion='0.26.2'
 $baseVariable=Get-Variable -Name HuymaierBaseDirectory -ErrorAction SilentlyContinue
 $baseDir=if($null -ne $baseVariable -and -not [string]::IsNullOrWhiteSpace([string]$baseVariable.Value)){[string]$baseVariable.Value}else{Split-Path -Parent $MyInvocation.MyCommand.Path}
 $corePath=Join-Path $baseDir 'HuymaierConsole.ps1'
@@ -123,7 +123,7 @@ try{
         exit 0
     }
 
-    Write-BootstrapLog 'Huymaier Console v0.26.1 integrity preflight and single-instance gate passed.'
+    Write-BootstrapLog 'Huymaier Console v0.26.2 integrity preflight and single-instance gate passed.'
     try{
         if($Windowed){& $corePath -Windowed}else{& $corePath}
     }finally{
@@ -131,7 +131,7 @@ try{
     }
 }catch{
     $message=$_.Exception.Message
-    Write-BootstrapLog "v0.26.1 preflight/startup failed:`n$message" 'FATAL'
+    Write-BootstrapLog "v0.26.2 preflight/startup failed:`n$message" 'FATAL'
     try{
         Add-Type -AssemblyName PresentationFramework
         [System.Windows.MessageBox]::Show("Huymaier Console could not start safely.`n`n$message`n`nThe error was saved to:`n$logDir",'Huymaier Console','OK','Error')|Out-Null

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -6,7 +6,7 @@ namespace HuymaierConsole.NativeApp
 {
     public static class HuymaierBuildStamp
     {
-        public const string Version = "0.26.1";
+        public const string Version = "0.26.2";
         public const string Architecture = "x64";
     }
 
