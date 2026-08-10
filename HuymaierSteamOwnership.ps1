@@ -68,10 +68,10 @@ function Merge-HcSteamOwnedLibrary {
         if(-not $id -or -not $name){continue}
         if($index.ContainsKey($id)){
             $existing=$items[[int]$index[$id]]
-            if($null -ne $existing){$existing|Add-Member -NotePropertyName Owned -NotePropertyValue $true -Force}
+            if($null -ne $existing){$existing|Add-Member -NotePropertyName Owned -NotePropertyValue $true -Force;$existingArt=[string](Get-Prop $existing 'ArtworkPath' '');if(-not $existingArt -or -not(Test-Path -LiteralPath $existingArt -PathType Leaf)){$existing|Add-Member -NotePropertyName ArtworkPath -NotePropertyValue (Get-SteamArtwork $root $id $name) -Force}}
             continue
         }
-        $art=$(if($root){Get-SteamArtwork $root $id}else{''})
+        $art=Get-SteamArtwork $root $id $name
         [void]$items.Add([pscustomobject]@{
             Id=$id;Name=$name;Provider='Steam';Source='Steam';Installed=$false;Owned=$true;
             InstallPath='';Path='';LaunchTarget=("steam://rungameid/"+$id);ArtworkPath=$art;

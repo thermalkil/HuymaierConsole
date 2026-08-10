@@ -2,19 +2,18 @@
   "name": "Huymaier Console FSE Shell, Storefront & Artwork Integration",
   "version": "0.26.3",
   "baseVersion": "0.26.2",
-  "build": "native-console-fidelity",
+  "build": "native-console-fidelity-rc3",
   "builtFrom": "HC262.zip",
   "features": [
-    "recreates the N64, GameCube, Wii, Wii U, Switch, Original Xbox, and Xbox 360 native interfaces with console-specific layouts and spatial navigation",
-    "removes LB/RB shoulder-button page and selection switching from Huymaier native console interfaces while preserving D-pad/stick, confirm, back, Guide/Game Bar, launch/return, saves, and alternate-emulator behavior",
-    "opens Huymaier Game Bar above external apps and Huymaier-native console surfaces while keeping main-shell Guide mapped to Quick Access",
-    "adds controller-first visual color wheels for interface, focus, accent, and dynamic-theme colors without requiring hex entry",
-    "adds persistent Games layout editing for storefront/console order, visibility, and per-platform tile sizing",
-    "repairs shared Manage/action-card sizing so highlighted titles and descriptions are not clipped",
-    "adds Steam client game management through the unified provider experience with install, verify, update, uninstall, launch, and Steam transfer telemetry",
-    "adds safe indeterminate live activity telemetry for GOG and Amazon when their backends do not expose a trustworthy total",
-    "preserves the v0.26.1 transactional installer, exact-artifact updater, x64 GameInput bridge, and fail-closed mixed-version protection",
-    "preserves the v0.26.1 storefront library import/file-browser repair and strict Xbox versus Original Xbox platform identity"
+    "rebuilds N64 as an original Huymaier cartridge-console surface inspired by the supplied classic-mini reference without redistributing third-party theme assets",
+    "renders the GameCube IPL hub as a translucent animated WPF 3D cube whose Game Play, Calendar, Memory Card, and Options faces rotate spatially with navigation",
+    "reworks Wii and Wii U menus around authentic channel/software presentation and integrates real emulator/data/library settings into those console surfaces",
+    "removes nonfunctional Wii, Switch, and Xbox service placeholders and keeps only actions that Huymaier Console can actually perform",
+    "routes emulator executable, data, and game-folder selection through Huymaier Consoles controller-first native file browser and offers latest supported emulator installation when no emulator is attached",
+    "resolves console cover art from emulator/data caches first, then Huymaier cache and online console artwork fallbacks without renaming or moving user ROMs",
+    "repairs Steam artwork so installed and owned entries prefer Steam local art, then Steam-hosted portrait art, then a deterministic cached nonblank fallback",
+    "preserves v0.26.2 Game Bar and Guide ownership, launch-return behavior, storefront/provider fixes, installer integrity, and controller navigation while keeping PS1, PS2, and PS3 visuals frozen except for shared path/install handoff",
+    "keeps LB/RB out of normal page and selection navigation on the redesigned non-PlayStation native console interfaces"
   ],
-  "description": "v0.26.3 is a focused native-console fidelity pass built on the published v0.26.2 baseline. It leaves the PS1, PS2, and PS3 interface implementations unchanged while replacing the generalized non-PlayStation shell behavior with console-specific layouts and controller navigation."
+  "description": "v0.26.3 RC3 is the authentic-console, emulator-integration, navigation, and artwork pass built from the published v0.26.2 baseline. PS1/PS2/PS3 presentation remains frozen; their emulator/data/library path choices now hand off to Huymaier Console native picker."
 }

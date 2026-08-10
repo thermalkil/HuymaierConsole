@@ -21,7 +21,18 @@ function SteamRoots{
     foreach($r in @($roots.ToArray())){$v=Join-Path ([string]$r) 'steamapps\libraryfolders.vdf';if(Test-Path -LiteralPath $v){try{$t=Get-Content -Raw -LiteralPath $v;foreach($m in [regex]::Matches($t,'"path"\s+"([^"]+)"')){Add-Path $roots ($m.Groups[1].Value -replace '\\\\','\')}}catch{}}}
     $roots.ToArray()
 }
-function SteamArt([string]$Root,[string]$AppId){
+function SteamFallbackArt([string]$AppId,[string]$Name){
+    $dataDir=Split-Path -Parent $ConfigPath;$cache=Join-Path (Join-Path $dataDir 'Artwork\Steam') ("$AppId.png")
+    if(Test-Path -LiteralPath $cache -PathType Leaf){return $cache}
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $cache)|Out-Null
+    try{
+        Add-Type -AssemblyName System.Drawing -ErrorAction Stop
+        $bmp=New-Object System.Drawing.Bitmap 600,900;$g=[System.Drawing.Graphics]::FromImage($bmp)
+        try{$g.Clear([System.Drawing.Color]::FromArgb(255,22,32,48));$font=New-Object System.Drawing.Font 'Segoe UI',38,[System.Drawing.FontStyle]::Bold;$small=New-Object System.Drawing.Font 'Segoe UI',20;try{$g.DrawString('STEAM',[System.Drawing.Font]$small,[System.Drawing.Brushes]::White,42,60);$label=if($Name){$Name}else{"Steam App $AppId"};$g.DrawString($label,$font,[System.Drawing.Brushes]::White,(New-Object System.Drawing.RectangleF 42,240,516,420));$g.DrawString("APPID $AppId",$small,[System.Drawing.Brushes]::LightGray,42,820)}finally{$font.Dispose();$small.Dispose()};$bmp.Save($cache,[System.Drawing.Imaging.ImageFormat]::Png)}finally{$g.Dispose();$bmp.Dispose()}
+    }catch{}
+    return $(if(Test-Path -LiteralPath $cache -PathType Leaf){$cache}else{''})
+}
+function SteamArt([string]$Root,[string]$AppId,[string]$Name=''){
     $artRoots=New-Object System.Collections.ArrayList
     Add-Path $artRoots $Root
     foreach($key in @('HKCU:\Software\Valve\Steam','HKLM:\SOFTWARE\WOW6432Node\Valve\Steam','HKLM:\SOFTWARE\Valve\Steam')){
@@ -31,18 +42,20 @@ function SteamArt([string]$Root,[string]$AppId){
         foreach($c in @(
             (Join-Path $artRoot "appcache\librarycache\${AppId}_library_600x900.jpg"),
             (Join-Path $artRoot "appcache\librarycache\${AppId}_library_600x900.png"),
+            (Join-Path $artRoot "appcache\librarycache\${AppId}_library_600x900_2x.jpg"),
             (Join-Path $artRoot "appcache\librarycache\$AppId\library_600x900.jpg"),
             (Join-Path $artRoot "appcache\librarycache\$AppId\library_600x900.png")
         )){if(Test-Path -LiteralPath $c){return $c}}
         $userdata=Join-Path $artRoot 'userdata'
-        if(Test-Path -LiteralPath $userdata){
-            foreach($user in Get-ChildItem -LiteralPath $userdata -Directory -ErrorAction SilentlyContinue){
-                $grid=Join-Path $user.FullName 'config\grid'
-                foreach($ext in @('jpg','png','webp','jpeg')){$candidate=Join-Path $grid "${AppId}p.$ext";if(Test-Path -LiteralPath $candidate){return $candidate}}
-            }
-        }
+        if(Test-Path -LiteralPath $userdata){foreach($user in Get-ChildItem -LiteralPath $userdata -Directory -ErrorAction SilentlyContinue){$grid=Join-Path $user.FullName 'config\grid';foreach($ext in @('jpg','png','webp','jpeg')){foreach($suffix in @('p','')){$candidate=Join-Path $grid ("$AppId$suffix.$ext");if(Test-Path -LiteralPath $candidate){return $candidate}}}}}
     }
-    return ''
+    $dataDir=Split-Path -Parent $ConfigPath;$cache=Join-Path (Join-Path $dataDir 'Artwork\Steam') ("$AppId.png")
+    if(Test-Path -LiteralPath $cache -PathType Leaf){return $cache}
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $cache)|Out-Null
+    foreach($url in @("https://cdn.cloudflare.steamstatic.com/steam/apps/$AppId/library_600x900.jpg","https://cdn.cloudflare.steamstatic.com/steam/apps/$AppId/library_600x900_2x.jpg","https://cdn.cloudflare.steamstatic.com/steam/apps/$AppId/header.jpg")){
+        $tmp="$cache.download";try{Invoke-WebRequest -UseBasicParsing -Uri $url -Headers @{'User-Agent'='Huymaier-Console/0.26.3'} -TimeoutSec 8 -OutFile $tmp;if((Test-Path -LiteralPath $tmp) -and (Get-Item -LiteralPath $tmp).Length -gt 2048){Move-Item -LiteralPath $tmp -Destination $cache -Force;return $cache}}catch{}finally{Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue}
+    }
+    return (SteamFallbackArt $AppId $Name)
 }
 function Test-SteamImportedGame([string]$Name,[string]$InstallDir){
     if([string]::IsNullOrWhiteSpace($Name)){return $false}
@@ -64,7 +77,7 @@ function Scan-SteamGames([System.Collections.ArrayList]$Target){
                 if(-not $appid -or -not(Test-SteamImportedGame $name $dir)){continue}
                 $key=$appid.ToLowerInvariant();if($seen.ContainsKey($key)){continue};$seen[$key]=$true
                 $install=if($dir){Join-Path $steamapps ("common\"+$dir)}else{''}
-                Add-Game $Target ("Steam:"+$appid) $name 'Steam' ("steam://rungameid/"+$appid) $install (SteamArt ([string]$root) $appid)
+                Add-Game $Target ("Steam:"+$appid) $name 'Steam' ("steam://rungameid/"+$appid) $install (SteamArt ([string]$root) $appid $name)
             }catch{}
         }
     }

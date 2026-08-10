@@ -56,14 +56,87 @@ function Read-AppManifest {param([string]$Path);if(-not(Test-Path -LiteralPath $
 function Find-AppManifest {param([string]$Id);foreach($root in @(Get-SteamRoots)){$path=Join-Path ([string]$root) ("steamapps\appmanifest_$Id.acf");if(Test-Path -LiteralPath $path -PathType Leaf){return $path}};return ''}
 function Find-AppRootForManifest {param([string]$ManifestPath);if(-not $ManifestPath){return ''};try{return Split-Path -Parent (Split-Path -Parent $ManifestPath)}catch{return ''}}
 function Get-DirBytes {param([string]$Path);if(-not $Path -or -not(Test-Path -LiteralPath $Path -PathType Container)){return [int64]0};$sum=[int64]0;try{foreach($f in Get-ChildItem -LiteralPath $Path -File -Recurse -Force -ErrorAction SilentlyContinue){$sum+=[int64]$f.Length}}catch{};return $sum}
-function Get-SteamArtwork {param([string]$Root,[string]$Id);foreach($candidate in @((Join-Path $Root "appcache\librarycache\${Id}_library_600x900.jpg"),(Join-Path $Root "appcache\librarycache\${Id}_library_600x900.png"),(Join-Path $Root "appcache\librarycache\$Id\library_600x900.jpg"),(Join-Path $Root "appcache\librarycache\$Id\library_600x900.png"))){if(Test-Path -LiteralPath $candidate -PathType Leaf){return $candidate}};return ''}
+function New-SteamFallbackArtwork {
+    param([string]$Id,[string]$Name,[string]$Target)
+    try{
+        Add-Type -AssemblyName System.Drawing -ErrorAction Stop
+        $dir=Split-Path -Parent $Target;New-Item -ItemType Directory -Force -Path $dir|Out-Null
+        $bmp=New-Object System.Drawing.Bitmap 600,900
+        $g=[System.Drawing.Graphics]::FromImage($bmp)
+        try{
+            $seed=0;foreach($ch in ([string]$Id).ToCharArray()){$seed=(($seed*33)+[int]$ch)-band 0x7fffffff}
+            $c1=[System.Drawing.Color]::FromArgb(255,18+(($seed -shr 1)-band 63),28+(($seed -shr 7)-band 63),45+(($seed -shr 13)-band 70))
+            $c2=[System.Drawing.Color]::FromArgb(255,10,15,24)
+            $rect=New-Object System.Drawing.Rectangle 0,0,600,900
+            $brush=New-Object System.Drawing.Drawing2D.LinearGradientBrush $rect,$c1,$c2,90
+            try{$g.FillRectangle($brush,$rect)}finally{$brush.Dispose()}
+            $g.SmoothingMode=[System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+            $steamFont=New-Object System.Drawing.Font 'Segoe UI',34,[System.Drawing.FontStyle]::Bold
+            $titleFont=New-Object System.Drawing.Font 'Segoe UI',42,[System.Drawing.FontStyle]::Bold
+            $smallFont=New-Object System.Drawing.Font 'Segoe UI',18,[System.Drawing.FontStyle]::Regular
+            $white=[System.Drawing.Brushes]::White;$soft=New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(205,225,235,245))
+            try{
+                $g.DrawString('STEAM',$steamFont,$soft,42,55)
+                $nameText=if([string]::IsNullOrWhiteSpace($Name)){"Steam App $Id"}else{$Name}
+                $format=New-Object System.Drawing.StringFormat;$format.Trimming=[System.Drawing.StringTrimming]::EllipsisWord;$format.FormatFlags=[System.Drawing.StringFormatFlags]::LineLimit
+                $g.DrawString($nameText,$titleFont,$white,(New-Object System.Drawing.RectangleF 42,250,516,370),$format)
+                $g.DrawString("APPID $Id",$smallFont,$soft,44,815)
+                $format.Dispose()
+            }finally{$steamFont.Dispose();$titleFont.Dispose();$smallFont.Dispose();$soft.Dispose()}
+            $bmp.Save($Target,[System.Drawing.Imaging.ImageFormat]::Png)
+        }finally{$g.Dispose();$bmp.Dispose()}
+        if(Test-Path -LiteralPath $Target -PathType Leaf){return $Target}
+    }catch{Write-LogLine "Could not generate deterministic Steam fallback artwork for ${Id}: $($_.Exception.Message)" 'WARN'}
+    return ''
+}
+function Get-SteamArtwork {
+    param([string]$Root,[string]$Id,[string]$Name='')
+    if([string]::IsNullOrWhiteSpace($Id)){return ''}
+    $artRoots=New-Object System.Collections.ArrayList;$seen=@{}
+    foreach($candidateRoot in @($Root)+(Get-SteamRoots)){if($candidateRoot){Add-UniquePath $artRoots $seen ([string]$candidateRoot)}}
+    foreach($artRoot in @($artRoots.ToArray())){
+        foreach($candidate in @(
+            (Join-Path $artRoot "appcache\librarycache\${Id}_library_600x900.jpg"),
+            (Join-Path $artRoot "appcache\librarycache\${Id}_library_600x900.png"),
+            (Join-Path $artRoot "appcache\librarycache\${Id}_library_600x900_2x.jpg"),
+            (Join-Path $artRoot "appcache\librarycache\$Id\library_600x900.jpg"),
+            (Join-Path $artRoot "appcache\librarycache\$Id\library_600x900.png")
+        )){if(Test-Path -LiteralPath $candidate -PathType Leaf){return $candidate}}
+        $nested=Join-Path $artRoot "appcache\librarycache\$Id"
+        if(Test-Path -LiteralPath $nested -PathType Container){
+            try{$found=Get-ChildItem -LiteralPath $nested -File -ErrorAction SilentlyContinue|Where-Object{$_.Extension -match '^\.(jpg|jpeg|png|webp)$' -and $_.Name -match '(?i)(library|600x900|portrait|cover)'}|Sort-Object Length -Descending|Select-Object -First 1;if($found){return $found.FullName}}catch{}
+        }
+        $userdata=Join-Path $artRoot 'userdata'
+        if(Test-Path -LiteralPath $userdata -PathType Container){
+            foreach($user in Get-ChildItem -LiteralPath $userdata -Directory -ErrorAction SilentlyContinue){
+                $grid=Join-Path $user.FullName 'config\grid'
+                foreach($ext in @('jpg','png','webp','jpeg')){foreach($suffix in @('p','')){$candidate=Join-Path $grid ("$Id$suffix.$ext");if(Test-Path -LiteralPath $candidate -PathType Leaf){return $candidate}}}
+            }
+        }
+    }
+    $cache=Join-Path (Join-Path $DataDir 'Artwork\Steam') ("$Id.png")
+    if(Test-Path -LiteralPath $cache -PathType Leaf){return $cache}
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $cache)|Out-Null
+    foreach($url in @(
+        "https://cdn.cloudflare.steamstatic.com/steam/apps/$Id/library_600x900.jpg",
+        "https://cdn.cloudflare.steamstatic.com/steam/apps/$Id/library_600x900_2x.jpg",
+        "https://cdn.cloudflare.steamstatic.com/steam/apps/$Id/header.jpg"
+    )){
+        $tmp="$cache.download"
+        try{
+            Invoke-WebRequest -UseBasicParsing -Uri $url -Headers @{'User-Agent'='Huymaier-Console/0.26.3'} -TimeoutSec 8 -OutFile $tmp
+            if((Test-Path -LiteralPath $tmp -PathType Leaf) -and (Get-Item -LiteralPath $tmp).Length -gt 2048){Move-Item -LiteralPath $tmp -Destination $cache -Force;return $cache}
+        }catch{}finally{Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue}
+    }
+    return (New-SteamFallbackArtwork $Id $Name $cache)
+}
 function Refresh-SteamCatalog {
     $previous=Get-ExistingSteamNode;$games=New-Object System.Collections.ArrayList;$byId=@{}
     foreach($root in @(Get-SteamRoots)){
         $steamapps=Join-Path ([string]$root) 'steamapps';if(-not(Test-Path -LiteralPath $steamapps -PathType Container)){continue}
-        foreach($file in Get-ChildItem -LiteralPath $steamapps -Filter 'appmanifest_*.acf' -File -ErrorAction SilentlyContinue){$m=Read-AppManifest $file.FullName;if($null -eq $m){continue};if($m.Name -match '(?i)^(Steamworks Common Redistributables|Steam Linux Runtime|Proton |SteamVR$|Steam Controller Configs$)'){continue};$install=if($m.InstallDir){Join-Path $steamapps ("common\"+$m.InstallDir)}else{''};$game=[pscustomobject]@{Id=[string]$m.AppId;Name=[string]$m.Name;Provider='Steam';Source='Steam';Installed=$true;InstallPath=$install;Path=$install;LaunchTarget=("steam://rungameid/"+$m.AppId);ArtworkPath=(Get-SteamArtwork ([string]$root) ([string]$m.AppId));Description='Steam library title';SizeText=$(if($m.SizeOnDisk -gt 0){'{0:N1} GB' -f ($m.SizeOnDisk/1GB)}else{''});InstallSizeBytes=[int64]$m.SizeOnDisk;UpdateAvailable=$false;BuildId=[string]$m.BuildId};$byId[[string]$m.AppId]=$games.Count;[void]$games.Add($game)}
+        foreach($file in Get-ChildItem -LiteralPath $steamapps -Filter 'appmanifest_*.acf' -File -ErrorAction SilentlyContinue){$m=Read-AppManifest $file.FullName;if($null -eq $m){continue};if($m.Name -match '(?i)^(Steamworks Common Redistributables|Steam Linux Runtime|Proton |SteamVR$|Steam Controller Configs$)'){continue};$install=if($m.InstallDir){Join-Path $steamapps ("common\"+$m.InstallDir)}else{''};$game=[pscustomobject]@{Id=[string]$m.AppId;Name=[string]$m.Name;Provider='Steam';Source='Steam';Installed=$true;InstallPath=$install;Path=$install;LaunchTarget=("steam://rungameid/"+$m.AppId);ArtworkPath=(Get-SteamArtwork ([string]$root) ([string]$m.AppId) ([string]$m.Name));Description='Steam library title';SizeText=$(if($m.SizeOnDisk -gt 0){'{0:N1} GB' -f ($m.SizeOnDisk/1GB)}else{''});InstallSizeBytes=[int64]$m.SizeOnDisk;UpdateAvailable=$false;BuildId=[string]$m.BuildId};$byId[[string]$m.AppId]=$games.Count;[void]$games.Add($game)}
     }
-    foreach($old in @(Get-Prop $previous 'Games' @())){$id=[string](Get-Prop $old 'Id' '');if(-not $id -or $byId.ContainsKey($id)){continue};$name=[string](Get-Prop $old 'Name' "Steam App $id");if($name -match '^Steam App \d+$'){continue};[void]$games.Add([pscustomobject]@{Id=$id;Name=$name;Provider='Steam';Source='Steam';Installed=$false;InstallPath='';Path='';LaunchTarget=("steam://rungameid/"+$id);ArtworkPath=[string](Get-Prop $old 'ArtworkPath' '');Description='Known Steam library title';SizeText=[string](Get-Prop $old 'SizeText' '');InstallSizeBytes=[int64](Get-Prop $old 'InstallSizeBytes' 0);UpdateAvailable=$false;BuildId=[string](Get-Prop $old 'BuildId' '')})}
+    foreach($old in @(Get-Prop $previous 'Games' @())){$id=[string](Get-Prop $old 'Id' '');if(-not $id -or $byId.ContainsKey($id)){continue};$name=[string](Get-Prop $old 'Name' "Steam App $id");if($name -match '^Steam App \d+$'){continue};[void]$games.Add([pscustomobject]@{Id=$id;Name=$name;Provider='Steam';Source='Steam';Installed=$false;InstallPath='';Path='';LaunchTarget=("steam://rungameid/"+$id);ArtworkPath=$(if([string](Get-Prop $old 'ArtworkPath' '')){[string](Get-Prop $old 'ArtworkPath' '')}else{Get-SteamArtwork '' $id $name});Description='Known Steam library title';SizeText=[string](Get-Prop $old 'SizeText' '');InstallSizeBytes=[int64](Get-Prop $old 'InstallSizeBytes' 0);UpdateAvailable=$false;BuildId=[string](Get-Prop $old 'BuildId' '')})}
     $exe=Get-SteamExe;$node=[pscustomobject]@{Id='Steam';Name='Steam';Backend='Steam Client';SchemaVersion=1;ToolReady=[bool]$exe;Authenticated=[bool]$exe;ToolPath=$exe;Status=$(if($exe){"$($games.Count) known Steam game(s) loaded."}else{'Steam client is not installed.'});Error='';Games=[object[]]$games.ToArray();Updated=(Get-Date).ToString('o')};Save-SteamNode $node;return [object[]]$games.ToArray()
 }
 function Open-SteamUri {param([string]$Uri);$exe=Get-SteamExe;if($exe){Start-Process -FilePath $exe -ArgumentList @('-silent',$Uri)|Out-Null}else{Start-Process $Uri|Out-Null}}

@@ -195,6 +195,9 @@ function Start-HcEmulatorPlatform {
                             }else{$script:Window.Activate()|Out-Null;$script:Window.Focus()|Out-Null}
                         }catch{}
                         $script:ControllerInputGuardUntil=[datetime]::Now.AddMilliseconds(450)
+                        $pickerHandled=$false
+                        try{if(Get-Command Invoke-HcNativeConsolePickerRequest -ErrorAction SilentlyContinue){$pickerHandled=[bool](Invoke-HcNativeConsolePickerRequest -Platform $script:NativePlatformReturnName)}}catch{Write-Log "Native console picker handoff failed: $($_.Exception.Message)" 'ERROR'}
+                        if($pickerHandled){$script:NativePlatformOpenQuickAccess=$false;return}
                         if($script:NativePlatformOpenQuickAccess -and (Get-Command Show-HcMainMenu -ErrorAction SilentlyContinue)){Show-HcMainMenu;Write-Log "Guide/Home returned from $($script:NativePlatformReturnName) to Huymaier Quick Access."}
                         $script:NativePlatformOpenQuickAccess=$false
                         Write-Log "Closed native emulator platform interface: $($script:NativePlatformReturnName); existing Console view restored in place."
@@ -214,6 +217,195 @@ function Start-HcEmulatorPlatform {
         Render-Page
     }
     return $true
+}
+
+
+
+$script:EmulatorPlatformPickerRequest = $null
+
+function Get-HcEmulatorPlatformSettingsPath {
+    param([Parameter(Mandatory=$true)][string]$PlatformId)
+    $id=$PlatformId.Trim().ToUpperInvariant()
+    return Join-Path (Join-Path $env:LOCALAPPDATA 'Huymaier Console\EmulatorPlatforms') (Join-Path $id 'settings.json')
+}
+
+function Read-HcEmulatorPlatformSettingsObject {
+    param([Parameter(Mandatory=$true)][string]$PlatformId)
+    $path=Get-HcEmulatorPlatformSettingsPath $PlatformId
+    if(Test-Path -LiteralPath $path -PathType Leaf){
+        try{return Get-Content -Raw -LiteralPath $path -Encoding UTF8|ConvertFrom-Json}catch{}
+    }
+    $default=Join-Path $script:BaseDir ("EmulatorPlatforms\{0}\settings.default.json" -f $PlatformId.Trim().ToUpperInvariant())
+    if(Test-Path -LiteralPath $default -PathType Leaf){try{return Get-Content -Raw -LiteralPath $default -Encoding UTF8|ConvertFrom-Json}catch{}}
+    return [pscustomobject]@{}
+}
+
+function Set-HcJsonProperty {
+    param([Parameter(Mandatory=$true)]$Object,[Parameter(Mandatory=$true)][string]$Name,$Value)
+    $property=$Object.PSObject.Properties[$Name]
+    if($null -eq $property){$Object|Add-Member -NotePropertyName $Name -NotePropertyValue $Value -Force}else{$Object.$Name=$Value}
+}
+
+function Save-HcEmulatorPlatformSettingsObject {
+    param([Parameter(Mandatory=$true)][string]$PlatformId,[Parameter(Mandatory=$true)]$Settings)
+    $path=Get-HcEmulatorPlatformSettingsPath $PlatformId
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path)|Out-Null
+    $Settings|ConvertTo-Json -Depth 30|Set-Content -LiteralPath $path -Encoding UTF8
+    return $path
+}
+
+function Update-HcEmulatorPlatformPathSetting {
+    param([Parameter(Mandatory=$true)]$Request,[Parameter(Mandatory=$true)][string]$SelectedPath)
+    $id=([string](Get-EntryProperty $Request 'platformId' '')).Trim().ToUpperInvariant()
+    $action=[string](Get-EntryProperty $Request 'action' '')
+    if(-not $id -or -not $action){throw 'The emulator picker request is incomplete.'}
+    $settings=Read-HcEmulatorPlatformSettingsObject $id
+    switch($id){
+        'PS1' {
+            switch($action){
+                'PrimaryEmulator' {Set-HcJsonProperty $settings 'duckStationPath' $SelectedPath}
+                'DataRoot' {Set-HcJsonProperty $settings 'dataRoot' $SelectedPath}
+                'GameFolder' {$items=@(Get-EntryProperty $settings 'gameFolders' @());if($SelectedPath -notin $items){$items+=,$SelectedPath};Set-HcJsonProperty $settings 'gameFolders' ([object[]]$items)}
+                'Ambience' {Set-HcJsonProperty $settings 'ambienceAudioPath' $SelectedPath}
+                default {throw "Unsupported PS1 picker action: $action"}
+            }
+        }
+        'PS2' {
+            switch($action){
+                'PrimaryEmulator' {Set-HcJsonProperty $settings 'pcsx2Path' $SelectedPath;Set-HcJsonProperty $settings 'installationMode' 'External'}
+                'DataRoot' {Set-HcJsonProperty $settings 'pcsx2DataPath' $SelectedPath}
+                'GameFolder' {$items=@(Get-EntryProperty $settings 'libraryRoots' @());if($SelectedPath -notin $items){$items+=,$SelectedPath};Set-HcJsonProperty $settings 'libraryRoots' ([object[]]$items)}
+                default {throw "Unsupported PS2 picker action: $action"}
+            }
+        }
+        'PS3' {
+            switch($action){
+                'PrimaryEmulator' {Set-HcJsonProperty $settings 'rpcs3Path' $SelectedPath;Set-HcJsonProperty $settings 'installationMode' 'External'}
+                'DataRoot' {Set-HcJsonProperty $settings 'rpcs3DataPath' $SelectedPath}
+                'GameFolder' {$items=@(Get-EntryProperty $settings 'libraryRoots' @());if($SelectedPath -notin $items){$items+=,$SelectedPath};Set-HcJsonProperty $settings 'libraryRoots' ([object[]]$items)}
+                default {throw "Unsupported PS3 picker action: $action"}
+            }
+        }
+        default {
+            switch($action){
+                'PrimaryEmulator' {Set-HcJsonProperty $settings 'emulatorPath' $SelectedPath}
+                'FallbackEmulator' {Set-HcJsonProperty $settings 'fallbackEmulatorPath' $SelectedPath}
+                'DataRoot' {Set-HcJsonProperty $settings 'emulatorDataPath' $SelectedPath}
+                'GameFolder' {$items=@(Get-EntryProperty $settings 'gameFolders' @());if($SelectedPath -notin $items){$items+=,$SelectedPath};Set-HcJsonProperty $settings 'gameFolders' ([object[]]$items)}
+                'Ambience' {Set-HcJsonProperty $settings 'ambiencePath' $SelectedPath;Set-HcJsonProperty $settings 'ambienceEnabled' $true}
+                default {throw "Unsupported emulator picker action: $action"}
+            }
+            Set-HcJsonProperty $settings 'schemaVersion' 6
+        }
+    }
+    [void](Save-HcEmulatorPlatformSettingsObject $id $settings)
+}
+
+function Complete-HcEmulatorPlatformPicker {
+    param([Parameter(Mandatory=$true)][string]$SelectedPath)
+    $request=$script:EmulatorPlatformPickerRequest
+    if($null -eq $request){return $false}
+    $action=[string](Get-EntryProperty $request 'action' '')
+    $platform=[string](Get-EntryProperty $request 'displayName' (Get-EntryProperty $request 'platformId' 'Console'))
+    try{
+        if($action -eq 'ExportSave'){
+            $source=[string](Get-EntryProperty $request 'sourcePath' '')
+            if(-not(Test-Path -LiteralPath $source)){throw 'The save to export no longer exists.'}
+            if(-not(Test-Path -LiteralPath $SelectedPath -PathType Container)){throw 'Choose a destination folder.'}
+            $name=[string](Get-EntryProperty $request 'suggestedName' (Split-Path -Leaf $source));if(-not $name){$name='Huymaier Save'}
+            $target=Join-Path $SelectedPath $name
+            if(Test-Path -LiteralPath $target){$target=Join-Path $SelectedPath ($name+'-'+(Get-Date -Format 'yyyyMMdd-HHmmss'))}
+            if(Test-Path -LiteralPath $source -PathType Container){Copy-Item -LiteralPath $source -Destination $target -Recurse -Force}else{Copy-Item -LiteralPath $source -Destination $target -Force}
+            Set-ConsoleNotice "$platform save exported." 'SUCCESS'
+        }else{
+            Update-HcEmulatorPlatformPathSetting -Request $request -SelectedPath $SelectedPath
+            Set-ConsoleNotice "$platform settings updated." 'SUCCESS'
+        }
+    }catch{
+        Set-ConsoleNotice "$platform selection could not be saved: $($_.Exception.Message)" 'ERROR'
+        Write-Log "Emulator platform picker completion failed for ${platform}: $($_.Exception.ToString())" 'ERROR'
+        return $true
+    }finally{
+        $script:EmulatorPlatformPickerRequest=$null
+    }
+    $script:SelectedTab=$script:FileBrowserReturnTab
+    $script:SubPage=$script:FileBrowserReturnSubPage
+    if($script:SubPage -eq 'FilePicker'){$script:SubPage=''}
+    $script:SelectedAction=0
+    try{Start-LibraryScan}catch{}
+    Render-Page;Update-NavVisuals
+    if($action -ne 'ExportSave'){
+        $reopen=[string](Get-EntryProperty $request 'displayName' (Get-EntryProperty $request 'platformId' ''))
+        if($reopen){try{[void](Start-HcEmulatorPlatform $reopen)}catch{Write-Log "Could not reopen $reopen after Huymaier picker: $($_.Exception.Message)" 'WARN'}}
+    }
+    return $true
+}
+
+function Start-HcEmulatorInstall {
+    param([Parameter(Mandatory=$true)]$Request)
+    $id=([string](Get-EntryProperty $Request 'platformId' '')).Trim().ToUpperInvariant()
+    $display=[string](Get-EntryProperty $Request 'displayName' $id)
+    if(-not $id){return $false}
+    $installer=Join-Path $script:BaseDir 'HuymaierEmulatorInstaller.ps1'
+    if(-not(Test-Path -LiteralPath $installer -PathType Leaf)){Set-ConsoleNotice 'The Huymaier emulator installer is missing.' 'ERROR';return $true}
+    $root=Join-Path (Join-Path $env:LOCALAPPDATA 'Huymaier Console') 'Emulators'
+    try{
+        Set-ConsoleNotice "Installing the latest supported $display emulator…" 'INFO';Render-Page
+        $output=@(& $installer -PlatformId $id -DestinationRoot $root -ConsoleRoot $script:BaseDir)
+        if($LASTEXITCODE -ne 0){throw "Installer exited with code $LASTEXITCODE."}
+        $json=$null
+        foreach($line in @($output|ForEach-Object{[string]$_}|Where-Object{$_ -match '^\s*\{.*\}\s*$'})){
+            try{$json=$line|ConvertFrom-Json}catch{}
+        }
+        if($null -eq $json -or [string]::IsNullOrWhiteSpace([string]$json.Executable)){throw 'The installer did not report the installed executable.'}
+        $installRequest=[pscustomobject]@{platformId=$id;displayName=$display;action='PrimaryEmulator'}
+        Update-HcEmulatorPlatformPathSetting -Request $installRequest -SelectedPath ([string]$json.Executable)
+        Set-ConsoleNotice "$display emulator installed and connected." 'SUCCESS'
+        try{Start-LibraryScan}catch{}
+        Render-Page;Update-NavVisuals
+        [void](Start-HcEmulatorPlatform $display)
+    }catch{
+        Set-ConsoleNotice "$display emulator installation failed: $($_.Exception.Message)" 'ERROR'
+        Write-Log "Latest emulator installation failed for ${display}: $($_.Exception.ToString())" 'ERROR'
+        Render-Page;Update-NavVisuals
+    }
+    return $true
+}
+
+function Invoke-HcNativeConsolePickerRequest {
+    param([string]$Platform='')
+    $requestPath=Join-Path (Join-Path $env:LOCALAPPDATA 'Huymaier Console\EmulatorPlatforms') 'picker-request.json'
+    if(-not(Test-Path -LiteralPath $requestPath -PathType Leaf)){return $false}
+    try{
+        $request=Get-Content -Raw -LiteralPath $requestPath -Encoding UTF8|ConvertFrom-Json
+        Remove-Item -LiteralPath $requestPath -Force -ErrorAction SilentlyContinue
+        if($null -eq $request){return $false}
+        $action=[string](Get-EntryProperty $request 'action' '')
+        $id=[string](Get-EntryProperty $request 'platformId' '')
+        $display=[string](Get-EntryProperty $request 'displayName' $(if($Platform){$Platform}else{$id}))
+        if(-not $action -or -not $id){return $false}
+        $script:EmulatorPlatformPickerRequest=$request
+        $start=[string](Get-EntryProperty $request 'startPath' $env:USERPROFILE)
+        if($start -and (Test-Path -LiteralPath $start -PathType Leaf)){$start=Split-Path -Parent $start}
+        if(-not($start -and (Test-Path -LiteralPath $start -PathType Container))){$start=$env:USERPROFILE}
+        switch($action){
+            'PrimaryEmulator' {Start-NativeFilePicker -Mode PickExecutable -Store $display -EntryType 'EmulatorPlatform' -ReturnTab $script:SelectedTab -StartPath $start;return $true}
+            'FallbackEmulator' {Start-NativeFilePicker -Mode PickExecutable -Store $display -EntryType 'EmulatorPlatform' -ReturnTab $script:SelectedTab -StartPath $start;return $true}
+            'DataRoot' {Start-NativeFilePicker -Mode PickFolder -Store "$display emulator data" -EntryType 'EmulatorPlatform' -ReturnTab $script:SelectedTab -StartPath $start;return $true}
+            'GameFolder' {Start-NativeFilePicker -Mode PickFolder -Store "$display game folder" -EntryType 'EmulatorPlatform' -ReturnTab $script:SelectedTab -StartPath $start;return $true}
+            'Ambience' {Start-NativeFilePicker -Mode PickAudio -Store "$display ambience" -EntryType 'EmulatorPlatform' -ReturnTab $script:SelectedTab -StartPath $start;return $true}
+            'ExportSave' {Start-NativeFilePicker -Mode PickFolder -Store "$display save export" -EntryType 'EmulatorPlatform' -ReturnTab $script:SelectedTab -StartPath $start;return $true}
+            'InstallPrimaryEmulator' {$script:EmulatorPlatformPickerRequest=$null;return (Start-HcEmulatorInstall $request)}
+            'OpenControllerSettings' {$script:EmulatorPlatformPickerRequest=$null;$script:SelectedTab=7;$script:SubPage='Controllers';$script:SelectedAction=0;Render-Page;Update-NavVisuals;return $true}
+            default {$script:EmulatorPlatformPickerRequest=$null;Write-Log "Unknown native console picker request '$action' from $display." 'WARN';return $false}
+        }
+    }catch{
+        try{Remove-Item -LiteralPath $requestPath -Force -ErrorAction SilentlyContinue}catch{}
+        $script:EmulatorPlatformPickerRequest=$null
+        Write-Log "Native console picker request could not be processed: $($_.Exception.ToString())" 'ERROR'
+        Set-ConsoleNotice 'The console file-browser request could not be opened.' 'ERROR'
+        return $false
+    }
 }
 
 # HES was retired from Huymaier Console in v0.24.11. Keep migration tolerant

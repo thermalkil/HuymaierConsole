@@ -24,6 +24,34 @@ using Huymaier.EmulatorPlatforms;
 
 namespace HuymaierConsole.NativeApp
 {
+
+    internal static class HuymaierNativePickerRequest
+    {
+        internal static void Request(Window owner, string platformId, string displayName, string action, string primaryBackend, string startPath)
+        {
+            try
+            {
+                string requestPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "Huymaier Console", "EmulatorPlatforms", "picker-request.json");
+                Directory.CreateDirectory(Path.GetDirectoryName(requestPath));
+                Dictionary<string, object> request = new Dictionary<string, object>();
+                request["platformId"] = platformId ?? String.Empty;
+                request["displayName"] = displayName ?? platformId ?? "Console";
+                request["action"] = action ?? String.Empty;
+                request["primaryBackend"] = primaryBackend ?? String.Empty;
+                request["startPath"] = String.IsNullOrWhiteSpace(startPath) ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) : startPath;
+                request["requestedAtUtc"] = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
+                File.WriteAllText(requestPath, new JavaScriptSerializer().Serialize(request), Encoding.UTF8);
+                if (owner != null) owner.Close();
+            }
+            catch (Exception ex)
+            {
+                try { MessageBox.Show("Huymaier Console could not open its native file browser.\n\n" + ex.Message,
+                    "Huymaier Console", MessageBoxButton.OK, MessageBoxImage.Error); } catch { }
+            }
+        }
+    }
+
     public static class Program
     {
         [DllImport("user32.dll")]
@@ -1199,7 +1227,7 @@ namespace HuymaierConsole.NativeApp
             settingsCategory.Items.Add(new XmbItem("System Update", "RPCS3 installation and PS3 system software", null,
                 new List<XmbItem> {
                     new XmbItem("Use / Change Existing Installation", GetRpcs3StatusText(), "ChooseRpcs3"),
-                    new XmbItem("Install Managed RPCS3", GetManagedInstallText(), "InstallRpcs3"),
+                    new XmbItem("Install / Update RPCS3", GetManagedInstallText(), "InstallRpcs3"),
                     new XmbItem("RPCS3 Data Location", GetRpcs3DataRootDisplay(), "ChangeDataPath"),
                     new XmbItem("Re-scan RPCS3 Configuration", "Detect native data and refresh the library", "RescanRpcs3"),
                     new XmbItem("Install PS3 System Software", GetFirmwareStatusText(), "InstallFirmware")
@@ -2544,91 +2572,14 @@ namespace HuymaierConsole.NativeApp
 
         private void ChooseExistingRpcs3()
         {
-            OpenFileDialog dialog = new OpenFileDialog();
-            dialog.Title = "Select your existing RPCS3 installation";
-            dialog.Filter = "RPCS3 (rpcs3.exe)|rpcs3.exe|Executables (*.exe)|*.exe";
-            if (dialog.ShowDialog(this) != true) return;
-            settings.rpcs3Path = Path.GetFullPath(dialog.FileName);
-            settings.installationMode = "Existing";
-            settings.rpcs3DataPath = Ps3PathResolver.FindDataRoot(settings.rpcs3Path, String.Empty);
-            settings.Save(settingsPath);
-            theme.Refresh();
-            audio.Refresh();
-            UpdateFirmwareThemesMenu();
-            BeginLibraryScan(true);
-            ShowNotice("Using existing RPCS3 installation");
+            string start = settings.rpcs3Path;
+            try { if (File.Exists(start)) start = Path.GetDirectoryName(start); } catch { }
+            HuymaierNativePickerRequest.Request(this, "PS3", "PlayStation 3", "PrimaryEmulator", "RPCS3", start);
         }
 
         private void InstallManagedRpcs3()
         {
-            Forms.FolderBrowserDialog dialog = new Forms.FolderBrowserDialog();
-            dialog.Description = "Choose the folder where RPCS3 should be installed. It will not be placed inside Huymaier Console unless you explicitly choose that folder.";
-            dialog.ShowNewFolderButton = true;
-            if (!String.IsNullOrWhiteSpace(settings.managedInstallFolder)) dialog.SelectedPath = settings.managedInstallFolder;
-            else dialog.SelectedPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "RPCS3");
-            if (dialog.ShowDialog() != Forms.DialogResult.OK) return;
-            string destination = Path.GetFullPath(dialog.SelectedPath);
-            string normalizedConsoleRoot = Path.GetFullPath(consoleRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            string normalizedDestination = destination.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            if (String.Equals(normalizedDestination, normalizedConsoleRoot, StringComparison.OrdinalIgnoreCase) ||
-                normalizedDestination.StartsWith(normalizedConsoleRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-            {
-                ShowNotice("Choose an RPCS3 folder outside Huymaier Console");
-                return;
-            }
-            string installer = Path.Combine(consoleRoot, "Tools", "Install-Latest-RPCS3.ps1");
-            if (!File.Exists(installer))
-            {
-                ShowNotice("RPCS3 installer helper is missing");
-                return;
-            }
-            inputSuspended = true;
-            audio.PauseMusic();
-            ShowNotice("Installing RPCS3...");
-            ThreadPool.QueueUserWorkItem(delegate
-            {
-                string error = String.Empty;
-                try
-                {
-                    Directory.CreateDirectory(destination);
-                    ProcessStartInfo info = new ProcessStartInfo();
-                    info.FileName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
-                        "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
-                    info.Arguments = "-NoLogo -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"" + installer + "\" -Destination \"" + destination + "\"";
-                    info.WorkingDirectory = consoleRoot;
-                    info.UseShellExecute = false;
-                    info.CreateNoWindow = true;
-                    info.WindowStyle = ProcessWindowStyle.Hidden;
-                    using (Process process = Process.Start(info))
-                    {
-                        if (process == null) throw new InvalidOperationException("RPCS3 installer did not start.");
-                        process.WaitForExit();
-                        if (process.ExitCode != 0) throw new InvalidOperationException("RPCS3 installer exited with code " + process.ExitCode + ".");
-                    }
-                    string executable = Path.Combine(destination, "rpcs3.exe");
-                    if (!File.Exists(executable)) throw new FileNotFoundException("rpcs3.exe was not installed.", executable);
-                    settings.rpcs3Path = executable;
-                    settings.rpcs3DataPath = destination;
-                    settings.managedInstallFolder = destination;
-                    settings.installationMode = "Managed";
-                    settings.Save(settingsPath);
-                }
-                catch (Exception ex) { error = ex.Message; WriteLog("RPCS3 install failed: " + ex, "ERROR"); }
-                SafeBeginUi(delegate
-                {
-                    inputSuspended = false;
-                    audio.ResumeMusic();
-                    if (String.IsNullOrWhiteSpace(error))
-                    {
-                        theme.Refresh();
-                        UpdateFirmwareThemesMenu();
-                        RefreshDynamicSubtitles();
-                        BeginLibraryScan(false);
-                        ShowNotice("RPCS3 installed to " + destination);
-                    }
-                    else ShowNotice("RPCS3 installation failed: " + error);
-                }, "RPCS3 managed install");
-            });
+            HuymaierNativePickerRequest.Request(this, "PS3", "PlayStation 3", "InstallPrimaryEmulator", "RPCS3", settings.managedInstallFolder);
         }
 
         private void RescanRpcs3Configuration()
@@ -2651,18 +2602,7 @@ namespace HuymaierConsole.NativeApp
 
         private void ChooseRpcs3DataPath()
         {
-            Forms.FolderBrowserDialog dialog = new Forms.FolderBrowserDialog();
-            dialog.Description = "Select the RPCS3 data folder containing dev_hdd0, dev_flash or config files.";
-            dialog.ShowNewFolderButton = false;
-            string current = Ps3PathResolver.FindDataRoot(settings.rpcs3Path, settings.rpcs3DataPath);
-            if (!String.IsNullOrWhiteSpace(current) && Directory.Exists(current)) dialog.SelectedPath = current;
-            if (dialog.ShowDialog() != Forms.DialogResult.OK) return;
-            settings.rpcs3DataPath = dialog.SelectedPath;
-            settings.Save(settingsPath);
-            theme.Refresh();
-            UpdateFirmwareThemesMenu();
-            BeginLibraryScan(true);
-            ShowNotice("RPCS3 data location updated");
+            HuymaierNativePickerRequest.Request(this, "PS3", "PlayStation 3", "DataRoot", "RPCS3", GetRpcs3DataRoot());
         }
 
         private void InstallFirmware()
@@ -2715,26 +2655,7 @@ namespace HuymaierConsole.NativeApp
 
         private void AddLibraryFolder()
         {
-            Forms.FolderBrowserDialog dialog = new Forms.FolderBrowserDialog();
-            dialog.Description = "Select a folder containing extracted PlayStation 3 games";
-            dialog.ShowNewFolderButton = true;
-            if (dialog.ShowDialog() != Forms.DialogResult.OK) return;
-            string selected = NormalizeLibraryRoot(dialog.SelectedPath);
-            if (String.IsNullOrWhiteSpace(selected)) return;
-            string overlap = settings.libraryRoots.FirstOrDefault(delegate(string value)
-            {
-                return LibraryRootsOverlap(NormalizeLibraryRoot(value), selected);
-            });
-            if (!String.IsNullOrWhiteSpace(overlap))
-            {
-                ShowNotice("That location is already covered by " + overlap);
-                return;
-            }
-            settings.libraryRoots.Add(selected);
-            settings.Save(settingsPath);
-            UpdateLibraryFolderSettingsMenu();
-            RefreshDynamicSubtitles();
-            BeginLibraryScan(true);
+            HuymaierNativePickerRequest.Request(this, "PS3", "PlayStation 3", "GameFolder", "RPCS3", GetRpcs3DataRoot());
         }
 
         private void RemoveLibraryFolder(string path)
@@ -6786,7 +6707,7 @@ namespace HuymaierConsole.NativeApp
             List<BbnItem> result = new List<BbnItem>();
             result.Add(new BbnItem("PCSX2 Installation", GetPcsx2Status(), null, new List<BbnItem> {
                 new BbnItem("Use / Change Existing Installation", GetPcsx2Status(), "ChoosePcsx2"),
-                new BbnItem("Install / Update Managed PCSX2", GetManagedStatus(), "InstallPcsx2"),
+                new BbnItem("Install / Update PCSX2", GetManagedStatus(), "InstallPcsx2"),
                 new BbnItem("PCSX2 Data Location", GetDataRoot(), "ChooseDataRoot"),
                 new BbnItem("Re-scan PCSX2 Configuration", "Refresh folders, BIOS and library", "RescanConfiguration")
             }));
@@ -7914,82 +7835,19 @@ namespace HuymaierConsole.NativeApp
 
         private void ChoosePcsx2()
         {
-            OpenFileDialog dialog = new OpenFileDialog();
-            dialog.Title = "Select PCSX2";
-            dialog.Filter = "PCSX2 executable (pcsx2*.exe)|pcsx2*.exe|Applications (*.exe)|*.exe";
-            if (dialog.ShowDialog(this) != true) return;
-            settings.pcsx2Path = Path.GetFullPath(dialog.FileName);
-            settings.installationMode = "Existing";
-            settings.pcsx2DataPath = Pcsx2PathResolver.FindDataRoot(settings.pcsx2Path, settings.pcsx2DataPath);
-            ImportConfiguredLibraryRoots();
-            settings.Save(settingsPath);
-            BuildChannels();
-            RefreshSaveVisuals();
-            BeginScan(true);
-            ShowNotice("Using existing PCSX2 installation");
+            string start = settings.pcsx2Path;
+            try { if (File.Exists(start)) start = Path.GetDirectoryName(start); } catch { }
+            HuymaierNativePickerRequest.Request(this, "PS2", "PlayStation 2", "PrimaryEmulator", "PCSX2", start);
         }
 
         private void InstallPcsx2()
         {
-            Forms.FolderBrowserDialog dialog = new Forms.FolderBrowserDialog();
-            dialog.Description = "Choose an external folder for PCSX2. It will not be installed inside Huymaier Console.";
-            if (!String.IsNullOrWhiteSpace(settings.managedInstallFolder)) dialog.SelectedPath = settings.managedInstallFolder;
-            if (dialog.ShowDialog() != Forms.DialogResult.OK) return;
-            string destination = Path.GetFullPath(dialog.SelectedPath);
-            if (destination.StartsWith(Path.GetFullPath(consoleRoot), StringComparison.OrdinalIgnoreCase))
-            {
-                ShowNotice("Choose a folder outside the Huymaier Console installation");
-                return;
-            }
-            string script = Path.Combine(consoleRoot, "Tools", "Install-Latest-PCSX2.ps1");
-            if (!File.Exists(script)) { ShowNotice("PCSX2 installer helper is missing"); return; }
-            inputSuspended = true;
-            ShowNotice("Installing the latest PCSX2 build...");
-            ThreadPool.QueueUserWorkItem(delegate
-            {
-                string error = String.Empty;
-                try
-                {
-                    ProcessStartInfo info = new ProcessStartInfo("powershell.exe",
-                        "-NoLogo -NoProfile -ExecutionPolicy Bypass -File " + Quote(script) + " -Destination " + Quote(destination));
-                    info.UseShellExecute = false;
-                    info.CreateNoWindow = true;
-                    Process process = Process.Start(info);
-                    process.WaitForExit();
-                    if (process.ExitCode != 0) error = "Installer exited with code " + process.ExitCode;
-                }
-                catch (Exception ex) { error = ex.Message; }
-                Dispatcher.BeginInvoke(new Action(delegate
-                {
-                    inputSuspended = false;
-                    if (!String.IsNullOrWhiteSpace(error)) { ShowNotice("PCSX2 installation failed: " + error); return; }
-                    string exe = Pcsx2PathResolver.FindExecutable(destination);
-                    if (String.IsNullOrWhiteSpace(exe)) { ShowNotice("PCSX2 executable was not found after installation"); return; }
-                    settings.pcsx2Path = exe;
-                    settings.managedInstallFolder = destination;
-                    settings.installationMode = "Managed";
-                    settings.pcsx2DataPath = Pcsx2PathResolver.FindDataRoot(exe, destination);
-                    settings.Save(settingsPath);
-                    BuildChannels();
-                    RefreshSaveVisuals();
-                    BeginScan(true);
-                    ShowNotice("PCSX2 installed");
-                }));
-            });
+            HuymaierNativePickerRequest.Request(this, "PS2", "PlayStation 2", "InstallPrimaryEmulator", "PCSX2", settings.managedInstallFolder);
         }
 
         private void ChooseDataRoot()
         {
-            Forms.FolderBrowserDialog dialog = new Forms.FolderBrowserDialog();
-            dialog.Description = "Choose the PCSX2 data folder containing inis, bios, memcards and covers";
-            dialog.SelectedPath = GetDataRoot();
-            if (dialog.ShowDialog() != Forms.DialogResult.OK) return;
-            settings.pcsx2DataPath = Path.GetFullPath(dialog.SelectedPath);
-            ImportConfiguredLibraryRoots();
-            settings.Save(settingsPath);
-            BuildChannels();
-            RefreshSaveVisuals();
-            BeginScan(true);
+            HuymaierNativePickerRequest.Request(this, "PS2", "PlayStation 2", "DataRoot", "PCSX2", GetDataRoot());
         }
 
         private void RescanConfiguration()
@@ -8020,16 +7878,7 @@ namespace HuymaierConsole.NativeApp
 
         private void AddLibrary()
         {
-            Forms.FolderBrowserDialog dialog = new Forms.FolderBrowserDialog();
-            dialog.Description = "Choose a PlayStation 2 game folder";
-            if (dialog.ShowDialog() != Forms.DialogResult.OK) return;
-            string path = Path.GetFullPath(dialog.SelectedPath).TrimEnd(Path.DirectorySeparatorChar);
-            if (!settings.libraryRoots.Any(delegate(string existing) { return String.Equals(existing, path, StringComparison.OrdinalIgnoreCase); }))
-                settings.libraryRoots.Add(path);
-            settings.Normalize();
-            settings.Save(settingsPath);
-            BuildChannels();
-            BeginScan(true);
+            HuymaierNativePickerRequest.Request(this, "PS2", "PlayStation 2", "GameFolder", "PCSX2", GetDataRoot());
         }
 
         private void RemoveLibrary(string path)

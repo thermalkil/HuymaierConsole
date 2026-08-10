@@ -2277,6 +2277,7 @@ function Complete-NativeFolderSelection {
     if ([string]::IsNullOrWhiteSpace($script:FileBrowserPath) -or -not (Test-Path -LiteralPath $script:FileBrowserPath -PathType Container)) { return }
     $path=[string]$script:FileBrowserPath
     $store=[string]$script:FileBrowserStore
+    if($script:FileBrowserEntryType -eq 'EmulatorPlatform' -and (Get-Command Complete-HcEmulatorPlatformPicker -ErrorAction SilentlyContinue)){[void](Complete-HcEmulatorPlatformPicker $path);return}
     if($script:FileBrowserEntryType -eq 'ProviderInstall' -and (Get-Command Complete-ProviderFolderSelection -ErrorAction SilentlyContinue)){Complete-ProviderFolderSelection $path|Out-Null;return}
     if($script:FileBrowserEntryType -eq 'ProviderMove' -and (Get-Command Complete-ProviderMoveFolderSelection -ErrorAction SilentlyContinue)){Complete-ProviderMoveFolderSelection $path|Out-Null;return}
     if($script:FileBrowserEntryType -eq 'DriverPackage'){$script:SelectedTab=$script:FileBrowserReturnTab;$script:SubPage='Drivers';$script:SelectedAction=0;Start-DriverWorker 'InstallPackage' $path;Render-Page;Update-NavVisuals;return}
@@ -2302,6 +2303,7 @@ function Complete-NativeFileSelection {
     if ($null -eq $Entry -or [string](Get-EntryProperty $Entry 'Type') -ne 'File') { return }
     $path=[string](Get-EntryProperty $Entry 'FullName')
     if ( -not (Test-Path -LiteralPath $path -PathType Leaf)) { return }
+    if($script:FileBrowserEntryType -eq 'EmulatorPlatform' -and (Get-Command Complete-HcEmulatorPlatformPicker -ErrorAction SilentlyContinue)){[void](Complete-HcEmulatorPlatformPicker $path);return}
     if ($script:FileBrowserMode -eq 'PickExecutable') {
         $type=[string]$script:FileBrowserEntryType
         $entry=[pscustomobject]@{
@@ -2337,6 +2339,7 @@ function Complete-NativeFileSelection {
 }
 
 function Cancel-NativeFilePicker {
+    if($script:FileBrowserEntryType -eq 'EmulatorPlatform'){$script:EmulatorPlatformPickerRequest=$null}
     $script:SelectedTab=$script:FileBrowserReturnTab
     $script:SubPage=$script:FileBrowserReturnSubPage
     if($script:SubPage -eq 'FilePicker'){$script:SubPage=''}

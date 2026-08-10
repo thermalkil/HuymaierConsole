@@ -151,7 +151,7 @@
         "RMG",
         "ares"
       ],
-      "version": "0.25.0",
+      "version": "0.26.3",
       "nativeType": "HuymaierConsole.NativeApp.ConsolePlatformWindow",
       "capabilities": [
         "library",
@@ -164,7 +164,10 @@
         "cover-art",
         "save-folder-backup",
         "compiled-native-host",
-        "in-process-platform-view"
+        "in-process-platform-view",
+        "huymaier-native-path-picker",
+        "latest-emulator-install",
+        "emulator-first-cover-art"
       ]
     },
     {
@@ -182,7 +185,7 @@
         "Nintendo GameCube",
         "Dolphin GameCube"
       ],
-      "version": "0.25.0",
+      "version": "0.26.3",
       "nativeType": "HuymaierConsole.NativeApp.ConsolePlatformWindow",
       "capabilities": [
         "library",
@@ -195,7 +198,10 @@
         "memory-card-folders",
         "save-folder-backup",
         "compiled-native-host",
-        "in-process-platform-view"
+        "in-process-platform-view",
+        "huymaier-native-path-picker",
+        "latest-emulator-install",
+        "emulator-first-cover-art"
       ]
     },
     {
@@ -213,7 +219,7 @@
         "Nintendo Wii",
         "Dolphin Wii"
       ],
-      "version": "0.25.0",
+      "version": "0.26.3",
       "nativeType": "HuymaierConsole.NativeApp.ConsolePlatformWindow",
       "capabilities": [
         "library",
@@ -226,7 +232,10 @@
         "cover-art",
         "save-folder-backup",
         "compiled-native-host",
-        "in-process-platform-view"
+        "in-process-platform-view",
+        "huymaier-native-path-picker",
+        "latest-emulator-install",
+        "emulator-first-cover-art"
       ]
     },
     {
@@ -244,7 +253,7 @@
         "Nintendo Wii U",
         "Cemu"
       ],
-      "version": "0.25.0",
+      "version": "0.26.3",
       "nativeType": "HuymaierConsole.NativeApp.ConsolePlatformWindow",
       "capabilities": [
         "library",
@@ -256,7 +265,10 @@
         "cover-art",
         "save-folder-backup",
         "compiled-native-host",
-        "in-process-platform-view"
+        "in-process-platform-view",
+        "huymaier-native-path-picker",
+        "latest-emulator-install",
+        "emulator-first-cover-art"
       ]
     },
     {
@@ -275,7 +287,7 @@
         "Eden",
         "Ryubing"
       ],
-      "version": "0.25.0",
+      "version": "0.26.3",
       "nativeType": "HuymaierConsole.NativeApp.ConsolePlatformWindow",
       "capabilities": [
         "library",
@@ -288,7 +300,10 @@
         "cover-art",
         "save-folder-backup",
         "compiled-native-host",
-        "in-process-platform-view"
+        "in-process-platform-view",
+        "huymaier-native-path-picker",
+        "latest-emulator-install",
+        "emulator-first-cover-art"
       ]
     },
     {
@@ -307,7 +322,7 @@
         "xemu",
         "Cxbx-Reloaded"
       ],
-      "version": "0.25.0",
+      "version": "0.26.3",
       "nativeType": "HuymaierConsole.NativeApp.ConsolePlatformWindow",
       "capabilities": [
         "library",
@@ -320,7 +335,10 @@
         "cover-art",
         "save-folder-backup",
         "compiled-native-host",
-        "in-process-platform-view"
+        "in-process-platform-view",
+        "huymaier-native-path-picker",
+        "latest-emulator-install",
+        "emulator-first-cover-art"
       ],
       "shellReference": "TeamUIX / Theseus"
     },
@@ -340,7 +358,7 @@
         "Xenia Canary",
         "Xenia"
       ],
-      "version": "0.25.0",
+      "version": "0.26.3",
       "nativeType": "HuymaierConsole.NativeApp.ConsolePlatformWindow",
       "capabilities": [
         "library",
@@ -355,7 +373,10 @@
         "cover-art",
         "save-folder-backup",
         "compiled-native-host",
-        "in-process-platform-view"
+        "in-process-platform-view",
+        "huymaier-native-path-picker",
+        "latest-emulator-install",
+        "emulator-first-cover-art"
       ],
       "dashboardStyles": [
         "Blades",
