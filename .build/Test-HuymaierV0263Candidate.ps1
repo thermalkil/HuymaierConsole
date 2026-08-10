@@ -121,7 +121,8 @@ $artwork=Require-Rc4Text (Join-Path $StageRoot 'HuymaierArtworkWorker.ps1') @(
     'https://www.steamgriddb.com/api/v2/grids/steam/',
     'https://www.steamgriddb.com/api/v2/search/autocomplete/',
     'https://www.steamgriddb.com/api/v2/grids/game/',
-    "'Authorization'=('Bearer '+$key)"
+    'Authorization',
+    'Bearer '
 ) 'SteamGridDB artwork worker'
 if($artwork -match 'SteamGridDbApiKey\s*=\s*[''"][A-Za-z0-9_-]{20,}[''"]'){throw 'A SteamGridDB API key appears to be hard-coded in production source.'}
 $steamOfficial=$artwork.IndexOf("if(-not `$found -and `$source -match '(?i)^steam`$')")
