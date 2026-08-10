@@ -1,6 +1,7 @@
 {
   "batch":"wave1-native-surfaces",
-  "requestedAtUtc":"2026-08-10T22:25:00Z",
+  "requestedAtUtc":"2026-08-10T22:32:00Z",
+  "retry":2,
   "platforms":["3DS","NDS","DSI","Dreamcast","Saturn","PSP"],
   "gate":"Windows PowerShell 5.1 parse plus exact x64 native-host source compile before commit"
 }
