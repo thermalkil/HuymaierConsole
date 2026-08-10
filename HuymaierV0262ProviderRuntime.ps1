@@ -66,3 +66,6 @@ function Update-HcActiveDownloadVisuals {
     }
     return $ok
 }
+
+$script:HcV0262HardeningPath=Join-Path $script:BaseDir 'HuymaierV0262Hardening.ps1'
+if(Test-Path -LiteralPath $script:HcV0262HardeningPath -PathType Leaf){. $script:HcV0262HardeningPath}
