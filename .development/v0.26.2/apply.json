@@ -1,5 +1,5 @@
 {
-  "batch": "runtime-colorwheel-2",
-  "script": "apply_runtime_colorwheel.py",
-  "requested_at": "2026-08-10T13:39:00Z"
+  "batch": "colorwheel-hardening-1",
+  "script": "apply_colorwheel_hardening.py",
+  "requested_at": "2026-08-10T13:54:00Z"
 }
