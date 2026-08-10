@@ -25,16 +25,16 @@ jobs:
           ref: feature/v0.26.3-console-fidelity
           fetch-depth: 0
 
-      - name: Apply exact production payload
+      - name: Apply checksum-verified production patch
         shell: bash
         run: |
           set -euo pipefail
-          python3 .development/v0.26.3/apply_authentic_console_integration.py
+          python3 .development/v0.26.3/apply_authentic_console_patch.py
           python3 - <<'PY'
           import json, datetime
           state={
             'batch':'console-fidelity-4-authentic-integration',
-            'script':'apply_authentic_console_integration.py',
+            'script':'apply_authentic_console_patch.py',
             'result':'success',
             'recordedAtUtc':datetime.datetime.now(datetime.timezone.utc).isoformat()
           }
