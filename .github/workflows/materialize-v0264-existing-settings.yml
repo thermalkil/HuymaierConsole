@@ -1,0 +1,33 @@
+name: Materialize v0.26.4 Existing Console Full Settings
+on:
+  pull_request:
+    branches: [feature/v0.26.3-console-fidelity]
+    paths: ['.development/v0.26.4/existing-settings-request.json','.development/v0.26.4/apply_xml_settings_support.py','.development/v0.26.4/apply_existing_native_settings_adapters.py','.github/workflows/materialize-v0264-existing-settings.yml']
+permissions: {contents: write}
+concurrency: {group: huymaier-v0264-existing-settings, cancel-in-progress: false}
+jobs:
+  materialize:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: feature/v0.26.4-platform-expansion, fetch-depth: 0}
+      - name: Materialize XML and existing backend adapters
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';$settings=Get-Content -Raw 'HuymaierEmulatorSettings.ps1' -Encoding UTF8;if($settings -notmatch [regex]::Escape('function Get-HcXmlSettings')){python .development\v0.26.4\apply_xml_settings_support.py;if($LASTEXITCODE){throw 'XML settings materializer failed'}};python .development\v0.26.4\apply_existing_native_settings_adapters.py;if($LASTEXITCODE){throw 'Existing backend adapter materializer failed'}
+      - name: Parse and validate full-settings coverage
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';foreach($path in @('.\HuymaierEmulatorSettings.ps1','.\HuymaierEmulatorSettingsWorker.ps1')){$t=$null;$e=$null;[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path),[ref]$t,[ref]$e);if($e.Count){$e|ForEach-Object{Write-Host "$path : $($_.Message)"};throw "$path parse failed."}}
+          $settings=Get-Content -Raw 'HuymaierEmulatorSettings.ps1' -Encoding UTF8;foreach($m in @('Get-HcXmlSettings','Set-HcXmlSetting',"elseif(`$ext -eq '.xml'){`$Format='xml'}")){if($settings -notmatch [regex]::Escape($m)){throw "XML full-settings marker missing: $m"}}
+          $worker=Get-Content -Raw 'HuymaierEmulatorSettingsWorker.ps1' -Encoding UTF8;foreach($adapter in @("'rmg'","'dolphin'","'cemu'","'eden'","'xemu'","'xenia'")){if($worker -notmatch [regex]::Escape($adapter)){throw "Existing backend discovery missing adapter $adapter"}}
+          foreach($pair in @(@('N64','rmg'),@('GameCube','dolphin'),@('Wii','dolphin'),@('WiiU','cemu'),@('Switch','eden'),@('Xbox','xemu'),@('Xbox360','xenia'))){$d=Get-Content -Raw (Join-Path (Join-Path 'EmulatorPlatforms' $pair[0]) 'platform.json') -Encoding UTF8|ConvertFrom-Json;if([string]$d.adapter -ne $pair[1]){throw "$($pair[0]) adapter is not $($pair[1])"}}
+      - name: Compile exact x64 native source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Windows.Forms,System.Drawing,System.Web.Extensions;$csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe';$automation=[Management.Automation.PSObject].Assembly.Location;$refs=@([Uri].Assembly.Location,[Linq.Enumerable].Assembly.Location,[System.Xaml.XamlReader].Assembly.Location,[Xml.XmlDocument].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,[Windows.Window].Assembly.Location,[Windows.Forms.Form].Assembly.Location,[Drawing.Bitmap].Assembly.Location,[Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,$automation)|Select-Object -Unique;$sources=@('Native\HuymaierConsole.NativeApp.cs','Native\HuymaierConsole.Ps1.cs','Native\HuymaierConsole.ConsolePlatforms.cs','Native\HuymaierConsole.SystemOverlay.cs','Native\HuymaierConsole.GameInput.cs','HuymaierNativeInput.cs','HuymaierNativeDisplay.cs','HuymaierNativeAudio.cs','HuymaierPerformance.cs','EmulatorPlatforms\Shared\Huymaier.P3T.cs');$out=Join-Path $env:RUNNER_TEMP 'hc-existing-settings.dll';$args=@('/noconfig','/nologo','/target:library','/platform:x64','/optimize+',('/out:'+$out));foreach($r in $refs){$args+=('/reference:'+$r)};$args+=$sources;& $csc @args;if($LASTEXITCODE -ne 0){throw 'Existing full-settings x64 compile failed.'}
+      - name: Commit validated existing settings source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com';git add HuymaierEmulatorSettings.ps1 HuymaierEmulatorSettingsWorker.ps1 EmulatorPlatforms/N64/platform.json EmulatorPlatforms/GameCube/platform.json EmulatorPlatforms/Wii/platform.json EmulatorPlatforms/WiiU/platform.json EmulatorPlatforms/Switch/platform.json EmulatorPlatforms/Xbox/platform.json EmulatorPlatforms/Xbox360/platform.json;if(git diff --cached --quiet){exit 0};git commit -m 'Materialize v0.26.4 full settings adapters for existing consoles';git fetch origin feature/v0.26.4-platform-expansion;git rebase origin/feature/v0.26.4-platform-expansion;if($LASTEXITCODE -ne 0){throw 'Existing settings rebase failed.'};git push origin HEAD:feature/v0.26.4-platform-expansion;if($LASTEXITCODE -ne 0){throw 'Existing settings push failed.'}
