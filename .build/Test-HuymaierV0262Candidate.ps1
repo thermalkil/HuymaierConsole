@@ -71,8 +71,8 @@ $runtime=Require-Text (Join-Path $StageRoot 'HuymaierV0262Runtime.ps1') @(
 ) 'v0.26.2 runtime'
 $hardening=Require-Text (Join-Path $StageRoot 'HuymaierV0262Hardening.ps1') @(
     'Get-HcGamesLayoutColumnCount',
-    "'Up' {$delta=-(Get-HcGamesLayoutColumnCount)}",
-    "'Down' {$delta=(Get-HcGamesLayoutColumnCount)}",
+    '''Up'' {$delta=-(Get-HcGamesLayoutColumnCount)}',
+    '''Down'' {$delta=(Get-HcGamesLayoutColumnCount)}',
     'Test-HcAnyProviderOperationActive',
     'fresh marker as busy'
 ) 'Layout/provider hardening'
