@@ -9,6 +9,7 @@ on:
       - '.development/v0.26.0/build-trigger.json'
       - '.development/v0.26.1/build-trigger.json'
       - '.build/Build-HuymaierReleaseCandidate.ps1'
+      - '.build/Test-HuymaierCandidate.ps1'
       - '.github/workflows/build-v026-test.yml'
 
 permissions:
@@ -39,6 +40,7 @@ jobs:
           "path=$path"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
           "candidate=$([string]$data.candidate)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
           "asset=$([string]$data.asset_name)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "package_root=$([string]$data.package_root)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
           "status=$([IO.Path]::Combine([IO.Path]::GetDirectoryName($path),'build-status.json'))"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Build exact x64 FSE Home host
@@ -52,8 +54,6 @@ jobs:
           if(-not(Test-Path -LiteralPath $source)){throw 'HuymaierFSEHost.cs is missing.'}
           & $csc /noconfig /nologo /target:winexe /platform:x64 /optimize+ ('/out:'+$output) $source
           if($LASTEXITCODE -ne 0 -or -not(Test-Path -LiteralPath $output)){throw 'x64 FSE Home host compilation failed.'}
-          # Make the deterministic generated binary visible to git ls-files for
-          # this job only; it is never committed to source control.
           git add -f FSEPackage/HuymaierFSEHost.exe
 
       - name: Build and integrity-test release-shaped candidate
@@ -63,6 +63,14 @@ jobs:
         run: |
           $ErrorActionPreference='Stop'
           & .\.build\Build-HuymaierReleaseCandidate.ps1 -TriggerPath '${{ steps.trigger.outputs.path }}'
+
+      - name: Run installer and conflict failure-injection tests
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $stage=Join-Path $env:RUNNER_TEMP ('hc-stage\${{ steps.trigger.outputs.package_root }}')
+          $validation=Join-Path $env:HC_CANDIDATE_OUTPUT 'candidate-validation.json'
+          & .\.build\Test-HuymaierCandidate.ps1 -StageRoot $stage -ValidationPath $validation
 
       - name: Upload exact candidate bytes
         uses: actions/upload-artifact@v4
@@ -94,6 +102,6 @@ jobs:
           }
           $state|ConvertTo-Json|Set-Content -LiteralPath $env:STATUS_PATH -Encoding UTF8
           git config user.name 'github-actions[bot]'
-          git config user.email '41898286+github-actions[bot]@users.noreply.github.com'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add $env:STATUS_PATH
           if(-not (git diff --cached --quiet)){git commit -m "Record $env:CANDIDATE candidate build status";git push origin HEAD:${{ github.ref_name }}}
