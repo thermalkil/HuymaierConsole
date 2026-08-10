@@ -1,4 +1,4 @@
 {
-  "batch": "console-fidelity-3-version",
-  "script": "apply_version_bump.py"
+  "batch": "console-fidelity-4-authentic-integration",
+  "script": "apply_authentic_console_integration.py"
 }
