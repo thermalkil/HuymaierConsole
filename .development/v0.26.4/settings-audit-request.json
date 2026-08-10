@@ -1,0 +1,1 @@
+{"requestedAtUtc":"2026-08-11T01:26:00Z","requirement":"Every enabled emulator-backed platform must expose a complete native settings adapter and settings-default path before v0.26.4 is considered complete."}
