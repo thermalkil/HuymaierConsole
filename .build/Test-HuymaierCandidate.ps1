@@ -172,7 +172,7 @@ try{
     $pickerStart=$shell.IndexOf('function Start-NativeFilePicker')
     $pickerEnd=$shell.IndexOf('function Complete-NativeFolderSelection',$pickerStart)
     $tabIndex=$shell.IndexOf('$script:SelectedTab=6',$pickerStart)
-    $subPageIndex=$shell.IndexOf("$script:SubPage='FilePicker'",$pickerStart)
+    $subPageIndex=$shell.IndexOf('$script:SubPage=''FilePicker''',$pickerStart)
     if($pickerStart -lt 0 -or $pickerEnd -lt 0 -or $tabIndex -lt $pickerStart -or $tabIndex -ge $pickerEnd -or $subPageIndex -lt $tabIndex -or $subPageIndex -ge $pickerEnd){throw 'Native non-Browse file picker does not enter the File Explorer tab before rendering FilePicker.'}
 
     # Combined next-build gates: customization is persisted and controller-first,
@@ -184,8 +184,8 @@ try{
     foreach($required in @("SubPage -eq 'Customization'",'ConsoleName','DynamicPrimaryColor','DynamicSecondaryColor','UiSoundVolume','Test-HcStorefrontPlatform $Platform','Scaling normal list cards caused selected text/borders to be clipped')){if($custom -notmatch [regex]::Escape($required)){throw "Customization/count/card invariant is missing: $required"}}
     foreach($required in @('New-HcRadialThemeBrush','Update-HcPageDisplayBrand','Convert-HcDisplayBrandText')){if($custom -notmatch [regex]::Escape($required)){throw "Customization gradient/display-name coverage is missing: $required"}}
     $shellRedesign=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierShellRedesign.ps1') -Encoding UTF8
-    $consoleSettingsStart=$shellRedesign.IndexOf("if($script:SubPage -eq 'ConsoleSettings')")
-    $updatesStart=$shellRedesign.IndexOf("if($script:SubPage -eq 'UpdatesHub')",$consoleSettingsStart)
+    $consoleSettingsStart=$shellRedesign.IndexOf('if($script:SubPage -eq ''ConsoleSettings'')')
+    $updatesStart=$shellRedesign.IndexOf('if($script:SubPage -eq ''UpdatesHub'')',$consoleSettingsStart)
     if($consoleSettingsStart -lt 0 -or $updatesStart -lt 0){throw 'ConsoleSettings test window could not be located.'}
     $consoleSettings=$shellRedesign.Substring($consoleSettingsStart,$updatesStart-$consoleSettingsStart)
     foreach($moved in @("'music-toggle'","'music-theme'","'music-import'","'music-volume-slider'","'ui-sounds-toggle'","'background-toggle'","'keyboard-theme'")){if($consoleSettings -match [regex]::Escape($moved)){throw "Personalization setting remains duplicated outside Customization: $moved"}}
