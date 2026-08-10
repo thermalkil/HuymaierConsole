@@ -146,16 +146,16 @@ function Get-PageDefinition {
         Initialize-HcCustomizationConfig
         $name=Get-HcConsoleName;$preset=[string](Get-EntryProperty $script:Config 'DynamicThemePreset' 'Huymaier')
         return (Update-HcPageDisplayBrand ([pscustomobject]@{
-            Title='Customization';Subtitle='Console identity, interface colors, dynamic theme, music, and navigation sounds.';Hero=$name.ToUpperInvariant();HeroText="Accent: $(Get-HcAccentColor)  |  Dynamic palette: $preset";Actions=@(
+            Title='Customization';Subtitle='Console identity, interface colors, dynamic theme, music, and navigation sounds.';Hero=$name.ToUpperInvariant();HeroText="Color preset: $preset  |  Controller color wheel available";Actions=@(
                 (New-Action 'customization-console-name' "Console name: $name" 'Changes the display name throughout the shell and Game Bar. Product files and update identity stay Huymaier Console.'),
                 (New-Action 'customization-preset' "Color preset: $preset" 'Cycles coordinated interface and dynamic-theme palettes.'),
-                (New-Action 'customization-shell-base' "Interface base: $(Get-HcColor 'ShellBaseColor' '#09111E')" 'Enter a #RRGGBB color.'),
-                (New-Action 'customization-accent' "Accent color: $(Get-HcAccentColor)" 'Enter a #RRGGBB color.'),
-                (New-Action 'customization-highlight' "Focus highlight: $(Get-HcHighlightColor)" 'Enter a #RRGGBB color.'),
+                (New-Action 'customization-shell-base' 'Interface base color' 'Open the controller color wheel.'),
+                (New-Action 'customization-accent' 'Accent color' 'Open the controller color wheel.'),
+                (New-Action 'customization-highlight' 'Focus highlight color' 'Open the controller color wheel.'),
                 (New-Action 'background-toggle' $(if($script:Config.DynamicBackground){'Dynamic background: On'}else{'Dynamic background: Off'})),
-                (New-Action 'customization-dynamic-primary' "Dynamic primary: $(Get-HcColor 'DynamicPrimaryColor' '#D6B64F')" 'Enter a #RRGGBB color.'),
-                (New-Action 'customization-dynamic-secondary' "Dynamic secondary: $(Get-HcColor 'DynamicSecondaryColor' '#4474C2')" 'Enter a #RRGGBB color.'),
-                (New-Action 'customization-dynamic-tertiary' "Dynamic tertiary: $(Get-HcColor 'DynamicTertiaryColor' '#315F9D')" 'Enter a #RRGGBB color.'),
+                (New-Action 'customization-dynamic-primary' 'Dynamic primary color' 'Open the controller color wheel.'),
+                (New-Action 'customization-dynamic-secondary' 'Dynamic secondary color' 'Open the controller color wheel.'),
+                (New-Action 'customization-dynamic-tertiary' 'Dynamic tertiary color' 'Open the controller color wheel.'),
                 (New-Action 'music-toggle' $(if($script:Config.MusicEnabled){'Console music: On'}else{'Console music: Off'})),
                 (New-Action 'music-theme' "Music theme: $($script:Config.MusicTheme)"),
                 (New-Action 'music-import' 'Import background music'),
@@ -185,12 +185,12 @@ function Invoke-Action {
         'customization-settings' {$script:SubPage='Customization';$script:SelectedAction=0;Render-Page;return}
         'customization-console-name' {Open-HcCustomizationKeyboard 'ConsoleName' 'Console name' (Get-HcConsoleName);return}
         'customization-preset' {Cycle-HcDynamicThemePreset;return}
-        'customization-shell-base' {Open-HcCustomizationKeyboard 'ShellBaseColor' 'Interface base color — #RRGGBB' (Get-HcColor 'ShellBaseColor' '#09111E');return}
-        'customization-accent' {Open-HcCustomizationKeyboard 'AccentColor' 'Accent color — #RRGGBB' (Get-HcAccentColor);return}
-        'customization-highlight' {Open-HcCustomizationKeyboard 'AccentHighlightColor' 'Focus highlight — #RRGGBB' (Get-HcHighlightColor);return}
-        'customization-dynamic-primary' {Open-HcCustomizationKeyboard 'DynamicPrimaryColor' 'Dynamic primary — #RRGGBB' (Get-HcColor 'DynamicPrimaryColor' '#D6B64F');return}
-        'customization-dynamic-secondary' {Open-HcCustomizationKeyboard 'DynamicSecondaryColor' 'Dynamic secondary — #RRGGBB' (Get-HcColor 'DynamicSecondaryColor' '#4474C2');return}
-        'customization-dynamic-tertiary' {Open-HcCustomizationKeyboard 'DynamicTertiaryColor' 'Dynamic tertiary — #RRGGBB' (Get-HcColor 'DynamicTertiaryColor' '#315F9D');return}
+        'customization-shell-base' {Show-HcColorPicker 'ShellBaseColor' 'Interface base color' (Get-HcColor 'ShellBaseColor' '#09111E');return}
+        'customization-accent' {Show-HcColorPicker 'AccentColor' 'Accent color' (Get-HcAccentColor);return}
+        'customization-highlight' {Show-HcColorPicker 'AccentHighlightColor' 'Focus highlight color' (Get-HcHighlightColor);return}
+        'customization-dynamic-primary' {Show-HcColorPicker 'DynamicPrimaryColor' 'Dynamic primary color' (Get-HcColor 'DynamicPrimaryColor' '#D6B64F');return}
+        'customization-dynamic-secondary' {Show-HcColorPicker 'DynamicSecondaryColor' 'Dynamic secondary color' (Get-HcColor 'DynamicSecondaryColor' '#4474C2');return}
+        'customization-dynamic-tertiary' {Show-HcColorPicker 'DynamicTertiaryColor' 'Dynamic tertiary color' (Get-HcColor 'DynamicTertiaryColor' '#315F9D');return}
     }
     & $script:HcCustomizationBaseInvokeAction $Id
 }
@@ -279,6 +279,9 @@ if($null -ne $script:HcCustomizationBaseMainMenuVisuals){
         }
     }
 }
+
+$script:HcColorPickerModulePath=Join-Path $script:BaseDir 'HuymaierColorPicker.ps1'
+if(Test-Path -LiteralPath $script:HcColorPickerModulePath -PathType Leaf){. $script:HcColorPickerModulePath}
 
 function Initialize-HcCustomization {
     Initialize-HcCustomizationConfig

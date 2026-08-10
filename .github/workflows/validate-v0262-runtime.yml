@@ -1,0 +1,135 @@
+name: Validate v0.26.2 Windows Runtime
+
+on:
+  push:
+    branches:
+      - feature/v0.26.2-customization-runtime
+    paths:
+      - 'HuymaierGameBar.ps1'
+      - 'HuymaierCustomization.ps1'
+      - 'HuymaierColorPicker.ps1'
+      - 'HuymaierV0262Runtime.ps1'
+      - 'HuymaierV0262ProviderRuntime.ps1'
+      - 'HuymaierV0262Hardening.ps1'
+      - 'HuymaierSteamWorker.ps1'
+      - 'HuymaierProviderProgressWorker.ps1'
+      - 'HuymaierConsole.ps1'
+      - 'HuymaierBootstrap.ps1'
+      - 'HuymaierInstallerCore.ps1'
+      - 'manifest.json'
+      - 'FSEPackage/AppxManifest.xml'
+      - 'Native/HuymaierConsole.GameInput.cs'
+      - 'Native/HuymaierConsole.NativeApp.cs'
+      - '.development/v0.26.2/validation-request.json'
+      - '.github/workflows/validate-v0262-runtime.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v0262-windows-runtime
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - name: Check out exact source SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Parse production PowerShell with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $files=@(Get-ChildItem -LiteralPath $env:GITHUB_WORKSPACE -Recurse -File | Where-Object {
+            $_.Extension -in @('.ps1','.psm1','.psd1') -and
+            $_.FullName -notmatch '[\\/](\.development|\.source|\.release|\.build|\.github)[\\/]'
+          })
+          $failures=New-Object Collections.Generic.List[string]
+          foreach($file in $files){
+            $tokens=$null;$errors=$null
+            [void][Management.Automation.Language.Parser]::ParseFile($file.FullName,[ref]$tokens,[ref]$errors)
+            foreach($error in @($errors)){[void]$failures.Add("$($file.Name):$($error.Extent.StartLineNumber):$($error.Extent.StartColumnNumber) $($error.Message)")}
+          }
+          if($failures.Count){throw ($failures -join "`r`n")}
+          Write-Host "Parsed $($files.Count) production PowerShell files successfully."
+
+      - name: Compile exact x64 managed host sources
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Windows.Forms,System.Drawing,System.Web.Extensions
+          $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          if(-not(Test-Path -LiteralPath $csc)){throw 'Framework64 csc.exe was not found.'}
+          $automation=[Management.Automation.PSObject].Assembly.Location
+          $refs=@(
+            [Uri].Assembly.Location,[Linq.Enumerable].Assembly.Location,[System.Xaml.XamlReader].Assembly.Location,
+            [Xml.XmlDocument].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,
+            [Windows.Window].Assembly.Location,[Windows.Forms.Form].Assembly.Location,[Drawing.Bitmap].Assembly.Location,
+            [Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,$automation
+          )|Select-Object -Unique
+          $sources=@(
+            'Native\HuymaierConsole.NativeApp.cs','Native\HuymaierConsole.Ps1.cs','Native\HuymaierConsole.ConsolePlatforms.cs',
+            'Native\HuymaierConsole.SystemOverlay.cs','Native\HuymaierConsole.GameInput.cs','HuymaierNativeInput.cs',
+            'HuymaierNativeDisplay.cs','HuymaierNativeAudio.cs','HuymaierPerformance.cs','EmulatorPlatforms\Shared\Huymaier.P3T.cs'
+          )|ForEach-Object{Join-Path $env:GITHUB_WORKSPACE $_}
+          foreach($source in $sources){if(-not(Test-Path -LiteralPath $source -PathType Leaf)){throw "Native source missing: $source"}}
+          $out=Join-Path $env:RUNNER_TEMP 'HuymaierConsole-v0262-validation.exe'
+          $args=@('/noconfig','/nologo','/target:winexe','/platform:x64','/optimize+',('/out:'+$out))
+          foreach($ref in $refs){$args+=('/reference:'+$ref)};$args+=$sources
+          & $csc @args
+          if($LASTEXITCODE -ne 0 -or -not(Test-Path -LiteralPath $out -PathType Leaf)){throw 'v0.26.2 x64 managed host compile failed.'}
+
+      - name: Validate v0.26.2 architecture invariants
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $manifest=Get-Content -Raw -LiteralPath 'manifest.json' -Encoding UTF8|ConvertFrom-Json
+          if([string]$manifest.version -ne '0.26.2'){throw 'manifest.json is not version 0.26.2.'}
+          $shell=Get-Content -Raw -LiteralPath 'HuymaierConsole.ps1' -Encoding UTF8
+          if($shell -notmatch [regex]::Escape("`$script:AppVersion = '0.26.2'")){throw 'Shell AppVersion is not 0.26.2.'}
+          $bootstrap=Get-Content -Raw -LiteralPath 'HuymaierBootstrap.ps1' -Encoding UTF8
+          if($bootstrap -notmatch [regex]::Escape("`$script:ExpectedConsoleVersion='0.26.2'")){throw 'Bootstrap expected version is not 0.26.2.'}
+          $installer=Get-Content -Raw -LiteralPath 'HuymaierInstallerCore.ps1' -Encoding UTF8
+          if($installer -notmatch [regex]::Escape("`$script:InstallVersion='0.26.2'")){throw 'Installer version is not 0.26.2.'}
+          $gameInput=Get-Content -Raw -LiteralPath 'Native\HuymaierConsole.GameInput.cs' -Encoding UTF8
+          if($gameInput -notmatch [regex]::Escape('public const string Version = "0.26.2";')){throw 'Native build stamp is not 0.26.2.'}
+          $nativeApp=Get-Content -Raw -LiteralPath 'Native\HuymaierConsole.NativeApp.cs' -Encoding UTF8
+          if($nativeApp -notmatch [regex]::Escape('return "0.26.2";')){throw 'NativeBridge version is not 0.26.2.'}
+          $appx=Get-Content -Raw -LiteralPath 'FSEPackage\AppxManifest.xml' -Encoding UTF8
+          if($appx -notmatch [regex]::Escape('Version="0.26.2.0"')){throw 'FSE package version is not 0.26.2.0.'}
+
+          $gameBar=Get-Content -Raw -LiteralPath 'HuymaierGameBar.ps1' -Encoding UTF8
+          foreach($required in @('mainShellActive','Huymaier Game Bar opened over a Huymaier-native console surface.','HuymaierGameBarHost]::Show()')){if($gameBar -notmatch [regex]::Escape($required)){throw "Native-surface Game Bar invariant missing: $required"}}
+          $picker=Get-Content -Raw -LiteralPath 'HuymaierColorPicker.ps1' -Encoding UTF8
+          foreach($required in @('HcColorPickerSwatchIndex','No color code typing required.','HuymaierV0262Runtime.ps1','HuymaierV0262ProviderRuntime.ps1')){if($picker -notmatch [regex]::Escape($required)){throw "Color wheel/runtime invariant missing: $required"}}
+          $runtime=Get-Content -Raw -LiteralPath 'HuymaierV0262Runtime.ps1' -Encoding UTF8
+          foreach($required in @('GamesPlatformOrder','GamesHiddenPlatforms','GamesPlatformSizes','layout-edit-games','Steam Client','Start-HcSteamWorker','MinHeight=[math]::Max(170')){if($runtime -notmatch [regex]::Escape($required)){throw "v0.26.2 runtime invariant missing: $required"}}
+          $hardening=Get-Content -Raw -LiteralPath 'HuymaierV0262Hardening.ps1' -Encoding UTF8
+          foreach($required in @('Get-HcGamesLayoutColumnCount','Move-HcGamesLayoutItem $delta','Test-HcAnyProviderOperationActive','fresh marker as busy')){if($hardening -notmatch [regex]::Escape($required)){throw "v0.26.2 hardening invariant missing: $required"}}
+          $providerBridge=Get-Content -Raw -LiteralPath 'HuymaierV0262ProviderRuntime.ps1' -Encoding UTF8
+          foreach($required in @('provider-progress.json','ProgressPath','IsIndeterminate','Observed writes','HuymaierV0262Hardening.ps1')){if($providerBridge -notmatch [regex]::Escape($required)){throw "Provider-progress invariant missing: $required"}}
+          $steam=Get-Content -Raw -LiteralPath 'HuymaierSteamWorker.ps1' -Encoding UTF8
+          foreach($required in @('steam://install/','steam://uninstall/','steam://validate/','steam://rungameid/','BytesToDownload','BytesDownloaded','Refresh-SteamCatalog')){if($steam -notmatch [regex]::Escape($required)){throw "Steam worker invariant missing: $required"}}
+          $sidecar=Get-Content -Raw -LiteralPath 'HuymaierProviderProgressWorker.ps1' -Encoding UTF8
+          if($sidecar -match [regex]::Escape('Move-Item -LiteralPath $tmp -Destination $StatePath')){throw 'Provider telemetry sidecar writes authoritative provider-state.json.'}
+          if($sidecar -notmatch [regex]::Escape('ProgressPath')){throw 'Provider telemetry sidecar has no independent output path.'}
+          Write-Host 'v0.26.2 version/runtime architecture invariants passed.'
+
+      - name: Record validation status
+        if: always()
+        shell: powershell
+        env:
+          VALIDATION_RESULT: ${{ job.status }}
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Force -Path '.development\v0.26.2'|Out-Null
+          $state=[ordered]@{result=$env:VALIDATION_RESULT;commit=$env:GITHUB_SHA;runId=$env:GITHUB_RUN_ID;runAttempt=$env:GITHUB_RUN_ATTEMPT;recordedAtUtc=[DateTime]::UtcNow.ToString('o')}
+          $state|ConvertTo-Json|Set-Content -LiteralPath '.development\v0.26.2\validation-status.json' -Encoding UTF8
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add '.development/v0.26.2/validation-status.json'
+          if(-not(git diff --cached --quiet)){git commit -m 'Record v0.26.2 Windows runtime validation';git push origin HEAD:feature/v0.26.2-customization-runtime}

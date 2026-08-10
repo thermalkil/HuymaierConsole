@@ -1,0 +1,6 @@
+{
+  "batch": "steam-ownership-loaders-1",
+  "script": "apply_steam_ownership_loaders.py",
+  "result": "success",
+  "recordedAtUtc": "2026-08-10T15:00:09.015782+00:00"
+}

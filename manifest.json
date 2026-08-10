@@ -1,22 +1,18 @@
 {
   "name": "Huymaier Console FSE Shell, Storefront & Artwork Integration",
-  "version": "0.26.1",
-  "baseVersion": "0.26.0",
-  "build": "system-integrity-transactional-installer-hotfix",
-  "builtFrom": "HC260.zip",
+  "version": "0.26.2",
+  "baseVersion": "0.26.1",
+  "build": "controller-customization-provider-runtime",
+  "builtFrom": "HC261.zip",
   "features": [
-    "keeps Quick Access exclusive to Huymaier Console while adding a separate external-game/app Huymaier Game Bar",
-    "separates physical Guide/Xbox/PS/Home from Xbox View/Back and PlayStation Share/Create",
-    "preserves the runtime-tested v0.26.0 native Huymaier Game Bar, task switcher, DPI scaling, fullscreen preservation, popup navigation, and Guide behavior",
-    "builds the GameInput bridge as x64 with the static MSVC runtime and ships the Microsoft GameInput redistributable",
-    "builds and installs the exact x64 HuymaierConsole.exe and FSE host validated by Windows CI instead of recompiling application binaries on client PCs",
-    "uses a closed SHA-256 package manifest as the authoritative managed-file list and rejects missing, tampered, duplicate, traversing, or unchecksummed payload",
-    "uses a persistent incomplete-install marker plus managed-file rollback so interrupted or failed updates cannot silently launch a mixed-version installation",
-    "fails startup closed when the installed manifest, native Game Bar host, or system-button bridge is missing or inconsistent",
-    "verifies the SHA-256 asset published with GitHub Releases before self-update installation",
-    "keeps Xbox Game Bar suppression limited to controller-button takeover and restores the user's prior setting on normal exit, recovery, next sign-in, and uninstall",
-    "keeps FSE Home registration per-user without changing machine-wide Developer Mode policy",
-    "removes obsolete parallel updater and Guide bridge implementations"
+    "opens Huymaier Game Bar above external apps and Huymaier-native console surfaces while keeping main-shell Guide mapped to Quick Access",
+    "adds controller-first visual color wheels for interface, focus, accent, and dynamic-theme colors without requiring hex entry",
+    "adds persistent Games layout editing for storefront/console order, visibility, and per-platform tile sizing",
+    "repairs shared Manage/action-card sizing so highlighted titles and descriptions are not clipped",
+    "adds Steam client game management through the unified provider experience with install, verify, update, uninstall, launch, and Steam transfer telemetry",
+    "adds safe indeterminate live activity telemetry for GOG and Amazon when their backends do not expose a trustworthy total",
+    "preserves the v0.26.1 transactional installer, exact-artifact updater, x64 GameInput bridge, and fail-closed mixed-version protection",
+    "preserves the v0.26.1 storefront library import/file-browser repair and strict Xbox versus Original Xbox platform identity"
   ],
-  "description": "v0.26.1 is the system-integrity hotfix for Huymaier Console: exact-artifact Windows packaging, closed package verification, transactional/fail-closed install and update behavior, reversible Windows setting ownership, x64 dependency parity, and removal of stale parallel runtime paths."
+  "description": "v0.26.2 expands the controller-first console experience with native-surface Game Bar routing, visual color and layout customization, Steam game management, multi-provider download telemetry, and shared card-rendering fixes while retaining the v0.26.1 integrity architecture."
 }
