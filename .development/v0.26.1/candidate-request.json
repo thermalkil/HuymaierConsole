@@ -1,10 +1,10 @@
 {
-  "candidate": "v0.26.1-rc18",
+  "candidate": "v0.26.1-rc19",
   "version": "0.26.1",
   "base_release": "v0.26.0",
   "base_asset": "HC260.zip",
   "package_root": "HC261",
   "asset_name": "HC261.zip",
-  "requested_at": "2026-08-10T12:55:00Z",
-  "focus": "RC18 complete combined next-build test candidate: Game Bar explicit HWND_TOPMOST foreground-thread activation and modal Huymaier controller ownership; dedicated Guide-only wake; storefront library/import native File Explorer routing with literal deterministic source gates and correct return; Xbox storefront count separated from Original Xbox emulator identity; selected-card clipping and native WPF focus-visual cleanup; Settings Customization with persisted console display name across user-facing shell/Game Bar copy, interface/accent/focus colors, gradient-preserving dynamic-theme presets and editable colors, music and navigation sound controls/volume; personalization de-duplicated from operational settings; transactional installer and exact x64 integrity"
+  "requested_at": "2026-08-10T13:00:00Z",
+  "focus": "RC19 immutable combined next-build test candidate: exact push-SHA checkout; Game Bar HWND_TOPMOST foreground-thread activation and modal Huymaier controller ownership; Guide-only wake; storefront library/import native File Explorer routing and correct return; Xbox storefront count separated from Original Xbox emulator identity; selected-card clipping and native WPF focus-visual cleanup; Settings Customization with persisted display name, interface/accent/focus colors, gradient-preserving dynamic-theme presets/editable colors, music and navigation sound controls/volume; personalization de-duplicated from operational settings; transactional installer and exact x64 package integrity"
 }
