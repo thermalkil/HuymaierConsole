@@ -1,0 +1,6 @@
+{
+  "batch":"wave1-native-storage-ui",
+  "requestedAtUtc":"2026-08-10T22:47:00Z",
+  "platforms":["PSP","Dreamcast","Saturn","NDS","DSI","3DS"],
+  "requirements":["native console-specific storage presentation","PSP PARAM.SFO and ICON0 display","Dreamcast VMU cards","Saturn backup-memory view","DS/DSi game-save view","3DS data-management view","safe Huymaier backup actions"]
+}
