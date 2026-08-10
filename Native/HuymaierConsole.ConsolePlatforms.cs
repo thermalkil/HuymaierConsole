@@ -516,7 +516,7 @@ namespace HuymaierConsole.NativeApp
             BuildChrome();
 
             Grid footer = new Grid { Margin = new Thickness(28, 0, 28, 0) };
-            string helpText = definition.Shell == "Xbox360" ? "A  Select     X  Fallback emulator     B  Back     GUIDE  Xbox Guide     LB / RB  Tab" : (definition.Shell == "Xbox" ? "A  Select     X  Fallback emulator     B  Back     LB / RB  Menu" : "A / CROSS  Select     OPTIONS  Fallback emulator     B / CIRCLE  Back     LB / RB  Section");
+            string helpText = definition.Shell == "Xbox360" ? "A  Select     X  Fallback emulator     B  Back     GUIDE  Quick Access     LB / RB  Tab" : (definition.Shell == "Xbox" ? "A  Select     X  Fallback emulator     B  Back     LB / RB  Menu" : "A / CROSS  Select     OPTIONS  Fallback emulator     B / CIRCLE  Back     LB / RB  Section");
             TextBlock help = new TextBlock { Text = helpText, FontSize = 13, VerticalAlignment = VerticalAlignment.Center };
             help.Foreground = IsLightShell() ? new SolidColorBrush(Color.FromRgb(54, 69, 75)) : new SolidColorBrush(Color.FromRgb(218, 224, 230));
             noticeText = new TextBlock { HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, FontSize = 13, Foreground = new SolidColorBrush(definition.Accent) };

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory=$true)][string]$PackageRoot,
     [switch]$SilentUpdate
 )
@@ -307,9 +307,12 @@ try{
 }catch{}
 Write-InstallerRecord "Installer v$script:InstallVersion started from $PackageRoot"
 
-$created=$false
-$script:InstallerMutex=New-Object System.Threading.Mutex($true,'Local\HuymaierConsole.Installer',[ref]$created)
-$script:OwnsInstallerMutex=$created
+$script:InstallerMutex=New-Object System.Threading.Mutex -ArgumentList $false,'Local\HuymaierConsole.Installer'
+try{
+    $script:OwnsInstallerMutex=[bool]$script:InstallerMutex.WaitOne(0,$false)
+}catch [System.Threading.AbandonedMutexException]{
+    $script:OwnsInstallerMutex=$true
+}
 if(-not $script:OwnsInstallerMutex){throw 'Another Huymaier Console installer/update transaction is already running.'}
 
 $PackageRoot=[IO.Path]::GetFullPath($PackageRoot)

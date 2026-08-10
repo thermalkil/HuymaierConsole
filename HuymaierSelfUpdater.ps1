@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory=$true)][string]$PackagePath,
     [Parameter(Mandatory=$true)][int]$ParentProcessId,
     [string]$InstallRoot=(Join-Path $env:LOCALAPPDATA 'Huymaier Console')
@@ -48,9 +48,12 @@ function Assert-HcZipEntriesSafe {
 }
 
 try{
-    $created=$false
-    $mutex=New-Object System.Threading.Mutex($true,'Local\HuymaierConsole.Updater',[ref]$created)
-    $ownsMutex=$created
+    $mutex=New-Object System.Threading.Mutex -ArgumentList $false,'Local\HuymaierConsole.Updater'
+    try{
+        $ownsMutex=[bool]$mutex.WaitOne(0,$false)
+    }catch [System.Threading.AbandonedMutexException]{
+        $ownsMutex=$true
+    }
     if(-not $ownsMutex){throw 'Another Huymaier Console update is already running.'}
 
     Log "Waiting for Huymaier Console PID $ParentProcessId to exit."
