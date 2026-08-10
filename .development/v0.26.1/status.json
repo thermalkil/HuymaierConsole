@@ -1,7 +1,7 @@
 {
-  "batch": "rc8-runtime-ownership-1",
-  "script": "apply_rc8_runtime_ownership.py",
+  "batch": "rc9-installer-wrapper-1",
+  "script": "apply_rc9_installer_wrapper.py",
   "patch_dir": "",
   "result": "success",
-  "recordedAtUtc": "2026-08-10T10:30:26.574100+00:00"
+  "recordedAtUtc": "2026-08-10T10:40:12.935982+00:00"
 }

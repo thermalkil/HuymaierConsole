@@ -411,7 +411,7 @@ if($null -ne $script:Backup){Remove-Item -LiteralPath $script:Backup.Root -Recur
 if($script:OwnsInstallerMutex -and $null -ne $script:InstallerMutex){try{$script:InstallerMutex.ReleaseMutex()}catch{};$script:OwnsInstallerMutex=$false}
 if($null -ne $script:InstallerMutex){try{$script:InstallerMutex.Dispose()}catch{};$script:InstallerMutex=$null}
 
-if($SilentUpdate){exit 0}
+if($SilentUpdate){return}
 try{
     Add-Type -AssemblyName PresentationFramework
     $result=[System.Windows.MessageBox]::Show("Huymaier Console v$script:InstallVersion was installed and verified for this Windows account.`n`nLocation:`n$script:Destination`n`nLaunch it now?",'Huymaier Console','YesNo','Information')

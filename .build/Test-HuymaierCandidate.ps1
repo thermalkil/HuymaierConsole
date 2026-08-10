@@ -124,6 +124,14 @@ try{
         if(Test-Path -LiteralPath (Join-Path $extraLocal 'Huymaier Console\HuymaierConsole.exe')){throw 'Unchecksummed package mutated the install root before rejection.'}
     }finally{Remove-Item -LiteralPath $extraRoot,$extraLocal -Recurse -Force -ErrorAction SilentlyContinue}
 
+    # Public installer wrapper invariant. The wrapper must own the success
+    # process exit code explicitly; $LASTEXITCODE is not guaranteed to exist
+    # after invoking another PowerShell script under StrictMode.
+    $wrapper=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'Install-HuymaierConsole.ps1') -Encoding UTF8
+    if($wrapper -match [regex]::Escape('$LASTEXITCODE')){throw 'Public installer wrapper still depends on undefined $LASTEXITCODE.'}
+    $coreText=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierInstallerCore.ps1') -Encoding UTF8
+    if($coreText -match [regex]::Escape('if($SilentUpdate){exit 0}')){throw 'Installer core still bypasses the public wrapper success path during CI.'}
+
     # Static conflict gates for Windows/Game Bar ownership and dead paths.
     $gameBar=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierGameBar.ps1') -Encoding UTF8
     foreach($forbidden in @('AppCaptureEnabled','GameDVR_Enabled','VKMToggleGameBar')){if($gameBar -match [regex]::Escape($forbidden)){throw "Game Bar module still changes broad Windows setting: $forbidden"}}
