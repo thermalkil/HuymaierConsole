@@ -30,9 +30,27 @@ jobs:
         run: |
           $ErrorActionPreference='Stop'
           $manifest=Get-Content -Raw -LiteralPath 'manifest.json' -Encoding UTF8|ConvertFrom-Json
-          if([string]$manifest.build -eq 'native-console-fidelity-rc4'){
+          if([string]$manifest.build -eq 'native-console-fidelity-rc4-final'){
             'changed=false'|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
-            Write-Host 'RC4 production source is already materialized.'
+            Write-Host 'RC4 final production source is already materialized.'
+            exit 0
+          }
+          if([string]$manifest.build -eq 'native-console-fidelity-rc4'){
+            $transformer='.development\v0.26.3\apply_rc4_finalize.py'
+            if(-not(Test-Path -LiteralPath $transformer -PathType Leaf)){throw 'RC4 final compile/settings materializer is missing.'}
+            python $transformer
+            if($LASTEXITCODE -ne 0){throw 'RC4 final compile/settings materializer failed.'}
+            $state=[ordered]@{batch='console-fidelity-rc4-final';script='apply_rc4_finalize.py';result='success';recordedAtUtc=[DateTime]::UtcNow.ToString('o')}
+            $state|ConvertTo-Json|Set-Content -LiteralPath '.development\v0.26.3\status.json' -Encoding UTF8
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add -A
+            if(git diff --cached --quiet){throw 'RC4 finalizer reported work but produced no materialized changes.'}
+            git commit -m 'Finalize v0.26.3 RC4 production source'
+            git push origin HEAD:feature/v0.26.3-console-fidelity
+            if($LASTEXITCODE -ne 0){throw 'Could not push finalized RC4 source.'}
+            'changed=true'|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            Write-Host 'RC4 final source was committed. Touch candidate-request.json again to build from the exact new SHA.'
             exit 0
           }
           if([string]$manifest.build -eq 'native-console-fidelity-rc3'){
@@ -50,7 +68,7 @@ jobs:
             git push origin HEAD:feature/v0.26.3-console-fidelity
             if($LASTEXITCODE -ne 0){throw 'Could not push materialized RC4 source.'}
             'changed=true'|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
-            Write-Host 'RC4 source was committed. Touch candidate-request.json again to build from the exact new SHA.'
+            Write-Host 'RC4 source was committed. Touch candidate-request.json again to finalize it.'
             exit 0
           }
           $transformer='.development\v0.26.3\apply_rc3_patch_v2.py'
