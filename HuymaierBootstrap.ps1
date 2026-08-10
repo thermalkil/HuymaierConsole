@@ -45,6 +45,12 @@ function Test-PowerShellFile {
     throw $details.ToString().Trim()
 }
 
+function Get-HuymaierNativeAssembly {
+    $nativeVariable=Get-Variable -Name HuymaierNativeBridge -ErrorAction SilentlyContinue
+    if($null -eq $nativeVariable -or $null -eq $nativeVariable.Value){throw 'The Huymaier native host bridge is unavailable. Rerun the installer.'}
+    return $nativeVariable.Value.GetType().Assembly
+}
+
 function Assert-HuymaierInstallIntegrity {
     if(Test-Path -LiteralPath $installIncompleteMarker -PathType Leaf){
         throw "Huymaier Console installation is marked incomplete. Rerun the v$script:ExpectedConsoleVersion installer to repair it before starting the Console."
@@ -57,10 +63,7 @@ function Assert-HuymaierInstallIntegrity {
     }
     if(-not(Test-Path -LiteralPath $gameInputBridgePath -PathType Leaf)){throw 'The native GameInput system-button bridge is missing. Rerun the installer.'}
 
-    $nativeVariable=Get-Variable -Name HuymaierNativeBridge -ErrorAction SilentlyContinue
-    if($null -eq $nativeVariable -or $null -eq $nativeVariable.Value){throw 'The Huymaier native host bridge is unavailable. Rerun the installer.'}
-    $nativeAssembly=$nativeVariable.Value.GetType().Assembly
-
+    $nativeAssembly=Get-HuymaierNativeAssembly
     $stampType=$nativeAssembly.GetType('HuymaierConsole.NativeApp.HuymaierBuildStamp',$false)
     if($null -eq $stampType){throw 'The installed native host has no Huymaier build stamp. Rerun the installer.'}
     $flags=[Reflection.BindingFlags]::Public -bor [Reflection.BindingFlags]::Static
@@ -72,12 +75,33 @@ function Assert-HuymaierInstallIntegrity {
         throw "Native host build mismatch. Native=$nativeVersion/$nativeArchitecture Expected=$script:ExpectedConsoleVersion/x64. Rerun the installer; mixed native/script installations are blocked."
     }
 
-    if($null -eq $nativeAssembly.GetType('HuymaierConsole.NativeApp.HuymaierGameBarHost',$false)){
-        throw 'The installed native host does not contain the Huymaier Game Bar. Rerun the installer.'
+    foreach($requiredType in @(
+        'HuymaierConsole.NativeApp.HuymaierGameBarHost',
+        'HuymaierConsole.NativeApp.HuymaierSystemButtonBridge',
+        'HuymaierConsole.NativeApp.HuymaierInstanceGate'
+    )){
+        if($null -eq $nativeAssembly.GetType($requiredType,$false)){throw "The installed native host is missing required type $requiredType. Rerun the installer."}
     }
-    if($null -eq $nativeAssembly.GetType('HuymaierConsole.NativeApp.HuymaierSystemButtonBridge',$false)){
-        throw 'The installed native host does not contain the Huymaier system-button bridge. Rerun the installer.'
-    }
+}
+
+function Enter-HuymaierSingleInstance {
+    $nativeAssembly=Get-HuymaierNativeAssembly
+    $gateType=$nativeAssembly.GetType('HuymaierConsole.NativeApp.HuymaierInstanceGate',$true)
+    $flags=[Reflection.BindingFlags]::Public -bor [Reflection.BindingFlags]::Static
+    $method=$gateType.GetMethod('TryAcquire',$flags)
+    if($null -eq $method){throw 'The native single-instance gate is incomplete.'}
+    return [bool]$method.Invoke($null,$null)
+}
+
+function Exit-HuymaierSingleInstance {
+    try{
+        $nativeAssembly=Get-HuymaierNativeAssembly
+        $gateType=$nativeAssembly.GetType('HuymaierConsole.NativeApp.HuymaierInstanceGate',$false)
+        if($null -eq $gateType){return}
+        $flags=[Reflection.BindingFlags]::Public -bor [Reflection.BindingFlags]::Static
+        $method=$gateType.GetMethod('Release',$flags)
+        if($null -ne $method){[void]$method.Invoke($null,$null)}
+    }catch{}
 }
 
 try{
@@ -93,8 +117,18 @@ try{
     Test-PowerShellFile $gameExperiencePath 'Unified game experience'
     Test-PowerShellFile $shellRedesignPath 'Shell redesign'
     Test-PowerShellFile $gameBarPath 'Huymaier Game Bar'
-    Write-BootstrapLog 'Huymaier Console v0.26.1 integrity preflight passed.'
-    if($Windowed){& $corePath -Windowed}else{& $corePath}
+
+    if(-not(Enter-HuymaierSingleInstance)){
+        Write-BootstrapLog 'Duplicate Huymaier Console launch was blocked by the native single-instance gate.' 'WARN'
+        exit 0
+    }
+
+    Write-BootstrapLog 'Huymaier Console v0.26.1 integrity preflight and single-instance gate passed.'
+    try{
+        if($Windowed){& $corePath -Windowed}else{& $corePath}
+    }finally{
+        Exit-HuymaierSingleInstance
+    }
 }catch{
     $message=$_.Exception.Message
     Write-BootstrapLog "v0.26.1 preflight/startup failed:`n$message" 'FATAL'
