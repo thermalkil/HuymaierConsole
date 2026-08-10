@@ -1,0 +1,10 @@
+{
+  "candidate": "v0.26.3-rc1",
+  "version": "0.26.3",
+  "base_release": "v0.26.2",
+  "base_asset": "HC262.zip",
+  "package_root": "HC263",
+  "asset_name": "HC263.zip",
+  "requested_at": "2026-08-10T16:05:00Z",
+  "focus": "RC1 focused native-console fidelity pass from the published v0.26.2 baseline. PS1, PS2, and PS3 interface implementations remain frozen. Recreates N64, GameCube, Wii, Wii U, Switch, Original Xbox, and Xbox 360 native interfaces with console-specific layouts and spatial controller navigation; removes LB/RB shoulder page/selection switching from native console surfaces; preserves v0.26.2 Guide/Game Bar routing, launch/return, save management, alternate-emulator behavior, customization, storefront, provider, Steam, and installer/integrity fixes."
+}
