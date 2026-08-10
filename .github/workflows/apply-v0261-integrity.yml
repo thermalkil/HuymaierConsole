@@ -45,13 +45,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -Fq "0.26.1" manifest.json
+          grep -Fq '"version": "0.26.1"' manifest.json
           grep -Fq "Assert-HuymaierInstallIntegrity" HuymaierBootstrap.ps1
-          grep -Fq "install-incomplete.json" Install-HuymaierConsole.ps1
+          grep -Fq "HuymaierInstanceGate" HuymaierBootstrap.ps1
+          grep -Fq "install-incomplete.json" HuymaierInstallerCore.ps1
+          grep -Fq "Assert-HcRollbackState" HuymaierInstallerCore.ps1
           grep -Fq "release-verified" HuymaierConsoleUpdateWorker.ps1
           grep -Fq "Restore-HcXboxGameBarSuppression" HuymaierGameBar.ps1
           grep -Fq "Version=\"0.26.1.0\"" FSEPackage/AppxManifest.xml
+          grep -Fq 'public const string Version = "0.26.1"' Native/HuymaierConsole.GameInput.cs
           test -f Restore-HuymaierWindowsSettings.ps1
+          test -f HuymaierInstallerCore.ps1
           test ! -e HuymaierGuideInput.cs
           test ! -e Native/GuideBridge/HuymaierGuideBridge.cpp
           test ! -e HuymaierConsoleUpdate.ps1
