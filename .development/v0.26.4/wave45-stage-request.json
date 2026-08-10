@@ -1,0 +1,6 @@
+{
+  "batch":"wave45-stage",
+  "requestedAtUtc":"2026-08-10T23:52:00Z",
+  "platforms":["Arcade","FinalBurnNeo","PS4","Vita"],
+  "gate":"distinct arcade cabinet/operator, PS4 Dynamic Menu and Vita LiveArea surfaces; disabled until backend/settings/storage completion; exact x64 compile required"
+}
