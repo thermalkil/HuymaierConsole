@@ -169,7 +169,11 @@ try{
     if($modalGateCount -lt 2){throw 'Game Bar modal ownership is not enforced in both native router layers.'}
     if($gameBar -notmatch [regex]::Escape('[HuymaierConsole.NativeApp.HuymaierGameBarHost]::PollNavigation()')){throw 'Visible Game Bar does not use its modal-safe navigation poll.'}
     $shell=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierConsole.ps1') -Encoding UTF8
-    if($shell -notmatch "(?s)else\\s*\\{\\s*\\`$script:SelectedTab=6\\s*\\`$script:SubPage='FilePicker'"){throw 'Native non-Browse file picker does not enter the File Explorer tab.'}
+    $pickerStart=$shell.IndexOf('function Start-NativeFilePicker')
+    $pickerEnd=$shell.IndexOf('function Complete-NativeFolderSelection',$pickerStart)
+    $tabIndex=$shell.IndexOf('$script:SelectedTab=6',$pickerStart)
+    $subPageIndex=$shell.IndexOf("$script:SubPage='FilePicker'",$pickerStart)
+    if($pickerStart -lt 0 -or $pickerEnd -lt 0 -or $tabIndex -lt $pickerStart -or $tabIndex -ge $pickerEnd -or $subPageIndex -lt $tabIndex -or $subPageIndex -ge $pickerEnd){throw 'Native non-Browse file picker does not enter the File Explorer tab before rendering FilePicker.'}
 
     # Combined next-build gates: customization is persisted and controller-first,
     # storefront Xbox counts by storefront display identity, custom WPF focus
