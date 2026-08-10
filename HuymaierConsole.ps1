@@ -36,6 +36,7 @@ $script:NativeConsoleLibraryWorkerPath = Join-Path $script:BaseDir 'HuymaierNati
 $script:GameExperienceModulePath = Join-Path $script:BaseDir 'HuymaierGameExperience.ps1'
 $script:ShellRedesignModulePath = Join-Path $script:BaseDir 'HuymaierShellRedesign.ps1'
 $script:EmulatorPlatformsModulePath = Join-Path $script:BaseDir 'HuymaierEmulatorPlatforms.ps1'
+$script:EmulatorSettingsModulePath = Join-Path $script:BaseDir 'HuymaierEmulatorSettings.ps1'
 $script:WebBrowserModulePath = Join-Path $script:BaseDir 'HuymaierWebBrowser.ps1'
 $script:GameBarModulePath = Join-Path $script:BaseDir 'HuymaierGameBar.ps1'
 $script:CustomizationModulePath = Join-Path $script:BaseDir 'HuymaierCustomization.ps1'
@@ -4193,6 +4194,10 @@ if (Test-Path -LiteralPath $script:ShellRedesignModulePath) {
 if (Test-Path -LiteralPath $script:EmulatorPlatformsModulePath) {
     try { . $script:EmulatorPlatformsModulePath }
     catch { Write-Log "Emulator platform module load failed: $($_.Exception.Message)" 'ERROR' }
+}
+if (Test-Path -LiteralPath $script:EmulatorSettingsModulePath) {
+    try { . $script:EmulatorSettingsModulePath }
+    catch { Write-Log "Emulator settings module load failed: $($_.Exception.Message)" 'ERROR' }
 }
 if (Test-Path -LiteralPath $script:WebBrowserModulePath) {
     try { . $script:WebBrowserModulePath }

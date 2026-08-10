@@ -68,7 +68,7 @@ function Backup-HcEmulatorConfigFile {
         Copy-Item -LiteralPath $Path -Destination $target -Force
         return $target
     }catch{
-        Write-Log "Could not back up emulator config $Path: $($_.Exception.Message)" 'WARN'
+        Write-Log "Could not back up emulator config ${Path}: $($_.Exception.Message)" 'WARN'
         return ''
     }
 }
