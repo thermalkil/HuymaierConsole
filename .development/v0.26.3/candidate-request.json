@@ -1,10 +1,10 @@
 {
-  "candidate": "v0.26.3-rc2",
+  "candidate": "v0.26.3-rc3-source-materialization",
   "version": "0.26.3",
   "base_release": "v0.26.2",
   "base_asset": "HC262.zip",
   "package_root": "HC263",
   "asset_name": "HC263.zip",
-  "requested_at": "2026-08-10T16:08:00Z",
-  "focus": "RC2 focused native-console fidelity pass from the published v0.26.2 baseline. Runtime payload is unchanged from the RC1 request; RC2 corrects only the release-gate compatibility-mirror copy command. PS1, PS2, and PS3 interface implementations remain frozen. Recreates N64, GameCube, Wii, Wii U, Switch, Original Xbox, and Xbox 360 native interfaces with console-specific layouts and spatial controller navigation; removes LB/RB shoulder page/selection switching from native console surfaces; preserves v0.26.2 Guide/Game Bar routing, launch/return, save management, alternate-emulator behavior, customization, storefront, provider, Steam, and installer/integrity fixes."
+  "requested_at": "2026-08-10T19:14:00Z",
+  "focus": "Materialize the reviewed RC3 authentic-console and emulator-integration payload into the feature branch. The workflow must stop before candidate packaging if it creates the production-source commit."
 }
