@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -576,6 +576,23 @@ namespace HuymaierConsole.Native
                     };
                 }
                 return result;
+            }
+        }
+
+        public static bool ConsumeGuideEdge()
+        {
+            lock (Sync)
+            {
+                DateTime now = DateTime.UtcNow;
+                foreach (var pair in Snapshots)
+                {
+                    HidControllerSnapshot value = pair.Value;
+                    if (value == null || (now - value.LastSeenUtc).TotalSeconds > 3) continue;
+                    if ((value.PendingMask & 2) == 0) continue;
+                    value.PendingMask &= ~2;
+                    return true;
+                }
+                return false;
             }
         }
 

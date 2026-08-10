@@ -1,4 +1,4 @@
-param(
+﻿param(
     [switch]$Windowed
 )
 
@@ -3929,10 +3929,10 @@ function Process-Gamepads {
         return
     }
     if(-not (Test-ConsoleHasInputFocus)){
-        # Do not reset the native router here. While an external game/app or the
-        # Huymaier Game Bar owns focus, the external Guide watcher uses this same
-        # router for A/B/D-pad/shoulder input. Resetting it from the background
-        # Console timer would erase every navigation edge before the overlay sees it.
+        # Do not reset the native router here. While an external game/app owns
+        # focus, the hidden watcher consumes only a dedicated Guide/Home edge.
+        # Once the Huymaier Game Bar is visible, it becomes the owner of normal
+        # A/B/D-pad/shoulder navigation until the overlay closes.
         $script:LastGamepadMask=0;$script:LastDirection='';$script:NextDirectionAt=[datetime]::MinValue
         return
     }

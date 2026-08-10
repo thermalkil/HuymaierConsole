@@ -4408,6 +4408,29 @@ namespace HuymaierConsole.NativeApp
             }
         }
 
+        public static bool ConsumeGuideOnly()
+        {
+            lock (Sync)
+            {
+                DateTime now = DateTime.UtcNow;
+                if (now < deviceChangeQuietUntilUtc) return false;
+
+                // Primary low-level system-button backend.
+                if (HuymaierSystemButtonBridge.ConsumeGuidePress()) return true;
+
+                // Compatibility fallbacks are deliberately Guide-only. They do
+                // not call router.Poll() and therefore cannot clear or steal any
+                // D-pad/A/B/shoulder/direction edge from the foreground owner.
+                if (XInputBridge.ConsumeGuideEdge()) return true;
+                try
+                {
+                    if (HuymaierConsole.Native.RawHidController.ConsumeGuideEdge()) return true;
+                }
+                catch { }
+                return false;
+            }
+        }
+
         public static void NotifyDeviceChange()
         {
             lock (Sync)
@@ -4533,6 +4556,22 @@ namespace HuymaierConsole.NativeApp
                 thread.IsBackground = true;
                 thread.Name = "Huymaier XInput Sampler";
                 thread.Start();
+            }
+        }
+
+        internal static bool ConsumeGuideEdge()
+        {
+            EnsureStarted();
+            lock (Sync)
+            {
+                for (int index = 0; index < Samples.Length; index++)
+                {
+                    Sample sample = Samples[index];
+                    if (!sample.Connected || (sample.PendingButtons & 4) == 0) continue;
+                    sample.PendingButtons &= ~4;
+                    return true;
+                }
+                return false;
             }
         }
 

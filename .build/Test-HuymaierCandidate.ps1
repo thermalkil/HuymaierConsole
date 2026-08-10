@@ -151,6 +151,18 @@ try{
     $restore=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'Restore-HuymaierWindowsSettings.ps1') -Encoding UTF8
     if($restore -notmatch [regex]::Escape('foreach($backup in @($rawBackup))')){throw 'Legacy Xbox Game Bar backup-array migration is missing.'}
 
+
+    # RC9: external Guide fallback must be strictly Guide-only, and the public
+    # installer wrapper must own success without relying on $LASTEXITCODE.
+    foreach($required in @('ConsumeGuideOnly','Get-HcSystemGuideEdge')){if($gameBar -notmatch [regex]::Escape($required)){throw "Guide-only external Game Bar wake path is missing: $required"}}
+    $nativeApp=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'Native\\HuymaierConsole.NativeApp.cs') -Encoding UTF8
+    foreach($required in @('public static bool ConsumeGuideOnly()','XInputBridge.ConsumeGuideEdge()','RawHidController.ConsumeGuideEdge()')){if($nativeApp -notmatch [regex]::Escape($required)){throw "Native Guide-only fallback invariant is missing: $required"}}
+    $nativeInput=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierNativeInput.cs') -Encoding UTF8
+    if($nativeInput -notmatch [regex]::Escape('value.PendingMask &= ~2')){throw 'PlayStation Guide-only fallback does not preserve non-Guide pending input.'}
+    $wrapper=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'Install-HuymaierConsole.ps1') -Encoding UTF8
+    if($wrapper -match [regex]::Escape('$LASTEXITCODE')){throw 'Public installer wrapper still references $LASTEXITCODE.'}
+    if($wrapper -notmatch [regex]::Escape('exit 0')){throw 'Public installer wrapper has no explicit success exit code.'}
+
     $validation=Get-Content -Raw -LiteralPath $ValidationPath -Encoding UTF8|ConvertFrom-Json
     $validation|Add-Member -NotePropertyName failureInjectionTests -NotePropertyValue 'success' -Force
     $validation|Add-Member -NotePropertyName lockedIdenticalRepair -NotePropertyValue 'success' -Force

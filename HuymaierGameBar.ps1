@@ -53,15 +53,15 @@ function Initialize-HcSystemGuideReflection {
         $nativeVariable=Get-Variable -Name HuymaierNativeBridge -ErrorAction SilentlyContinue
         if($null -eq $nativeVariable -or $null -eq $nativeVariable.Value){return}
         $assembly=$nativeVariable.Value.GetType().Assembly
-        $type=$assembly.GetType('HuymaierConsole.NativeApp.HuymaierSystemButtonBridge',$false)
+        $type=$assembly.GetType('HuymaierConsole.NativeApp.NativeConsoleNavigation',$false)
         if($null -eq $type){return}
-        $flags=[Reflection.BindingFlags]::Static -bor [Reflection.BindingFlags]::NonPublic
-        $method=$type.GetMethod('ConsumeGuidePress',$flags)
+        $flags=[Reflection.BindingFlags]::Static -bor [Reflection.BindingFlags]::Public
+        $method=$type.GetMethod('ConsumeGuideOnly',$flags)
         if($null -ne $method){$script:HcSystemGuideType=$type;$script:HcSystemGuideMethod=$method}
     }catch{}
 }
 
-function Get-HcGameInputGuideEdge {
+function Get-HcSystemGuideEdge {
     try{
         Initialize-HcSystemGuideReflection
         if($null -eq $script:HcSystemGuideMethod){return $false}
@@ -179,11 +179,11 @@ function Initialize-HuymaierGameBar {
                 # The hidden watcher observes only the dedicated system Guide/Home
                 # edge. It must never consume D-pad/A/B/shoulder input from the
                 # shared navigation router while the overlay is hidden.
-                $gameInputGuideEdge=Get-HcGameInputGuideEdge
+                $nativeGuideEdge=Get-HcSystemGuideEdge
                 $rawGuide=Get-HcRawSystemGuidePressed
                 $rawGuideEdge=($rawGuide -and -not $script:HcExternalGuideDown)
                 $script:HcExternalGuideDown=$rawGuide
-                $guideEdge=$gameInputGuideEdge -or $rawGuideEdge
+                $guideEdge=$nativeGuideEdge -or $rawGuideEdge
 
                 $visible=[HuymaierConsole.NativeApp.HuymaierGameBarHost]::IsVisible
                 if($visible){
