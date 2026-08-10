@@ -1,5 +1,5 @@
 {
-  "batch": "mutex-guide-cleanup-1",
-  "script": "apply_mutex_and_guide_cleanup.py",
-  "requested_at": "2026-08-10T09:25:00Z"
+  "batch": "candidate-test-consolidation-1",
+  "script": "apply_candidate_test_consolidation.py",
+  "requested_at": "2026-08-10T09:29:00Z"
 }
