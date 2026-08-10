@@ -1,0 +1,6 @@
+{
+  "batch":"wave2-backends",
+  "requestedAtUtc":"2026-08-10T23:15:00Z",
+  "platforms":["Atari2600","NES","SNES","GameBoy","GBC","GBA","Genesis","SegaCD","Sega32X","GameGear","MasterSystem","TurboGrafx16"],
+  "requirements":["latest official emulator installer resolution","native complete settings discovery","unknown-key-preserving JSON support","library count scanning","PowerShell 5.1 parse","exact x64 compile"]
+}
