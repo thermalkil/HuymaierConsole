@@ -1,0 +1,16 @@
+{
+  "id": "neogeo",
+  "displayName": "Neo Geo",
+  "primaryBackend": "FinalBurn Neo",
+  "fallbackBackend": "MAME",
+  "adapter": "fbneo",
+  "interface": "Neo Geo AES/MVS cartridge-system interface",
+  "version": "0.26.4-dev",
+  "enabled": false,
+  "gameExtensions": [
+    ".zip",
+    ".7z",
+    ".neo"
+  ],
+  "dashboardStyle": "Neo Geo AES"
+}

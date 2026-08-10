@@ -1,0 +1,17 @@
+{
+  "id": "ngpc",
+  "displayName": "Neo Geo Pocket Color",
+  "primaryBackend": "Mednafen",
+  "fallbackBackend": "ares",
+  "adapter": "mednafen",
+  "interface": "Neo Geo Pocket Color handheld interface",
+  "version": "0.26.4-dev",
+  "enabled": false,
+  "gameExtensions": [
+    ".ngc",
+    ".ngp",
+    ".npc",
+    ".zip"
+  ],
+  "dashboardStyle": "NGPC Handheld"
+}
