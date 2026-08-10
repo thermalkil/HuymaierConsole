@@ -1,0 +1,6 @@
+{
+  "batch":"wave4-arcade-backends",
+  "requestedAtUtc":"2026-08-11T00:12:00Z",
+  "platforms":["Arcade","FinalBurnNeo"],
+  "requirements":["dynamic official MAME installer","MAME -showconfig full settings inventory","reversible command-line overrides","MAME driver/rompath launch","FBNeo current release asset detection","PowerShell 5.1 parse","x64 compile"]
+}
