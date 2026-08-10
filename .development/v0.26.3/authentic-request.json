@@ -1,6 +1,6 @@
 {
   "batch": "console-fidelity-4-authentic-integration",
-  "requestedAtUtc": "2026-08-10T19:09:00Z",
-  "scope": "Apply the exact reviewed production payload for authentic non-PlayStation console interfaces, Huymaier-native emulator path selection/install flow, emulator-first console artwork, Steam artwork repair, and PS1/PS2/PS3 path-only picker integration.",
-  "trigger": 2
+  "requestedAtUtc": "2026-08-10T20:00:00Z",
+  "scope": "Apply the checksum-verified reviewed production payload for authentic non-PlayStation console interfaces, Huymaier-native emulator path selection/install flow, emulator-first console artwork, Steam artwork repair, and PS1/PS2/PS3 path-only picker integration.",
+  "trigger": 3
 }
