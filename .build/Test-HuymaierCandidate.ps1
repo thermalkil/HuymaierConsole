@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory=$true)][string]$StageRoot,
     [Parameter(Mandatory=$true)][string]$ValidationPath
 )
@@ -98,6 +98,31 @@ try{
     # User-owned data remains untouched.
     if((Get-Content -Raw -LiteralPath $config -Encoding UTF8) -notmatch 'preserve-me'){throw 'config.json was modified by the managed-package transaction.'}
     if((Get-Content -Raw -LiteralPath $sentinel -Encoding ASCII).Trim() -ne 'preserve-me'){throw 'Unmanaged user data was modified by the installer.'}
+
+    # Tampered and extra/unchecksummed packages must fail before any installed
+    # managed byte is mutated. Use fresh fake install roots so rollback state from
+    # one negative test cannot influence another.
+    $tamperRoot=Join-Path $env:RUNNER_TEMP ('hc-tamper-'+[guid]::NewGuid().ToString('N'))
+    Copy-Item -LiteralPath $StageRoot -Destination $tamperRoot -Recurse -Force
+    Add-Content -LiteralPath (Join-Path $tamperRoot 'manifest.json') -Value 'tamper'
+    $tamperLocal=Join-Path $env:RUNNER_TEMP ('hc-tamper-local-'+[guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Force -Path (Join-Path $tamperLocal 'Huymaier Console')|Out-Null
+    Set-Content -LiteralPath (Join-Path $tamperLocal 'Huymaier Console\gameinput-redist.version') -Value '3.5.262' -Encoding ASCII
+    try{
+        if((Invoke-Installer -Root $tamperRoot -FakeLocal $tamperLocal) -eq 0){throw 'Tampered package was incorrectly accepted.'}
+        if(Test-Path -LiteralPath (Join-Path $tamperLocal 'Huymaier Console\HuymaierConsole.exe')){throw 'Tampered package mutated the install root before rejection.'}
+    }finally{Remove-Item -LiteralPath $tamperRoot,$tamperLocal -Recurse -Force -ErrorAction SilentlyContinue}
+
+    $extraRoot=Join-Path $env:RUNNER_TEMP ('hc-extra-'+[guid]::NewGuid().ToString('N'))
+    Copy-Item -LiteralPath $StageRoot -Destination $extraRoot -Recurse -Force
+    Set-Content -LiteralPath (Join-Path $extraRoot 'unexpected.bin') -Value 'unexpected' -Encoding ASCII
+    $extraLocal=Join-Path $env:RUNNER_TEMP ('hc-extra-local-'+[guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Force -Path (Join-Path $extraLocal 'Huymaier Console')|Out-Null
+    Set-Content -LiteralPath (Join-Path $extraLocal 'Huymaier Console\gameinput-redist.version') -Value '3.5.262' -Encoding ASCII
+    try{
+        if((Invoke-Installer -Root $extraRoot -FakeLocal $extraLocal) -eq 0){throw 'Unchecksummed extra payload was incorrectly accepted.'}
+        if(Test-Path -LiteralPath (Join-Path $extraLocal 'Huymaier Console\HuymaierConsole.exe')){throw 'Unchecksummed package mutated the install root before rejection.'}
+    }finally{Remove-Item -LiteralPath $extraRoot,$extraLocal -Recurse -Force -ErrorAction SilentlyContinue}
 
     # Static conflict gates for Windows/Game Bar ownership and dead paths.
     $gameBar=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierGameBar.ps1') -Encoding UTF8

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory=$true)][string]$TriggerPath
 )
 Set-StrictMode -Version 2.0
@@ -130,28 +130,7 @@ foreach($f in @(Get-ChildItem $stage -File -Recurse|Where-Object{$_.Name -notin 
 $text=($rows -join "`n")+"`n";[IO.File]::WriteAllText((Join-Path $stage 'checksums.sha256'),$text,(New-Object Text.UTF8Encoding($false)));[IO.File]::WriteAllText((Join-Path $stage 'SHA256SUMS.txt'),$text,(New-Object Text.UTF8Encoding($false)))
 if((Get-Content -Raw (Join-Path $stage 'checksums.sha256')) -ne (Get-Content -Raw (Join-Path $stage 'SHA256SUMS.txt'))){throw 'Internal checksum manifests diverged.'}
 
-# Isolated installer tests. Pretend GameInput redist is already current to avoid
-# elevation in CI; runtime/redist acquisition was validated above.
-$fakeLocal=Join-Path $temp 'hc-localappdata';Remove-Item $fakeLocal -Recurse -Force -ErrorAction SilentlyContinue;New-Item -ItemType Directory -Force -Path (Join-Path $fakeLocal 'Huymaier Console')|Out-Null
-Set-Content (Join-Path $fakeLocal 'Huymaier Console\gameinput-redist.version') '3.5.262' -Encoding ASCII
-$oldLocal=$env:LOCALAPPDATA;$env:LOCALAPPDATA=$fakeLocal
-try{
-    & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $stage 'Install-HuymaierConsole.ps1') -SilentUpdate
-    if($LASTEXITCODE -ne 0){throw "Clean installer test failed: $LASTEXITCODE"}
-    $installed=Join-Path $fakeLocal 'Huymaier Console\HuymaierConsole.exe'
-    if((Get-FileHash $installed -Algorithm SHA256).Hash -ne (Get-FileHash $exe -Algorithm SHA256).Hash){throw 'Installed executable differs from CI-built executable.'}
-    # Repair install over identical payload must also succeed (covers the icon-lock class by avoiding replacement of identical files).
-    & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $stage 'Install-HuymaierConsole.ps1') -SilentUpdate
-    if($LASTEXITCODE -ne 0){throw "Repair installer test failed: $LASTEXITCODE"}
-    # Tampered payload must fail before mutation.
-    $tamper=Join-Path $temp 'hc-tamper';Copy-Item $stage $tamper -Recurse -Force;Add-Content (Join-Path $tamper 'manifest.json') 'tamper'
-    & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $tamper 'Install-HuymaierConsole.ps1') -SilentUpdate
-    if($LASTEXITCODE -eq 0){throw 'Tampered package was incorrectly accepted.'}
-    # Extra unchecksummed payload must fail closed.
-    $extra=Join-Path $temp 'hc-extra';Copy-Item $stage $extra -Recurse -Force;Set-Content (Join-Path $extra 'unexpected.bin') 'unexpected' -Encoding ASCII
-    & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $extra 'Install-HuymaierConsole.ps1') -SilentUpdate
-    if($LASTEXITCODE -eq 0){throw 'Unchecksummed extra payload was incorrectly accepted.'}
-}finally{$env:LOCALAPPDATA=$oldLocal}
+# Installer execution and failure injection are performed by .build/Test-HuymaierCandidate.ps1.
 
 # Final release-shaped asset and provenance record.
 $zip=Join-Path $out $assetName
