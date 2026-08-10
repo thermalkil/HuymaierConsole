@@ -1,4 +1,6 @@
 Docs/EMULATOR-PLATFORMS.md
+Docs/PLATFORM-EXPANSION-v0.26.4.md
+EmulatorPlatforms/emulator-adapters.json
 EmulatorPlatforms/GameCube/Assets/README-STARTUP.txt
 EmulatorPlatforms/GameCube/platform.json
 EmulatorPlatforms/GameCube/settings.default.json
@@ -44,6 +46,7 @@ HuymaierConsole.ps1
 HuymaierConsoleUpdateWorker.ps1
 HuymaierDriverWorker.ps1
 HuymaierEmulatorPlatforms.ps1
+HuymaierEmulatorSettings.ps1
 HuymaierFSEHost.cs
 HuymaierGameExperience.ps1
 HuymaierGameProviders.ps1
