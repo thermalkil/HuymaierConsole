@@ -1,0 +1,54 @@
+name: Materialize Huymaier Console v0.26.4 Wave 2 Storage and Settings
+
+on:
+  pull_request:
+    branches:
+      - feature/v0.26.3-console-fidelity
+    paths:
+      - '.development/v0.26.4/wave2-storage-request.json'
+      - '.development/v0.26.4/apply_wave2_storage_settings.py'
+      - '.github/workflows/materialize-v0264-wave2-storage.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: huymaier-v0264-wave2-storage
+  cancel-in-progress: false
+
+jobs:
+  materialize-and-validate:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v0.26.4-platform-expansion
+          fetch-depth: 0
+      - name: Materialize Wave 2 native storage/settings
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $native=Get-Content -Raw 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8
+          if($native -notmatch [regex]::Escape('private void RenderWave2Settings()')){
+            python .development\v0.26.4\apply_wave2_storage_settings.py
+            if($LASTEXITCODE -ne 0){throw 'Wave 2 storage/settings materializer failed.'}
+          }else{Write-Host 'Wave 2 storage/settings already materialized.'}
+      - name: Validate Wave 2 native behavior
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $native=Get-Content -Raw 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8
+          foreach($required in @('RenderWave2Storage','RenderWave2Settings','FindWave2SaveFiles','GetWave2SaveExtensions','CreateWave2SaveChip','CARTRIDGE NVRAM / SAVEKEY','BACKUP RAM','HUCARD / CD BACKUP','bool wave2 = IsWave2Shell()','else if (gameCube || wave2) selected = target;','OpenNativeBackendSettings')){if($native -notmatch [regex]::Escape($required)){throw "Wave 2 storage/settings invariant missing: $required"}}
+          if($native -match [regex]::Escape('if (dashboardSubpage == "saves") { RenderWave1Storage(); return; }')){throw 'Wave 2 saves still use the generic Wave 1 storage renderer.'}
+          if($native -match 'LeftShoulder[^\r\n]{0,180}SwitchPage' -or $native -match 'RightShoulder[^\r\n]{0,180}SwitchPage'){throw 'LB/RB may accelerate by first letter but may not switch pages.'}
+      - name: Compile exact x64 native source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Windows.Forms,System.Drawing,System.Web.Extensions
+          $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe';$automation=[Management.Automation.PSObject].Assembly.Location;$refs=@([Uri].Assembly.Location,[Linq.Enumerable].Assembly.Location,[System.Xaml.XamlReader].Assembly.Location,[Xml.XmlDocument].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,[Windows.Window].Assembly.Location,[Windows.Forms.Form].Assembly.Location,[Drawing.Bitmap].Assembly.Location,[Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,$automation)|Select-Object -Unique
+          $sources=@('Native\HuymaierConsole.NativeApp.cs','Native\HuymaierConsole.Ps1.cs','Native\HuymaierConsole.ConsolePlatforms.cs','Native\HuymaierConsole.SystemOverlay.cs','Native\HuymaierConsole.GameInput.cs','HuymaierNativeInput.cs','HuymaierNativeDisplay.cs','HuymaierNativeAudio.cs','HuymaierPerformance.cs','EmulatorPlatforms\Shared\Huymaier.P3T.cs');$out=Join-Path $env:RUNNER_TEMP 'HuymaierConsole-v0264-wave2-storage.dll';$args=@('/noconfig','/nologo','/target:library','/platform:x64','/optimize+',('/out:'+$out));foreach($r in $refs){$args+=('/reference:'+$r)};$args+=$sources;& $csc @args;if($LASTEXITCODE -ne 0){throw 'Wave 2 storage/settings x64 compile failed.'}
+      - name: Commit validated Wave 2 storage/settings
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com';git add Native/HuymaierConsole.ConsolePlatforms.cs;if(git diff --cached --quiet){Write-Host 'No Wave 2 storage/settings source changes.';exit 0};git commit -m 'Materialize v0.26.4 Wave 2 native storage settings and alphabet navigation';git fetch origin feature/v0.26.4-platform-expansion;git rebase origin/feature/v0.26.4-platform-expansion;if($LASTEXITCODE -ne 0){throw 'Wave 2 storage/settings rebase failed.'};git push origin HEAD:feature/v0.26.4-platform-expansion;if($LASTEXITCODE -ne 0){throw 'Wave 2 storage/settings push failed.'}
