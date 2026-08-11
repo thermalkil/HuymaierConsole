@@ -2,7 +2,7 @@ name: Materialize Huymaier Console v0.26.4 PS4 Vita Native Settings UI
 on:
   pull_request:
     branches: [feature/v0.26.3-console-fidelity]
-    paths: ['.development/v0.26.4/wave5-native-ui-request.json','.development/v0.26.4/apply_wave5_native_settings_storage.py','.github/workflows/materialize-v0264-wave5-native-ui.yml']
+    paths: ['.development/v0.26.4/wave5-native-ui-request.json','.development/v0.26.4/apply_wave5_native_settings_storage.py','.development/v0.26.4/apply_wave45_stage.py','.development/v0.26.4/apply_wave45_compile_fixes.py','.github/workflows/materialize-v0264-wave5-native-ui.yml']
 permissions: {contents: write}
 concurrency: {group: huymaier-v0264-wave5-native-ui, cancel-in-progress: false}
 jobs:
@@ -12,14 +12,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: {ref: feature/v0.26.4-platform-expansion, fetch-depth: 0}
-      - name: Materialize modern native settings/storage
+      - name: Ensure Wave 4/5 stage then materialize modern native settings/storage
         shell: powershell
         run: |
-          $ErrorActionPreference='Stop';$n=Get-Content -Raw 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8;if($n -notmatch [regex]::Escape('private void RenderModernPlayStationSettings()')){python .development\v0.26.4\apply_wave5_native_settings_storage.py;if($LASTEXITCODE){throw 'PS4/Vita native UI materializer failed'}}
+          $ErrorActionPreference='Stop'
+          $n=Get-Content -Raw 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8
+          if($n -notmatch [regex]::Escape('private void RenderWave45Subpage()')){python .development\v0.26.4\apply_wave45_stage.py;if($LASTEXITCODE){throw 'Wave4/5 stage prerequisite failed'}}
+          python .development\v0.26.4\apply_wave45_compile_fixes.py
+          if($LASTEXITCODE){throw 'Wave4/5 compile overlay prerequisite failed'}
+          $n=Get-Content -Raw 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8
+          if($n -notmatch [regex]::Escape('private void RenderModernPlayStationSettings()')){python .development\v0.26.4\apply_wave5_native_settings_storage.py;if($LASTEXITCODE){throw 'PS4/Vita native UI materializer failed'}}
       - name: Validate modern PlayStation native UI
         shell: powershell
         run: |
-          $ErrorActionPreference='Stop';$n=Get-Content -Raw 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8;foreach($m in @('RenderModernPlayStationSettings','RenderModernPlayStationStorage','GetModernPlayStationSaveRoots','Content Manager','Saved Data Management','OpenNativeBackendSettings')){if($n -notmatch [regex]::Escape($m)){throw "Modern PS UI marker missing: $m"}};if($n -match [regex]::Escape('(definition.Shell=="PS4"||definition.Shell=="Vita")&&dashboardSubpage=="settings"){RenderWave1Settings()')){throw 'PS4/Vita settings still fall through to generic Wave1 settings.'}
+          $ErrorActionPreference='Stop';$n=Get-Content -Raw 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8;foreach($m in @('RenderWave45Subpage','RenderPs4DynamicMenu','RenderVitaLiveArea','RenderModernPlayStationSettings','RenderModernPlayStationStorage','GetModernPlayStationSaveRoots','Content Manager','Saved Data Management','OpenNativeBackendSettings')){if($n -notmatch [regex]::Escape($m)){throw "Modern PS UI marker missing: $m"}};if($n -match [regex]::Escape('(definition.Shell=="PS4"||definition.Shell=="Vita")&&dashboardSubpage=="settings"){RenderWave1Settings()')){throw 'PS4/Vita settings still fall through to generic Wave1 settings.'}
       - name: Compile exact x64 native source
         shell: powershell
         run: |
