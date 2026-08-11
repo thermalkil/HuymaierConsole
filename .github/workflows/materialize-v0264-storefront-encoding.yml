@@ -19,7 +19,13 @@ jobs:
       - name: Validate Windows PowerShell 5.1 parse and glyph preservation
         shell: powershell
         run: |
-          $ErrorActionPreference='Stop';$bytes=[IO.File]::ReadAllBytes((Resolve-Path '.\HuymaierStorefronts.ps1'));if($bytes.Length -lt 3 -or $bytes[0]-ne0xEF -or $bytes[1]-ne0xBB -or $bytes[2]-ne0xBF){throw 'Storefront module is not UTF-8 BOM encoded.'};$t=$null;$e=$null;[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path '.\HuymaierStorefronts.ps1'),[ref]$t,[ref]$e);if($e.Count){$e|ForEach-Object{Write-Host $_.Message};throw 'Storefront module still fails Windows PowerShell 5.1 parsing.'};$text=Get-Content -Raw -Encoding UTF8 '.\HuymaierStorefronts.ps1';foreach($glyph in @('€','£','¥','₹','←','✓','★','♪')){if(-not $text.Contains($glyph)){throw "Native keyboard glyph was lost: $glyph"}}
+          $ErrorActionPreference='Stop'
+          $bytes=[IO.File]::ReadAllBytes((Resolve-Path '.\HuymaierStorefronts.ps1'))
+          if($bytes.Length -lt 3 -or $bytes[0]-ne0xEF -or $bytes[1]-ne0xBB -or $bytes[2]-ne0xBF){throw 'Storefront module is not UTF-8 BOM encoded.'}
+          $t=$null;$e=$null;[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path '.\HuymaierStorefronts.ps1'),[ref]$t,[ref]$e)
+          if($e.Count){$e|ForEach-Object{Write-Host $_.Message};throw 'Storefront module still fails Windows PowerShell 5.1 parsing.'}
+          $text=Get-Content -Raw -Encoding UTF8 '.\HuymaierStorefronts.ps1'
+          foreach($codepoint in @(0x20AC,0x00A3,0x00A5,0x20B9,0x2190,0x2713,0x2605,0x266A)){$glyph=[char]$codepoint;if(-not $text.Contains([string]$glyph)){throw ('Native keyboard glyph was lost: U+'+$codepoint.ToString('X4'))}}
       - name: Commit validated encoding
         shell: powershell
         run: |
