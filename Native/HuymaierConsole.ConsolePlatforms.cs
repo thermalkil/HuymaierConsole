@@ -318,7 +318,7 @@ namespace HuymaierConsole.NativeApp
             }
             else if (key == "NEOGEO")
             {
-                d.DisplayName="Neo Geo";d.Subtitle="ADVANCED ENTERTAINMENT SYSTEM";d.Shell="NeoGeo";d.PrimaryBackend="FinalBurn Neo";d.FallbackBackend="MAME";d.PrimaryExecutableNames=new string[]{"fbneo.exe","FinalBurnNeo.exe"};d.FallbackExecutableNames=new string[]{"mame.exe"};d.GameExtensions=new string[]{".zip",".7z",".neo"};d.ColorA=Color.FromRgb(14,15,16);d.ColorB=Color.FromRgb(3,4,5);d.Accent=Color.FromRgb(215,31,39);
+                d.DisplayName="Neo Geo";d.Subtitle="ADVANCED ENTERTAINMENT SYSTEM";d.Shell="NeoGeo";d.PrimaryBackend="FinalBurn Neo";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"fbneo.exe","FinalBurnNeo.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".zip",".7z",".neo"};d.ColorA=Color.FromRgb(14,15,16);d.ColorB=Color.FromRgb(3,4,5);d.Accent=Color.FromRgb(215,31,39);
             }
             else if (key == "NGPC")
             {
@@ -326,7 +326,7 @@ namespace HuymaierConsole.NativeApp
             }
             else if (key == "JAGUAR")
             {
-                d.DisplayName="Atari Jaguar";d.Subtitle="64-BIT INTERACTIVE MULTIMEDIA SYSTEM";d.Shell="Jaguar";d.PrimaryBackend="BigPEmu";d.FallbackBackend="Virtual Jaguar libretro";d.PrimaryExecutableNames=new string[]{"BigPEmu.exe","bigpemu.exe"};d.FallbackExecutableNames=new string[]{"retroarch.exe"};d.GameExtensions=new string[]{".j64",".jag",".rom",".bin",".abs",".cof",".zip"};d.ColorA=Color.FromRgb(17,18,19);d.ColorB=Color.FromRgb(4,5,5);d.Accent=Color.FromRgb(209,35,42);
+                d.DisplayName="Atari Jaguar";d.Subtitle="64-BIT INTERACTIVE MULTIMEDIA SYSTEM";d.Shell="Jaguar";d.PrimaryBackend="BigPEmu";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"BigPEmu.exe","bigpemu.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".j64",".jag",".rom",".bin",".abs",".cof",".zip"};d.ColorA=Color.FromRgb(17,18,19);d.ColorB=Color.FromRgb(4,5,5);d.Accent=Color.FromRgb(209,35,42);
             }
             else if (key == "PRIMEHACK")
             {
@@ -334,7 +334,7 @@ namespace HuymaierConsole.NativeApp
             }
             else if (key == "ATARI2600")
             {
-                d.DisplayName="Atari 2600";d.Subtitle="Video Computer System";d.Shell="Atari2600";d.PrimaryBackend="Stella";d.FallbackBackend="ares";d.PrimaryExecutableNames=new string[]{"Stella.exe","stella.exe"};d.FallbackExecutableNames=new string[]{"ares.exe"};d.GameExtensions=new string[]{".a26",".bin",".rom",".zip"};d.ColorA=Color.FromRgb(25,21,17);d.ColorB=Color.FromRgb(76,45,24);d.Accent=Color.FromRgb(220,149,57);
+                d.DisplayName="Atari 2600";d.Subtitle="Video Computer System";d.Shell="Atari2600";d.PrimaryBackend="Stella";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"Stella.exe","stella.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".a26",".bin",".rom",".zip"};d.ColorA=Color.FromRgb(25,21,17);d.ColorB=Color.FromRgb(76,45,24);d.Accent=Color.FromRgb(220,149,57);
             }
             else if (key == "NES")
             {
