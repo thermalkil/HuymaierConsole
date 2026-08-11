@@ -1,1 +1,1 @@
-{"requestedAtUtc":"2026-08-11T21:36:00Z","attempt":6,"authoritative":false,"platform":"Jaguar","backend":"BigPEmu","note":"superseded by branch-scoped late-platform finalization; prevents treating earlier PR-recursive run as authoritative"}
+{"requestedAtUtc":"2026-08-11T21:38:00Z","authoritative":false,"note":"do not use this request for further PR-scoped runs; branch-scoped finalization is replacing recursive PR CI"}
