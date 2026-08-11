@@ -28,7 +28,7 @@ jobs:
           $ErrorActionPreference='Stop'
           $files=@(Get-ChildItem -LiteralPath . -File -Filter '*.ps1')+@(Get-ChildItem -LiteralPath '.\Tools' -File -Filter '*.ps1' -ErrorAction SilentlyContinue)
           foreach($file in $files){$tokens=$null;$errors=$null;[void][Management.Automation.Language.Parser]::ParseFile($file.FullName,[ref]$tokens,[ref]$errors);if($errors.Count){$errors|ForEach-Object{Write-Host "$($file.FullName): $($_.Message)"};throw "PowerShell 5.1 parse failed: $($file.Name)"}}
-      - name: Validate complete expansion inventory and enablement discipline
+      - name: Validate complete expansion inventory and atomic enablement discipline
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
@@ -38,22 +38,36 @@ jobs:
           $registry=Get-Content -Raw 'EmulatorPlatforms\platform-registry.json' -Encoding UTF8|ConvertFrom-Json
           $registryIds=@{};foreach($entry in @($registry.platforms)){if($registryIds.ContainsKey([string]$entry.id)){throw "Duplicate platform registry id: $($entry.id)"};$registryIds[[string]$entry.id]=$true}
           foreach($id in @('psp','nds','dsi','3ds','dreamcast','saturn')){$entry=@($registry.platforms|Where-Object{$_.id -eq $id});if($entry.Count -ne 1 -or -not [bool]$entry[0].enabled){throw "Wave 1 platform is not enabled exactly once: $id"}}
-          # Later waves must remain disabled until a dedicated enablement gate removes them from this list.
-          foreach($folder in @('Atari2600','NES','SNES','GameBoy','GBC','GBA','Genesis','SegaCD','Sega32X','GameGear','MasterSystem','TurboGrafx16','AtariLynx','NeoGeo','NGPC','Jaguar','PrimeHack','Arcade','FinalBurnNeo','PS4','Vita')){
-            $path=Join-Path (Join-Path 'EmulatorPlatforms' $folder) 'platform.json';if(-not(Test-Path $path)){continue};$definition=Get-Content -Raw $path -Encoding UTF8|ConvertFrom-Json;if([bool]$definition.enabled){throw "$folder was enabled without graduating through its dedicated enablement gate."}
+
+          function Test-AtomicWave([string[]]$Ids,[string]$Label){
+            $states=@();foreach($id in $Ids){$entry=@($registry.platforms|Where-Object{$_.id -eq $id});if($entry.Count -gt 1){throw "$Label duplicate registry entry: $id"};$states+=($entry.Count -eq 1 -and [bool]$entry[0].enabled)}
+            $enabled=@($states|Where-Object{$_}).Count
+            if($enabled -ne 0 -and $enabled -ne $Ids.Count){throw "$Label is partially enabled ($enabled/$($Ids.Count)); platform graduation must be atomic."}
+            return ($enabled -eq $Ids.Count)
           }
-      - name: Validate native settings, artwork and navigation invariants
+          $wave2=@('atari2600','nes','snes','gameboy','gbc','gba','genesis','segacd','sega32x','gamegear','mastersystem','turbografx16')
+          $wave3=@('atarilynx','ngpc','primehack')
+          $wave2Enabled=Test-AtomicWave $wave2 'Wave 2'
+          $wave3Enabled=Test-AtomicWave $wave3 'Wave 3 validated subset'
+          if($wave2Enabled){foreach($id in $wave2){$entry=@($registry.platforms|Where-Object{$_.id -eq $id})[0];foreach($cap in @('latest-emulator-install','native-full-emulator-settings','unknown-setting-preservation','native-save-management','alphabet-index')){if(@($entry.capabilities)-notcontains$cap){throw "$id is enabled without $cap"}}}}
+          if($wave3Enabled){foreach($id in $wave3){$entry=@($registry.platforms|Where-Object{$_.id -eq $id})[0];foreach($cap in @('latest-emulator-install','native-full-emulator-settings','native-save-management')){if(@($entry.capabilities)-notcontains$cap){throw "$id is enabled without $cap"}}}}
+
+          # These remain staged until their dedicated readiness blockers are solved.
+          foreach($folder in @('NeoGeo','Jaguar','Arcade','FinalBurnNeo','PS4','Vita')){
+            $path=Join-Path (Join-Path 'EmulatorPlatforms' $folder) 'platform.json';if(-not(Test-Path $path)){continue};$definition=Get-Content -Raw $path -Encoding UTF8|ConvertFrom-Json;if([bool]$definition.enabled){throw "$folder is enabled before its dedicated readiness gate passed."}
+          }
+      - name: Validate native settings artwork and navigation invariants
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
           $shell=Get-Content -Raw 'HuymaierConsole.ps1' -Encoding UTF8
           foreach($required in @("Title='Artwork & Metadata'","SteamGridDB artwork key: Configured","SteamGridDB artwork key: Not configured")){if($shell -notmatch [regex]::Escape($required)){throw "Artwork discoverability invariant missing: $required"}}
           $settings=Get-Content -Raw 'HuymaierEmulatorSettings.ps1' -Encoding UTF8
-          foreach($required in @('Backup-HcEmulatorConfigFile','Get-HcCompleteEmulatorSettingsInventory','Set-HcEmulatorConfigSetting','Get-HcJsonSettings','Set-HcJsonSetting')){if($settings -notmatch [regex]::Escape($required)){throw "Full emulator settings invariant missing: $required"}}
+          foreach($required in @('Backup-HcEmulatorConfigFile','Get-HcCompleteEmulatorSettingsInventory','Set-HcEmulatorConfigSetting','Get-HcJsonSettings','Set-HcJsonSetting','Get-HcTomlScalarSettings','Get-HcXmlSettings','Set-HcXmlSetting')){if($settings -notmatch [regex]::Escape($required)){throw "Full emulator settings invariant missing: $required"}}
           $native=Get-Content -Raw 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8
           if($native -match 'LeftShoulder[^\r\n]{0,200}SwitchPage' -or $native -match 'RightShoulder[^\r\n]{0,200}SwitchPage'){throw 'Shoulder buttons may not switch native console pages.'}
           foreach($required in @('TryProcessLibraryLetterJump','OpenNativeBackendSettings','RequestHuymaierPicker','Huymaier Game Bar')){if($native -notmatch [regex]::Escape($required)){throw "Native navigation/settings invariant missing: $required"}}
-      - name: Keep PlayStation 1 visual source frozen
+      - name: Keep PlayStation 1 2 3 presentation source frozen
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
