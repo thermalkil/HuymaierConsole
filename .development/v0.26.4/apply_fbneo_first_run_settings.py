@@ -10,10 +10,22 @@ function Initialize-FbNeoConfigIfNeeded {
         if(-not$exe){continue}
         $config=Join-Path $exe[0].Directory.FullName ('config\'+[IO.Path]::GetFileNameWithoutExtension($exe[0].Name)+'.ini')
         if(Test-Path -LiteralPath $config -PathType Leaf){return $config}
+        $stdout=Join-Path $env:TEMP ('hc-fbneo-listinfo-'+[guid]::NewGuid().ToString('N')+'.out')
+        $stderr=Join-Path $env:TEMP ('hc-fbneo-listinfo-'+[guid]::NewGuid().ToString('N')+'.err')
         try{
-            $psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName=$exe[0].FullName;$psi.Arguments='-listinfo';$psi.WorkingDirectory=$exe[0].Directory.FullName;$psi.UseShellExecute=$false;$psi.CreateNoWindow=$true;$psi.RedirectStandardOutput=$true;$psi.RedirectStandardError=$true
-            $process=[Diagnostics.Process]::Start($psi);if($null-ne$process){$stdoutTask=$process.StandardOutput.ReadToEndAsync();$stderrTask=$process.StandardError.ReadToEndAsync();if(-not$process.WaitForExit(20000)){try{$process.Kill()}catch{}};try{$null=$stdoutTask.Result;$null=$stderrTask.Result}catch{}}
+            # FBNeo -listinfo emits a very large driver listing and can block if its
+            # redirected stdout pipe is not continuously drained. Redirect to files,
+            # poll only for the config artifact Huymaier needs, then terminate as soon
+            # as the complete first-run config has appeared.
+            $process=Start-Process -FilePath $exe[0].FullName -ArgumentList '-listinfo' -WorkingDirectory $exe[0].Directory.FullName -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -WindowStyle Hidden
+            $deadline=[DateTime]::UtcNow.AddSeconds(15)
+            while([DateTime]::UtcNow -lt $deadline -and -not(Test-Path -LiteralPath $config -PathType Leaf)){
+                if($process.HasExited){break}
+                Start-Sleep -Milliseconds 150
+            }
+            if(-not$process.HasExited){try{$process.Kill();$process.WaitForExit()}catch{}}
         }catch{Write-Log "FBNeo default configuration initialization recovered: $($_.Exception.Message)" 'WARN'}
+        finally{Remove-Item -LiteralPath $stdout,$stderr -Force -ErrorAction SilentlyContinue}
         if(Test-Path -LiteralPath $config -PathType Leaf){return $config}
     }
     return ''
@@ -26,7 +38,7 @@ if 'function Initialize-FbNeoConfigIfNeeded {' not in text:
     text=text.replace(anchor,helper+anchor,1)
 old='$roots=Get-ConfigRoots -AdapterId $adapterId -Settings $settings\n$configFiles=Get-ExplicitConfigFiles -AdapterId $adapterId -Roots $roots\n'
 new="$roots=Get-ConfigRoots -AdapterId $adapterId -Settings $settings\nif($adapterId -ieq 'fbneo'){[void](Initialize-FbNeoConfigIfNeeded -Roots $roots)}\n$configFiles=Get-ExplicitConfigFiles -AdapterId $adapterId -Roots $roots\n"
-if old in text:text=text.replace(old,new,1)
+if old in text:text.replace(old,new,1)
 elif new not in text:raise SystemExit('FBNeo first-run invocation anchor missing')
 path.write_text(text,encoding='utf-8-sig')
-print('materialized FBNeo non-GUI first-run full config initialization')
+print('materialized nonblocking FBNeo first-run full config initialization')
