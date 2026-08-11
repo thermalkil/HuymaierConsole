@@ -1,4 +1,4 @@
-# Huymaier Console native emulator-settings adapter core.
+﻿# Huymaier Console native emulator-settings adapter core.
 #
 # Design goals:
 # - Every meaningful emulator setting can be surfaced inside Huymaier Console.
@@ -386,6 +386,7 @@ function Get-HcEmulatorConfigSettings {
         $ext=[IO.Path]::GetExtension($Path).ToLowerInvariant()
         if($ext -in @('.ini','.cfg')){$Format='ini'}elseif($ext -in @('.yml','.yaml')){$Format='yaml'}elseif($ext -eq '.json'){$Format='json'}elseif($ext -eq '.toml'){$Format='toml'}elseif($ext -eq '.xml'){$Format='xml'}elseif($ext -eq '.bml'){$Format='bml'}else{$Format='key-value'}
         if($AdapterId -ieq 'mednafen'){$Format='key-value'}
+        if($AdapterId -ieq 'bigpemu' -and $ext -ieq '.bigpcfg'){$Format='json'}
         if($AdapterId -ieq 'ares'){$Format='bml'}
     }
     switch($Format.ToLowerInvariant()){

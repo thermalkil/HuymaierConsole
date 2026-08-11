@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][ValidateSet('Inventory','Set')][string]$Mode,
     [Parameter(Mandatory=$true)][string]$PlatformId,
@@ -81,7 +81,7 @@ function Get-ConfigRoots {
         'xenia' {Add-Root $roots $seen (Join-Path $docs 'Xenia');Add-Root $roots $seen (Join-Path $app 'Xenia');Add-Root $roots $seen (Join-Path $local 'Xenia')}
         'fbneo' {Add-Root $roots $seen (Join-Path $app 'FBNeo');Add-Root $roots $seen (Join-Path $local 'FBNeo');Add-Root $roots $seen (Join-Path $app 'FinalBurn Neo')}
         'primehack' {Add-Root $roots $seen (Join-Path $app 'PrimeHack');Add-Root $roots $seen (Join-Path $local 'PrimeHack');Add-Root $roots $seen (Join-Path $docs 'PrimeHack');Add-Root $roots $seen (Join-Path $docs 'Dolphin Emulator')}
-        'bigpemu' {Add-Root $roots $seen (Join-Path $app 'BigPEmu');Add-Root $roots $seen (Join-Path $local 'BigPEmu')}
+        'bigpemu' {Add-Root $roots $seen (Join-Path $app 'BigPEmu');Add-Root $roots $seen (Join-Path $local 'BigPEmu');foreach($folder in @((Get-EntryProperty $Settings 'gameFolders' @()))){Add-Root $roots $seen ([string]$folder)}}
         'mesence' {Add-Root $roots $seen (Join-Path $app 'Mesen');Add-Root $roots $seen (Join-Path $app 'Mesen2');Add-Root $roots $seen (Join-Path $local 'Mesen');Add-Root $roots $seen (Join-Path $local 'Mesen2')}
         'sameboy' {Add-Root $roots $seen (Join-Path $app 'SameBoy');Add-Root $roots $seen (Join-Path $local 'SameBoy')}
         'mgba' {Add-Root $roots $seen (Join-Path $app 'mGBA');Add-Root $roots $seen (Join-Path $local 'mGBA')}
@@ -120,7 +120,7 @@ function Get-ExplicitConfigFiles {
             'xenia' {foreach($rel in @('xenia-canary.config.toml','xenia.config.toml','xenia-canary.config.json','xenia.config.json')){Add-File (Join-Path $root $rel)};try{Get-ChildItem -LiteralPath $root -File -ErrorAction SilentlyContinue|Where-Object{$_.Name -match '(?i)^xenia.*config\.(toml|json)$'}|Select-Object -First 20|ForEach-Object{Add-File $_.FullName}}catch{}}
             'fbneo' {foreach($rel in @('config\fbneo.ini','config\fbneo.cfg','fbneo.ini','fbneo.cfg')){Add-File (Join-Path $root $rel)};try{Get-ChildItem -LiteralPath (Join-Path $root 'config') -File -ErrorAction SilentlyContinue|Where-Object{$_.Extension -match '(?i)^\.(ini|cfg)$'}|Select-Object -First 80|ForEach-Object{Add-File $_.FullName}}catch{}}
             'primehack' {foreach($rel in @('Config\Dolphin.ini','Config\GFX.ini','Config\PrimeHack.ini','Config\WiimoteNew.ini','Config\Hotkeys.ini','Config\Logger.ini','Dolphin.ini','GFX.ini','PrimeHack.ini')){Add-File (Join-Path $root $rel)}}
-            'bigpemu' {foreach($rel in @('BigPEmu.ini','bigpemu.ini','config.ini','settings.ini','config.json','settings.json')){Add-File (Join-Path $root $rel)};try{Get-ChildItem -LiteralPath $root -File -ErrorAction SilentlyContinue|Where-Object{$_.Name -match '(?i)(bigpemu|config|settings|profile).*\.(ini|cfg|json)$'}|Select-Object -First 40|ForEach-Object{Add-File $_.FullName}}catch{}}
+            'bigpemu' {foreach($rel in @('BigPEmuConfig.bigpcfg','UserData\BigPEmuConfig.bigpcfg','BigPEmu.ini','bigpemu.ini','config.ini','settings.ini','config.json','settings.json')){Add-File (Join-Path $root $rel)};try{Get-ChildItem -LiteralPath $root -File -Recurse -ErrorAction SilentlyContinue|Where-Object{$_.Name -ieq 'BigPEmuConfig.bigpcfg' -or $_.Extension -ieq '.bigpcfg' -or $_.Name -match '(?i)(bigpemu|config|settings|profile).*\.(ini|cfg|json)$'}|Select-Object -First 500|ForEach-Object{Add-File $_.FullName}}catch{}}
             'mesence' {foreach($rel in @('settings.json','Settings.json','config.json','preferences.json','Mesen.json','Mesen2.json')){Add-File (Join-Path $root $rel)};try{Get-ChildItem -LiteralPath $root -File -ErrorAction SilentlyContinue|Where-Object{$_.Name -match '(?i)(settings|config|preferences).*\.(json|ini|cfg)$'}|Select-Object -First 20|ForEach-Object{Add-File $_.FullName}}catch{}}
             'sameboy' {foreach($rel in @('sameboy.ini','SameBoy.ini','sameboy.cfg','preferences.ini','config.ini')){Add-File (Join-Path $root $rel)};try{Get-ChildItem -LiteralPath $root -File -ErrorAction SilentlyContinue|Where-Object{$_.Name -match '(?i)(sameboy|settings|config|preferences).*\.(ini|cfg|json)$'}|Select-Object -First 20|ForEach-Object{Add-File $_.FullName}}catch{}}
             'mgba' {foreach($rel in @('config.ini','mGBA.ini','mgba.ini','qt.ini')){Add-File (Join-Path $root $rel)};try{Get-ChildItem -LiteralPath $root -File -ErrorAction SilentlyContinue|Where-Object{$_.Name -match '(?i)(mgba|config|settings).*\.(ini|cfg|json)$'}|Select-Object -First 20|ForEach-Object{Add-File $_.FullName}}catch{}}
