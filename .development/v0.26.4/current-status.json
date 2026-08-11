@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 1,
+  "branch": "feature/v0.26.4-platform-expansion",
+  "enabledPlatforms": [
+    "3ds",
+    "atari2600",
+    "atarilynx",
+    "dreamcast",
+    "dsi",
+    "gameboy",
+    "gamecube",
+    "gamegear",
+    "gba",
+    "gbc",
+    "genesis",
+    "mastersystem",
+    "n64",
+    "nds",
+    "nes",
+    "ngpc",
+    "primehack",
+    "ps1",
+    "ps2",
+    "ps3",
+    "psp",
+    "saturn",
+    "sega32x",
+    "segacd",
+    "snes",
+    "switch",
+    "turbografx16",
+    "wii",
+    "wiiu",
+    "xbox",
+    "xbox360"
+  ],
+  "enabledCount": 31,
+  "stagedPlatforms": [
+    {
+      "folder": "Arcade",
+      "id": "arcade",
+      "backend": "MAME",
+      "adapter": "mame"
+    },
+    {
+      "folder": "FinalBurnNeo",
+      "id": "finalburnneo",
+      "backend": "FinalBurn Neo",
+      "adapter": "fbneo"
+    },
+    {
+      "folder": "GameCube",
+      "id": "gamecube",
+      "backend": "Dolphin",
+      "adapter": "dolphin"
+    },
+    {
+      "folder": "Jaguar",
+      "id": "jaguar",
+      "backend": "BigPEmu",
+      "adapter": "bigpemu"
+    },
+    {
+      "folder": "N64",
+      "id": "n64",
+      "backend": "RMG",
+      "adapter": "rmg"
+    },
+    {
+      "folder": "NeoGeo",
+      "id": "neogeo",
+      "backend": "FinalBurn Neo",
+      "adapter": "fbneo"
+    },
+    {
+      "folder": "PS1",
+      "id": "ps1",
+      "backend": null,
+      "adapter": null
+    },
+    {
+      "folder": "PS2",
+      "id": "ps2",
+      "backend": null,
+      "adapter": null
+    },
+    {
+      "folder": "PS3",
+      "id": "ps3",
+      "backend": null,
+      "adapter": null
+    },
+    {
+      "folder": "PS4",
+      "id": "ps4",
+      "backend": "shadPS4",
+      "adapter": "shadps4"
+    },
+    {
+      "folder": "Switch",
+      "id": "switch",
+      "backend": "Eden",
+      "adapter": "eden"
+    },
+    {
+      "folder": "Vita",
+      "id": "vita",
+      "backend": "Vita3K",
+      "adapter": "vita3k"
+    },
+    {
+      "folder": "Wii",
+      "id": "wii",
+      "backend": "Dolphin",
+      "adapter": "dolphin"
+    },
+    {
+      "folder": "WiiU",
+      "id": "wiiu",
+      "backend": "Cemu",
+      "adapter": "cemu"
+    },
+    {
+      "folder": "Xbox",
+      "id": "xbox",
+      "backend": "xemu",
+      "adapter": "xemu"
+    },
+    {
+      "folder": "Xbox360",
+      "id": "xbox360",
+      "backend": "Xenia Canary",
+      "adapter": "xenia"
+    }
+  ],
+  "markers": {
+    "RenderWave2Settings": true,
+    "RenderWave2Storage": true,
+    "Get-StellaCliSettings": true,
+    "BuildStellaOverrideArguments": true,
+    "RenderWave3Settings": true,
+    "RenderWave3Storage": true,
+    "RenderArcadeOperatorSettings": true,
+    "RenderArcadeStorage": true,
+    "Get-MameCliSettings": true,
+    "BuildMameOverrideArguments": true,
+    "Get-HcJsonSettings": true,
+    "Get-HcTomlScalarSettings": true,
+    "Get-HcXmlSettings": true,
+    "RenderPs4DynamicMenu": true,
+    "RenderVitaLiveArea": true,
+    "RefreshModernPlayStationLibrary": true,
+    "RenderModernPlayStationSettings": true,
+    "RenderModernPlayStationStorage": true
+  },
+  "allMarkersPresent": true
+}
