@@ -1,13 +1,12 @@
 name: Finalize Huymaier Console v0.26.4 Late Platforms
 on:
-  pull_request:
-    branches: [feature/v0.26.3-console-fidelity]
-    paths: ['.development/v0.26.4/late-platforms-finalize-request.json','.github/workflows/finalize-v0264-late-platforms.yml']
+  push:
+    branches: [feature/v0.26.4-platform-expansion]
+    paths: ['.development/v0.26.4/late-platforms-finalize-request.json']
 permissions: {contents: write}
 concurrency: {group: huymaier-v0264-late-platforms-final, cancel-in-progress: false}
 jobs:
   finalize:
-    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
