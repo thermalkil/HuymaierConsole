@@ -1,7 +1,7 @@
 # v0.26.4 emulator settings coverage
 
-Platforms in registry: **16**  
-Enabled: **16**  
+Platforms in registry: **28**  
+Enabled: **28**  
 Enabled missing a complete native adapter: **3**
 
 | Platform | Enabled | Backend | Adapter | Native settings ready |
@@ -22,5 +22,17 @@ Enabled missing a complete native adapter: **3**
 | Xbox 360 | yes | Xenia Canary | xenia | yes |
 | Sega Dreamcast | yes | Flycast | flycast | yes |
 | Sega Saturn | yes | Mednafen | mednafen | yes |
+| Atari 2600 | yes | Stella | stella | yes |
+| Nintendo Entertainment System | yes | Mesen Community Edition | mesence | yes |
+| Super Nintendo Entertainment System | yes | Mesen Community Edition | mesence | yes |
+| Nintendo Game Boy | yes | Mesen Community Edition | mesence | yes |
+| Nintendo Game Boy Color | yes | Mesen Community Edition | mesence | yes |
+| Nintendo Game Boy Advance | yes | mGBA | mgba | yes |
+| Sega Genesis | yes | ares | ares | yes |
+| Sega CD | yes | ares | ares | yes |
+| Sega 32X | yes | ares | ares | yes |
+| Sega Game Gear | yes | Mesen Community Edition | mesence | yes |
+| Sega Master System | yes | Mesen Community Edition | mesence | yes |
+| TurboGrafx-16 | yes | Mednafen | mednafen | yes |
 
 Enabled platforms missing native settings: ps1, ps2, ps3

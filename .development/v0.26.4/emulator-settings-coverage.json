@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "generatedFromBranch": "feature/v0.26.4-platform-expansion",
-  "platformCount": 16,
-  "enabledCount": 16,
+  "platformCount": 28,
+  "enabledCount": 28,
   "enabledMissingNativeSettings": [
     "ps1",
     "ps2",
@@ -316,6 +316,246 @@
       "primaryBackend": "Mednafen",
       "adapter": "mednafen",
       "fallbackAdapter": "kronos",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "atari2600",
+      "name": "Atari 2600",
+      "enabled": true,
+      "primaryBackend": "Stella",
+      "adapter": "stella",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "nes",
+      "name": "Nintendo Entertainment System",
+      "enabled": true,
+      "primaryBackend": "Mesen Community Edition",
+      "adapter": "mesence",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "snes",
+      "name": "Super Nintendo Entertainment System",
+      "enabled": true,
+      "primaryBackend": "Mesen Community Edition",
+      "adapter": "mesence",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "gameboy",
+      "name": "Nintendo Game Boy",
+      "enabled": true,
+      "primaryBackend": "Mesen Community Edition",
+      "adapter": "mesence",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "gbc",
+      "name": "Nintendo Game Boy Color",
+      "enabled": true,
+      "primaryBackend": "Mesen Community Edition",
+      "adapter": "mesence",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "gba",
+      "name": "Nintendo Game Boy Advance",
+      "enabled": true,
+      "primaryBackend": "mGBA",
+      "adapter": "mgba",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "genesis",
+      "name": "Sega Genesis",
+      "enabled": true,
+      "primaryBackend": "ares",
+      "adapter": "ares",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "segacd",
+      "name": "Sega CD",
+      "enabled": true,
+      "primaryBackend": "ares",
+      "adapter": "ares",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "sega32x",
+      "name": "Sega 32X",
+      "enabled": true,
+      "primaryBackend": "ares",
+      "adapter": "ares",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "gamegear",
+      "name": "Sega Game Gear",
+      "enabled": true,
+      "primaryBackend": "Mesen Community Edition",
+      "adapter": "mesence",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "mastersystem",
+      "name": "Sega Master System",
+      "enabled": true,
+      "primaryBackend": "Mesen Community Edition",
+      "adapter": "mesence",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "turbografx16",
+      "name": "TurboGrafx-16",
+      "enabled": true,
+      "primaryBackend": "Mednafen",
+      "adapter": "mednafen",
+      "fallbackAdapter": "",
       "platformDefinitionFound": true,
       "settingsDefault": true,
       "adapterDiscoveryPresent": true,
