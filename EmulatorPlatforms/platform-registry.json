@@ -1047,6 +1047,113 @@
         "alphabet-index",
         "hucard-and-cd-library"
       ]
+    },
+    {
+      "id": "atarilynx",
+      "name": "Atari Lynx",
+      "kind": "native-platform-view",
+      "enabled": true,
+      "sortOrder": 520,
+      "backend": "Mednafen",
+      "interface": "Atari Lynx handheld interface",
+      "displayName": "Atari Lynx",
+      "menuName": "Atari Lynx",
+      "aliases": [
+        "Atari Lynx",
+        "AtariLynx",
+        "Mednafen"
+      ],
+      "version": "0.26.4-dev",
+      "nativeType": "HuymaierConsole.NativeApp.ConsolePlatformWindow",
+      "capabilities": [
+        "library",
+        "cached-library",
+        "direct-launch",
+        "launch-return",
+        "controller-navigation",
+        "cover-art",
+        "compiled-native-host",
+        "in-process-platform-view",
+        "huymaier-native-path-picker",
+        "latest-emulator-install",
+        "emulator-first-cover-art",
+        "native-full-emulator-settings",
+        "unknown-setting-preservation",
+        "native-save-management",
+        "alphabet-index"
+      ]
+    },
+    {
+      "id": "ngpc",
+      "name": "Neo Geo Pocket Color",
+      "kind": "native-platform-view",
+      "enabled": true,
+      "sortOrder": 540,
+      "backend": "Mednafen",
+      "interface": "Neo Geo Pocket Color handheld interface",
+      "displayName": "Neo Geo Pocket Color",
+      "menuName": "Neo Geo Pocket Color",
+      "aliases": [
+        "Neo Geo Pocket Color",
+        "NGPC",
+        "Mednafen"
+      ],
+      "version": "0.26.4-dev",
+      "nativeType": "HuymaierConsole.NativeApp.ConsolePlatformWindow",
+      "capabilities": [
+        "library",
+        "cached-library",
+        "direct-launch",
+        "launch-return",
+        "controller-navigation",
+        "cover-art",
+        "compiled-native-host",
+        "in-process-platform-view",
+        "huymaier-native-path-picker",
+        "latest-emulator-install",
+        "emulator-first-cover-art",
+        "native-full-emulator-settings",
+        "unknown-setting-preservation",
+        "native-save-management",
+        "alphabet-index"
+      ]
+    },
+    {
+      "id": "primehack",
+      "name": "Metroid PrimeHack",
+      "kind": "native-platform-view",
+      "enabled": true,
+      "sortOrder": 550,
+      "backend": "PrimeHack",
+      "interface": "Prime-series visor HUD interface for PrimeHack",
+      "displayName": "Metroid PrimeHack",
+      "menuName": "Metroid PrimeHack",
+      "aliases": [
+        "Metroid PrimeHack",
+        "PrimeHack",
+        "PrimeHack"
+      ],
+      "version": "0.26.4-dev",
+      "nativeType": "HuymaierConsole.NativeApp.ConsolePlatformWindow",
+      "capabilities": [
+        "library",
+        "cached-library",
+        "direct-launch",
+        "launch-return",
+        "controller-navigation",
+        "cover-art",
+        "compiled-native-host",
+        "in-process-platform-view",
+        "huymaier-native-path-picker",
+        "latest-emulator-install",
+        "emulator-first-cover-art",
+        "native-full-emulator-settings",
+        "unknown-setting-preservation",
+        "native-save-management",
+        "alphabet-index",
+        "prime-visor-interface",
+        "primehack-controller-settings"
+      ]
     }
   ]
 }

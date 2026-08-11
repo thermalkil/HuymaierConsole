@@ -2,11 +2,11 @@
   "id": "atarilynx",
   "displayName": "Atari Lynx",
   "primaryBackend": "Mednafen",
-  "fallbackBackend": "ares",
+  "fallbackBackend": "",
   "adapter": "mednafen",
   "interface": "Atari Lynx handheld interface",
   "version": "0.26.4-dev",
-  "enabled": false,
+  "enabled": true,
   "gameExtensions": [
     ".lnx",
     ".lyx",

@@ -314,7 +314,7 @@ namespace HuymaierConsole.NativeApp
             }
             else if (key == "ATARILYNX")
             {
-                d.DisplayName="Atari Lynx";d.Subtitle="HANDHELD COLOR ENTERTAINMENT SYSTEM";d.Shell="AtariLynx";d.PrimaryBackend="Mednafen";d.FallbackBackend="ares";d.PrimaryExecutableNames=new string[]{"mednafen.exe"};d.FallbackExecutableNames=new string[]{"ares.exe"};d.GameExtensions=new string[]{".lnx",".lyx",".o",".zip"};d.ColorA=Color.FromRgb(22,23,24);d.ColorB=Color.FromRgb(4,5,6);d.Accent=Color.FromRgb(226,82,44);
+                d.DisplayName="Atari Lynx";d.Subtitle="HANDHELD COLOR ENTERTAINMENT SYSTEM";d.Shell="AtariLynx";d.PrimaryBackend="Mednafen";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"mednafen.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".lnx",".lyx",".o",".zip"};d.ColorA=Color.FromRgb(22,23,24);d.ColorB=Color.FromRgb(4,5,6);d.Accent=Color.FromRgb(226,82,44);
             }
             else if (key == "NEOGEO")
             {
@@ -322,7 +322,7 @@ namespace HuymaierConsole.NativeApp
             }
             else if (key == "NGPC")
             {
-                d.DisplayName="Neo Geo Pocket Color";d.Subtitle="COLOR";d.Shell="NGPC";d.PrimaryBackend="Mednafen";d.FallbackBackend="ares";d.PrimaryExecutableNames=new string[]{"mednafen.exe"};d.FallbackExecutableNames=new string[]{"ares.exe"};d.GameExtensions=new string[]{".ngc",".ngp",".npc",".zip"};d.ColorA=Color.FromRgb(84,87,89);d.ColorB=Color.FromRgb(29,31,32);d.Accent=Color.FromRgb(78,183,182);
+                d.DisplayName="Neo Geo Pocket Color";d.Subtitle="COLOR";d.Shell="NGPC";d.PrimaryBackend="Mednafen";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"mednafen.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".ngc",".ngp",".npc",".zip"};d.ColorA=Color.FromRgb(84,87,89);d.ColorB=Color.FromRgb(29,31,32);d.Accent=Color.FromRgb(78,183,182);
             }
             else if (key == "JAGUAR")
             {
@@ -330,7 +330,7 @@ namespace HuymaierConsole.NativeApp
             }
             else if (key == "PRIMEHACK")
             {
-                d.DisplayName="Metroid PrimeHack";d.Subtitle="PRIME VISOR";d.Shell="PrimeHack";d.PrimaryBackend="PrimeHack";d.FallbackBackend="Dolphin";d.PrimaryExecutableNames=new string[]{"PrimeHack.exe","DolphinQt2.exe","Dolphin.exe"};d.FallbackExecutableNames=new string[]{"Dolphin.exe","DolphinQt2.exe"};d.GameExtensions=new string[]{".iso",".rvz",".wbfs",".gcm",".ciso"};d.ColorA=Color.FromRgb(5,29,31);d.ColorB=Color.FromRgb(2,7,9);d.Accent=Color.FromRgb(63,225,211);
+                d.DisplayName="Metroid PrimeHack";d.Subtitle="PRIME VISOR";d.Shell="PrimeHack";d.PrimaryBackend="PrimeHack";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"PrimeHack.exe","DolphinQt2.exe","Dolphin.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".iso",".rvz",".wbfs",".gcm",".ciso"};d.ColorA=Color.FromRgb(5,29,31);d.ColorB=Color.FromRgb(2,7,9);d.Accent=Color.FromRgb(63,225,211);
             }
             else if (key == "ATARI2600")
             {

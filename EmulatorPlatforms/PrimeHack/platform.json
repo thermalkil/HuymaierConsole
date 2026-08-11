@@ -2,11 +2,11 @@
   "id": "primehack",
   "displayName": "Metroid PrimeHack",
   "primaryBackend": "PrimeHack",
-  "fallbackBackend": "Dolphin",
+  "fallbackBackend": "",
   "adapter": "primehack",
   "interface": "Prime-series visor HUD interface for PrimeHack",
   "version": "0.26.4-dev",
-  "enabled": false,
+  "enabled": true,
   "gameExtensions": [
     ".iso",
     ".rvz",
