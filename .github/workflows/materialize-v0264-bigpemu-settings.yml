@@ -1,0 +1,35 @@
+name: Materialize v0.26.4 BigPEmu Full Settings Adapter
+on:
+  pull_request:
+    branches: [feature/v0.26.3-console-fidelity]
+    paths: ['.development/v0.26.4/bigpemu-settings-request.json','.development/v0.26.4/apply_bigpemu_full_settings.py','.github/workflows/materialize-v0264-bigpemu-settings.yml']
+permissions: {contents: write}
+concurrency: {group: huymaier-v0264-bigpemu-settings, cancel-in-progress: false}
+jobs:
+  materialize:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: feature/v0.26.4-platform-expansion, fetch-depth: 0}
+      - name: Materialize BigPEmu settings discovery
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';python .development\v0.26.4\apply_bigpemu_full_settings.py;if($LASTEXITCODE){throw 'BigPEmu settings materializer failed'}
+      - name: Parse and functionally prove bigpcfg preservation
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';foreach($p in @('.\HuymaierEmulatorSettings.ps1','.\HuymaierEmulatorSettingsWorker.ps1')){$t=$null;$e=$null;[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p),[ref]$t,[ref]$e);if($e.Count){$e|ForEach-Object{Write-Host "$p : $($_.Message)"};throw "$p parse failed"}}
+          $worker=Get-Content -Raw '.\HuymaierEmulatorSettingsWorker.ps1' -Encoding UTF8;foreach($m in @('BigPEmuConfig.bigpcfg','UserData\BigPEmuConfig.bigpcfg',"Extension -ieq '.bigpcfg'",'gameFolders')){if($worker -notmatch [regex]::Escape($m)){throw "BigPEmu discovery marker missing: $m"}}
+          $core=Get-Content -Raw '.\HuymaierEmulatorSettings.ps1' -Encoding UTF8;if($core -notmatch [regex]::Escape("AdapterId -ieq 'bigpemu' -and `$ext -ieq '.bigpcfg'")){throw 'BigPEmu .bigpcfg JSON format mapping missing'}
+          $test=Join-Path $env:RUNNER_TEMP 'BigPEmuConfig.bigpcfg';@'{
+          "VideoPlugin":"BigPEmu_Video_OpenGL",
+          "FutureUnknownSetting":123,
+          "Nested":{"HDR":true,"Scale":2}
+          }
+          '@|Set-Content -LiteralPath $test -Encoding UTF8
+          $script:BaseDir=(Resolve-Path '.').Path;function Write-Log{};function Get-EntryProperty{param($Object,[string]$Name,$Default=$null);if($null-ne$Object){$p=$Object.PSObject.Properties[$Name];if($p){return $p.Value}};return $Default};. .\HuymaierEmulatorSettings.ps1;$items=@(Get-HcEmulatorSettings -Path $test -AdapterId 'bigpemu');if($items.Count-lt4){throw 'BigPEmu JSON inventory did not expose all scalar settings'};$target=@($items|Where-Object{$_.Key -eq 'VideoPlugin'}|Select-Object -First 1);Set-HcEmulatorSettingValue -Setting $target -Value 'BigPEmu_Video_D3D12';$after=Get-Content -Raw $test -Encoding UTF8|ConvertFrom-Json;if($after.VideoPlugin-ne'BigPEmu_Video_D3D12'-or$after.FutureUnknownSetting-ne123-or-not$after.Nested.HDR-or$after.Nested.Scale-ne2){throw 'BigPEmu edit did not preserve unknown/nested settings'}
+      - name: Commit validated adapter
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com';git add HuymaierEmulatorSettings.ps1 HuymaierEmulatorSettingsWorker.ps1;if(git diff --cached --quiet){exit 0};git commit -m 'Materialize v0.26.4 BigPEmu full settings adapter';git fetch origin feature/v0.26.4-platform-expansion;git rebase origin/feature/v0.26.4-platform-expansion;if($LASTEXITCODE-ne0){throw 'BigPEmu adapter rebase failed'};git push origin HEAD:feature/v0.26.4-platform-expansion;if($LASTEXITCODE-ne0){throw 'BigPEmu adapter push failed'}
