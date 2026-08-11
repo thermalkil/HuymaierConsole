@@ -1,0 +1,91 @@
+﻿{
+    "schemaVersion":  1,
+    "generatedAtUtc":  "2026-08-11T05:46:32.0872133Z",
+    "bigpemu":  {
+                    "downloadResolved":  true,
+                    "downloadUrl":  "https://www.richwhitehouse.com/jaguar/builds/BigPEmu_WinARM64_v1221.zip",
+                    "archiveSha256":  "28470e9493abc9e08452c01f0ad666173b880403ff9857fbbf0fc1c86f48a0cf",
+                    "executableResolved":  true,
+                    "executable":  "D:\\a\\_temp\\hc-specialty-research\\BigPEmu\\BigPEmu.exe",
+                    "fileVersion":  null,
+                    "productVersion":  null,
+                    "cliProbes":  [
+                                      {
+                                          "argument":  "-help",
+                                          "error":  "Exception calling \"Start\" with \"1\" argument(s): \"The specified executable is not a valid application for this OS platform.\""
+                                      },
+                                      {
+                                          "argument":  "--help",
+                                          "error":  "Exception calling \"Start\" with \"1\" argument(s): \"The specified executable is not a valid application for this OS platform.\""
+                                      },
+                                      {
+                                          "argument":  "/?",
+                                          "error":  "Exception calling \"Start\" with \"1\" argument(s): \"The specified executable is not a valid application for this OS platform.\""
+                                      },
+                                      {
+                                          "argument":  "",
+                                          "error":  "Exception calling \"Start\" with \"1\" argument(s): \"The specified executable is not a valid application for this OS platform.\""
+                                      }
+                                  ],
+                    "detectedConfigFiles":  [
+                                                "D:\\a\\_temp\\hc-specialty-research\\BigPEmu\\BigPEmu.exe",
+                                                "D:\\a\\_temp\\hc-specialty-research\\BigPEmu\\Plugins\\BigPEmu_Audio_DirectSound.dll",
+                                                "D:\\a\\_temp\\hc-specialty-research\\BigPEmu\\Plugins\\BigPEmu_Input_DirectInput.dll",
+                                                "D:\\a\\_temp\\hc-specialty-research\\BigPEmu\\Plugins\\BigPEmu_Network_WS2.dll",
+                                                "D:\\a\\_temp\\hc-specialty-research\\BigPEmu\\Plugins\\BigPEmu_Other_MMDev.dll",
+                                                "D:\\a\\_temp\\hc-specialty-research\\BigPEmu\\Plugins\\BigPEmu_Video_D3D12.dll",
+                                                "D:\\a\\_temp\\hc-specialty-research\\BigPEmu\\Plugins\\BigPEmu_Video_OpenGL.dll",
+                                                "D:\\a\\_temp\\hc-specialty-research\\BigPEmu\\Plugins\\BigPEmu_Video_Software.dll",
+                                                "D:\\a\\_temp\\hc-specialty-research\\BigPEmu\\Scripts\\cheat_codes.json"
+                                            ],
+                    "registryProbe":  "\r\nEnd of search: 0 match(es) found.\r\n"
+                },
+    "fbneo":  {
+                  "tag":  "latest",
+                  "releaseName":  "nightly release",
+                  "assets":  [
+                                 {
+                                     "name":  "linux-sdl1-x86_64.zip",
+                                     "size":  15595256,
+                                     "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/linux-sdl1-x86_64.zip"
+                                 },
+                                 {
+                                     "name":  "linux-sdl2-x86_64.zip",
+                                     "size":  15507646,
+                                     "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/linux-sdl2-x86_64.zip"
+                                 },
+                                 {
+                                     "name":  "windows-arm64-debug.zip",
+                                     "size":  14064404,
+                                     "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/windows-arm64-debug.zip"
+                                 },
+                                 {
+                                     "name":  "windows-arm64.zip",
+                                     "size":  13234651,
+                                     "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/windows-arm64.zip"
+                                 },
+                                 {
+                                     "name":  "windows-x86_32-debug.zip",
+                                     "size":  16185126,
+                                     "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/windows-x86_32-debug.zip"
+                                 },
+                                 {
+                                     "name":  "windows-x86_32.zip",
+                                     "size":  16040204,
+                                     "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/windows-x86_32.zip"
+                                 },
+                                 {
+                                     "name":  "windows-x86_64-debug.zip",
+                                     "size":  16843879,
+                                     "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/windows-x86_64-debug.zip"
+                                 },
+                                 {
+                                     "name":  "windows-x86_64.zip",
+                                     "size":  16663819,
+                                     "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/windows-x86_64.zip"
+                                 }
+                             ],
+                  "binaryResolved":  false,
+                  "error":  "Latest official GitHub release does not expose a Windows binary asset matching the supported installer contract."
+              }
+}
