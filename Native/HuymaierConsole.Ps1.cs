@@ -1814,6 +1814,9 @@ namespace HuymaierConsole.NativeApp
             AddActionButton(panel, "DuckStation", executableStatus, delegate { ChooseDuckStation(); });
             AddActionButton(panel, "DuckStation Data", String.IsNullOrWhiteSpace(settings.dataRoot) ? "Not detected" : settings.dataRoot, delegate { ChooseDataRoot(); });
             AddActionButton(panel, "Install / Update DuckStation", "Install the latest supported DuckStation release through Huymaier Console", delegate { InstallManagedDuckStation(); });
+            // v0.26.4 PS1_FULL_BACKEND_SETTINGS_ACTION_BEGIN
+            AddActionButton(panel, "Full DuckStation Settings", "Every setting discovered from the installed DuckStation configuration", OpenFullDuckStationSettings);
+            // v0.26.4 PS1_FULL_BACKEND_SETTINGS_ACTION_END
             AddActionButton(panel, "BIOS", biosStatus, delegate { ImportBiosImage(); });
             AddActionButton(panel, "Open BIOS Folder", "Open DuckStation's BIOS directory", delegate { OpenBiosFolder(); });
             AddActionButton(panel, "Add Game Folder", settings.gameFolders.Count.ToString(CultureInfo.InvariantCulture) + " Huymaier folder(s) configured; DuckStation paths are also detected", delegate { AddGameFolder(); });
@@ -1922,6 +1925,15 @@ namespace HuymaierConsole.NativeApp
             settings.Save(settingsPath);
             RenderSettings();
         }
+
+        // v0.26.4 PS1_FULL_BACKEND_SETTINGS_METHOD_BEGIN
+        private void OpenFullDuckStationSettings()
+        {
+            NativeBackendSettingsWindow.Show(this, consoleRoot, "PS1", "PlayStation", "DuckStation", settingsPath);
+            NativeConsoleNavigation.Reset();
+            RenderSettings();
+        }
+        // v0.26.4 PS1_FULL_BACKEND_SETTINGS_METHOD_END
 
         private void InstallManagedDuckStation()
         {
