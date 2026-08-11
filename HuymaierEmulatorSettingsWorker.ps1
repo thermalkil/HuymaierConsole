@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][ValidateSet('Inventory','Set')][string]$Mode,
     [Parameter(Mandatory=$true)][string]$PlatformId,
