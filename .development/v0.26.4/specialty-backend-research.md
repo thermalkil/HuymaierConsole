@@ -1,18 +1,15 @@
 ﻿# v0.26.4 Jaguar / Neo Geo backend readiness
 
-Generated from the current official BigPEmu download page and current official FBNeo GitHub release.
+Deterministic audit of the current official Windows x64 distributions.
 
 ## BigPEmu
-
-- Download resolved: True
+- x64 download resolved: True
 - Executable resolved: True
-- Product version: 
-- Detected config candidates: 9
+- PE machine: 0x8664
 
 ## FinalBurn Neo
-
 - Latest tag: latest
-- Windows binary resolved: False
-- Selected asset: 
-- Executable resolved: 
+- Windows x86_64 asset: windows-x86_64.zip
+- Executable resolved: True
+- Executable name: fbneo64.exe
 
