@@ -1,0 +1,43 @@
+name: Enable Huymaier Console v0.26.4 Modern PlayStation
+on:
+  pull_request:
+    branches: [feature/v0.26.3-console-fidelity]
+    paths: ['.development/v0.26.4/modern-playstation-enable-request.json','.development/v0.26.4/apply_modern_playstation_launch_enable.py','.github/workflows/materialize-v0264-modern-playstation-enable.yml']
+permissions: {contents: write}
+concurrency: {group: huymaier-v0264-modern-playstation-enable, cancel-in-progress: false}
+jobs:
+  enable:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: feature/v0.26.4-platform-expansion, fetch-depth: 0}
+      - name: Live-install current shadPS4 and Vita3K Windows backends
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';foreach($id in @('PS4','VITA')){$root=Join-Path $env:RUNNER_TEMP ('hc-'+$id.ToLower());New-Item -ItemType Directory -Force -Path $root|Out-Null;$json=& .\HuymaierEmulatorInstaller.ps1 -PlatformId $id -DestinationRoot $root -ConsoleRoot (Resolve-Path '.').Path|Select-Object -Last 1;$result=$json|ConvertFrom-Json;$exe=[string]$result.Executable;if(-not(Test-Path -LiteralPath $exe -PathType Leaf)){throw "$id installer did not return an executable"};$bytes=[IO.File]::ReadAllBytes($exe);$pe=[BitConverter]::ToInt32($bytes,0x3c);$machine=[BitConverter]::ToUInt16($bytes,$pe+4);if($machine-ne0x8664){throw "$id installed executable is not x64 (machine 0x$($machine.ToString('X4')))"};Write-Host "$id current x64 backend: $exe"}
+      - name: Materialize upstream-grounded launch contracts
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';python .development\v0.26.4\apply_modern_playstation_launch_enable.py;if($LASTEXITCODE){throw 'Modern PlayStation graduation materializer failed'};python .development\v0.26.4\apply_source_manifest.py;if($LASTEXITCODE){throw 'Source manifest sync failed'}
+      - name: Validate installed-content launch/settings contracts
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';$native=Get-Content -Raw 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8;foreach($m in @('RefreshModernPlayStationLibrary(showNotice)','sce_sys","param.sfo','eboot.bin','shad.Append("-g ")','"-r " + QuoteProcessArgument(titleId)','RenderPs4DynamicMenu','RenderVitaLiveArea','RenderModernPlayStationSettings','RenderModernPlayStationStorage')){if($native -notmatch [regex]::Escape($m)){throw "Modern PlayStation native marker missing: $m"}}
+          $start=$native.IndexOf('private void RefreshModernPlayStationLibrary');$end=$native.IndexOf('private static string CleanName',$start);if($start-lt0-or$end-le$start){throw 'Installed-content scanner could not be isolated'};$block=$native.Substring($start,$end-$start);if($block-match '\.(pkg|vpk)'){throw 'PS4/Vita installed library still treats package archives as playable games'}
+          $worker=Get-Content -Raw 'HuymaierEmulatorSettingsWorker.ps1' -Encoding UTF8;foreach($m in @("'shadps4'","'vita3k'",'config.toml','config.yml')){if($worker -notmatch [regex]::Escape($m)){throw "Modern PlayStation settings discovery missing: $m"}}
+          foreach($folder in @('PS4','Vita')){$d=Get-Content -Raw (Join-Path (Join-Path 'EmulatorPlatforms' $folder) 'platform.json') -Encoding UTF8|ConvertFrom-Json;if(-not[bool]$d.enabled){throw "$folder not enabled"};if(-not[string]::IsNullOrWhiteSpace([string]$d.fallbackBackend)){throw "$folder exposes an unaudited fallback backend"}}
+          $registry=Get-Content -Raw 'EmulatorPlatforms\platform-registry.json' -Encoding UTF8|ConvertFrom-Json;foreach($id in @('ps4','vita')){$e=@($registry.platforms|Where-Object{$_.id-eq$id});if($e.Count-ne1-or-not[bool]$e[0].enabled){throw "$id registry graduation invalid"};foreach($cap in @('native-full-emulator-settings','installed-application-library','latest-emulator-install')){if(@($e[0].capabilities)-notcontains$cap){throw "$id missing $cap"}}}
+      - name: Parse production PowerShell and compile exact x64 native source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';foreach($p in @('.\HuymaierEmulatorInstaller.ps1','.\HuymaierEmulatorSettings.ps1','.\HuymaierEmulatorSettingsWorker.ps1','.\HuymaierNativeConsoleLibraryWorker.ps1')){$t=$null;$e=$null;[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p),[ref]$t,[ref]$e);if($e.Count){$e|ForEach-Object{Write-Host "$p : $($_.Message)"};throw "$p parse failed"}}
+          Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Windows.Forms,System.Drawing,System.Web.Extensions;$csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe';$automation=[Management.Automation.PSObject].Assembly.Location;$refs=@([Uri].Assembly.Location,[Linq.Enumerable].Assembly.Location,[System.Xaml.XamlReader].Assembly.Location,[Xml.XmlDocument].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,[Windows.Window].Assembly.Location,[Windows.Forms.Form].Assembly.Location,[Drawing.Bitmap].Assembly.Location,[Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,$automation)|Select-Object -Unique;$sources=@('Native\HuymaierConsole.NativeApp.cs','Native\HuymaierConsole.Ps1.cs','Native\HuymaierConsole.ConsolePlatforms.cs','Native\HuymaierConsole.SystemOverlay.cs','Native\HuymaierConsole.GameInput.cs','HuymaierNativeInput.cs','HuymaierNativeDisplay.cs','HuymaierNativeAudio.cs','HuymaierPerformance.cs','EmulatorPlatforms\Shared\Huymaier.P3T.cs');$out=Join-Path $env:RUNNER_TEMP 'hc-modern-playstation.dll';$args=@('/noconfig','/nologo','/target:library','/platform:x64','/optimize+',('/out:'+$out));foreach($ref in $refs){$args+=('/reference:'+$ref)};$args+=$sources;& $csc @args;if($LASTEXITCODE-ne0-or-not(Test-Path $out)){throw 'Modern PlayStation graduation x64 compile failed'}
+      - name: Keep PS1 PS2 PS3 presentation frozen
+        shell: powershell
+        run: |
+          git diff --quiet 9f3b5b390dd24f82ecce129c1e25dbc97bf598a5 -- Native/HuymaierConsole.Ps1.cs;if($LASTEXITCODE-ne0){$before=git show 9f3b5b390dd24f82ecce129c1e25dbc97bf598a5:Native/HuymaierConsole.Ps1.cs;$after=Get-Content -Raw Native/HuymaierConsole.Ps1.cs -Encoding UTF8;if($after-notmatch'PS1_FULL_BACKEND_SETTINGS_ACTION_BEGIN'){throw 'Unexpected PS1 source drift during PS4/Vita graduation'}}
+      - name: Commit validated modern PlayStation graduation
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com';git add Native/HuymaierConsole.ConsolePlatforms.cs EmulatorPlatforms/PS4/platform.json EmulatorPlatforms/Vita/platform.json EmulatorPlatforms/platform-registry.json manifest.json .source/source-files.txt;if(git diff --cached --quiet){exit 0};git commit -m 'Enable validated v0.26.4 PS4 and Vita native platforms';git fetch origin feature/v0.26.4-platform-expansion;git rebase origin/feature/v0.26.4-platform-expansion;if($LASTEXITCODE-ne0){throw 'Modern PlayStation graduation rebase failed'};git push origin HEAD:feature/v0.26.4-platform-expansion;if($LASTEXITCODE-ne0){throw 'Modern PlayStation graduation push failed'}
