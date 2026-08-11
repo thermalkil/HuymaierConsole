@@ -1,0 +1,16 @@
+{
+  "id": "vita",
+  "displayName": "PlayStation Vita",
+  "primaryBackend": "Vita3K",
+  "fallbackBackend": "Vita3K Development",
+  "adapter": "vita3k",
+  "interface": "Native PlayStation Vita LiveArea-style interface",
+  "version": "0.26.4-dev",
+  "enabled": false,
+  "gameExtensions": [
+    ".vpk",
+    ".pkg",
+    ".zip"
+  ],
+  "dashboardStyle": "LiveArea"
+}

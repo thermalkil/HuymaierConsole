@@ -1,0 +1,16 @@
+{
+  "id": "ps4",
+  "displayName": "PlayStation 4",
+  "primaryBackend": "shadPS4",
+  "fallbackBackend": "shadPS4 Nightly",
+  "adapter": "shadps4",
+  "interface": "Native PS4 Dynamic Menu-style interface",
+  "version": "0.26.4-dev",
+  "enabled": false,
+  "gameExtensions": [
+    ".pkg",
+    ".elf",
+    ".bin"
+  ],
+  "dashboardStyle": "Dynamic Menu"
+}

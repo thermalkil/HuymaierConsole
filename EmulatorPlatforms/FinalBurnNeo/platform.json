@@ -1,0 +1,16 @@
+{
+  "id": "finalburnneo",
+  "displayName": "Final Burn Neo",
+  "primaryBackend": "FinalBurn Neo",
+  "fallbackBackend": "MAME",
+  "adapter": "fbneo",
+  "interface": "Native arcade-board / operator interface",
+  "version": "0.26.4-dev",
+  "enabled": false,
+  "gameExtensions": [
+    ".zip",
+    ".7z",
+    ".chd"
+  ],
+  "dashboardStyle": "FBNeo Arcade Board"
+}
