@@ -3,9 +3,9 @@
 Deterministic audit of the current official Windows x64 distributions.
 
 ## BigPEmu
-- x64 download resolved: False
-- Executable resolved: 
-- PE machine: 
+- x64 download resolved: True
+- Executable resolved: True
+- PE machine: 0x8664
 
 ## FinalBurn Neo
 - Latest tag: latest

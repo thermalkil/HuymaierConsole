@@ -1,8 +1,13 @@
 ﻿{
     "schemaVersion":  2,
     "bigpemu":  {
-                    "downloadResolved":  false,
-                    "error":  "The remote server returned an error: (409) Conflict."
+                    "downloadResolved":  true,
+                    "downloadUrl":  "https://www.richwhitehouse.com/jaguar/builds/BigPEmu_v1221.zip",
+                    "archiveSha256":  "90b49dff119c66f8e8bd6eb45c1c5f24959dde165778e3d0e7fb5f7c46ee8c3d",
+                    "executableResolved":  true,
+                    "peMachine":  "0x8664",
+                    "fileVersion":  null,
+                    "productVersion":  null
                 },
     "fbneo":  {
                   "tag":  "latest",
@@ -10,48 +15,48 @@
                   "assets":  [
                                  {
                                      "name":  "linux-sdl1-x86_64.zip",
-                                     "size":  15599195,
+                                     "size":  15605293,
                                      "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/linux-sdl1-x86_64.zip"
                                  },
                                  {
                                      "name":  "linux-sdl2-x86_64.zip",
-                                     "size":  15505938,
+                                     "size":  15509101,
                                      "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/linux-sdl2-x86_64.zip"
                                  },
                                  {
                                      "name":  "windows-arm64-debug.zip",
-                                     "size":  14007524,
+                                     "size":  14010086,
                                      "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/windows-arm64-debug.zip"
                                  },
                                  {
                                      "name":  "windows-arm64.zip",
-                                     "size":  13234691,
+                                     "size":  13235710,
                                      "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/windows-arm64.zip"
                                  },
                                  {
                                      "name":  "windows-x86_32-debug.zip",
-                                     "size":  16184466,
+                                     "size":  16188647,
                                      "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/windows-x86_32-debug.zip"
                                  },
                                  {
                                      "name":  "windows-x86_32.zip",
-                                     "size":  16040917,
+                                     "size":  16043491,
                                      "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/windows-x86_32.zip"
                                  },
                                  {
                                      "name":  "windows-x86_64-debug.zip",
-                                     "size":  16845624,
+                                     "size":  16845688,
                                      "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/windows-x86_64-debug.zip"
                                  },
                                  {
                                      "name":  "windows-x86_64.zip",
-                                     "size":  16663351,
+                                     "size":  16667160,
                                      "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/windows-x86_64.zip"
                                  }
                              ],
                   "binaryResolved":  true,
                   "selectedAsset":  "windows-x86_64.zip",
-                  "archiveSha256":  "74a1f53c56883b986ddadbb290a50fddf17a8479057c1c5b8a213e83270d1b5c",
+                  "archiveSha256":  "63c332cee7e5bab981f82bdb400cefcab77de80c2e0c42e5aa92bc6c47b8e6f0",
                   "executables":  [
                                       "fbneo64.exe"
                                   ],
