@@ -26,10 +26,13 @@ jobs:
           import os,re
           before=Path(os.environ['RUNNER_TEMP'])/'ps1-before.cs'
           current=Path('Native/HuymaierConsole.Ps1.cs')
-          a=before.read_text(encoding='utf-8-sig').replace('\r\n','\n')
-          b=current.read_text(encoding='utf-8-sig').replace('\r\n','\n')
-          for name in ('ACTION','METHOD'):
-              b=re.sub(r'(?ms)^\s*// v0\.26\.4 PS1_FULL_BACKEND_SETTINGS_'+name+r'_BEGIN\n.*?^\s*// v0\.26\.4 PS1_FULL_BACKEND_SETTINGS_'+name+r'_END\n?', '', b)
+          def strip_allowed(value):
+              value=value.replace('\r\n','\n')
+              for name in ('ACTION','METHOD'):
+                  value=re.sub(r'(?ms)^\s*// v0\.26\.4 PS1_FULL_BACKEND_SETTINGS_'+name+r'_BEGIN\n.*?^\s*// v0\.26\.4 PS1_FULL_BACKEND_SETTINGS_'+name+r'_END\n?', '', value)
+              return value
+          a=strip_allowed(before.read_text(encoding='utf-8-sig'))
+          b=strip_allowed(current.read_text(encoding='utf-8-sig'))
           if a!=b:
               raise SystemExit('PS1 source changed outside the two explicitly marked full-backend-settings integration blocks.')
           print('PS1 visual/navigation source is unchanged outside functional full-settings integration markers')
