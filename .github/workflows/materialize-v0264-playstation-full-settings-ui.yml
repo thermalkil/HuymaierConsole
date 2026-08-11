@@ -2,7 +2,7 @@ name: Materialize v0.26.4 PlayStation Native Full Settings UI
 on:
   pull_request:
     branches: [feature/v0.26.3-console-fidelity]
-    paths: ['.development/v0.26.4/playstation-full-settings-ui-request.json','.development/v0.26.4/apply_playstation_full_settings_ui.py','.github/workflows/materialize-v0264-playstation-full-settings-ui.yml']
+    paths: ['.development/v0.26.4/playstation-full-settings-ui-request.json','.development/v0.26.4/apply_playstation_full_settings_ui.py','.development/v0.26.4/apply_playstation_full_settings_ui_compile_fix.py','.github/workflows/materialize-v0264-playstation-full-settings-ui.yml']
 permissions: {contents: write}
 concurrency: {group: huymaier-v0264-playstation-full-settings-ui, cancel-in-progress: false}
 jobs:
@@ -18,7 +18,7 @@ jobs:
       - name: Materialize controller-native complete backend settings UI
         shell: powershell
         run: |
-          $ErrorActionPreference='Stop';$native=Get-Content -Raw '.\Native\HuymaierConsole.NativeApp.cs' -Encoding UTF8;if($native -notmatch [regex]::Escape('COMPLETE_BACKEND_SETTINGS_WINDOW_BEGIN')){python .development\v0.26.4\apply_playstation_full_settings_ui.py;if($LASTEXITCODE){throw 'PlayStation full-settings UI materializer failed'}}
+          $ErrorActionPreference='Stop';$native=Get-Content -Raw '.\Native\HuymaierConsole.NativeApp.cs' -Encoding UTF8;if($native -notmatch [regex]::Escape('COMPLETE_BACKEND_SETTINGS_WINDOW_BEGIN')){python .development\v0.26.4\apply_playstation_full_settings_ui.py;if($LASTEXITCODE){throw 'PlayStation full-settings UI materializer failed'}};python .development\v0.26.4\apply_playstation_full_settings_ui_compile_fix.py;if($LASTEXITCODE){throw 'PlayStation full-settings compile overlay failed'}
       - name: Prove only marked PS1 functional integration was added
         shell: python
         run: |
@@ -37,7 +37,7 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference='Stop';$native=Get-Content -Raw '.\Native\HuymaierConsole.NativeApp.cs' -Encoding UTF8;$ps1=Get-Content -Raw '.\Native\HuymaierConsole.Ps1.cs' -Encoding UTF8
-          foreach($m in @('NativeBackendSettingsWindow','NativeBackendValueKeyboardWindow','RunWorker("Inventory"','RunWorker("Set"','NativeConsoleNavigation.Poll()','All RPCS3 Settings','Full PCSX2 Settings','OpenFullPcsx2Settings','OpenFullRpcs3Settings')){if($native -notmatch [regex]::Escape($m)){throw "PlayStation full-settings UI marker missing: $m"}}
+          foreach($m in @('NativeBackendSettingsWindow','NativeBackendValueKeyboardWindow','RunWorker("Inventory"','RunWorker("Set"','NativeConsoleNavigation.Poll()','All RPCS3 Settings','Full PCSX2 Settings','OpenFullPcsx2Settings','OpenFullRpcs3Settings','System.Windows.Controls.Primitives.UniformGrid')){if($native -notmatch [regex]::Escape($m)){throw "PlayStation full-settings UI marker missing: $m"}}
           foreach($m in @('Full DuckStation Settings','OpenFullDuckStationSettings','PS1_FULL_BACKEND_SETTINGS_ACTION_BEGIN','PS1_FULL_BACKEND_SETTINGS_METHOD_BEGIN')){if($ps1 -notmatch [regex]::Escape($m)){throw "PS1 full-settings marker missing: $m"}}
           if($native -match 'LeftShoulder[^\r\n]{0,200}(SwitchPage|Move\(|Confirm\()' -or $native -match 'RightShoulder[^\r\n]{0,200}(SwitchPage|Move\(|Confirm\()'){throw 'Full-settings UI assigns shoulder buttons to ordinary navigation.'}
       - name: Compile exact x64 native host source
