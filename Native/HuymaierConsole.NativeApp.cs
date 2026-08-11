@@ -209,6 +209,7 @@ namespace HuymaierConsole.NativeApp
         private void PollController()
         {
             if (!IsActive) return; NativeNavigationCommand command = NativeConsoleNavigation.Poll(); if (command == null || String.IsNullOrWhiteSpace(command.Command)) return;
+            if (command.Command == "Guide") { HuymaierGameBarHost.Toggle(); return; }
             if (command.Command == "Left") MoveHorizontal(-1); else if (command.Command == "Right") MoveHorizontal(1); else if (command.Command == "Up") MoveVertical(-1); else if (command.Command == "Down") MoveVertical(1); else if (command.Command == "Confirm") InvokeToken(keyLayout[rowIndex][columnIndex]); else if (command.Command == "Back") { Accepted = false; Close(); } else if (command.Command == "Secondary") Backspace(); else if (command.Command == "Tertiary") { lowerCase = !lowerCase; BuildKeys(); }
         }
         private void OnKeyDown(object sender, KeyEventArgs e)
@@ -387,7 +388,7 @@ namespace HuymaierConsole.NativeApp
         }
         private void PollController()
         {
-            if (!IsActive) return; NativeNavigationCommand command = NativeConsoleNavigation.Poll(); if (command == null || String.IsNullOrWhiteSpace(command.Command)) return; if (command.Command == "Up") Move(-1); else if (command.Command == "Down") Move(1); else if (command.Command == "Confirm") Confirm(); else if (command.Command == "Back") BackOneLayer(); else if (command.Command == "Secondary" && layer == 1 && selected < visibleSettings.Count) { string next; if (TryToggleValue(visibleSettings[selected].Value,out next)) ApplySetting(visibleSettings[selected],next); }
+            if (!IsActive) return; NativeNavigationCommand command = NativeConsoleNavigation.Poll(); if (command == null || String.IsNullOrWhiteSpace(command.Command)) return; if (command.Command == "Guide") { HuymaierGameBarHost.Toggle(); return; } if (command.Command == "Up") Move(-1); else if (command.Command == "Down") Move(1); else if (command.Command == "Confirm") Confirm(); else if (command.Command == "Back") BackOneLayer(); else if (command.Command == "Secondary" && layer == 1 && selected < visibleSettings.Count) { string next; if (TryToggleValue(visibleSettings[selected].Value,out next)) ApplySetting(visibleSettings[selected],next); }
         }
         private void OnKeyDown(object sender, KeyEventArgs e)
         {
