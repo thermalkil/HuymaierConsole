@@ -2643,7 +2643,22 @@ namespace HuymaierConsole.NativeApp
 
         private bool IsWave45Shell() { return definition.Shell == "Arcade" || definition.Shell == "FinalBurnNeo" || definition.Shell == "PS4" || definition.Shell == "Vita"; }
         private void RenderWave45Root() { if(definition.Shell=="Arcade")RenderArcadeCabinet();else if(definition.Shell=="FinalBurnNeo")RenderFbNeoBoard();else if(definition.Shell=="PS4")RenderPs4DynamicMenu();else RenderVitaLiveArea(); }
-        private void RenderWave45Subpage() { if(dashboardSubpage=="library"){RenderWave1Library();return;}if(dashboardSubpage=="settings"||dashboardSubpage=="backend-settings"||dashboardSubpage=="backend-settings-list"||dashboardSubpage=="backend-setting-detail"){RenderWave1Subpage();return;}if(dashboardSubpage=="saves"){RenderWave1Storage();return;}RenderWave1Settings(); }
+        private void RenderWave45Subpage() { if(dashboardSubpage=="library"){RenderWave1Library();return;}if(dashboardSubpage=="backend-settings"||dashboardSubpage=="backend-settings-list"||dashboardSubpage=="backend-setting-detail"){RenderWave1Subpage();return;}if((definition.Shell=="Arcade"||definition.Shell=="FinalBurnNeo")&&dashboardSubpage=="settings"){RenderArcadeOperatorSettings();return;}if((definition.Shell=="Arcade"||definition.Shell=="FinalBurnNeo")&&dashboardSubpage=="saves"){RenderArcadeStorage();return;}if(dashboardSubpage=="settings"){RenderWave1Settings();return;}if(dashboardSubpage=="saves"){RenderWave1Storage();return;}RenderWave1Settings(); }
+
+
+        private List<string> FindArcadeStorageItems()
+        {
+            List<string> roots=new List<string>();Action<string> add=delegate(string value){if(String.IsNullOrWhiteSpace(value))return;try{if(File.Exists(value))value=Path.GetDirectoryName(value);if(Directory.Exists(value)&&!roots.Contains(value,StringComparer.OrdinalIgnoreCase))roots.Add(value);}catch{}};add(settings.emulatorDataPath);add(settings.emulatorPath);add(settings.fallbackEmulatorPath);foreach(string root in roots.ToArray())foreach(string name in new[]{"nvram","memcard","hi","sta","cfg","config"}){try{add(Path.Combine(root,name));}catch{}}
+            HashSet<string> items=new HashSet<string>(StringComparer.OrdinalIgnoreCase);int visited=0;foreach(string root in roots){try{foreach(string file in Directory.EnumerateFiles(root,"*",SearchOption.AllDirectories)){if(++visited>14000)break;string lower=file.ToLowerInvariant();if(lower.Contains("\\nvram\\")||lower.Contains("\\memcard\\")||lower.Contains("\\hi\\")||lower.Contains("\\sta\\")||lower.EndsWith(".nv")||lower.EndsWith(".nvram")||lower.EndsWith(".hi")||lower.EndsWith(".sta")||lower.EndsWith(".mem"))items.Add(file);}}catch{}if(visited>14000)break;}return items.OrderBy(delegate(string p){return Path.GetFileName(p);},StringComparer.CurrentCultureIgnoreCase).ToList();
+        }
+        private void RenderArcadeStorage()
+        {
+            Color accent=definition.Shell=="Arcade"?Color.FromRgb(255,49,171):Color.FromRgb(255,193,37);titleText.Text="Operator Storage";subtitleText.Text="NVRAM  •  memory cards  •  high scores  •  save states";columns=3;WrapPanel panel=new WrapPanel{Margin=new Thickness(38,10,38,24)};contentHost.Children.Add(new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=panel});List<string> items=FindArcadeStorageItems();foreach(string value in items.Take(800)){string captured=value;AddHardwareUtility(panel,Path.GetFileNameWithoutExtension(value),FormatBytes(GetPathSize(value))+"  •  "+Path.GetExtension(value).TrimStart('.').ToUpperInvariant(),"MEM",accent,delegate{BackupNativeSavePath(captured,"Arcade-"+Path.GetFileNameWithoutExtension(captured));},310,120);}if(items.Count==0)AddHardwareUtility(panel,"No Operator Storage","Launch games to create NVRAM/high-score/state data.","MEM",accent,delegate{dashboardSubpage="settings";selected=0;RenderPage();},310,120);else AddHardwareUtility(panel,"Back Up All",items.Count+" storage item(s)","⇧",accent,delegate{foreach(string value in items)BackupNativeSavePath(value,"Arcade-"+Path.GetFileNameWithoutExtension(value));},310,120);
+        }
+        private void RenderArcadeOperatorSettings()
+        {
+            Color accent=definition.Shell=="Arcade"?Color.FromRgb(255,49,171):Color.FromRgb(255,193,37);titleText.Text="OPERATOR MENU";subtitleText.Text=definition.PrimaryBackend+"  •  service controls stay inside Huymaier Console";columns=3;Grid body=new Grid{Margin=new Thickness(45,8,45,24)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(110)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);Border header=new Border{Background=new SolidColorBrush(Color.FromRgb(14,14,16)),BorderBrush=new SolidColorBrush(accent),BorderThickness=new Thickness(3),Padding=new Thickness(20)};header.Child=new TextBlock{Text=(definition.Shell=="Arcade"?"MAME MACHINE CONFIGURATION":"FINALBURN NEO BOARD CONFIGURATION"),FontFamily=new FontFamily("Consolas"),FontSize=22,Foreground=new SolidColorBrush(accent),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};body.Children.Add(header);WrapPanel controls=new WrapPanel{Margin=new Thickness(0,12,0,0)};ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=controls};Grid.SetRow(scroll,1);body.Children.Add(scroll);if(String.IsNullOrWhiteSpace(settings.emulatorPath)||!File.Exists(settings.emulatorPath)){AddHardwareUtility(controls,"LOCATE EMULATOR",definition.PrimaryBackend,"SERVICE",accent,ChoosePrimaryEmulator,310,125);AddHardwareUtility(controls,"INSTALL LATEST",definition.PrimaryBackend,"↓",accent,InstallPrimaryEmulator,310,125);}else AddHardwareUtility(controls,"EMULATOR",settings.emulatorPath,"OK",accent,ChoosePrimaryEmulator,310,125);AddHardwareUtility(controls,"FULL MACHINE SETTINGS","Every installed-version backend option","DIP",accent,OpenNativeBackendSettings,310,125);AddHardwareUtility(controls,"ROM PATHS",settings.gameFolders.Count+" configured","ROM",accent,AddGameFolder,310,125);AddHardwareUtility(controls,"EMULATOR DATA",DisplayPath(settings.emulatorDataPath),"DATA",accent,ChooseEmulatorDataRoot,310,125);AddHardwareUtility(controls,"OPERATOR STORAGE","NVRAM / memory cards / high scores","MEM",accent,delegate{dashboardSubpage="saves";selected=0;RenderPage();},310,125);AddHardwareUtility(controls,"REFRESH SETS",games.Count+" detected sets","↻",accent,delegate{RefreshLibrary(true);},310,125);
+        }
 
         private void RenderArcadeCabinet()
         {
@@ -3208,9 +3223,10 @@ namespace HuymaierConsole.NativeApp
             bool gameCube = definition.Shell == "GameCube" && !IsRootConsoleSurface() && page == 0;
             bool wii = definition.Shell == "Wii" && IsRootConsoleSurface();
             bool wave2 = IsWave2Shell() && IsRootConsoleSurface() && selected >= 0 && selected < games.Count;
-            if (!n64 && !gameCube && !wii && !wave2) return false;
+            bool arcadeLibrary = (definition.Shell == "Arcade" || definition.Shell == "FinalBurnNeo") && IsRootConsoleSurface() && selected >= 0 && selected < games.Count;
+            if (!n64 && !gameCube && !wii && !wave2 && !arcadeLibrary) return false;
 
-            int currentIndex = n64 ? n64LibraryIndex : (gameCube ? Math.Max(0, Math.Min(games.Count - 1, selected)) : (wave2 ? Math.Max(0, Math.Min(games.Count - 1, selected)) : Math.Max(0, Math.Min(games.Count - 1, wiiMenuPage * 12 + Math.Min(selected, 11)))));
+            int currentIndex = n64 ? n64LibraryIndex : (gameCube ? Math.Max(0, Math.Min(games.Count - 1, selected)) : ((wave2 || arcadeLibrary) ? Math.Max(0, Math.Min(games.Count - 1, selected)) : Math.Max(0, Math.Min(games.Count - 1, wiiMenuPage * 12 + Math.Min(selected, 11)))));
             List<char> letters = GetAvailableLibraryLetters();
             if (letters.Count == 0) return false;
             char current = GetLibraryInitial(games[currentIndex]);
@@ -3221,7 +3237,7 @@ namespace HuymaierConsole.NativeApp
             int target = FindFirstGameIndex(letters[letterIndex]);
 
             if (n64) n64LibraryIndex = target;
-            else if (gameCube || wave2) selected = target;
+            else if (gameCube || wave2 || arcadeLibrary) selected = target;
             else
             {
                 wiiMenuPage = target / 12;
