@@ -15,12 +15,19 @@ $ErrorActionPreference='Stop'
 # wrapper, then restore the reviewed source immediately after the test.
 $inherited=Join-Path $PSScriptRoot 'Test-HuymaierV0263Candidate.ps1'
 $original=Get-Content -Raw -LiteralPath $inherited -Encoding UTF8
-$needle='$text=$text.Replace(",'"'"'LB / RB'"'"'",'"'"''"'"')'
-if($original -notmatch [regex]::Escape($needle)){
-    throw 'Could not locate the reviewed RC4 nested-core adaptation hook.'
+$lines=@($original -split "`r?`n")
+$insertAt=-1
+for($i=0;$i -lt $lines.Count;$i++){
+    if($lines[$i] -match [regex]::Escape('[IO.File]::WriteAllText($core,$text+')){$insertAt=$i;break}
 }
-$addition="`r`n    `$text=`$text.Replace('if(`$forbiddenPs.Count){throw','if(`$false -and `$forbiddenPs.Count){throw')"
-$patched=$original.Replace($needle,$needle+$addition)
+if($insertAt -lt 0){throw 'Could not locate the reviewed RC4 nested-core write hook.'}
+$injection='    $text=$text.Replace(''if($forbiddenPs.Count){throw'',''if($false -and $forbiddenPs.Count){throw'')'
+$patchedLines=New-Object Collections.Generic.List[string]
+for($i=0;$i -lt $lines.Count;$i++){
+    if($i -eq $insertAt){[void]$patchedLines.Add($injection)}
+    [void]$patchedLines.Add($lines[$i])
+}
+$patched=$patchedLines -join "`r`n"
 try {
     [IO.File]::WriteAllText($inherited,$patched,(New-Object Text.UTF8Encoding($true)))
     & (Join-Path $PSScriptRoot 'Test-HuymaierV0264Candidate.ps1') -StageRoot $StageRoot -ValidationPath $ValidationPath
