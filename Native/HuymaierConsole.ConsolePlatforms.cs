@@ -2643,7 +2643,7 @@ namespace HuymaierConsole.NativeApp
 
         private bool IsWave45Shell() { return definition.Shell == "Arcade" || definition.Shell == "FinalBurnNeo" || definition.Shell == "PS4" || definition.Shell == "Vita"; }
         private void RenderWave45Root() { if(definition.Shell=="Arcade")RenderArcadeCabinet();else if(definition.Shell=="FinalBurnNeo")RenderFbNeoBoard();else if(definition.Shell=="PS4")RenderPs4DynamicMenu();else RenderVitaLiveArea(); }
-        private void RenderWave45Subpage() { if(dashboardSubpage=="library"){RenderWave1Library();return;}if(dashboardSubpage=="backend-settings"||dashboardSubpage=="backend-settings-list"||dashboardSubpage=="backend-setting-detail"){RenderWave1Subpage();return;}if((definition.Shell=="Arcade"||definition.Shell=="FinalBurnNeo")&&dashboardSubpage=="settings"){RenderArcadeOperatorSettings();return;}if((definition.Shell=="Arcade"||definition.Shell=="FinalBurnNeo")&&dashboardSubpage=="saves"){RenderArcadeStorage();return;}if(dashboardSubpage=="settings"){RenderWave1Settings();return;}if(dashboardSubpage=="saves"){RenderWave1Storage();return;}RenderWave1Settings(); }
+        private void RenderWave45Subpage() { if(dashboardSubpage=="library"){RenderWave1Library();return;}if(dashboardSubpage=="backend-settings"||dashboardSubpage=="backend-settings-list"||dashboardSubpage=="backend-setting-detail"){RenderWave1Subpage();return;}if((definition.Shell=="Arcade"||definition.Shell=="FinalBurnNeo")&&dashboardSubpage=="settings"){RenderArcadeOperatorSettings();return;}if((definition.Shell=="Arcade"||definition.Shell=="FinalBurnNeo")&&dashboardSubpage=="saves"){RenderArcadeStorage();return;}if((definition.Shell=="PS4"||definition.Shell=="Vita")&&dashboardSubpage=="settings"){RenderModernPlayStationSettings();return;}if(dashboardSubpage=="settings"){RenderWave1Settings();return;}if((definition.Shell=="PS4"||definition.Shell=="Vita")&&dashboardSubpage=="saves"){RenderModernPlayStationStorage();return;}if(dashboardSubpage=="saves"){RenderWave1Storage();return;}RenderWave1Settings(); }
 
 
         private List<string> FindArcadeStorageItems()
@@ -2673,6 +2673,82 @@ namespace HuymaierConsole.NativeApp
             titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=6;Grid body=new Grid{Margin=new Thickness(35,0,35,18)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(135)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);
             Border board=new Border{CornerRadius=new CornerRadius(8),Background=new LinearGradientBrush(Color.FromRgb(46,42,25),Color.FromRgb(9,9,7),90),BorderBrush=new SolidColorBrush(Color.FromRgb(255,193,37)),BorderThickness=new Thickness(3),Padding=new Thickness(20),Margin=new Thickness(110,0,110,8)};Grid pcb=new Grid();pcb.Children.Add(new TextBlock{Text="FINALBURN NEO\nARCADE SYSTEM BOARD",FontSize=24,FontWeight=FontWeights.SemiBold,Foreground=new SolidColorBrush(Color.FromRgb(255,220,101)),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(35,0,0,0),TextAlignment=TextAlignment.Center});pcb.Children.Add(new TextBlock{Text="TEST   SERVICE   DIP SWITCH",FontFamily=new FontFamily("Consolas"),FontSize=12,Foreground=new SolidColorBrush(Color.FromRgb(202,183,113)),HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,38,0)});board.Child=pcb;body.Children.Add(board);WrapPanel cards=new WrapPanel();ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=cards};Grid.SetRow(scroll,1);body.Children.Add(scroll);foreach(ConsolePlatformGame game in games)AddHardwareGame(cards,game,Color.FromRgb(255,193,37),132,170,"ROM SET");AddHardwareUtility(cards,"Operator / DIP","FBNeo board options","DIP",Color.FromRgb(185,136,26),delegate{OpenWave1Subpage("settings");},150,170);
         }
+
+        private Color GetModernPlayStationAccent(){return definition.Shell=="PS4"?Color.FromRgb(75,173,255):Color.FromRgb(115,222,255);}
+        private List<string> GetModernPlayStationSaveRoots()
+        {
+            List<string> roots=new List<string>();
+            Action<string> add=delegate(string value){if(String.IsNullOrWhiteSpace(value))return;try{if(File.Exists(value))value=Path.GetDirectoryName(value);if(Directory.Exists(value)&&!roots.Contains(value,StringComparer.OrdinalIgnoreCase))roots.Add(value);}catch{}};
+            add(settings.emulatorDataPath);
+            string exeRoot=!String.IsNullOrWhiteSpace(settings.emulatorPath)&&File.Exists(settings.emulatorPath)?Path.GetDirectoryName(settings.emulatorPath):String.Empty;add(exeRoot);
+            foreach(string root in roots.ToArray())
+            {
+                try
+                {
+                    if(definition.Shell=="Vita")
+                    {
+                        add(Path.Combine(root,"ux0","user","00","savedata"));
+                        add(Path.Combine(root,"Vita3K","ux0","user","00","savedata"));
+                    }
+                    else
+                    {
+                        add(Path.Combine(root,"user","savedata"));
+                        add(Path.Combine(root,"savedata"));
+                        add(Path.Combine(root,"user","home"));
+                        add(Path.Combine(root,"save"));
+                    }
+                }catch{}
+            }
+            return roots;
+        }
+        private List<string> FindModernPlayStationSaveItems()
+        {
+            HashSet<string> items=new HashSet<string>(StringComparer.OrdinalIgnoreCase);int visited=0;
+            foreach(string root in GetModernPlayStationSaveRoots())
+            {
+                if(!Directory.Exists(root))continue;
+                try{foreach(string dir in Directory.GetDirectories(root)){if(++visited>4000)break;items.Add(dir);}}catch{}
+                if(visited>4000)break;
+            }
+            return items.OrderBy(delegate(string value){return Path.GetFileName(value);},StringComparer.CurrentCultureIgnoreCase).ToList();
+        }
+        private void RenderModernPlayStationStorage()
+        {
+            Color accent=GetModernPlayStationAccent();bool vita=definition.Shell=="Vita";
+            titleText.Text=vita?"Content Manager":"Saved Data Management";
+            subtitleText.Text=vita?"PS Vita saved data inside the Vita3K user environment":"PS4 saved data inside the shadPS4 user environment";
+            columns=3;WrapPanel panel=new WrapPanel{Margin=new Thickness(42,10,42,24)};
+            contentHost.Children.Add(new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=panel});
+            List<string> items=FindModernPlayStationSaveItems();
+            foreach(string value in items.Take(500))
+            {
+                string captured=value;string title=Path.GetFileName(value);string sfo=Path.Combine(value,"param.sfo");
+                if(File.Exists(sfo)){string parsed=ReadPspSfoString(sfo,"TITLE");if(!String.IsNullOrWhiteSpace(parsed))title=parsed;}
+                AddHardwareUtility(panel,title,FormatBytes(GetPathSize(value))+"  •  "+Path.GetFileName(value),vita?"◉":"▣",accent,delegate{BackupNativeSavePath(captured,definition.Id+"-"+Path.GetFileName(captured));},300,130);
+            }
+            if(items.Count==0)AddHardwareUtility(panel,"No Saved Data","No emulator save directories have been detected yet.",vita?"◉":"▣",accent,delegate{dashboardSubpage="settings";selected=0;RenderPage();},300,130);
+            else AddHardwareUtility(panel,"Back Up All",items.Count+" save item(s)","⇧",accent,delegate{foreach(string value in items)BackupNativeSavePath(value,definition.Id+"-"+Path.GetFileName(value));},300,130);
+        }
+        private void RenderModernPlayStationSettings()
+        {
+            Color accent=GetModernPlayStationAccent();bool vita=definition.Shell=="Vita";
+            titleText.Text="Settings";subtitleText.Text=definition.PrimaryBackend+"  •  Huymaier native system integration";columns=3;
+            Grid body=new Grid{Margin=new Thickness(45,6,45,24)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(vita?95:74)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);
+            Border header=new Border{CornerRadius=new CornerRadius(vita?38:4),Background=new LinearGradientBrush(Color.FromArgb(220,accent.R,accent.G,accent.B),Color.FromArgb(150,13,66,135),0),BorderBrush=new SolidColorBrush(Color.FromArgb(210,255,255,255)),BorderThickness=new Thickness(2),Padding=new Thickness(20),Child=new TextBlock{Text=vita?"LIVEAREA SYSTEM SETTINGS":"PS4 SYSTEM SETTINGS",FontSize=20,FontWeight=FontWeights.SemiBold,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center}};body.Children.Add(header);
+            WrapPanel panel=new WrapPanel{Margin=new Thickness(0,12,0,0)};ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=panel};Grid.SetRow(scroll,1);body.Children.Add(scroll);
+            if(String.IsNullOrWhiteSpace(settings.emulatorPath)||!File.Exists(settings.emulatorPath))
+            {
+                AddHardwareUtility(panel,"Locate Emulator",definition.PrimaryBackend,"⌕",accent,ChoosePrimaryEmulator,300,132);
+                AddHardwareUtility(panel,"Install Latest",definition.PrimaryBackend+" current supported build","↓",accent,InstallPrimaryEmulator,300,132);
+            }
+            else AddHardwareUtility(panel,definition.PrimaryBackend,settings.emulatorPath,"✓",accent,ChoosePrimaryEmulator,300,132);
+            AddHardwareUtility(panel,"Full Emulator Settings","Every discovered backend setting","⚙",accent,OpenNativeBackendSettings,300,132);
+            AddHardwareUtility(panel,"Emulator Data",DisplayPath(settings.emulatorDataPath),"▣",accent,ChooseEmulatorDataRoot,300,132);
+            AddHardwareUtility(panel,"Application Folders",settings.gameFolders.Count+" configured","▦",accent,AddGameFolder,300,132);
+            AddHardwareUtility(panel,vita?"Content Manager":"Saved Data Management","Native save storage","◫",accent,delegate{dashboardSubpage="saves";selected=0;RenderPage();},300,132);
+            AddHardwareUtility(panel,"Refresh Installed Apps",games.Count+" installed applications","↻",accent,delegate{RefreshLibrary(true);},300,132);
+        }
+
 
         private void RenderPs4DynamicMenu()
         {
