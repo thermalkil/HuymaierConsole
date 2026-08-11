@@ -15,48 +15,48 @@
                   "assets":  [
                                  {
                                      "name":  "linux-sdl1-x86_64.zip",
-                                     "size":  15595256,
+                                     "size":  15599195,
                                      "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/linux-sdl1-x86_64.zip"
                                  },
                                  {
                                      "name":  "linux-sdl2-x86_64.zip",
-                                     "size":  15507646,
+                                     "size":  15505938,
                                      "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/linux-sdl2-x86_64.zip"
                                  },
                                  {
                                      "name":  "windows-arm64-debug.zip",
-                                     "size":  14064404,
+                                     "size":  14007524,
                                      "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/windows-arm64-debug.zip"
                                  },
                                  {
                                      "name":  "windows-arm64.zip",
-                                     "size":  13234651,
+                                     "size":  13234691,
                                      "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/windows-arm64.zip"
                                  },
                                  {
                                      "name":  "windows-x86_32-debug.zip",
-                                     "size":  16185126,
+                                     "size":  16184466,
                                      "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/windows-x86_32-debug.zip"
                                  },
                                  {
                                      "name":  "windows-x86_32.zip",
-                                     "size":  16040204,
+                                     "size":  16040917,
                                      "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/windows-x86_32.zip"
                                  },
                                  {
                                      "name":  "windows-x86_64-debug.zip",
-                                     "size":  16843879,
+                                     "size":  16845624,
                                      "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/windows-x86_64-debug.zip"
                                  },
                                  {
                                      "name":  "windows-x86_64.zip",
-                                     "size":  16663819,
+                                     "size":  16663351,
                                      "url":  "https://github.com/finalburnneo/FBNeo/releases/download/latest/windows-x86_64.zip"
                                  }
                              ],
                   "binaryResolved":  true,
                   "selectedAsset":  "windows-x86_64.zip",
-                  "archiveSha256":  "e1d53f6421231eab6e26b63e532f01cdba62427082fe5536fded6be9368f1723",
+                  "archiveSha256":  "74a1f53c56883b986ddadbb290a50fddf17a8479057c1c5b8a213e83270d1b5c",
                   "executables":  [
                                       "fbneo64.exe"
                                   ],
