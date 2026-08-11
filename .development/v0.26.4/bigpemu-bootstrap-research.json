@@ -1,0 +1,56 @@
+﻿{
+    "schemaVersion":  1,
+    "downloadUrl":  "https://www.richwhitehouse.com/jaguar/builds/BigPEmu_v1221.zip",
+    "sha256":  "90b49dff119c66f8e8bd6eb45c1c5f24959dde165778e3d0e7fb5f7c46ee8c3d",
+    "attempts":  [
+                     {
+                         "name":  "localdata-setcfgprop",
+                         "argumentList":  [
+                                              "*null",
+                                              "-localdata",
+                                              "-setcfgprop",
+                                              "VideoPlugin",
+                                              "BigPEmu_Video_OpenGL"
+                                          ],
+                         "config":  "D:\\a\\_temp\\hc-bigpemu-bootstrap\\stage\\UserData\\BigPEmuConfig.bigpcfg",
+                         "exists":  false,
+                         "bytes":  0,
+                         "jsonValid":  false,
+                         "sample":  ""
+                     },
+                     {
+                         "name":  "cfgpathabs-setcfgprop",
+                         "argumentList":  [
+                                              "*null",
+                                              "-cfgpathabs",
+                                              "D:\\a\\_temp\\hc-bigpemu-bootstrap\\abs\\HuymaierBootstrap.bigpcfg",
+                                              "-setcfgprop",
+                                              "VideoPlugin",
+                                              "BigPEmu_Video_OpenGL"
+                                          ],
+                         "config":  "D:\\a\\_temp\\hc-bigpemu-bootstrap\\abs\\HuymaierBootstrap.bigpcfg",
+                         "exists":  false,
+                         "bytes":  0,
+                         "jsonValid":  false,
+                         "sample":  ""
+                     },
+                     {
+                         "name":  "cfgpathabs-setcfgpropcat",
+                         "argumentList":  [
+                                              "*null",
+                                              "-cfgpathabs",
+                                              "D:\\a\\_temp\\hc-bigpemu-bootstrap\\abs2\\HuymaierBootstrap.bigpcfg",
+                                              "-setcfgpropcat",
+                                              "VideoPlugin",
+                                              "BigPEmu_Video_OpenGL",
+                                              "0"
+                                          ],
+                         "config":  "D:\\a\\_temp\\hc-bigpemu-bootstrap\\abs2\\HuymaierBootstrap.bigpcfg",
+                         "exists":  false,
+                         "bytes":  0,
+                         "jsonValid":  false,
+                         "sample":  ""
+                     }
+                 ],
+    "anyGenerated":  false
+}
