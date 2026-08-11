@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: {ref: feature/v0.26.4-platform-expansion, fetch-depth: 0}
-      - name: Generate current official BigPEmu x64 configuration
+      - name: Probe current official BigPEmu x64 configuration generation
         shell: powershell
         run: |
           $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$headers=@{'User-Agent'='Huymaier-Console-v0.26.4-config-audit'}
@@ -21,14 +21,17 @@ jobs:
           $href=[Net.WebUtility]::HtmlDecode($match.Groups['url'].Value);$url=$(if($href-match'^https?://'){$href}else{(New-Object Uri ([uri]$pageUrl),$href).AbsoluteUri});if($url-match'(?i)ARM64'){throw 'BigPEmu config research resolved an ARM64 archive on x64.'}
           $work=Join-Path $env:RUNNER_TEMP 'hc-bigpemu-config';Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue;New-Item -ItemType Directory -Force -Path $work|Out-Null;$zip=Join-Path $work 'BigPEmu-x64.zip';Invoke-WebRequest -UseBasicParsing -Uri $url -Headers $headers -OutFile $zip;$stage=Join-Path $work 'stage';Expand-Archive -LiteralPath $zip -DestinationPath $stage -Force
           $exe=Get-ChildItem $stage -File -Recurse -Filter 'BigPEmu.exe'|Select-Object -First 1;if(-not$exe){throw 'BigPEmu.exe missing.'};$bytes=[IO.File]::ReadAllBytes($exe.FullName);$pe=[BitConverter]::ToInt32($bytes,0x3c);if([BitConverter]::ToUInt16($bytes,$pe+4)-ne0x8664){throw 'Downloaded BigPEmu is not x64.'}
-          $p=Start-Process -FilePath $exe.FullName -ArgumentList @('*null','-localdata') -WorkingDirectory $exe.Directory.FullName -PassThru;Start-Sleep -Seconds 6;if(-not$p.HasExited){try{$p.CloseMainWindow()|Out-Null;Start-Sleep -Seconds 1}catch{};if(-not$p.HasExited){$p.Kill();$p.WaitForExit()}}
-          $config=Get-ChildItem $exe.Directory.FullName -File -Recurse -Filter 'BigPEmuConfig.bigpcfg' -ErrorAction SilentlyContinue|Select-Object -First 1;if(-not$config){throw 'BigPEmuConfig.bigpcfg was not generated in -localdata mode.'}
-          $raw=[IO.File]::ReadAllBytes($config.FullName);$text=[Text.Encoding]::UTF8.GetString($raw);$encoding='utf8-or-ansi';if($raw.Length-ge2-and$raw[0]-eq0xFF-and$raw[1]-eq0xFE){$encoding='utf16-le';$text=[Text.Encoding]::Unicode.GetString($raw,2,$raw.Length-2)}elseif($raw.Length-ge3-and$raw[0]-eq0xEF-and$raw[1]-eq0xBB-and$raw[2]-eq0xBF){$encoding='utf8-bom';$text=[Text.Encoding]::UTF8.GetString($raw,3,$raw.Length-3)}
-          $jsonValid=$false;try{$null=$text|ConvertFrom-Json;$jsonValid=$true}catch{}
-          $sample=@(($text -split "`r?`n")|Select-Object -First 120|ForEach-Object{if($_.Length-gt400){$_.Substring(0,400)}else{$_}})
-          # No timestamp or runner-specific absolute config path: unchanged
-          # upstream format must produce no diff and no bot-commit loop.
-          $report=[ordered]@{schemaVersion=1;downloadUrl=$url;sha256=(Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant();configFile='BigPEmuConfig.bigpcfg';configBytes=$raw.Length;encoding=$encoding;jsonValid=$jsonValid;equalsLineCount=@([regex]::Matches($text,'(?m)^\s*[A-Za-z0-9_.-]+\s*=')).Count;colonLineCount=@([regex]::Matches($text,'(?m)^\s*[A-Za-z0-9_.-]+\s*:')).Count;braceCount=@([regex]::Matches($text,'[{}]')).Count;sample=$sample}
+          $p=Start-Process -FilePath $exe.FullName -ArgumentList @('*null','-localdata') -WorkingDirectory $exe.Directory.FullName -PassThru;Start-Sleep -Seconds 7;if(-not$p.HasExited){try{$p.CloseMainWindow()|Out-Null;Start-Sleep -Seconds 1}catch{};if(-not$p.HasExited){$p.Kill();$p.WaitForExit()}}
+          $config=Get-ChildItem $exe.Directory.FullName -File -Recurse -Filter 'BigPEmuConfig.bigpcfg' -ErrorAction SilentlyContinue|Select-Object -First 1
+          $report=[ordered]@{schemaVersion=2;downloadUrl=$url;sha256=(Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant();configFile='BigPEmuConfig.bigpcfg';configGenerated=($null-ne$config);headlessProbe='GitHub-hosted Windows x64'}
+          if($config){
+            $raw=[IO.File]::ReadAllBytes($config.FullName);$text=[Text.Encoding]::UTF8.GetString($raw);$encoding='utf8-or-ansi';if($raw.Length-ge2-and$raw[0]-eq0xFF-and$raw[1]-eq0xFE){$encoding='utf16-le';$text=[Text.Encoding]::Unicode.GetString($raw,2,$raw.Length-2)}elseif($raw.Length-ge3-and$raw[0]-eq0xEF-and$raw[1]-eq0xBB-and$raw[2]-eq0xBF){$encoding='utf8-bom';$text=[Text.Encoding]::UTF8.GetString($raw,3,$raw.Length-3)};$jsonValid=$false;try{$null=$text|ConvertFrom-Json;$jsonValid=$true}catch{};$report.configBytes=$raw.Length;$report.encoding=$encoding;$report.jsonValid=$jsonValid;$report.equalsLineCount=@([regex]::Matches($text,'(?m)^\s*[A-Za-z0-9_.-]+\s*=')).Count;$report.colonLineCount=@([regex]::Matches($text,'(?m)^\s*[A-Za-z0-9_.-]+\s*:')).Count;$report.braceCount=@([regex]::Matches($text,'[{}]')).Count;$report.sample=@(($text -split "`r?`n")|Select-Object -First 120|ForEach-Object{if($_.Length-gt400){$_.Substring(0,400)}else{$_}})
+          }else{
+            # This is a valid research result: the current x64 build did not emit
+            # configuration in the non-interactive hosted runner. Jaguar therefore
+            # remains staged; no guessed parser is introduced from this probe.
+            $report.reason='Current BigPEmu x64 did not emit BigPEmuConfig.bigpcfg during a non-interactive *null -localdata launch; use a real-machine generated config or a documented enumeration path before graduating Jaguar full settings.'
+          }
           $report|ConvertTo-Json -Depth 6|Set-Content '.development\v0.26.4\bigpemu-config-research.json' -Encoding UTF8
       - name: Commit only materially changed format research
         shell: powershell
