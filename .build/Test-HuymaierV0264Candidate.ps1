@@ -27,7 +27,7 @@ foreach($folder in @('PS1','PS2','PS3')){
     $expected=$psMetadata[$folder]
     if([string]$current.adapter -ne $expected[0]){throw "$folder adapter metadata changed unexpectedly."}
     if([string]$current.primaryBackend -ne $expected[1]){throw "$folder primary backend metadata changed unexpectedly."}
-    if(-[bool]$current.nativeFullEmulatorSettings){throw "$folder native full-settings metadata is missing."}
+    if(-not [bool]$current.nativeFullEmulatorSettings){throw "$folder native full-settings metadata is missing."}
     foreach($property in @('adapter','primaryBackend','nativeFullEmulatorSettings')){[void]$current.PSObject.Properties.Remove($property)}
     $baselineCanonical=$baseline|ConvertTo-Json -Depth 30 -Compress
     $currentCanonical=$current|ConvertTo-Json -Depth 30 -Compress
@@ -77,7 +77,7 @@ if([string]$manifest.builtFrom -ne 'HC262.zip'){throw 'v0.26.4 candidate did not
 $registry=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'EmulatorPlatforms\platform-registry.json') -Encoding UTF8|ConvertFrom-Json
 foreach($id in @('ps4','vita','arcade')){
     $entry=@($registry.platforms|Where-Object{$_.id -eq $id})
-    if($entry.Count -ne 1 -or -not[bool]$entry[0].enabled){throw "$id is not enabled exactly once in the v0.26.4 candidate."}
+    if($entry.Count -ne 1 -or -not [bool]$entry[0].enabled){throw "$id is not enabled exactly once in the v0.26.4 candidate."}
     foreach($cap in @('latest-emulator-install','native-full-emulator-settings','native-save-management')){if(@($entry[0].capabilities)-notcontains$cap){throw "$id candidate registry missing capability: $cap"}}
 }
 foreach($folder in @('FinalBurnNeo','NeoGeo','Jaguar')){
@@ -118,9 +118,9 @@ if($native -match 'LeftShoulder[^\r\n]{0,200}SwitchPage' -or $native -match 'Rig
 $ps4=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'EmulatorPlatforms\PS4\platform.json') -Encoding UTF8|ConvertFrom-Json
 $vita=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'EmulatorPlatforms\Vita\platform.json') -Encoding UTF8|ConvertFrom-Json
 $arcade=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'EmulatorPlatforms\Arcade\platform.json') -Encoding UTF8|ConvertFrom-Json
-if(-[bool]$ps4.enabled -or [string]$ps4.primaryBackend -ne 'shadPS4' -or -not[string]::IsNullOrWhiteSpace([string]$ps4.fallbackBackend)){throw 'PS4 production backend contract is invalid.'}
-if(-[bool]$vita.enabled -or [string]$vita.primaryBackend -ne 'Vita3K' -or -not[string]::IsNullOrWhiteSpace([string]$vita.fallbackBackend)){throw 'Vita production backend contract is invalid.'}
-if(-[bool]$arcade.enabled -or [string]$arcade.primaryBackend -ne 'MAME' -or -not[string]::IsNullOrWhiteSpace([string]$arcade.fallbackBackend)){throw 'Arcade production backend contract is not MAME-only.'}
+if((-not [bool]$ps4.enabled) -or [string]$ps4.primaryBackend -ne 'shadPS4' -or -not [string]::IsNullOrWhiteSpace([string]$ps4.fallbackBackend)){throw 'PS4 production backend contract is invalid.'}
+if((-not [bool]$vita.enabled) -or [string]$vita.primaryBackend -ne 'Vita3K' -or -not [string]::IsNullOrWhiteSpace([string]$vita.fallbackBackend)){throw 'Vita production backend contract is invalid.'}
+if((-not [bool]$arcade.enabled) -or [string]$arcade.primaryBackend -ne 'MAME' -or -not [string]::IsNullOrWhiteSpace([string]$arcade.fallbackBackend)){throw 'Arcade production backend contract is not MAME-only.'}
 
 $core=Require-Text 'HuymaierConsole.ps1' @("`$script:AppVersion = '0.26.4'")
 $bootstrap=Require-Text 'HuymaierBootstrap.ps1' @("`$script:ExpectedConsoleVersion='0.26.4'")
