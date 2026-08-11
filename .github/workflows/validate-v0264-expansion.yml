@@ -66,9 +66,13 @@ jobs:
           foreach($required in @('Backup-HcEmulatorConfigFile','Get-HcCompleteEmulatorSettingsInventory','Set-HcEmulatorConfigSetting','Get-HcJsonSettings','Set-HcJsonSetting','Get-HcTomlScalarSettings','Get-HcXmlSettings','Set-HcXmlSetting')){if($settings -notmatch [regex]::Escape($required)){throw "Full emulator settings invariant missing: $required"}}
           $worker=Get-Content -Raw 'HuymaierEmulatorSettingsWorker.ps1' -Encoding UTF8
           foreach($required in @("'duckstation'","'pcsx2'","'rpcs3'","'dolphin'","'cemu'","'eden'","'xemu'","'xenia'",'Get-StellaCliSettings','Get-MameCliSettings')){if($worker -notmatch [regex]::Escape($required)){throw "Native backend settings coverage marker missing: $required"}}
-          $native=Get-Content -Raw 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8
-          if($native -match 'LeftShoulder[^\r\n]{0,200}SwitchPage' -or $native -match 'RightShoulder[^\r\n]{0,200}SwitchPage'){throw 'Shoulder buttons may not switch native console pages.'}
-          foreach($required in @('TryProcessLibraryLetterJump','OpenNativeBackendSettings','RequestHuymaierPicker','Huymaier Game Bar')){if($native -notmatch [regex]::Escape($required)){throw "Native navigation/settings invariant missing: $required"}}
+          $platformNative=Get-Content -Raw 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8
+          if($platformNative -match 'LeftShoulder[^\r\n]{0,200}SwitchPage' -or $platformNative -match 'RightShoulder[^\r\n]{0,200}SwitchPage'){throw 'Shoulder buttons may not switch native console pages.'}
+          foreach($required in @('TryProcessLibraryLetterJump','OpenNativeBackendSettings','RequestHuymaierPicker')){if($platformNative -notmatch [regex]::Escape($required)){throw "Native navigation/settings invariant missing: $required"}}
+          # Guide/Game Bar ownership spans the shared navigation router and overlay
+          # host; do not require its text marker to live in one platform renderer.
+          $nativeSet=$platformNative+(Get-Content -Raw 'Native\HuymaierConsole.NativeApp.cs' -Encoding UTF8)+(Get-Content -Raw 'Native\HuymaierConsole.SystemOverlay.cs' -Encoding UTF8)+(Get-Content -Raw 'Native\HuymaierConsole.GameInput.cs' -Encoding UTF8)
+          foreach($required in @('HuymaierGameBarHost','BlocksNativeNavigation','ConsumeGuidePress')){if($nativeSet -notmatch [regex]::Escape($required)){throw "Guide/Game Bar invariant missing: $required"}}
       - name: Keep PlayStation presentation frozen except explicit full-settings integration
         shell: python
         run: |
