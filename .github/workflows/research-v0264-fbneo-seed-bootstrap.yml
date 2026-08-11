@@ -1,0 +1,23 @@
+name: Research v0.26.4 FBNeo Seed Bootstrap
+on:
+  push:
+    branches: [feature/v0.26.4-platform-expansion]
+    paths: ['.development/v0.26.4/fbneo-seed-bootstrap-request.json']
+permissions: {contents: read}
+concurrency: {group: huymaier-v0264-fbneo-seed-bootstrap, cancel-in-progress: true}
+jobs:
+  research:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: feature/v0.26.4-platform-expansion}
+      - name: Materialize current FBNeo resolver and install x64
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';python .development\v0.26.4\apply_mame_release_resolver.py;python .development\v0.26.4\apply_fbneo_native_integration.py;$root=Join-Path $env:RUNNER_TEMP 'fbneo-seed';New-Item -ItemType Directory -Force -Path $root|Out-Null;$json=& .\HuymaierEmulatorInstaller.ps1 -PlatformId NEOGEO -DestinationRoot $root -ConsoleRoot (Resolve-Path '.').Path|Select-Object -Last 1;$r=$json|ConvertFrom-Json;$exe=[string]$r.Executable;if(-not(Test-Path $exe)){throw 'FBNeo install failed'};$exe|Set-Content (Join-Path $env:RUNNER_TEMP 'fbneo-exe.txt') -Encoding UTF8
+      - name: Seed only version marker and let FBNeo author its complete config
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';$exe=(Get-Content -Raw (Join-Path $env:RUNNER_TEMP 'fbneo-exe.txt')).Trim();$root=Split-Path -Parent $exe;$config=Join-Path $root ('config\'+[IO.Path]::GetFileNameWithoutExtension($exe)+'.ini');New-Item -ItemType Directory -Force -Path (Split-Path -Parent $config)|Out-Null;@('// Huymaier temporary bootstrap marker; FBNeo must replace this file','nIniVersion 0xFFFFFF')|Set-Content $config -Encoding ASCII
+          $out=Join-Path $env:RUNNER_TEMP 'fbneo-neogeo.dat';$err=Join-Path $env:RUNNER_TEMP 'fbneo-neogeo.err';$p=Start-Process -FilePath $exe -ArgumentList '-listinfoneogeoonly' -WorkingDirectory $root -RedirectStandardOutput $out -RedirectStandardError $err -PassThru -WindowStyle Hidden;if(-not$p.WaitForExit(30000)){try{$p.Kill();$p.WaitForExit()}catch{};throw 'Seeded FBNeo -listinfoneogeoonly timed out'}
+          $raw=Get-Content -Raw $config -Encoding UTF8;if($raw-match'0xFFFFFF'){throw 'FBNeo did not replace the temporary version seed'};if($raw-notmatch'(?m)^nIniVersion\s+0x[0-9A-Fa-f]+' -or $raw-notmatch'(?m)^nVidVSync\s+' -or $raw-notmatch'(?m)^szAppRomPaths\[0\]\s+'){throw 'FBNeo did not author a complete config after seeded bootstrap'};$lineCount=@($raw-split"`r?`n").Count;if($lineCount-lt150){throw "FBNeo generated config is unexpectedly small: $lineCount lines"};Write-Host "FBNeo authoritative seeded bootstrap passed: $lineCount lines; exit $($p.ExitCode)"
