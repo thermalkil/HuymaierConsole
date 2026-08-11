@@ -2,13 +2,13 @@
 
 Platforms in registry: **31**  
 Enabled: **31**  
-Enabled missing a complete native adapter: **3**
+Enabled missing a complete native adapter: **0**
 
 | Platform | Enabled | Backend | Adapter | Native settings ready |
 |---|---:|---|---|---:|
-| PlayStation 1 | yes | DuckStation | MISSING | NO |
-| PlayStation 2 | yes | PCSX2 | MISSING | NO |
-| PlayStation 3 | yes | RPCS3 | MISSING | NO |
+| PlayStation 1 | yes | DuckStation | duckstation | yes |
+| PlayStation 2 | yes | PCSX2 | pcsx2 | yes |
+| PlayStation 3 | yes | RPCS3 | rpcs3 | yes |
 | PlayStation Portable | yes | PPSSPP | ppsspp | yes |
 | Nintendo 64 | yes | RMG | rmg | yes |
 | Nintendo DS | yes | melonDS | melonds | yes |
@@ -38,4 +38,4 @@ Enabled missing a complete native adapter: **3**
 | Neo Geo Pocket Color | yes | Mednafen | mednafen | yes |
 | Metroid PrimeHack | yes | PrimeHack | primehack | yes |
 
-Enabled platforms missing native settings: ps1, ps2, ps3
+Enabled platforms missing native settings: none
