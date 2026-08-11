@@ -23,11 +23,11 @@ jobs:
       - name: Live-install current official Neo Geo backend
         shell: powershell
         run: |
-          $ErrorActionPreference='Stop';$root=Join-Path $env:RUNNER_TEMP 'hc-neogeo-install';New-Item -ItemType Directory -Force -Path $root|Out-Null;& .\HuymaierEmulatorInstaller.ps1 -PlatformId NEOGEO -DestinationRoot $root -ConsoleRoot (Resolve-Path '.').Path|Write-Host;$exe=Get-ChildItem $root -File -Recurse|Where-Object{$_.Name -match '(?i)^(fbneo|FinalBurnNeo|FinalBurn Neo)\.exe$'}|Select-Object -First 1;if(-not$exe){throw 'FBNeo executable missing after official windows-x86_64 install.'};$bytes=[IO.File]::ReadAllBytes($exe.FullName);$pe=[BitConverter]::ToInt32($bytes,0x3c);$machine=[BitConverter]::ToUInt16($bytes,$pe+4);if($machine-ne0x8664){throw ('FBNeo installer selected non-x64 PE machine 0x'+$machine.ToString('X4'))};Write-Host "FBNeo x64 installed: $($exe.FullName)"
+          $ErrorActionPreference='Stop';$root=Join-Path $env:RUNNER_TEMP 'hc-neogeo-install';New-Item -ItemType Directory -Force -Path $root|Out-Null;& .\HuymaierEmulatorInstaller.ps1 -PlatformId NEOGEO -DestinationRoot $root -ConsoleRoot (Resolve-Path '.').Path|Write-Host;$exe=Get-ChildItem $root -File -Recurse|Where-Object{$_.Name -match '(?i)^(fbneo|fbneo64|FinalBurnNeo|FinalBurnNeo64|FinalBurn Neo)\.exe$'}|Select-Object -First 1;if(-not$exe){throw 'FBNeo executable missing after official windows-x86_64 install.'};$bytes=[IO.File]::ReadAllBytes($exe.FullName);$pe=[BitConverter]::ToInt32($bytes,0x3c);$machine=[BitConverter]::ToUInt16($bytes,$pe+4);if($machine-ne0x8664){throw ('FBNeo installer selected non-x64 PE machine 0x'+$machine.ToString('X4'))};Write-Host "FBNeo x64 installed: $($exe.FullName)"
       - name: Validate resolver policy
         shell: powershell
         run: |
-          $text=Get-Content -Raw '.\HuymaierEmulatorInstaller.ps1' -Encoding UTF8;foreach($m in @('Windows\s*\(x64\)','WinARM64','windows-x86_64.zip','BigPEmu.exe')){if($text -notmatch [regex]::Escape($m)){throw "Specialty resolver marker missing: $m"}}
+          $text=Get-Content -Raw '.\HuymaierEmulatorInstaller.ps1' -Encoding UTF8;foreach($m in @('Windows\s*\(x64\)','WinARM64','windows-x86_64.zip','BigPEmu.exe','fbneo64.exe')){if($text -notmatch [regex]::Escape($m)){throw "Specialty resolver marker missing: $m"}}
       - name: Commit live-proven resolver source
         shell: powershell
         run: |
