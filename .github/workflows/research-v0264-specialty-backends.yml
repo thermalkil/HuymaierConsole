@@ -68,6 +68,12 @@ jobs:
 
           $jsonPath='.development\v0.26.4\specialty-backend-research.json';$report|ConvertTo-Json -Depth 9|Set-Content $jsonPath -Encoding UTF8
           $md=New-Object Text.StringBuilder;[void]$md.AppendLine('# v0.26.4 Jaguar / Neo Geo backend readiness');[void]$md.AppendLine();[void]$md.AppendLine('Generated from the current official BigPEmu download page and current official FBNeo GitHub release.');[void]$md.AppendLine();[void]$md.AppendLine('## BigPEmu');[void]$md.AppendLine();[void]$md.AppendLine("- Download resolved: $($report.bigpemu.downloadResolved)");[void]$md.AppendLine("- Executable resolved: $($report.bigpemu.executableResolved)");[void]$md.AppendLine("- Product version: $($report.bigpemu.productVersion)");[void]$md.AppendLine("- Detected config candidates: $(@($report.bigpemu.detectedConfigFiles).Count)");[void]$md.AppendLine();[void]$md.AppendLine('## FinalBurn Neo');[void]$md.AppendLine();[void]$md.AppendLine("- Latest tag: $($report.fbneo.tag)");[void]$md.AppendLine("- Windows binary resolved: $($report.fbneo.binaryResolved)");[void]$md.AppendLine("- Selected asset: $($report.fbneo.selectedAsset)");[void]$md.AppendLine("- Executable resolved: $($report.fbneo.executableResolved)");$md.ToString()|Set-Content '.development\v0.26.4\specialty-backend-research.md' -Encoding UTF8
+          # Native probes such as `reg query` are expected to return nonzero when a
+          # key does not exist. The report above is the research result; do not let
+          # a stale native LASTEXITCODE discard it. Real PowerShell exceptions still
+          # stop before this point because ErrorActionPreference is Stop.
+          $global:LASTEXITCODE=0
+          exit 0
 
       - name: Commit bounded research record
         shell: powershell
