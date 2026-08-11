@@ -64,15 +64,34 @@ jobs:
           foreach($required in @("Title='Artwork & Metadata'","SteamGridDB artwork key: Configured","SteamGridDB artwork key: Not configured")){if($shell -notmatch [regex]::Escape($required)){throw "Artwork discoverability invariant missing: $required"}}
           $settings=Get-Content -Raw 'HuymaierEmulatorSettings.ps1' -Encoding UTF8
           foreach($required in @('Backup-HcEmulatorConfigFile','Get-HcCompleteEmulatorSettingsInventory','Set-HcEmulatorConfigSetting','Get-HcJsonSettings','Set-HcJsonSetting','Get-HcTomlScalarSettings','Get-HcXmlSettings','Set-HcXmlSetting')){if($settings -notmatch [regex]::Escape($required)){throw "Full emulator settings invariant missing: $required"}}
+          $worker=Get-Content -Raw 'HuymaierEmulatorSettingsWorker.ps1' -Encoding UTF8
+          foreach($required in @("'duckstation'","'pcsx2'","'rpcs3'","'dolphin'","'cemu'","'eden'","'xemu'","'xenia'",'Get-StellaCliSettings','Get-MameCliSettings')){if($worker -notmatch [regex]::Escape($required)){throw "Native backend settings coverage marker missing: $required"}}
           $native=Get-Content -Raw 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8
           if($native -match 'LeftShoulder[^\r\n]{0,200}SwitchPage' -or $native -match 'RightShoulder[^\r\n]{0,200}SwitchPage'){throw 'Shoulder buttons may not switch native console pages.'}
           foreach($required in @('TryProcessLibraryLetterJump','OpenNativeBackendSettings','RequestHuymaierPicker','Huymaier Game Bar')){if($native -notmatch [regex]::Escape($required)){throw "Native navigation/settings invariant missing: $required"}}
-      - name: Keep PlayStation 1 2 3 presentation source frozen
-        shell: powershell
+      - name: Keep PlayStation presentation frozen except explicit full-settings integration
+        shell: python
         run: |
-          $ErrorActionPreference='Stop'
-          git diff --quiet 9f3b5b390dd24f82ecce129c1e25dbc97bf598a5 -- Native/HuymaierConsole.Ps1.cs EmulatorPlatforms/PS1 EmulatorPlatforms/PS2 EmulatorPlatforms/PS3
-          if($LASTEXITCODE -ne 0){git diff -- 9f3b5b390dd24f82ecce129c1e25dbc97bf598a5 -- Native/HuymaierConsole.Ps1.cs EmulatorPlatforms/PS1 EmulatorPlatforms/PS2 EmulatorPlatforms/PS3;throw 'Frozen PlayStation platform presentation/config assets changed on the expansion branch.'}
+          from pathlib import Path
+          import json,re,subprocess
+          base='9f3b5b390dd24f82ecce129c1e25dbc97bf598a5'
+          def git_show(path):
+              return subprocess.check_output(['git','show',f'{base}:{path}']).decode('utf-8-sig').replace('\r\n','\n')
+          current=Path('Native/HuymaierConsole.Ps1.cs').read_text(encoding='utf-8-sig').replace('\r\n','\n')
+          for name in ('ACTION','METHOD'):
+              current=re.sub(r'(?ms)^\s*// v0\.26\.4 PS1_FULL_BACKEND_SETTINGS_'+name+r'_BEGIN\n.*?^\s*// v0\.26\.4 PS1_FULL_BACKEND_SETTINGS_'+name+r'_END\n?', '', current)
+          if current != git_show('Native/HuymaierConsole.Ps1.cs'):
+              raise SystemExit('PS1 changed outside the explicitly marked native full-backend-settings integration blocks.')
+          allowed={'adapter','primaryBackend','nativeFullEmulatorSettings'}
+          for folder in ('PS1','PS2','PS3'):
+              path=f'EmulatorPlatforms/{folder}/platform.json'
+              before=json.loads(git_show(path))
+              after=json.loads(Path(path).read_text(encoding='utf-8-sig'))
+              for key in allowed:
+                  before.pop(key,None);after.pop(key,None)
+              if before != after:
+                  raise SystemExit(f'{folder} platform definition changed beyond allowed backend-adapter metadata.')
+          print('PlayStation presentation freeze passed with only explicit full-settings integration allowed')
       - name: Compile exact x64 native host source
         shell: powershell
         run: |
