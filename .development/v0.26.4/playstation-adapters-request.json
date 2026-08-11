@@ -1,0 +1,1 @@
+{"requestedAtUtc":"2026-08-11T05:51:00Z","platforms":{"PS1":"DuckStation","PS2":"PCSX2","PS3":"RPCS3"},"requirements":["discover installed backend config roots","enumerate global and per-game config files","preserve unknown settings","do not change PlayStation presentation source","Windows PowerShell 5.1 parse"]}
