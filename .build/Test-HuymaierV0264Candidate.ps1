@@ -13,7 +13,10 @@ try {
     $text=Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'Test-HuymaierV0263Candidate.ps1') -Encoding UTF8
     if([string]::IsNullOrWhiteSpace($text) -or $text -notmatch 'rc4UserFeedbackGate'){throw 'Could not load the reviewed v0.26.3 RC4 regression suite.'}
     $text=$text.Replace('native-console-fidelity-rc4-final','platform-expansion-rc1')
-    $text=$text.Replace("$text=$text.Replace('native-console-fidelity-rc3','platform-expansion-rc1')","$text=$text.Replace('native-console-fidelity-rc3','platform-expansion-rc1');$text=$text.Replace('0.26.3','0.26.4')")
+    $needle='$text=$text.Replace(''native-console-fidelity-rc3'',''platform-expansion-rc1'')'
+    $replacement=$needle+"`r`n            `$text=`$text.Replace('0.26.3','0.26.4')"
+    if($text -notmatch [regex]::Escape($needle)){throw 'Could not locate inherited RC3 build-identity adaptation hook.'}
+    $text=$text.Replace($needle,$replacement)
     $text=$text.Replace('Final v0.26.3 validation record','Final v0.26.4 validation record')
     [IO.File]::WriteAllText($runtime,$text+"`n",(New-Object Text.UTF8Encoding($true)))
     & $runtime -StageRoot $StageRoot -ValidationPath $ValidationPath
