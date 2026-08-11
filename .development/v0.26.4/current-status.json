@@ -75,20 +75,20 @@
     {
       "folder": "PS1",
       "id": "ps1",
-      "backend": null,
-      "adapter": null
+      "backend": "DuckStation",
+      "adapter": "duckstation"
     },
     {
       "folder": "PS2",
       "id": "ps2",
-      "backend": null,
-      "adapter": null
+      "backend": "PCSX2",
+      "adapter": "pcsx2"
     },
     {
       "folder": "PS3",
       "id": "ps3",
-      "backend": null,
-      "adapter": null
+      "backend": "RPCS3",
+      "adapter": "rpcs3"
     },
     {
       "folder": "PS4",
