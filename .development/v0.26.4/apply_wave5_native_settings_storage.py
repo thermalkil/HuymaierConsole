@@ -32,22 +32,24 @@ def method_span(source, signature):
     return None
 
 # Route PS4/Vita settings and storage inside the current Wave4/5 subpage method.
-# This deliberately does not depend on the exact one-line body used by an older
-# materializer, so adding Arcade/operator cases cannot invalidate the patch.
+# The method itself is isolated structurally; inside that known-safe block use
+# exact fallback strings so spacing/regex quirks cannot prevent materialization.
 if 'private void RenderModernPlayStationSettings()' not in text:
     span=method_span(text,'private void RenderWave45Subpage()')
     if span is None:raise SystemExit('RenderWave45Subpage method is missing; materialize Wave4/5 stage first')
     start,end=span;block=text[start:end]
     settings_route='if((definition.Shell=="PS4"||definition.Shell=="Vita")&&dashboardSubpage=="settings"){RenderModernPlayStationSettings();return;}'
     saves_route='if((definition.Shell=="PS4"||definition.Shell=="Vita")&&dashboardSubpage=="saves"){RenderModernPlayStationStorage();return;}'
+    settings_fallback='if(dashboardSubpage=="settings"){RenderWave1Settings();return;}'
+    saves_fallback='if(dashboardSubpage=="saves"){RenderWave1Storage();return;}'
     if settings_route not in block:
-        match=re.search(r'if\s*\(\s*dashboardSubpage\s*==\s*"settings"\s*\)\s*\{\s*RenderWave1Settings\s*\(\s*\)\s*;\s*return\s*;\s*\}',block)
-        if not match:raise SystemExit('Generic Wave4/5 settings fallback was not found')
-        block=block[:match.start()]+settings_route+block[match.start():]
+        pos=block.find(settings_fallback)
+        if pos<0:raise SystemExit('Generic Wave4/5 settings fallback was not found')
+        block=block[:pos]+settings_route+block[pos:]
     if saves_route not in block:
-        match=re.search(r'if\s*\(\s*dashboardSubpage\s*==\s*"saves"\s*\)\s*\{\s*RenderWave1Storage\s*\(\s*\)\s*;\s*return\s*;\s*\}',block)
-        if not match:raise SystemExit('Generic Wave4/5 storage fallback was not found')
-        block=block[:match.start()]+saves_route+block[match.start():]
+        pos=block.find(saves_fallback)
+        if pos<0:raise SystemExit('Generic Wave4/5 storage fallback was not found')
+        block=block[:pos]+saves_route+block[pos:]
     text=text[:start]+block+text[end:]
 
 methods=r'''
