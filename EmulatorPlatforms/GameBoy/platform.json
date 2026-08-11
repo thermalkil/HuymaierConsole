@@ -1,12 +1,12 @@
 {
   "id": "gameboy",
   "displayName": "Nintendo Game Boy",
-  "primaryBackend": "SameBoy",
-  "fallbackBackend": "Mesen Community Edition",
-  "adapter": "sameboy",
+  "primaryBackend": "Mesen Community Edition",
+  "fallbackBackend": "",
+  "adapter": "mesence",
   "interface": "DMG handheld and cartridge interface",
   "version": "0.26.4-dev",
-  "enabled": false,
+  "enabled": true,
   "gameExtensions": [
     ".gb",
     ".sgb",

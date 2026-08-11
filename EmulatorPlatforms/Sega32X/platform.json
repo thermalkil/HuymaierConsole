@@ -2,11 +2,11 @@
   "id": "sega32x",
   "displayName": "Sega 32X",
   "primaryBackend": "ares",
-  "fallbackBackend": "PicoDrive libretro",
+  "fallbackBackend": "",
   "adapter": "ares",
   "interface": "Genesis + 32X tower and cartridge interface",
   "version": "0.26.4-dev",
-  "enabled": false,
+  "enabled": true,
   "gameExtensions": [
     ".32x",
     ".bin",

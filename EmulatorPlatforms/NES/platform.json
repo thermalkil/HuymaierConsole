@@ -2,11 +2,11 @@
   "id": "nes",
   "displayName": "Nintendo Entertainment System",
   "primaryBackend": "Mesen Community Edition",
-  "fallbackBackend": "ares",
+  "fallbackBackend": "",
   "adapter": "mesence",
   "interface": "NES control-deck and cartridge interface",
   "version": "0.26.4-dev",
-  "enabled": false,
+  "enabled": true,
   "gameExtensions": [
     ".nes",
     ".fds",

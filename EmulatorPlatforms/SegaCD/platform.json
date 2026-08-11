@@ -2,17 +2,16 @@
   "id": "segacd",
   "displayName": "Sega CD",
   "primaryBackend": "ares",
-  "fallbackBackend": "Mednafen",
+  "fallbackBackend": "",
   "adapter": "ares",
   "interface": "Sega CD BIOS / CD-player inspired disc interface",
   "version": "0.26.4-dev",
-  "enabled": false,
+  "enabled": true,
   "gameExtensions": [
     ".cue",
     ".chd",
     ".iso",
     ".bin"
   ],
-  "dashboardStyle": "Sega CD Model 1",
-  "fallbackAdapter": "mednafen"
+  "dashboardStyle": "Sega CD Model 1"
 }

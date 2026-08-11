@@ -2,11 +2,11 @@
   "id": "gba",
   "displayName": "Nintendo Game Boy Advance",
   "primaryBackend": "mGBA",
-  "fallbackBackend": "Mesen Community Edition",
+  "fallbackBackend": "",
   "adapter": "mgba",
   "interface": "Game Boy Advance handheld and cartridge interface",
   "version": "0.26.4-dev",
-  "enabled": false,
+  "enabled": true,
   "gameExtensions": [
     ".gba",
     ".agb",

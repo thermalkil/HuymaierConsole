@@ -2,11 +2,11 @@
   "id": "turbografx16",
   "displayName": "TurboGrafx-16",
   "primaryBackend": "Mednafen",
-  "fallbackBackend": "Mesen Community Edition",
+  "fallbackBackend": "",
   "adapter": "mednafen",
   "interface": "TurboGrafx-16 / PC Engine HuCard and CD interface",
   "version": "0.26.4-dev",
-  "enabled": false,
+  "enabled": true,
   "gameExtensions": [
     ".pce",
     ".sgx",
@@ -14,6 +14,5 @@
     ".chd",
     ".zip"
   ],
-  "dashboardStyle": "TurboGrafx-16",
-  "fallbackAdapter": "mesence"
+  "dashboardStyle": "TurboGrafx-16"
 }

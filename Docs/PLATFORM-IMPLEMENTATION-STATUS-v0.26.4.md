@@ -17,7 +17,7 @@ Existing interfaces remain separate and are not replaced by expansion work: PS1,
 
 Wave 1 has passed Windows PowerShell 5.1 parsing and the exact x64 managed/native host compile. Each platform uses the shared native backend-settings editor and Huymaier picker/install contract.
 
-## Expansion Wave 2 — staged, not enabled until all backend audits are complete
+## Expansion Wave 2 — enabled in v0.26.4 development
 
 - Atari 2600 — Stella, ares fallback — woodgrain VCS control deck
 - NES — Mesen Community Edition, ares fallback — NES Control Deck
@@ -32,7 +32,7 @@ Wave 1 has passed Windows PowerShell 5.1 parsing and the exact x64 managed/nativ
 - Sega Master System — Mesen CE, ares fallback — Master System control deck
 - TurboGrafx-16 — Mednafen, Mesen CE fallback — HuCard/CD system
 
-Wave 2 hardware renderers have passed the exact x64 compile. The backend layer includes dynamic latest-release installation, JSON/TOML/INI/BML/YAML/key-value preservation infrastructure, save-memory presentation and large-library first-letter acceleration. Atari 2600 additionally uses an installed-version Stella `-help` adapter so Huymaier does not write Stella 7's SQLite database directly. SameBoy remains under settings-completeness audit before Wave 2 is globally enabled.
+Wave 2 hardware renderers, native save/settings surfaces, latest-emulator installers and exact x64 compile gates have passed. Atari 2600 uses an installed-version Stella `-help` adapter so Huymaier never writes Stella 7 SQLite configuration directly. GB/GBC use Mesen CE as the attached backend so every enabled Wave 2 emulator has a complete native settings path.
 
 ## Expansion Wave 3 — staged, disabled pending backend/storage completion
 

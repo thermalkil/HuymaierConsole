@@ -330,11 +330,11 @@ namespace HuymaierConsole.NativeApp
             }
             else if (key == "GAMEBOY")
             {
-                d.DisplayName="Nintendo Game Boy";d.Subtitle="DOT MATRIX WITH STEREO SOUND";d.Shell="GameBoy";d.PrimaryBackend="SameBoy";d.FallbackBackend="Mesen Community Edition";d.PrimaryExecutableNames=new string[]{"sameboy.exe","SameBoy.exe"};d.FallbackExecutableNames=new string[]{"Mesen.exe","Mesen2.exe"};d.GameExtensions=new string[]{".gb",".sgb",".zip"};d.ColorA=Color.FromRgb(197,198,189);d.ColorB=Color.FromRgb(145,147,137);d.Accent=Color.FromRgb(117,44,111);
+                d.DisplayName="Nintendo Game Boy";d.Subtitle="DOT MATRIX WITH STEREO SOUND";d.Shell="GameBoy";d.PrimaryBackend="Mesen Community Edition";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"Mesen.exe","Mesen2.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".gb",".sgb",".zip"};d.ColorA=Color.FromRgb(197,198,189);d.ColorB=Color.FromRgb(145,147,137);d.Accent=Color.FromRgb(117,44,111);
             }
             else if (key == "GBC")
             {
-                d.DisplayName="Nintendo Game Boy Color";d.Subtitle="COLOR";d.Shell="GBC";d.PrimaryBackend="SameBoy";d.FallbackBackend="Mesen Community Edition";d.PrimaryExecutableNames=new string[]{"sameboy.exe","SameBoy.exe"};d.FallbackExecutableNames=new string[]{"Mesen.exe","Mesen2.exe"};d.GameExtensions=new string[]{".gbc",".gb",".zip"};d.ColorA=Color.FromRgb(80,36,122);d.ColorB=Color.FromRgb(37,20,66);d.Accent=Color.FromRgb(244,73,142);
+                d.DisplayName="Nintendo Game Boy Color";d.Subtitle="COLOR";d.Shell="GBC";d.PrimaryBackend="Mesen Community Edition";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"Mesen.exe","Mesen2.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".gbc",".gb",".zip"};d.ColorA=Color.FromRgb(80,36,122);d.ColorB=Color.FromRgb(37,20,66);d.Accent=Color.FromRgb(244,73,142);
             }
             else if (key == "GBA")
             {

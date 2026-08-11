@@ -2,11 +2,11 @@
   "id": "atari2600",
   "displayName": "Atari 2600",
   "primaryBackend": "Stella",
-  "fallbackBackend": "ares",
+  "fallbackBackend": "",
   "adapter": "stella",
   "interface": "Atari VCS control-deck and cartridge interface",
   "version": "0.26.4-dev",
-  "enabled": false,
+  "enabled": true,
   "gameExtensions": [
     ".a26",
     ".bin",
