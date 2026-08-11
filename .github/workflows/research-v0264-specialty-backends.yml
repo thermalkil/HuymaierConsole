@@ -1,0 +1,75 @@
+name: Research v0.26.4 Jaguar and Neo Geo Backend Readiness
+
+on:
+  pull_request:
+    branches: [feature/v0.26.3-console-fidelity]
+    paths:
+      - '.development/v0.26.4/specialty-backend-research-request.json'
+      - '.github/workflows/research-v0264-specialty-backends.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: huymaier-v0264-specialty-backend-research
+  cancel-in-progress: true
+
+jobs:
+  research:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v0.26.4-platform-expansion
+          fetch-depth: 0
+
+      - name: Probe current official BigPEmu and FBNeo distributions
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $ProgressPreference='SilentlyContinue'
+          $headers=@{'User-Agent'='Huymaier-Console-v0.26.4-readiness-audit'}
+          $work=Join-Path $env:RUNNER_TEMP 'hc-specialty-research';Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue;New-Item -ItemType Directory -Force -Path $work|Out-Null
+          $report=[ordered]@{schemaVersion=1;generatedAtUtc=[DateTime]::UtcNow.ToString('o');bigpemu=[ordered]@{};fbneo=[ordered]@{}}
+
+          # BigPEmu: resolve from the author's official Jaguar download page, not a pinned version URL.
+          $pageUrl='https://www.richwhitehouse.com/jaguar/index.php?content=download'
+          try{
+            $page=Invoke-WebRequest -UseBasicParsing -Uri $pageUrl -Headers $headers
+            $matches=[regex]::Matches([string]$page.Content,'(?i)href=["''](?<url>[^"'']*BigPEmu[^"'']*\.zip)["'']')
+            $windows=@($matches|ForEach-Object{$_.Groups['url'].Value}|Where-Object{$_ -match '(?i)(win|windows|x64|64)'})
+            $href=$(if($windows.Count){$windows[0]}elseif($matches.Count){$matches[0].Groups['url'].Value}else{''})
+            if($href){$href=[Net.WebUtility]::HtmlDecode($href);$download=$(if($href -match '^https?://'){$href}else{(New-Object Uri ([uri]$pageUrl),$href).AbsoluteUri});$report.bigpemu.downloadResolved=$true;$report.bigpemu.downloadUrl=$download
+              $zip=Join-Path $work 'BigPEmu.zip';Invoke-WebRequest -UseBasicParsing -Uri $download -Headers $headers -OutFile $zip;$report.bigpemu.archiveSha256=(Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant();$extract=Join-Path $work 'BigPEmu';Expand-Archive -LiteralPath $zip -DestinationPath $extract -Force;$exe=Get-ChildItem $extract -File -Recurse -Filter 'BigPEmu.exe' -ErrorAction SilentlyContinue|Select-Object -First 1
+              if(-not $exe){$exe=Get-ChildItem $extract -File -Recurse|Where-Object{$_.Name -ieq 'bigpemu.exe'}|Select-Object -First 1}
+              if($exe){$report.bigpemu.executableResolved=$true;$report.bigpemu.executable=$exe.FullName;$report.bigpemu.fileVersion=$exe.VersionInfo.FileVersion;$report.bigpemu.productVersion=$exe.VersionInfo.ProductVersion
+                $sandbox=Join-Path $work 'BigPEmuProfile';$appdata=Join-Path $sandbox 'AppData\Roaming';$local=Join-Path $sandbox 'AppData\Local';New-Item -ItemType Directory -Force -Path $appdata,$local|Out-Null
+                $probes=New-Object Collections.ArrayList
+                foreach($arg in @('-help','--help','/?','')){
+                  $psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName=$exe.FullName;$psi.Arguments=$arg;$psi.WorkingDirectory=$exe.Directory.FullName;$psi.UseShellExecute=$false;$psi.CreateNoWindow=$true;$psi.RedirectStandardOutput=$true;$psi.RedirectStandardError=$true;$psi.EnvironmentVariables['USERPROFILE']=$sandbox;$psi.EnvironmentVariables['APPDATA']=$appdata;$psi.EnvironmentVariables['LOCALAPPDATA']=$local
+                  try{$p=[Diagnostics.Process]::Start($psi);$exited=$p.WaitForExit(3500);if(-not $exited){try{$p.Kill()}catch{}};$stdout=$p.StandardOutput.ReadToEnd();$stderr=$p.StandardError.ReadToEnd();[void]$probes.Add([ordered]@{argument=$arg;exited=$exited;exitCode=$(if($exited){$p.ExitCode}else{$null});stdout=$stdout.Substring(0,[Math]::Min(12000,$stdout.Length));stderr=$stderr.Substring(0,[Math]::Min(12000,$stderr.Length))})}catch{[void]$probes.Add([ordered]@{argument=$arg;error=$_.Exception.Message})}
+                }
+                $report.bigpemu.cliProbes=@($probes)
+                $configFiles=@();foreach($root in @($extract,$sandbox)){if(Test-Path $root){$configFiles+=@(Get-ChildItem $root -File -Recurse -ErrorAction SilentlyContinue|Where-Object{$_.Name -match '(?i)(bigpemu|config|settings|profile)' -or $_.Extension -match '(?i)^\.(ini|cfg|json|xml|db|sqlite|toml)$'}|Select-Object -First 120|ForEach-Object{$_.FullName})}};$report.bigpemu.detectedConfigFiles=@($configFiles|Select-Object -Unique)
+                $registryText='';try{$registryText=(reg query HKCU\Software /f BigPEmu /s 2>&1|Out-String)}catch{};$report.bigpemu.registryProbe=$registryText.Substring(0,[Math]::Min(12000,$registryText.Length))
+              }else{$report.bigpemu.executableResolved=$false}
+            }else{$report.bigpemu.downloadResolved=$false;$report.bigpemu.error='No BigPEmu ZIP link was found on the official download page.'}
+          }catch{$report.bigpemu.error=$_.Exception.Message}
+
+          # FinalBurn Neo: audit the current official GitHub release asset list and validate a Windows binary if one exists.
+          try{
+            $release=Invoke-RestMethod -Headers $headers -Uri 'https://api.github.com/repos/finalburnneo/FBNeo/releases/latest'
+            $report.fbneo.tag=[string]$release.tag_name;$report.fbneo.releaseName=[string]$release.name;$report.fbneo.assets=@($release.assets|ForEach-Object{[ordered]@{name=$_.name;size=$_.size;url=$_.browser_download_url}})
+            $asset=@($release.assets|Where-Object{$_.name -match '(?i)(fbneo|finalburn).*(windows|win|x64|64).*\.(zip|7z)$' -and $_.name -notmatch '(?i)(source|debug|symbols|pdb)'}|Select-Object -First 1)
+            if($asset.Count){$report.fbneo.binaryResolved=$true;$report.fbneo.selectedAsset=$asset[0].name;$archive=Join-Path $work $asset[0].name;Invoke-WebRequest -UseBasicParsing -Headers $headers -Uri $asset[0].browser_download_url -OutFile $archive;$report.fbneo.archiveSha256=(Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant();$dest=Join-Path $work 'FBNeo';New-Item -ItemType Directory -Force -Path $dest|Out-Null;if($archive -match '(?i)\.zip$'){Expand-Archive -LiteralPath $archive -DestinationPath $dest -Force}else{& 7z x $archive ('-o'+$dest) -y|Out-Null;if($LASTEXITCODE -ne 0){throw '7-Zip could not extract the selected FBNeo asset.'}};$exe=Get-ChildItem $dest -File -Recurse -ErrorAction SilentlyContinue|Where-Object{$_.Name -match '(?i)^(fbneo|FinalBurnNeo)\.exe$'}|Select-Object -First 1;$report.fbneo.executableResolved=($null-ne$exe);if($exe){$report.fbneo.executable=$exe.FullName;$report.fbneo.fileVersion=$exe.VersionInfo.FileVersion}}
+            else{$report.fbneo.binaryResolved=$false;$report.fbneo.error='Latest official GitHub release does not expose a Windows binary asset matching the supported installer contract.'}
+          }catch{$report.fbneo.error=$_.Exception.Message}
+
+          $jsonPath='.development\v0.26.4\specialty-backend-research.json';$report|ConvertTo-Json -Depth 9|Set-Content $jsonPath -Encoding UTF8
+          $md=New-Object Text.StringBuilder;[void]$md.AppendLine('# v0.26.4 Jaguar / Neo Geo backend readiness');[void]$md.AppendLine();[void]$md.AppendLine('Generated from the current official BigPEmu download page and current official FBNeo GitHub release.');[void]$md.AppendLine();[void]$md.AppendLine('## BigPEmu');[void]$md.AppendLine();[void]$md.AppendLine("- Download resolved: $($report.bigpemu.downloadResolved)");[void]$md.AppendLine("- Executable resolved: $($report.bigpemu.executableResolved)");[void]$md.AppendLine("- Product version: $($report.bigpemu.productVersion)");[void]$md.AppendLine("- Detected config candidates: $(@($report.bigpemu.detectedConfigFiles).Count)");[void]$md.AppendLine();[void]$md.AppendLine('## FinalBurn Neo');[void]$md.AppendLine();[void]$md.AppendLine("- Latest tag: $($report.fbneo.tag)");[void]$md.AppendLine("- Windows binary resolved: $($report.fbneo.binaryResolved)");[void]$md.AppendLine("- Selected asset: $($report.fbneo.selectedAsset)");[void]$md.AppendLine("- Executable resolved: $($report.fbneo.executableResolved)");$md.ToString()|Set-Content '.development\v0.26.4\specialty-backend-research.md' -Encoding UTF8
+
+      - name: Commit bounded research record
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com';git add .development/v0.26.4/specialty-backend-research.json .development/v0.26.4/specialty-backend-research.md;if(git diff --cached --quiet){exit 0};git commit -m 'Record v0.26.4 Jaguar and Neo Geo backend readiness research';git fetch origin feature/v0.26.4-platform-expansion;git rebase origin/feature/v0.26.4-platform-expansion;if($LASTEXITCODE-ne 0){throw 'Specialty research rebase failed'};git push origin HEAD:feature/v0.26.4-platform-expansion;if($LASTEXITCODE-ne 0){throw 'Specialty research push failed'}
