@@ -4,7 +4,7 @@ Generated from current upstream primary-source repositories. Snippets are intent
 
 ## shadPS4
 
-Upstream commit: `b70f26414259e19ae813af21c62673a970b2be38`
+Upstream commit: `11aaefe2171ae28199317bc1a07f9bb4e35437a6`
 
 ### CLI / launch / content symbols
 ```text
