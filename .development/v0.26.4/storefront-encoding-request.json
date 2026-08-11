@@ -1,1 +1,1 @@
-{"requestedAtUtc":"2026-08-11T05:39:00Z","file":"HuymaierStorefronts.ps1","reason":"Windows PowerShell 5.1 misdecodes the Unicode on-screen keyboard glyph table without a UTF-8 BOM; preserve glyphs and restore parser compatibility."}
+{"requestedAtUtc":"2026-08-11T05:44:00Z","file":"HuymaierStorefronts.ps1","reason":"Add UTF-8 BOM for Windows PowerShell 5.1 and verify Unicode keyboard glyph preservation using numeric codepoints so the validation script itself remains ASCII-safe."}
