@@ -1,4 +1,4 @@
-# Huymaier Console storefront hub and native keyboard module.
+﻿# Huymaier Console storefront hub and native keyboard module.
 # Dot-sourced by HuymaierConsole.ps1 so all functions share the shell script scope.
 
 function Get-StorefrontDefinitions {
