@@ -38,7 +38,7 @@ if 'function Initialize-FbNeoConfigIfNeeded {' not in text:
     text=text.replace(anchor,helper+anchor,1)
 old='$roots=Get-ConfigRoots -AdapterId $adapterId -Settings $settings\n$configFiles=Get-ExplicitConfigFiles -AdapterId $adapterId -Roots $roots\n'
 new="$roots=Get-ConfigRoots -AdapterId $adapterId -Settings $settings\nif($adapterId -ieq 'fbneo'){[void](Initialize-FbNeoConfigIfNeeded -Roots $roots)}\n$configFiles=Get-ExplicitConfigFiles -AdapterId $adapterId -Roots $roots\n"
-if old in text:text.replace(old,new,1)
+if old in text:text=text.replace(old,new,1)
 elif new not in text:raise SystemExit('FBNeo first-run invocation anchor missing')
 path.write_text(text,encoding='utf-8-sig')
 print('materialized nonblocking FBNeo first-run full config initialization')
