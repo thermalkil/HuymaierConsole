@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][string]$PlatformId,
     [Parameter(Mandatory=$true)][string]$DestinationRoot,
@@ -64,6 +64,7 @@ function Install-GithubArchive {
         if($roots.Count -eq 1 -and @((Get-ChildItem -LiteralPath $stage -File -ErrorAction SilentlyContinue)).Count -eq 0){$source=$roots[0].FullName}
         Copy-Item -Path (Join-Path $source '*') -Destination $target -Recurse -Force
         foreach($name in $ExecutableNames){$exe=Get-ChildItem -LiteralPath $target -Filter $name -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1;if($exe){return $exe.FullName}}
+        if($TargetName -eq 'FinalBurnNeo'){$exe=Get-ChildItem -LiteralPath $target -Filter '*.exe' -File -Recurse -ErrorAction SilentlyContinue|Where-Object{$_.Name -match '(?i)(fbneo|finalburn)' -and $_.Name -notmatch '(?i)(debug|test|benchmark|unins|setup)'}|Select-Object -First 1;if($exe){return $exe.FullName}}
         throw "Installed $TargetName but its executable was not found."
     }finally{Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue}
 }
@@ -106,13 +107,34 @@ function Install-BigPEmuLatest {
     $pageUrl='https://www.richwhitehouse.com/jaguar/index.php?content=download'
     $page=Invoke-WebRequest -UseBasicParsing -Uri $pageUrl -Headers @{'User-Agent'='Huymaier-Console/0.26.4'}
     $html=[string]$page.Content
-    $matches=[regex]::Matches($html,'(?i)href=["''](?<url>[^"'']*BigPEmu[^"'']*(?:Win|Windows|x64|64)[^"'']*\.zip)["'']')
-    if($matches.Count -eq 0){$matches=[regex]::Matches($html,'(?i)href=["''](?<url>[^"'']*BigPEmu[^"'']*\.zip)["'']')}
-    if($matches.Count -eq 0){throw 'The current official BigPEmu Windows archive could not be identified from the BigPEmu download page.'}
-    $href=[System.Net.WebUtility]::HtmlDecode($matches[0].Groups['url'].Value)
+    # The official page labels the architecture next to each link. The x64 build
+    # intentionally has no x64 token in its filename (BigPEmu_vNNNN.zip), while
+    # ARM64 is named BigPEmu_WinARM64_vNNNN.zip. Resolve by the page label first.
+    $architecture=[string]$env:PROCESSOR_ARCHITECTURE
+    $wantArm=($architecture -match '(?i)ARM64')
+    $labelPattern=$(if($wantArm){'Windows\s*\(ARM64\)'}else{'Windows\s*\(x64\)'})
+    $pattern='(?is)'+$labelPattern+'.{0,1200}?href=["''](?<url>[^"'']*BigPEmu[^"'']*\.zip)["'']'
+    $match=[regex]::Match($html,$pattern)
+    if(-not $match.Success){
+        $links=@([regex]::Matches($html,'(?i)href=["''](?<url>[^"'']*BigPEmu[^"'']*\.zip)["'']')|ForEach-Object{$_.Groups['url'].Value})
+        if($wantArm){$href=@($links|Where-Object{$_ -match '(?i)WinARM64'}|Select-Object -First 1)}
+        else{$href=@($links|Where-Object{$_ -notmatch '(?i)(ARM64|Linux|Android)' }|Select-Object -First 1)}
+        if(-not $href){throw 'The current official BigPEmu Windows archive could not be identified from the BigPEmu download page.'}
+        $href=[string]$href[0]
+    }else{$href=$match.Groups['url'].Value}
+    $href=[System.Net.WebUtility]::HtmlDecode([string]$href)
+    if(-not $wantArm -and $href -match '(?i)ARM64'){throw 'The BigPEmu resolver selected an ARM64 archive on an x64 Windows host.'}
+    if($wantArm -and $href -notmatch '(?i)ARM64'){throw 'The BigPEmu resolver did not select the ARM64 archive on an ARM64 Windows host.'}
     $url=$href;if($href -notmatch '^https?://'){$url=(New-Object Uri ([uri]$pageUrl),$href).AbsoluteUri}
     $target=Join-Path $DestinationRoot 'BigPEmu';$work=Join-Path $env:TEMP ('hc-bigpemu-'+[guid]::NewGuid().ToString('N'));New-Item -ItemType Directory -Force -Path $work|Out-Null
-    try{$archive=Join-Path $work 'BigPEmu-Windows.zip';Invoke-WebRequest -UseBasicParsing -Headers $headers -Uri $url -OutFile $archive;New-Item -ItemType Directory -Force -Path $target|Out-Null;Expand-HcArchive $archive $target;$exe=Get-ChildItem -LiteralPath $target -Filter 'BigPEmu.exe' -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1;if(-not $exe){$exe=Get-ChildItem -LiteralPath $target -Filter 'bigpemu.exe' -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1};if(-not $exe){throw 'BigPEmu.exe was not found after extraction.'};return $exe.FullName}finally{Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue}
+    try{
+        $archive=Join-Path $work ([IO.Path]::GetFileName(([uri]$url).AbsolutePath));Invoke-WebRequest -UseBasicParsing -Headers $headers -Uri $url -OutFile $archive
+        New-Item -ItemType Directory -Force -Path $target|Out-Null;Expand-HcArchive $archive $target
+        $exe=Get-ChildItem -LiteralPath $target -Filter 'BigPEmu.exe' -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1
+        if(-not $exe){$exe=Get-ChildItem -LiteralPath $target -Filter 'bigpemu.exe' -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1}
+        if(-not $exe){throw 'BigPEmu.exe was not found after extraction.'}
+        return $exe.FullName
+    }finally{Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue}
 }
 
 function Install-StellaLatest {
@@ -189,9 +211,9 @@ switch($PlatformId){
     'PS4' {$exe=Install-GithubArchive 'shadps4-emu/shadPS4' { $_.name -match '(?i)(windows|win).*(x64|64).*\.(zip|7z)$' -or $_.name -match '(?i)shadps4.*windows.*\.(zip|7z)$' } 'shadPS4' @('shadPS4.exe','shadps4.exe')}
     'VITA' {$exe=Install-GithubArchive 'Vita3K/Vita3K' { $_.name -match '(?i)(windows|win).*(x64|64).*\.(zip|7z)$' -or $_.name -match '(?i)Vita3K.*windows.*\.(zip|7z)$' } 'Vita3K' @('Vita3K.exe','vita3k.exe')}
     'ARCADE' {$exe=Install-MameLatest}
-    'FINALBURNNEO' {$exe=Install-GithubArchive 'finalburnneo/FBNeo' { $_.name -match '(?i)(fbneo|finalburn).*(windows|win|x64|64).*\.(zip|7z)$' -and $_.name -notmatch '(?i)(source|debug|symbols|pdb)' } 'FinalBurnNeo' @('fbneo.exe','FinalBurnNeo.exe')}
+    'FINALBURNNEO' {$exe=Install-GithubArchive 'finalburnneo/FBNeo' { $_.name -ieq 'windows-x86_64.zip' -or ($_.name -match '(?i)(fbneo|finalburn).*(windows|win).*(x86_64|x64|64).*\.(zip|7z)$' -and $_.name -notmatch '(?i)(source|debug|symbols|pdb)') } 'FinalBurnNeo' @('fbneo.exe','fbneo64.exe','FinalBurnNeo.exe','FinalBurnNeo64.exe','FinalBurn Neo.exe')}
     'ATARILYNX' {$exe=Install-MednafenLatest}
-    'NEOGEO' {$exe=Install-GithubArchive 'finalburnneo/FBNeo' { $_.name -match '(?i)(fbneo|finalburn).*(windows|win|x64|64).*\.(zip|7z)$' -and $_.name -notmatch '(?i)(source|debug|symbols|pdb)' } 'FinalBurnNeo' @('fbneo.exe','FinalBurnNeo.exe')}
+    'NEOGEO' {$exe=Install-GithubArchive 'finalburnneo/FBNeo' { $_.name -ieq 'windows-x86_64.zip' -or ($_.name -match '(?i)(fbneo|finalburn).*(windows|win).*(x86_64|x64|64).*\.(zip|7z)$' -and $_.name -notmatch '(?i)(source|debug|symbols|pdb)') } 'FinalBurnNeo' @('fbneo.exe','fbneo64.exe','FinalBurnNeo.exe','FinalBurnNeo64.exe','FinalBurn Neo.exe')}
     'NGPC' {$exe=Install-MednafenLatest}
     'JAGUAR' {$exe=Install-BigPEmuLatest}
     'PRIMEHACK' {$exe=Install-GithubArchive 'shiiion/dolphin' { $_.name -match '(?i)(primehack|dolphin).*(windows|win|x64|64).*\.(zip|7z)$' -and $_.name -notmatch '(?i)(source|symbols|pdb|debug)' } 'PrimeHack' @('PrimeHack.exe','DolphinQt2.exe','Dolphin.exe')}
