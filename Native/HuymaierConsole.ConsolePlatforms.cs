@@ -370,15 +370,15 @@ namespace HuymaierConsole.NativeApp
             }
             else if (key == "GAMEGEAR")
             {
-                d.DisplayName="Sega Game Gear";d.Subtitle="GAME GEAR";d.Shell="GameGear";d.PrimaryBackend="Mesen Community Edition";d.FallbackBackend="ares";d.PrimaryExecutableNames=new string[]{"Mesen.exe","Mesen2.exe"};d.FallbackExecutableNames=new string[]{"ares.exe"};d.GameExtensions=new string[]{".gg",".zip"};d.ColorA=Color.FromRgb(12,14,17);d.ColorB=Color.FromRgb(34,39,45);d.Accent=Color.FromRgb(47,137,205);
+                d.DisplayName="Sega Game Gear";d.Subtitle="GAME GEAR";d.Shell="GameGear";d.PrimaryBackend="Mesen Community Edition";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"Mesen.exe","Mesen2.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".gg",".zip"};d.ColorA=Color.FromRgb(12,14,17);d.ColorB=Color.FromRgb(34,39,45);d.Accent=Color.FromRgb(47,137,205);
             }
             else if (key == "MASTERSYSTEM")
             {
-                d.DisplayName="Sega Master System";d.Subtitle="MASTER SYSTEM";d.Shell="MasterSystem";d.PrimaryBackend="Mesen Community Edition";d.FallbackBackend="ares";d.PrimaryExecutableNames=new string[]{"Mesen.exe","Mesen2.exe"};d.FallbackExecutableNames=new string[]{"ares.exe"};d.GameExtensions=new string[]{".sms",".sg",".zip"};d.ColorA=Color.FromRgb(8,9,10);d.ColorB=Color.FromRgb(38,39,40);d.Accent=Color.FromRgb(206,31,39);
+                d.DisplayName="Sega Master System";d.Subtitle="MASTER SYSTEM";d.Shell="MasterSystem";d.PrimaryBackend="Mesen Community Edition";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"Mesen.exe","Mesen2.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".sms",".sg",".zip"};d.ColorA=Color.FromRgb(8,9,10);d.ColorB=Color.FromRgb(38,39,40);d.Accent=Color.FromRgb(206,31,39);
             }
             else if (key == "TURBOGRAFX16")
             {
-                d.DisplayName="TurboGrafx-16";d.Subtitle="ENTERTAINMENT SUPER SYSTEM";d.Shell="TurboGrafx16";d.PrimaryBackend="Mednafen";d.FallbackBackend="Mesen Community Edition";d.PrimaryExecutableNames=new string[]{"mednafen.exe"};d.FallbackExecutableNames=new string[]{"Mesen.exe","Mesen2.exe"};d.GameExtensions=new string[]{".pce",".sgx",".cue",".chd",".zip"};d.ColorA=Color.FromRgb(224,223,218);d.ColorB=Color.FromRgb(178,177,171);d.Accent=Color.FromRgb(193,34,42);
+                d.DisplayName="TurboGrafx-16";d.Subtitle="ENTERTAINMENT SUPER SYSTEM";d.Shell="TurboGrafx16";d.PrimaryBackend="Mednafen";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"mednafen.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".pce",".sgx",".cue",".chd",".zip"};d.ColorA=Color.FromRgb(224,223,218);d.ColorB=Color.FromRgb(178,177,171);d.Accent=Color.FromRgb(193,34,42);
             }
             else if (key == "3DS")
             {
