@@ -17,10 +17,10 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference='Stop';$path='.development\v0.26.4\candidate-request.json';$data=Get-Content -Raw $path -Encoding UTF8|ConvertFrom-Json;foreach($required in @('candidate','version','base_release','base_asset','package_root','asset_name','production_source')){if([string]::IsNullOrWhiteSpace([string]$data.$required)){throw "Candidate request missing $required"}};if([string]$data.version-ne'0.26.4'){throw 'Candidate version is not 0.26.4'};if([string]$data.base_release-ne'v0.26.2'-or[string]$data.base_asset-ne'HC262.zip'){throw 'v0.26.4 must stage from the published v0.26.2 / HC262.zip runtime baseline'};if([string]$data.package_root-ne'HC264'-or[string]$data.asset_name-ne'HC264.zip'){throw 'v0.26.4 package identity must be HC264'};if([string]$data.production_source-ne'91bd40877bd0d5ee5d0f86748a2356a446d75bc6'){throw 'Candidate request does not name the validated production-source commit'};$m=Get-Content -Raw manifest.json -Encoding UTF8|ConvertFrom-Json;if([string]$m.version-ne'0.26.4'-or[string]$m.build-ne'platform-expansion-rc1'){throw 'Exact requested checkout is not the finalized v0.26.4 RC1 production state'};"path=$path"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append;"candidate=$([string]$data.candidate)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append;"asset=$([string]$data.asset_name)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append;"package_root=$([string]$data.package_root)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
-      - name: Parse v0.26.4 candidate gate
+      - name: Parse v0.26.4 candidate gates
         shell: powershell
         run: |
-          $t=$null;$e=$null;[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path '.\.build\Test-HuymaierV0264Candidate.ps1'),[ref]$t,[ref]$e);if($e.Count){$e|ForEach-Object{Write-Host $_.Message};throw 'v0.26.4 candidate gate failed PowerShell 5.1 parse'}
+          foreach($p in @('.\.build\Test-HuymaierV0264Candidate.ps1','.\.build\Test-HuymaierV0264CandidateV2.ps1')){$t=$null;$e=$null;[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p),[ref]$t,[ref]$e);if($e.Count){$e|ForEach-Object{Write-Host "$p : $($_.Message)"};throw "$p failed PowerShell 5.1 parse"}}
       - name: Build exact x64 FSE Home host
         shell: powershell
         run: |
@@ -37,7 +37,7 @@ jobs:
       - name: Run v0.26.4 platform and inherited regression gates
         shell: powershell
         run: |
-          $ErrorActionPreference='Stop';$stage=Join-Path $env:RUNNER_TEMP ('hc-stage\${{ steps.request.outputs.package_root }}');$validation=Join-Path $env:HC_CANDIDATE_OUTPUT 'candidate-validation.json';& .\.build\Test-HuymaierV0264Candidate.ps1 -StageRoot $stage -ValidationPath $validation
+          $ErrorActionPreference='Stop';$stage=Join-Path $env:RUNNER_TEMP ('hc-stage\${{ steps.request.outputs.package_root }}');$validation=Join-Path $env:HC_CANDIDATE_OUTPUT 'candidate-validation.json';& .\.build\Test-HuymaierV0264CandidateV2.ps1 -StageRoot $stage -ValidationPath $validation
       - name: Run Steam owned-library behavior tests
         shell: powershell
         run: |
