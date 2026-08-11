@@ -1,0 +1,9 @@
+﻿{
+    "schemaVersion":  2,
+    "downloadUrl":  "https://www.richwhitehouse.com/jaguar/builds/BigPEmu_v1221.zip",
+    "sha256":  "90b49dff119c66f8e8bd6eb45c1c5f24959dde165778e3d0e7fb5f7c46ee8c3d",
+    "configFile":  "BigPEmuConfig.bigpcfg",
+    "configGenerated":  false,
+    "headlessProbe":  "GitHub-hosted Windows x64",
+    "reason":  "Current BigPEmu x64 did not emit BigPEmuConfig.bigpcfg during a non-interactive *null -localdata launch; use a real-machine generated config or a documented enumeration path before graduating Jaguar full settings."
+}
