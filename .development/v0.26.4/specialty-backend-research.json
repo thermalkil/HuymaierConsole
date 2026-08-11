@@ -1,8 +1,13 @@
 ﻿{
     "schemaVersion":  2,
     "bigpemu":  {
-                    "downloadResolved":  false,
-                    "error":  "The remote server returned an error: (409) Conflict."
+                    "downloadResolved":  true,
+                    "downloadUrl":  "https://www.richwhitehouse.com/jaguar/builds/BigPEmu_v1221.zip",
+                    "archiveSha256":  "90b49dff119c66f8e8bd6eb45c1c5f24959dde165778e3d0e7fb5f7c46ee8c3d",
+                    "executableResolved":  true,
+                    "peMachine":  "0x8664",
+                    "fileVersion":  null,
+                    "productVersion":  null
                 },
     "fbneo":  {
                   "tag":  "latest",
