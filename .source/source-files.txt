@@ -3,6 +3,8 @@ Docs/PLATFORM-EXPANSION-v0.26.4.md
 Docs/PLATFORM-IMPLEMENTATION-STATUS-v0.26.4.md
 EmulatorPlatforms/3DS/platform.json
 EmulatorPlatforms/3DS/settings.default.json
+EmulatorPlatforms/Arcade/platform.json
+EmulatorPlatforms/Arcade/settings.default.json
 EmulatorPlatforms/Atari2600/platform.json
 EmulatorPlatforms/Atari2600/settings.default.json
 EmulatorPlatforms/AtariLynx/platform.json
@@ -12,6 +14,8 @@ EmulatorPlatforms/Dreamcast/settings.default.json
 EmulatorPlatforms/DSI/platform.json
 EmulatorPlatforms/DSI/settings.default.json
 EmulatorPlatforms/emulator-adapters.json
+EmulatorPlatforms/FinalBurnNeo/platform.json
+EmulatorPlatforms/FinalBurnNeo/settings.default.json
 EmulatorPlatforms/GameBoy/platform.json
 EmulatorPlatforms/GameBoy/settings.default.json
 EmulatorPlatforms/GameCube/Assets/README-STARTUP.txt
@@ -55,6 +59,8 @@ EmulatorPlatforms/PS3/Assets/README-STARTUP.txt
 EmulatorPlatforms/PS3/Assets/README.txt
 EmulatorPlatforms/PS3/platform.json
 EmulatorPlatforms/PS3/settings.default.json
+EmulatorPlatforms/PS4/platform.json
+EmulatorPlatforms/PS4/settings.default.json
 EmulatorPlatforms/PSP/platform.json
 EmulatorPlatforms/PSP/settings.default.json
 EmulatorPlatforms/Saturn/platform.json
@@ -72,6 +78,8 @@ EmulatorPlatforms/Switch/platform.json
 EmulatorPlatforms/Switch/settings.default.json
 EmulatorPlatforms/TurboGrafx16/platform.json
 EmulatorPlatforms/TurboGrafx16/settings.default.json
+EmulatorPlatforms/Vita/platform.json
+EmulatorPlatforms/Vita/settings.default.json
 EmulatorPlatforms/Wii/Assets/README-STARTUP.txt
 EmulatorPlatforms/Wii/platform.json
 EmulatorPlatforms/Wii/settings.default.json
