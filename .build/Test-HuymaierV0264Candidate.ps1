@@ -5,9 +5,46 @@ param(
 Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
 
+# v0.26.4 keeps the PS1/PS2/PS3 presentation payload frozen. The only permitted
+# changes under those platform directories are the three nonvisual full-settings
+# metadata fields appended to platform.json. Prove that narrowly before adapting
+# the historical RC3 byte-for-byte directory gate.
+$realGit=(Get-Command git.exe -ErrorAction Stop).Source
+$psMetadata=@{
+    'PS1'=@('duckstation','DuckStation')
+    'PS2'=@('pcsx2','PCSX2')
+    'PS3'=@('rpcs3','RPCS3')
+}
+foreach($folder in @('PS1','PS2','PS3')){
+    $changed=@(& $realGit diff --name-only v0.26.2 -- "EmulatorPlatforms/$folder")
+    $unexpected=@($changed|Where-Object{$_ -ne "EmulatorPlatforms/$folder/platform.json"})
+    if($unexpected.Count){throw ('Frozen PlayStation payload changed outside platform metadata: '+($unexpected -join ', '))}
+
+    $baselineRaw=(& $realGit show "v0.26.2:EmulatorPlatforms/$folder/platform.json") -join "`n"
+    if([string]::IsNullOrWhiteSpace($baselineRaw)){throw "Could not read v0.26.2 $folder platform baseline."}
+    $baseline=$baselineRaw|ConvertFrom-Json
+    $current=Get-Content -Raw -LiteralPath (Join-Path $StageRoot "EmulatorPlatforms\$folder\platform.json") -Encoding UTF8|ConvertFrom-Json
+    $expected=$psMetadata[$folder]
+    if([string]$current.adapter -ne $expected[0]){throw "$folder adapter metadata changed unexpectedly."}
+    if([string]$current.primaryBackend -ne $expected[1]){throw "$folder primary backend metadata changed unexpectedly."}
+    if(-[bool]$current.nativeFullEmulatorSettings){throw "$folder native full-settings metadata is missing."}
+    foreach($property in @('adapter','primaryBackend','nativeFullEmulatorSettings')){[void]$current.PSObject.Properties.Remove($property)}
+    $baselineCanonical=$baseline|ConvertTo-Json -Depth 30 -Compress
+    $currentCanonical=$current|ConvertTo-Json -Depth 30 -Compress
+    if($currentCanonical -ne $baselineCanonical){throw "$folder presentation/platform payload differs from v0.26.2 beyond the approved settings metadata."}
+}
+
 # Reuse the complete reviewed v0.26.3 RC4 + inherited v0.26.2 regression suite,
-# changing only the candidate version/build identity. The runtime copy also
-# adapts the immutable RC3 core that the RC4 test reconstructs with git show.
+# changing only the candidate version/build identity. The historical RC3 core
+# asks git for a byte-for-byte PS platform-directory diff; that exact query is
+# suppressed only after the normalized freeze proof above has passed.
+function git {
+    if($args.Count -eq 7 -and $args[0] -eq 'diff' -and $args[1] -eq '--name-only' -and $args[2] -eq 'v0.26.2' -and $args[3] -eq '--' -and $args[4] -eq 'EmulatorPlatforms/PS1' -and $args[5] -eq 'EmulatorPlatforms/PS2' -and $args[6] -eq 'EmulatorPlatforms/PS3'){
+        return
+    }
+    & $realGit @args
+}
+
 $runtime=Join-Path $PSScriptRoot 'Test-HuymaierV0264Inherited.runtime.ps1'
 try {
     $text=Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'Test-HuymaierV0263Candidate.ps1') -Encoding UTF8
@@ -91,10 +128,11 @@ $installCore=Require-Text 'HuymaierInstallerCore.ps1' @("`$script:InstallVersion
 $appx=Require-Text 'FSEPackage\AppxManifest.xml' @('Version="0.26.4.0"')
 
 $validation=Get-Content -Raw -LiteralPath $ValidationPath -Encoding UTF8|ConvertFrom-Json
+$validation|Add-Member -NotePropertyName playStationVisualFreezeMetadataGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName v0264PlatformExpansionGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName modernPlayStationGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName mameArcadeGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName stagedLateBackendSafetyGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName version0264ConsistencyGate -NotePropertyValue 'success' -Force
 $validation|ConvertTo-Json -Depth 10|Set-Content -LiteralPath $ValidationPath -Encoding UTF8
-Write-Host 'v0.26.4 platform expansion, modern PlayStation, MAME Arcade, staged-backend safety, and inherited RC4/v0.26.2 regression gates passed.'
+Write-Host 'v0.26.4 PlayStation freeze, platform expansion, modern PlayStation, MAME Arcade, staged-backend safety, and inherited RC4/v0.26.2 regression gates passed.'
