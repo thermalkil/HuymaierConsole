@@ -338,11 +338,11 @@ namespace HuymaierConsole.NativeApp
             }
             else if (key == "NES")
             {
-                d.DisplayName="Nintendo Entertainment System";d.Subtitle="Control Deck";d.Shell="NES";d.PrimaryBackend="Mesen Community Edition";d.FallbackBackend="ares";d.PrimaryExecutableNames=new string[]{"Mesen.exe","Mesen2.exe"};d.FallbackExecutableNames=new string[]{"ares.exe"};d.GameExtensions=new string[]{".nes",".fds",".unf",".unif",".zip"};d.ColorA=Color.FromRgb(205,204,199);d.ColorB=Color.FromRgb(102,103,100);d.Accent=Color.FromRgb(194,35,42);
+                d.DisplayName="Nintendo Entertainment System";d.Subtitle="Control Deck";d.Shell="NES";d.PrimaryBackend="Mesen Community Edition";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"Mesen.exe","Mesen2.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".nes",".fds",".unf",".unif",".zip"};d.ColorA=Color.FromRgb(205,204,199);d.ColorB=Color.FromRgb(102,103,100);d.Accent=Color.FromRgb(194,35,42);
             }
             else if (key == "SNES")
             {
-                d.DisplayName="Super Nintendo Entertainment System";d.Subtitle="Super NES Control Deck";d.Shell="SNES";d.PrimaryBackend="Mesen Community Edition";d.FallbackBackend="ares";d.PrimaryExecutableNames=new string[]{"Mesen.exe","Mesen2.exe"};d.FallbackExecutableNames=new string[]{"ares.exe"};d.GameExtensions=new string[]{".sfc",".smc",".fig",".swc",".zip"};d.ColorA=Color.FromRgb(208,207,205);d.ColorB=Color.FromRgb(116,113,123);d.Accent=Color.FromRgb(103,74,151);
+                d.DisplayName="Super Nintendo Entertainment System";d.Subtitle="Super NES Control Deck";d.Shell="SNES";d.PrimaryBackend="Mesen Community Edition";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"Mesen.exe","Mesen2.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".sfc",".smc",".fig",".swc",".zip"};d.ColorA=Color.FromRgb(208,207,205);d.ColorB=Color.FromRgb(116,113,123);d.Accent=Color.FromRgb(103,74,151);
             }
             else if (key == "GAMEBOY")
             {
@@ -354,7 +354,7 @@ namespace HuymaierConsole.NativeApp
             }
             else if (key == "GBA")
             {
-                d.DisplayName="Nintendo Game Boy Advance";d.Subtitle="ADVANCE";d.Shell="GBA";d.PrimaryBackend="mGBA";d.FallbackBackend="Mesen Community Edition";d.PrimaryExecutableNames=new string[]{"mGBA.exe","mgba.exe","mGBA-qt.exe"};d.FallbackExecutableNames=new string[]{"Mesen.exe","Mesen2.exe"};d.GameExtensions=new string[]{".gba",".agb",".zip"};d.ColorA=Color.FromRgb(79,55,145);d.ColorB=Color.FromRgb(38,26,83);d.Accent=Color.FromRgb(168,145,255);
+                d.DisplayName="Nintendo Game Boy Advance";d.Subtitle="ADVANCE";d.Shell="GBA";d.PrimaryBackend="mGBA";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"mGBA.exe","mgba.exe","mGBA-qt.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".gba",".agb",".zip"};d.ColorA=Color.FromRgb(79,55,145);d.ColorB=Color.FromRgb(38,26,83);d.Accent=Color.FromRgb(168,145,255);
             }
             else if (key == "GENESIS")
             {
