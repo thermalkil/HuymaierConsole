@@ -47,17 +47,11 @@ manifest_path=ROOT/'manifest.json';manifest=json.loads(manifest_path.read_text(e
 if feature not in features:features.append(feature)
 manifest['features']=features;manifest['description']='v0.26.4 development Wave 2 adds twelve validated cartridge/CD/handheld platforms on top of Wave 1 while preserving v0.26.3 RC4 console behavior.';manifest_path.write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8')
 
-# Update status documentation from staged -> enabled wording.
 status=ROOT/'Docs'/'PLATFORM-IMPLEMENTATION-STATUS-v0.26.4.md'
 if status.exists():
  s=status.read_text(encoding='utf-8-sig');s=s.replace('## Expansion Wave 2 — staged, not enabled until all backend audits are complete','## Expansion Wave 2 — enabled in v0.26.4 development');s=s.replace('Wave 2 hardware renderers have passed the exact x64 compile. The backend layer includes dynamic latest-release installation, JSON/TOML/INI/BML/YAML/key-value preservation infrastructure, save-memory presentation and large-library first-letter acceleration. Atari 2600 additionally uses an installed-version Stella `-help` adapter so Huymaier does not write Stella 7\'s SQLite database directly. SameBoy remains under settings-completeness audit before Wave 2 is globally enabled.','Wave 2 hardware renderers, native save/settings surfaces, latest-emulator installers and exact x64 compile gates have passed. Atari 2600 uses an installed-version Stella `-help` adapter so Huymaier never writes Stella 7 SQLite configuration directly. GB/GBC use Mesen CE as the attached backend so every enabled Wave 2 emulator has a complete native settings path.');status.write_text(s,encoding='utf-8')
 
-# Branch-wide validator must now regard Wave2 as graduated. Remove only the
-# Wave2 folder names from the later-wave disabled list.
-validator=ROOT/'.github'/'workflows'/'validate-v0264-expansion.yml'
-if validator.exists():
- v=validator.read_text(encoding='utf-8-sig')
- for folder in platforms:
-  v=v.replace("'"+folder+"',",'').replace(",\'"+folder+"\'",'')
- validator.write_text(v,encoding='utf-8')
+# IMPORTANT: product materializers never edit .github/workflows. GitHub Actions
+# tokens without workflows permission cannot push such a commit. Validation
+# policy is maintained separately by the branch-wide validator.
 print('graduated all 12 Wave 2 platforms with single fully-supported primary backends')
