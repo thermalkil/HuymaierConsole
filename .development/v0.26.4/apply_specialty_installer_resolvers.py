@@ -16,7 +16,6 @@ replacement=r'''function Install-BigPEmuLatest {
     $architecture=[string]$env:PROCESSOR_ARCHITECTURE
     $wantArm=($architecture -match '(?i)ARM64')
     $labelPattern=$(if($wantArm){'Windows\s*\(ARM64\)'}else{'Windows\s*\(x64\)'})
-    $match=[regex]::Match($html,(?i:''))
     $pattern='(?is)'+$labelPattern+'.{0,1200}?href=["''](?<url>[^"'']*BigPEmu[^"'']*\.zip)["'']'
     $match=[regex]::Match($html,$pattern)
     if(-not $match.Success){
@@ -41,14 +40,20 @@ replacement=r'''function Install-BigPEmuLatest {
     }finally{Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue}
 }
 '''
-# Remove accidental placeholder regex line before writing.
-replacement=replacement.replace("    $match=[regex]::Match($html,(?i:''))\n",'')
 text=text[:start]+replacement+text[end:]
 old="{ $_.name -match '(?i)(fbneo|finalburn).*(windows|win|x64|64).*\\.(zip|7z)$' -and $_.name -notmatch '(?i)(source|debug|symbols|pdb)' } 'FinalBurnNeo' @('fbneo.exe','FinalBurnNeo.exe')"
-new="{ $_.name -ieq 'windows-x86_64.zip' -or ($_.name -match '(?i)(fbneo|finalburn).*(windows|win).*(x86_64|x64|64).*\\.(zip|7z)$' -and $_.name -notmatch '(?i)(source|debug|symbols|pdb)') } 'FinalBurnNeo' @('fbneo.exe','FinalBurnNeo.exe','FinalBurn Neo.exe')"
+new="{ $_.name -ieq 'windows-x86_64.zip' -or ($_.name -match '(?i)(fbneo|finalburn).*(windows|win).*(x86_64|x64|64).*\\.(zip|7z)$' -and $_.name -notmatch '(?i)(source|debug|symbols|pdb)') } 'FinalBurnNeo' @('fbneo.exe','fbneo64.exe','FinalBurnNeo.exe','FinalBurnNeo64.exe','FinalBurn Neo.exe')"
 count=text.count(old)
-if count not in (0,2):raise SystemExit(f'Expected zero or two FBNeo resolver filters, found {count}')
+if count not in (0,2):raise SystemExit(f'Expected zero or two legacy FBNeo resolver filters, found {count}')
 if count:text=text.replace(old,new)
+# A nightly archive may rename the Windows executable without changing the
+# official asset contract. For FinalBurnNeo only, resolve any shipped .exe whose
+# filename clearly identifies FBNeo/FinalBurn, after the preferred exact names.
+anchor='''        foreach($name in $ExecutableNames){$exe=Get-ChildItem -LiteralPath $target -Filter $name -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1;if($exe){return $exe.FullName}}\n        throw "Installed $TargetName but its executable was not found."'''
+replacement_anchor='''        foreach($name in $ExecutableNames){$exe=Get-ChildItem -LiteralPath $target -Filter $name -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1;if($exe){return $exe.FullName}}\n        if($TargetName -eq 'FinalBurnNeo'){$exe=Get-ChildItem -LiteralPath $target -Filter '*.exe' -File -Recurse -ErrorAction SilentlyContinue|Where-Object{$_.Name -match '(?i)(fbneo|finalburn)' -and $_.Name -notmatch '(?i)(debug|test|benchmark|unins|setup)'}|Select-Object -First 1;if($exe){return $exe.FullName}}\n        throw "Installed $TargetName but its executable was not found."'''
+if "if($TargetName -eq 'FinalBurnNeo')" not in text:
+    if text.count(anchor)!=1:raise SystemExit('Install-GithubArchive executable resolution anchor missing')
+    text=text.replace(anchor,replacement_anchor,1)
 if "'FINALBURNNEO'" in text and "windows-x86_64.zip" not in text:raise SystemExit('FBNeo x86_64 resolver was not materialized')
 path.write_text(text,encoding='utf-8-sig')
-print('materialized architecture-correct BigPEmu and official FBNeo Windows x86_64 resolvers')
+print('materialized architecture-correct BigPEmu and official FBNeo Windows x86_64 resolvers with archive-name fallback')
