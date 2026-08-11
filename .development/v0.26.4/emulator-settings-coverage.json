@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "generatedFromBranch": "feature/v0.26.4-platform-expansion",
-  "platformCount": 28,
-  "enabledCount": 28,
+  "platformCount": 31,
+  "enabledCount": 31,
   "enabledMissingNativeSettings": [
     "ps1",
     "ps2",
@@ -555,6 +555,66 @@
       "enabled": true,
       "primaryBackend": "Mednafen",
       "adapter": "mednafen",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "atarilynx",
+      "name": "Atari Lynx",
+      "enabled": true,
+      "primaryBackend": "Mednafen",
+      "adapter": "mednafen",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "ngpc",
+      "name": "Neo Geo Pocket Color",
+      "enabled": true,
+      "primaryBackend": "Mednafen",
+      "adapter": "mednafen",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "primehack",
+      "name": "Metroid PrimeHack",
+      "enabled": true,
+      "primaryBackend": "PrimeHack",
+      "adapter": "primehack",
       "fallbackAdapter": "",
       "platformDefinitionFound": true,
       "settingsDefault": true,

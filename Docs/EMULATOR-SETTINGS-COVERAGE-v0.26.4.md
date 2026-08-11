@@ -1,7 +1,7 @@
 # v0.26.4 emulator settings coverage
 
-Platforms in registry: **28**  
-Enabled: **28**  
+Platforms in registry: **31**  
+Enabled: **31**  
 Enabled missing a complete native adapter: **3**
 
 | Platform | Enabled | Backend | Adapter | Native settings ready |
@@ -34,5 +34,8 @@ Enabled missing a complete native adapter: **3**
 | Sega Game Gear | yes | Mesen Community Edition | mesence | yes |
 | Sega Master System | yes | Mesen Community Edition | mesence | yes |
 | TurboGrafx-16 | yes | Mednafen | mednafen | yes |
+| Atari Lynx | yes | Mednafen | mednafen | yes |
+| Neo Geo Pocket Color | yes | Mednafen | mednafen | yes |
+| Metroid PrimeHack | yes | PrimeHack | primehack | yes |
 
 Enabled platforms missing native settings: ps1, ps2, ps3
