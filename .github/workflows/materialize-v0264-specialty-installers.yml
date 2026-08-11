@@ -1,0 +1,34 @@
+name: Materialize v0.26.4 Jaguar and Neo Geo Install Resolvers
+on:
+  pull_request:
+    branches: [feature/v0.26.3-console-fidelity]
+    paths: ['.development/v0.26.4/specialty-installer-request.json','.development/v0.26.4/apply_specialty_installer_resolvers.py','.github/workflows/materialize-v0264-specialty-installers.yml']
+permissions: {contents: write}
+concurrency: {group: huymaier-v0264-specialty-installers, cancel-in-progress: false}
+jobs:
+  validate:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: feature/v0.26.4-platform-expansion, fetch-depth: 0}
+      - name: Materialize architecture-correct resolvers
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';python .development\v0.26.4\apply_specialty_installer_resolvers.py;if($LASTEXITCODE){throw 'Specialty installer resolver materializer failed'};$t=$null;$e=$null;[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path '.\HuymaierEmulatorInstaller.ps1'),[ref]$t,[ref]$e);if($e.Count){$e|ForEach-Object{Write-Host $_.Message};throw 'Specialty installer source fails Windows PowerShell 5.1 parsing.'}
+      - name: Live-install current official Jaguar x64 backend
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';$root=Join-Path $env:RUNNER_TEMP 'hc-jaguar-install';New-Item -ItemType Directory -Force -Path $root|Out-Null;& .\HuymaierEmulatorInstaller.ps1 -PlatformId JAGUAR -DestinationRoot $root -ConsoleRoot (Resolve-Path '.').Path;if($LASTEXITCODE-ne0){throw 'Jaguar installer exited nonzero.'};$exe=Get-ChildItem $root -Filter 'BigPEmu.exe' -File -Recurse|Select-Object -First 1;if(-not$exe){throw 'BigPEmu.exe missing after official x64 install.'};$bytes=[IO.File]::ReadAllBytes($exe.FullName);$pe=[BitConverter]::ToInt32($bytes,0x3c);$machine=[BitConverter]::ToUInt16($bytes,$pe+4);if($machine-ne0x8664){throw ('BigPEmu installer selected non-x64 PE machine 0x'+$machine.ToString('X4'))};Write-Host "BigPEmu x64 installed: $($exe.FullName)"
+      - name: Live-install current official Neo Geo backend
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';$root=Join-Path $env:RUNNER_TEMP 'hc-neogeo-install';New-Item -ItemType Directory -Force -Path $root|Out-Null;& .\HuymaierEmulatorInstaller.ps1 -PlatformId NEOGEO -DestinationRoot $root -ConsoleRoot (Resolve-Path '.').Path;if($LASTEXITCODE-ne0){throw 'Neo Geo installer exited nonzero.'};$exe=Get-ChildItem $root -File -Recurse|Where-Object{$_.Name -match '(?i)^(fbneo|FinalBurnNeo|FinalBurn Neo)\.exe$'}|Select-Object -First 1;if(-not$exe){throw 'FBNeo executable missing after official windows-x86_64 install.'};$bytes=[IO.File]::ReadAllBytes($exe.FullName);$pe=[BitConverter]::ToInt32($bytes,0x3c);$machine=[BitConverter]::ToUInt16($bytes,$pe+4);if($machine-ne0x8664){throw ('FBNeo installer selected non-x64 PE machine 0x'+$machine.ToString('X4'))};Write-Host "FBNeo x64 installed: $($exe.FullName)"
+      - name: Validate resolver policy
+        shell: powershell
+        run: |
+          $text=Get-Content -Raw '.\HuymaierEmulatorInstaller.ps1' -Encoding UTF8;foreach($m in @('Windows\s*\(x64\)','WinARM64','windows-x86_64.zip','BigPEmu.exe')){if($text -notmatch [regex]::Escape($m)){throw "Specialty resolver marker missing: $m"}}
+      - name: Commit live-proven resolver source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com';git add HuymaierEmulatorInstaller.ps1;if(git diff --cached --quiet){exit 0};git commit -m 'Fix v0.26.4 BigPEmu and FBNeo latest install resolution';git fetch origin feature/v0.26.4-platform-expansion;git rebase origin/feature/v0.26.4-platform-expansion;if($LASTEXITCODE-ne0){throw 'Specialty resolver rebase failed'};git push origin HEAD:feature/v0.26.4-platform-expansion;if($LASTEXITCODE-ne0){throw 'Specialty resolver push failed'}
