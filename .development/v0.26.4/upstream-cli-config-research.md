@@ -4,7 +4,7 @@ Generated from current upstream primary-source repositories. Snippets are intent
 
 ## shadPS4
 
-Upstream commit: `c5ae3c681276bd884b9b714c2099d55796c36154`
+Upstream commit: `b70f26414259e19ae813af21c62673a970b2be38`
 
 ### CLI / launch / content symbols
 ```text
@@ -75,40 +75,44 @@ Upstream commit: `c5ae3c681276bd884b9b714c2099d55796c36154`
 /home/runner/work/_temp/hc-upstream/shadPS4/src/video_core/renderer_vulkan/vk_rasterizer.cpp:643:                    auto& vk_buffer = buffer_cache.GetUtilityBuffer(VideoCore::MemoryUsage::Stream);
 /home/runner/work/_temp/hc-upstream/shadPS4/src/video_core/renderer_vulkan/vk_rasterizer.cpp:663:                auto& lds_buffer = buffer_cache.GetUtilityBuffer(VideoCore::MemoryUsage::Stream);
 /home/runner/work/_temp/hc-upstream/shadPS4/src/video_core/renderer_vulkan/vk_presenter.cpp:152:                 VideoCore::MemoryUsage::Download,
-/home/runner/work/_temp/hc-upstream/shadPS4/src/imgui/big_picture/big_picture.cpp:199:                    if (const auto title_id = psf.GetString("TITLE_ID"); title_id.has_value()) {
-/home/runner/work/_temp/hc-upstream/shadPS4/src/imgui/big_picture/big_picture.cpp:200:                        icon.serial = *title_id;
-/home/runner/work/_temp/hc-upstream/shadPS4/src/imgui/big_picture/big_picture.cpp:212:                icon.ebootPath = entry.path() / "eboot.bin";
-/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:276:        file /= "eboot.bin";
-/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:303:            archive_inner = "eboot.bin";
-/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:387:            const auto title_id = param_sfo->GetString("TITLE_ID");
-/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:390:            } else if (title_id.has_value()) {
-/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:391:                id = *title_id;
-/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:463:        LOG_CRITICAL(Loader, "eboot.bin does not exist: {}", guest_eboot_path);
-/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:526:        const auto argc = std::min<size_t>(args.size(), 32);
-/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:527:        for (auto i = 0; i < argc; i++) {
-/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:654:        LOG_CRITICAL(Loader, "Failed to load game's eboot.bin: {}", guest_eboot_path);
-/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:715:        if (!guest.empty() && guest != "eboot.bin") {
-/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:723:        auto game_path = mnt->GetHostPath("/app0");
-/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:729:        args.push_back(Common::FS::PathToUTF8String(game_path));
-/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:799:    std::vector<char*> argv;
-/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:802:    argv.push_back(const_cast<char*>(executableName));
-/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:805:        argv.push_back(const_cast<char*>(arg.c_str()));
-/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:807:    argv.push_back(nullptr);
-/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:812:        execvp(executableName, argv.data());
+/home/runner/work/_temp/hc-upstream/shadPS4/src/imgui/big_picture/big_picture.cpp:195:                    if (const auto title_id = psf.GetString("TITLE_ID"); title_id.has_value()) {
+/home/runner/work/_temp/hc-upstream/shadPS4/src/imgui/big_picture/big_picture.cpp:196:                        icon.serial = *title_id;
+/home/runner/work/_temp/hc-upstream/shadPS4/src/imgui/big_picture/big_picture.cpp:208:                icon.ebootPath = entry.path() / "eboot.bin";
+/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:277:        file /= "eboot.bin";
+/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:304:            archive_inner = "eboot.bin";
+/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:388:            const auto title_id = param_sfo->GetString("TITLE_ID");
+/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:391:            } else if (title_id.has_value()) {
+/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:392:                id = *title_id;
+/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:464:        LOG_CRITICAL(Loader, "eboot.bin does not exist: {}", guest_eboot_path);
+/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:527:        const auto argc = std::min<size_t>(args.size(), 32);
+/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:528:        for (auto i = 0; i < argc; i++) {
+/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:660:        LOG_CRITICAL(Loader, "Failed to load game's eboot.bin: {}", guest_eboot_path);
+/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:721:        if (!guest.empty() && guest != "eboot.bin") {
+/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:729:        auto game_path = mnt->GetHostPath("/app0");
+/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:735:        args.push_back(Common::FS::PathToUTF8String(game_path));
+/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:805:    std::vector<char*> argv;
+/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:808:    argv.push_back(const_cast<char*>(executableName));
+/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:811:        argv.push_back(const_cast<char*>(arg.c_str()));
+/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:813:    argv.push_back(nullptr);
+/home/runner/work/_temp/hc-upstream/shadPS4/src/emulator.cpp:818:        execvp(executableName, argv.data());
 /home/runner/work/_temp/hc-upstream/shadPS4/src/main.cpp:32:int main(int argc, char* argv[]) {
-/home/runner/work/_temp/hc-upstream/shadPS4/src/main.cpp:72:    app.add_option("-g,--game", gamePath, "Game path or ID");
-/home/runner/work/_temp/hc-upstream/shadPS4/src/main.cpp:107:    if (argc == 1) {
-/home/runner/work/_temp/hc-upstream/shadPS4/src/main.cpp:117:        app.parse(argc, argv);
-/home/runner/work/_temp/hc-upstream/shadPS4/src/main.cpp:128:    LOG_INFO(Debug, "Run: {}", std::span(argv, argc));
-/home/runner/work/_temp/hc-upstream/shadPS4/src/main.cpp:149:        BigPictureMode::Launch(argv[0], sameProcess);
-/home/runner/work/_temp/hc-upstream/shadPS4/src/main.cpp:173:            LOG_ERROR(Debug, "Please provide a game path or ID.");
-/home/runner/work/_temp/hc-upstream/shadPS4/src/main.cpp:213:    // ---- Resolve game path or ID ----
-/home/runner/work/_temp/hc-upstream/shadPS4/src/main.cpp:242:    emulator->executableName = argv[0];
-/home/runner/work/_temp/hc-upstream/shadPS4/src/core/linker.cpp:208:        // Add all guest arguments, we will always have the executable path in argv[0]
-/home/runner/work/_temp/hc-upstream/shadPS4/src/core/linker.cpp:210:        constexpr int MaxArgs = sizeof(params.argv) / sizeof(params.argv[0]);
-/home/runner/work/_temp/hc-upstream/shadPS4/src/core/linker.cpp:211:        params.argc = std::min<int>(args.size(), MaxArgs);
-/home/runner/work/_temp/hc-upstream/shadPS4/src/core/linker.cpp:212:        for (int i = 0; i < params.argc; i++) {
-/home/runner/work/_temp/hc-upstream/shadPS4/src/core/linker.cpp:213:            params.argv[i] = args[i].c_str();
+/home/runner/work/_temp/hc-upstream/shadPS4/src/main.cpp:74:    app.add_option("guest_arg", gamePath, "Game path or ID"); // positional
+/home/runner/work/_temp/hc-upstream/shadPS4/src/main.cpp:75:    app.add_option("-g,--game", gamePath, "Game path or ID");
+/home/runner/work/_temp/hc-upstream/shadPS4/src/main.cpp:104:    if (argc == 1) {
+/home/runner/work/_temp/hc-upstream/shadPS4/src/main.cpp:117:        for (int i = 0; i < argc; i++) {
+/home/runner/work/_temp/hc-upstream/shadPS4/src/main.cpp:119:                gameArgs.emplace_back(argv[i]);
+/home/runner/work/_temp/hc-upstream/shadPS4/src/main.cpp:121:            if (!double_dash_found && std::string(argv[i]) == "--") {
+/home/runner/work/_temp/hc-upstream/shadPS4/src/main.cpp:128:        app.parse(double_dash_index, argv);
+/home/runner/work/_temp/hc-upstream/shadPS4/src/main.cpp:139:    LOG_INFO(Debug, "Run: {}", std::span(argv, argc));
+/home/runner/work/_temp/hc-upstream/shadPS4/src/main.cpp:160:        BigPictureMode::Launch(argv[0], sameProcess);
+/home/runner/work/_temp/hc-upstream/shadPS4/src/main.cpp:184:            LOG_ERROR(Debug, "Please provide a game path or ID.");
+/home/runner/work/_temp/hc-upstream/shadPS4/src/main.cpp:216:    // ---- Resolve game path or ID ----
+/home/runner/work/_temp/hc-upstream/shadPS4/src/main.cpp:245:    emulator->executableName = argv[0];
+/home/runner/work/_temp/hc-upstream/shadPS4/src/core/linker.cpp:206:        // Add all guest arguments, we will always have the executable path in argv[0]
+/home/runner/work/_temp/hc-upstream/shadPS4/src/core/linker.cpp:208:        constexpr int MaxArgs = sizeof(params.argv) / sizeof(params.argv[0]);
+/home/runner/work/_temp/hc-upstream/shadPS4/src/core/linker.cpp:209:        params.argc = std::min<int>(args.size(), MaxArgs);
+/home/runner/work/_temp/hc-upstream/shadPS4/src/core/linker.cpp:210:        for (int i = 0; i < params.argc; i++) {
+/home/runner/work/_temp/hc-upstream/shadPS4/src/core/linker.cpp:211:            params.argv[i] = args[i].c_str();
 /home/runner/work/_temp/hc-upstream/shadPS4/src/core/linker.h:50:    int argc;
 /home/runner/work/_temp/hc-upstream/shadPS4/src/core/linker.h:52:    const char* argv[33];
 /home/runner/work/_temp/hc-upstream/shadPS4/src/core/devtools/widget/module_list.h:48:        if (name == "eboot.bin") {
@@ -169,12 +173,12 @@ Upstream commit: `c5ae3c681276bd884b9b714c2099d55796c36154`
 /home/runner/work/_temp/hc-upstream/shadPS4/src/core/libraries/sysmodule/sysmodule.h:28:s32 PS4_SYSV_ABI sceSysmoduleLoadModuleInternalWithArg(OrbisSysModuleInternal id, s32 argc,
 /home/runner/work/_temp/hc-upstream/shadPS4/src/core/libraries/sysmodule/sysmodule.h:29:                                                       const void* argv, u64 unk, s32* res_out);
 /home/runner/work/_temp/hc-upstream/shadPS4/src/core/libraries/kernel/kernel.cpp:47:static const char* g_progname = "eboot.bin";
-/home/runner/work/_temp/hc-upstream/shadPS4/src/core/libraries/kernel/kernel.cpp:267:s32 PS4_SYSV_ABI getargc() {
-/home/runner/work/_temp/hc-upstream/shadPS4/src/core/libraries/kernel/kernel.cpp:268:    return entry_params.argc;
-/home/runner/work/_temp/hc-upstream/shadPS4/src/core/libraries/kernel/kernel.cpp:271:const char** PS4_SYSV_ABI getargv() {
-/home/runner/work/_temp/hc-upstream/shadPS4/src/core/libraries/kernel/kernel.cpp:272:    return entry_params.argv;
-/home/runner/work/_temp/hc-upstream/shadPS4/src/core/libraries/kernel/kernel.cpp:541:    LIB_FUNCTION("iKJMWrAumPE", "libkernel", 1, "libkernel", getargc);
-/home/runner/work/_temp/hc-upstream/shadPS4/src/core/libraries/kernel/kernel.cpp:542:    LIB_FUNCTION("FJmglmTMdr4", "libkernel", 1, "libkernel", getargv);
+/home/runner/work/_temp/hc-upstream/shadPS4/src/core/libraries/kernel/kernel.cpp:250:s32 PS4_SYSV_ABI getargc() {
+/home/runner/work/_temp/hc-upstream/shadPS4/src/core/libraries/kernel/kernel.cpp:251:    return entry_params.argc;
+/home/runner/work/_temp/hc-upstream/shadPS4/src/core/libraries/kernel/kernel.cpp:254:const char** PS4_SYSV_ABI getargv() {
+/home/runner/work/_temp/hc-upstream/shadPS4/src/core/libraries/kernel/kernel.cpp:255:    return entry_params.argv;
+/home/runner/work/_temp/hc-upstream/shadPS4/src/core/libraries/kernel/kernel.cpp:521:    LIB_FUNCTION("iKJMWrAumPE", "libkernel", 1, "libkernel", getargc);
+/home/runner/work/_temp/hc-upstream/shadPS4/src/core/libraries/kernel/kernel.cpp:522:    LIB_FUNCTION("FJmglmTMdr4", "libkernel", 1, "libkernel", getargv);
 /home/runner/work/_temp/hc-upstream/shadPS4/src/core/libraries/app_content/app_content.cpp:36:static std::string title_id;
 /home/runner/work/_temp/hc-upstream/shadPS4/src/core/libraries/app_content/app_content.cpp:64:    const auto& addon_path = EmulatorSettings.GetAddonInstallDir() / title_id;
 /home/runner/work/_temp/hc-upstream/shadPS4/src/core/libraries/app_content/app_content.cpp:296:    if (const auto value = param_sfo->GetString("TITLE_ID"); value.has_value()) {
@@ -184,10 +188,6 @@ Upstream commit: `c5ae3c681276bd884b9b714c2099d55796c36154`
 /home/runner/work/_temp/hc-upstream/shadPS4/src/core/ipc/ipc.cpp:65: *   - RESTART(argn: number, argv: ...string): Request restart of the emulator, must call STOP
 /home/runner/work/_temp/hc-upstream/shadPS4/src/core/file_format/psf.cpp:16:    {"SUBTITLE", 128},  {"TITLE_ID", 12},
 /home/runner/work/_temp/hc-upstream/shadPS4/src/shader_recompiler/ir/ir_emitter.cpp:2152:// Example usage:
-/home/runner/work/_temp/hc-upstream/shadPS4/externals/CMakeLists.txt:164:    target_compile_options(sirit PRIVATE $<$<CXX_COMPILER_ID:Clang>:-Wno-error=unused-command-line-argument>)
-/home/runner/work/_temp/hc-upstream/shadPS4/externals/renderdoc/renderdoc_app.h:457:// if connectTargetControl is 1, the Replay UI will be launched with a command line parameter
-/home/runner/work/_temp/hc-upstream/shadPS4/externals/renderdoc/renderdoc_app.h:459:// cmdline is the rest of the command line, as a UTF-8 string. E.g. a captures to open
-/home/runner/work/_temp/hc-upstream/shadPS4/externals/renderdoc/renderdoc_app.h:460:// if cmdline is NULL, the command line will be empty.
 ```
 
 ### Config / preferences symbols
@@ -200,8 +200,8 @@ Upstream commit: `c5ae3c681276bd884b9b714c2099d55796c36154`
 /home/runner/work/_temp/hc-upstream/shadPS4/tests/test_emulator_settings.cpp:286:// tests for global config.json file
 /home/runner/work/_temp/hc-upstream/shadPS4/tests/test_emulator_settings.cpp:824:    EXPECT_EQ(t0, t1) << "Destructor wrote config.json without a prior Load()";
 /home/runner/work/_temp/hc-upstream/shadPS4/tests/test_windows_guest_red_zone_protection_settings.cpp:128:    std::ofstream output(root / "config.json");
-/home/runner/work/_temp/hc-upstream/shadPS4/CMakeLists.txt:1271:target_compile_definitions(shadps4 PRIVATE IMGUI_USER_CONFIG="imgui/imgui_config.h")
-/home/runner/work/_temp/hc-upstream/shadPS4/CMakeLists.txt:1272:target_compile_definitions(Dear_ImGui PRIVATE IMGUI_USER_CONFIG="${PROJECT_SOURCE_DIR}/src/imgui/imgui_config.h")
+/home/runner/work/_temp/hc-upstream/shadPS4/CMakeLists.txt:1273:target_compile_definitions(shadps4 PRIVATE IMGUI_USER_CONFIG="imgui/imgui_config.h")
+/home/runner/work/_temp/hc-upstream/shadPS4/CMakeLists.txt:1274:target_compile_definitions(Dear_ImGui PRIVATE IMGUI_USER_CONFIG="${PROJECT_SOURCE_DIR}/src/imgui/imgui_config.h")
 /home/runner/work/_temp/hc-upstream/shadPS4/scripts/aerolib.inl:60:STUB("+-wmVyLhgm0", WKPreferencesSetStandardFontFamily)
 /home/runner/work/_temp/hc-upstream/shadPS4/scripts/aerolib.inl:91:STUB("+0rdnkSicqk", WKPreferencesGetApplicationChromeModeEnabled)
 /home/runner/work/_temp/hc-upstream/shadPS4/scripts/aerolib.inl:130:STUB("+1n+h4FUu9E", WKPreferencesSetAutostartOriginPlugInSnapshottingEnabled)
