@@ -2,15 +2,19 @@
   "id": "ps4",
   "displayName": "PlayStation 4",
   "primaryBackend": "shadPS4",
-  "fallbackBackend": "shadPS4 Nightly",
+  "fallbackBackend": "",
   "adapter": "shadps4",
   "interface": "Native PS4 Dynamic Menu-style interface",
   "version": "0.26.4-dev",
-  "enabled": false,
+  "enabled": true,
   "gameExtensions": [
     ".pkg",
     ".elf",
     ".bin"
   ],
-  "dashboardStyle": "Dynamic Menu"
+  "dashboardStyle": "Dynamic Menu",
+  "directoryGameDetection": [
+    "sce_sys/param.sfo",
+    "eboot.bin"
+  ]
 }

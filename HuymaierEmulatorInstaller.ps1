@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][string]$PlatformId,
     [Parameter(Mandatory=$true)][string]$DestinationRoot,
@@ -89,9 +89,8 @@ function Install-DolphinLatest {
 
 
 function Install-MameLatest {
-    $assets=Get-GithubLatestAssets 'mamedev/mame'
-    $asset=@($assets|Where-Object{$_.name -match '(?i)^mame[0-9]+b?_64bit\.exe$' -or $_.name -match '(?i)mame.*64.*\.exe$'}|Select-Object -First 1)
-    if(-not $asset){throw 'The latest official MAME GitHub release did not expose a 64-bit Windows self-extracting archive.'}
+    $asset=Get-GithubReleaseAsset 'mamedev/mame' { $_.name -match '(?i)^mame[0-9]+b?_x64\.exe$' -or ($_.name -match '(?i)^mame[0-9]+b?_.*(x86_64|amd64|x64).*\.exe$' -and $_.name -notmatch '(?i)(arm64|aarch64|source|symbols|debug)') }
+    if(-not $asset){throw 'The latest official MAME GitHub release did not expose a Windows x64 self-extracting archive.'}
     $target=Join-Path $DestinationRoot 'MAME';$work=Join-Path $env:TEMP ('hc-mame-'+[guid]::NewGuid().ToString('N'));New-Item -ItemType Directory -Force -Path $work|Out-Null
     try{
         $archive=Join-Path $work ([string]$asset.name);Invoke-WebRequest -UseBasicParsing -Headers $headers -Uri ([string]$asset.browser_download_url) -OutFile $archive
@@ -209,7 +208,7 @@ switch($PlatformId){
         $exe=Get-ChildItem -LiteralPath $dest -Filter 'rpcs3.exe' -File -Recurse -ErrorAction SilentlyContinue|Select-Object -First 1 -ExpandProperty FullName
     }
     'PS4' {$exe=Install-GithubArchive 'shadps4-emu/shadPS4' { $_.name -match '(?i)(windows|win).*(x64|64).*\.(zip|7z)$' -or $_.name -match '(?i)shadps4.*windows.*\.(zip|7z)$' } 'shadPS4' @('shadPS4.exe','shadps4.exe')}
-    'VITA' {$exe=Install-GithubArchive 'Vita3K/Vita3K' { $_.name -match '(?i)(windows|win).*(x64|64).*\.(zip|7z)$' -or $_.name -match '(?i)Vita3K.*windows.*\.(zip|7z)$' } 'Vita3K' @('Vita3K.exe','vita3k.exe')}
+    'VITA' {$exe=Install-GithubArchive 'Vita3K/Vita3K' { $_.name -ieq 'windows-latest.zip' -or ($_.name -match '(?i)(windows|win).*(x86_64|x64|amd64).*\.(zip|7z)$' -and $_.name -notmatch '(?i)(arm64|aarch64)') } 'Vita3K' @('Vita3K.exe','vita3k.exe')}
     'ARCADE' {$exe=Install-MameLatest}
     'FINALBURNNEO' {$exe=Install-GithubArchive 'finalburnneo/FBNeo' { $_.name -ieq 'windows-x86_64.zip' -or ($_.name -match '(?i)(fbneo|finalburn).*(windows|win).*(x86_64|x64|64).*\.(zip|7z)$' -and $_.name -notmatch '(?i)(source|debug|symbols|pdb)') } 'FinalBurnNeo' @('fbneo.exe','fbneo64.exe','FinalBurnNeo.exe','FinalBurnNeo64.exe','FinalBurn Neo.exe')}
     'ATARILYNX' {$exe=Install-MednafenLatest}

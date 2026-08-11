@@ -1,8 +1,8 @@
 {
   "name": "Huymaier Console FSE Shell, Storefront & Artwork Integration",
-  "version": "0.26.3",
-  "baseVersion": "0.26.2",
-  "build": "platform-expansion-wave2",
+  "version": "0.26.4",
+  "baseVersion": "0.26.3",
+  "build": "platform-expansion-rc1",
   "builtFrom": "HC262.zip",
   "features": [
     "rebuilds N64 as an original Huymaier cartridge-console surface inspired by the supplied classic-mini reference without redistributing third-party theme assets",
@@ -17,7 +17,9 @@
     "adds a prominent Settings > Artwork & Metadata surface for SteamGridDB, provider artwork, online artwork refresh and platform backgrounds",
     "enables the first researched expansion wave: PSP, Nintendo DS, Nintendo DSi, Nintendo 3DS, Dreamcast and Saturn native platform surfaces with native settings, install and storage integration",
     "enables researched Wave 2 hardware-native Atari 2600, NES, SNES, Game Boy, Game Boy Color, Game Boy Advance, Genesis, Sega CD, Sega 32X, Game Gear, Master System and TurboGrafx-16 surfaces with native install/settings/storage integration",
-    "enables Atari Lynx, Neo Geo Pocket Color and PrimeHack native expansion surfaces while keeping Neo Geo and Jaguar staged pending backend-specific readiness audits"
+    "enables Atari Lynx, Neo Geo Pocket Color and PrimeHack native expansion surfaces while keeping Neo Geo and Jaguar staged pending backend-specific readiness audits",
+    "enables PS4/shadPS4 and PS Vita/Vita3K native installed-application surfaces using upstream-documented direct-launch contracts and native full backend settings",
+    "graduates PS4/shadPS4, PS Vita/Vita3K and Arcade/MAME after live x64 backend and runtime-contract validation while keeping FinalBurn Neo, Neo Geo and Jaguar staged"
   ],
-  "description": "v0.26.4 development Wave 2 adds twelve validated cartridge/CD/handheld platforms on top of Wave 1 while preserving v0.26.3 RC4 console behavior."
+  "description": "v0.26.4 RC1 expands Huymaier Console with validated native platform support while preserving the tested v0.26.3 console-fidelity and v0.26.2 Guide/Game Bar baselines. PS4, PS Vita and MAME Arcade are included only after live backend/runtime validation; FBNeo/Neo Geo and Jaguar remain staged."
 }

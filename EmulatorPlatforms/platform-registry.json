@@ -1154,6 +1154,121 @@
         "prime-visor-interface",
         "primehack-controller-settings"
       ]
+    },
+    {
+      "id": "arcade",
+      "name": "Arcade",
+      "kind": "native-platform-view",
+      "enabled": true,
+      "sortOrder": 600,
+      "backend": "MAME",
+      "interface": "native arcade cabinet/software wall with operator/service configuration",
+      "displayName": "Arcade",
+      "menuName": "Arcade",
+      "aliases": [
+        "Arcade",
+        "MAME"
+      ],
+      "version": "0.26.4-dev",
+      "nativeType": "HuymaierConsole.NativeApp.ConsolePlatformWindow",
+      "capabilities": [
+        "library",
+        "cached-library",
+        "direct-launch",
+        "launch-return",
+        "controller-navigation",
+        "cover-art",
+        "compiled-native-host",
+        "in-process-platform-view",
+        "huymaier-native-path-picker",
+        "latest-emulator-install",
+        "emulator-first-cover-art",
+        "native-full-emulator-settings",
+        "unknown-setting-preservation",
+        "native-save-management",
+        "alphabet-index",
+        "operator-settings",
+        "mame-driver-launch",
+        "mame-showconfig-settings",
+        "rompath-launch-registration",
+        "nvram-management",
+        "high-score-storage"
+      ]
+    },
+    {
+      "id": "ps4",
+      "name": "PlayStation 4",
+      "kind": "native-platform-view",
+      "enabled": true,
+      "sortOrder": 700,
+      "backend": "shadPS4",
+      "interface": "PS4 dynamic menu with installed application content area and system settings",
+      "displayName": "PlayStation 4",
+      "menuName": "4",
+      "aliases": [
+        "PlayStation 4",
+        "PS4",
+        "shadPS4"
+      ],
+      "version": "0.26.4-dev",
+      "nativeType": "HuymaierConsole.NativeApp.ConsolePlatformWindow",
+      "capabilities": [
+        "library",
+        "cached-library",
+        "direct-launch",
+        "launch-return",
+        "controller-navigation",
+        "cover-art",
+        "compiled-native-host",
+        "in-process-platform-view",
+        "huymaier-native-path-picker",
+        "latest-emulator-install",
+        "emulator-first-cover-art",
+        "native-full-emulator-settings",
+        "unknown-setting-preservation",
+        "native-save-management",
+        "installed-application-library",
+        "ps4-dynamic-menu",
+        "shadps4-title-id-launch"
+      ]
+    },
+    {
+      "id": "vita",
+      "name": "PlayStation Vita",
+      "kind": "native-platform-view",
+      "enabled": true,
+      "sortOrder": 710,
+      "backend": "Vita3K",
+      "interface": "PS Vita LiveArea with installed application bubbles and Content Manager",
+      "displayName": "PlayStation Vita",
+      "menuName": "Vita",
+      "aliases": [
+        "PlayStation Vita",
+        "Vita",
+        "Vita3K"
+      ],
+      "version": "0.26.4-dev",
+      "nativeType": "HuymaierConsole.NativeApp.ConsolePlatformWindow",
+      "capabilities": [
+        "library",
+        "cached-library",
+        "direct-launch",
+        "launch-return",
+        "controller-navigation",
+        "cover-art",
+        "compiled-native-host",
+        "in-process-platform-view",
+        "huymaier-native-path-picker",
+        "latest-emulator-install",
+        "emulator-first-cover-art",
+        "native-full-emulator-settings",
+        "unknown-setting-preservation",
+        "native-save-management",
+        "installed-application-library",
+        "vita-livearea",
+        "vita3k-installed-title-launch",
+        "content-manager"
+      ]
     }
   ]
 }

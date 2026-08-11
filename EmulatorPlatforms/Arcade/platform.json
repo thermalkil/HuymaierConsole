@@ -2,11 +2,11 @@
   "id": "arcade",
   "displayName": "Arcade",
   "primaryBackend": "MAME",
-  "fallbackBackend": "FinalBurn Neo",
+  "fallbackBackend": "",
   "adapter": "mame",
   "interface": "Native arcade-cabinet library and operator interface",
   "version": "0.26.4-dev",
-  "enabled": false,
+  "enabled": true,
   "gameExtensions": [
     ".zip",
     ".7z",

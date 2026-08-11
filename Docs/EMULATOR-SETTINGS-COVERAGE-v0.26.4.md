@@ -1,7 +1,7 @@
 # v0.26.4 emulator settings coverage
 
-Platforms in registry: **31**  
-Enabled: **31**  
+Platforms in registry: **34**  
+Enabled: **34**  
 Enabled missing a complete native adapter: **0**
 
 | Platform | Enabled | Backend | Adapter | Native settings ready |
@@ -37,5 +37,8 @@ Enabled missing a complete native adapter: **0**
 | Atari Lynx | yes | Mednafen | mednafen | yes |
 | Neo Geo Pocket Color | yes | Mednafen | mednafen | yes |
 | Metroid PrimeHack | yes | PrimeHack | primehack | yes |
+| Arcade | yes | MAME | mame | yes |
+| PlayStation 4 | yes | shadPS4 | shadps4 | yes |
+| PlayStation Vita | yes | Vita3K | vita3k | yes |
 
 Enabled platforms missing native settings: none

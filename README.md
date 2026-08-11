@@ -6,7 +6,7 @@ Huymaier Console is a controller-first Windows 11 full-screen console shell with
 
 The current published stable release is **v0.26.2**.
 
-The active development branch for **v0.26.3** is focused on native-console fidelity and emulator integration. It preserves the tested v0.26.2 Game Bar/Guide behavior and leaves the PS1, PS2, and PS3 visual/interface implementations frozen except for the shared Huymaier emulator/path handoff requested for all emulator platforms.
+The active development branch for **v0.26.4** expands the validated native platform library while preserving the v0.26.3 console-fidelity work and the tested v0.26.2 Guide/Game Bar behavior. It preserves the tested v0.26.2 Game Bar/Guide behavior and leaves the PS1, PS2, and PS3 visual/interface implementations frozen except for the shared Huymaier emulator/path handoff requested for all emulator platforms.
 
 Confirmed behaviors carried forward include:
 
@@ -23,9 +23,9 @@ Confirmed behaviors carried forward include:
 - Transactional install/update behavior with exact-artifact verification and fail-closed mixed-version protection.
 - x64 GameInput controller bridge and controller hot-plug/reconnect support.
 
-## v0.26.3 development goals
+## v0.26.4 development status
 
-The v0.26.3 console-fidelity pass is replacing generalized non-PlayStation console surfaces with interfaces that match each console's real design language and navigation model.
+v0.26.4 builds on the console-fidelity pass with researched native platform expansion, complete backend settings integration, controller-first storage management, and validated emulator installation/launch contracts.
 
 - N64: original Huymaier presentation inspired by the supplied classic-mini reference rather than a fabricated BIOS/dashboard.
 - GameCube: translucent 3D IPL-style cube with animated face rotation for Game Play, Calendar, Memory Card, and Options.

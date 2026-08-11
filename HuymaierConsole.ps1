@@ -11,7 +11,7 @@ Add-Type -AssemblyName WindowsBase
 Add-Type -AssemblyName System.Xaml
 try { Add-Type -AssemblyName System.Runtime.WindowsRuntime -ErrorAction SilentlyContinue } catch { }
 
-$script:AppVersion = '0.26.3'
+$script:AppVersion = '0.26.4'
 $script:AppName = 'Huymaier Console'
 $script:DataDir = Join-Path $env:LOCALAPPDATA 'Huymaier Console'
 $script:ConfigPath = Join-Path $script:DataDir 'config.json'

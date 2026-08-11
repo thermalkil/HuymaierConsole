@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "generatedFromBranch": "feature/v0.26.4-platform-expansion",
-  "platformCount": 31,
-  "enabledCount": 31,
+  "platformCount": 34,
+  "enabledCount": 34,
   "enabledMissingNativeSettings": [],
   "platforms": [
     {
@@ -611,6 +611,66 @@
       "enabled": true,
       "primaryBackend": "PrimeHack",
       "adapter": "primehack",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "arcade",
+      "name": "Arcade",
+      "enabled": true,
+      "primaryBackend": "MAME",
+      "adapter": "mame",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "ps4",
+      "name": "PlayStation 4",
+      "enabled": true,
+      "primaryBackend": "shadPS4",
+      "adapter": "shadps4",
+      "fallbackAdapter": "",
+      "platformDefinitionFound": true,
+      "settingsDefault": true,
+      "adapterDiscoveryPresent": true,
+      "specialAdapterReady": true,
+      "nativeSettingsReady": true,
+      "supportedCoreFormats": [
+        "INI",
+        "JSON",
+        "TOML",
+        "YAML",
+        "BML"
+      ]
+    },
+    {
+      "id": "vita",
+      "name": "PlayStation Vita",
+      "enabled": true,
+      "primaryBackend": "Vita3K",
+      "adapter": "vita3k",
       "fallbackAdapter": "",
       "platformDefinitionFound": true,
       "settingsDefault": true,

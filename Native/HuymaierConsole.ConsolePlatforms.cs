@@ -4469,6 +4469,22 @@ namespace HuymaierConsole.NativeApp
             string quoted = "\"" + gamePath.Replace("\"", String.Empty) + "\"";
             if (definition.Shell == "Arcade" && exe.IndexOf("mame", StringComparison.OrdinalIgnoreCase) >= 0) { string driver=Path.GetFileNameWithoutExtension(gamePath); string romDir=Path.GetDirectoryName(gamePath); string overrides=BuildMameOverrideArguments(); StringBuilder mame=new StringBuilder(); if(!String.IsNullOrWhiteSpace(overrides))mame.Append(overrides).Append(' '); if(!String.IsNullOrWhiteSpace(romDir))mame.Append("-rompath ").Append(QuoteProcessArgument(romDir)).Append(' '); mame.Append(driver); return mame.ToString(); }
             if (definition.Shell == "Atari2600" && exe.IndexOf("stella", StringComparison.OrdinalIgnoreCase) >= 0) { string overrides = BuildStellaOverrideArguments(); return (String.IsNullOrWhiteSpace(overrides) ? String.Empty : overrides + " ") + quoted; }
+            if (definition.Shell == "PS4")
+            {
+                string appRoot=Path.GetDirectoryName(gamePath); string titleId=String.Empty;
+                try { string sfo=Path.Combine(appRoot ?? String.Empty,"sce_sys","param.sfo"); if(File.Exists(sfo)) titleId=ReadPspSfoString(sfo,"TITLE_ID"); } catch { }
+                if(String.IsNullOrWhiteSpace(titleId) && !String.IsNullOrWhiteSpace(appRoot)) titleId=Path.GetFileName(appRoot.TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar));
+                string target=!String.IsNullOrWhiteSpace(titleId)?titleId:gamePath;
+                StringBuilder shad=new StringBuilder(); if(settings.fullscreen) shad.Append("--fullscreen true "); shad.Append("-g ").Append(QuoteProcessArgument(target)); return shad.ToString();
+            }
+            if (definition.Shell == "Vita")
+            {
+                string appRoot=Path.GetDirectoryName(gamePath); string titleId=String.Empty;
+                try { string sfo=Path.Combine(appRoot ?? String.Empty,"sce_sys","param.sfo"); if(File.Exists(sfo)) titleId=ReadPspSfoString(sfo,"TITLE_ID"); } catch { }
+                if(String.IsNullOrWhiteSpace(titleId) && !String.IsNullOrWhiteSpace(appRoot)) titleId=Path.GetFileName(appRoot.TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar));
+                if(String.IsNullOrWhiteSpace(titleId)) return quoted;
+                return (settings.fullscreen ? "-F " : String.Empty) + "-r " + QuoteProcessArgument(titleId);
+            }
             if (definition.Shell == "GameCube" || definition.Shell == "Wii") return "-b -e " + quoted;
             if (definition.Shell == "3DS") return quoted;
             if (definition.Shell == "NDS" || definition.Shell == "DSI") return quoted;
