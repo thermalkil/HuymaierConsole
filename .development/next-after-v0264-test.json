@@ -1,0 +1,22 @@
+{
+  "recordedAtUtc": "2026-08-11T22:07:00Z",
+  "status": "queued-after-current-test-build",
+  "priorities": [
+    {
+      "id": "wii-library-filtering",
+      "requirement": "Fix Wii interface/library polling so files that are not actual Wii games are excluded from the native Wii game library."
+    },
+    {
+      "id": "console-button-remapping",
+      "requirement": "Add Huymaier Console action/button remapping so users can assign controller buttons to Huymaier actions as they choose while preserving global Guide/Home semantics unless explicitly remapped by an approved design."
+    },
+    {
+      "id": "apps-manual-library",
+      "requirement": "Allow apps to be removed from the Apps library and stop broad pre-scanning/pre-importing applications that overload the list with junk. Prefer explicit/manual app import and user-managed entries."
+    },
+    {
+      "id": "recomps-games-provider",
+      "requirement": "Add a Recomps provider to Games with a retro-inspired presentation while following the Steam/GOG shelf and library model. Support importing a folder or a specific game executable, retain the executable as the launch target, and resolve/download cover art using the game name."
+    }
+  ]
+}
