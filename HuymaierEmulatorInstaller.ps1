@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][string]$PlatformId,
     [Parameter(Mandatory=$true)][string]$DestinationRoot,
