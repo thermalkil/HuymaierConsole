@@ -358,15 +358,15 @@ namespace HuymaierConsole.NativeApp
             }
             else if (key == "GENESIS")
             {
-                d.DisplayName="Sega Genesis";d.Subtitle="16-BIT";d.Shell="Genesis";d.PrimaryBackend="ares";d.FallbackBackend="BlastEm";d.PrimaryExecutableNames=new string[]{"ares.exe"};d.FallbackExecutableNames=new string[]{"blastem.exe","BlastEm.exe"};d.GameExtensions=new string[]{".md",".gen",".bin",".smd",".zip"};d.ColorA=Color.FromRgb(5,7,9);d.ColorB=Color.FromRgb(29,31,34);d.Accent=Color.FromRgb(191,34,45);
+                d.DisplayName="Sega Genesis";d.Subtitle="16-BIT";d.Shell="Genesis";d.PrimaryBackend="ares";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"ares.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".md",".gen",".bin",".smd",".zip"};d.ColorA=Color.FromRgb(5,7,9);d.ColorB=Color.FromRgb(29,31,34);d.Accent=Color.FromRgb(191,34,45);
             }
             else if (key == "SEGACD")
             {
-                d.DisplayName="Sega CD";d.Subtitle="CD-ROM SYSTEM";d.Shell="SegaCD";d.PrimaryBackend="ares";d.FallbackBackend="Mednafen";d.PrimaryExecutableNames=new string[]{"ares.exe"};d.FallbackExecutableNames=new string[]{"mednafen.exe"};d.GameExtensions=new string[]{".cue",".chd",".iso",".bin"};d.ColorA=Color.FromRgb(6,8,11);d.ColorB=Color.FromRgb(31,35,40);d.Accent=Color.FromRgb(80,147,214);
+                d.DisplayName="Sega CD";d.Subtitle="CD-ROM SYSTEM";d.Shell="SegaCD";d.PrimaryBackend="ares";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"ares.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".cue",".chd",".iso",".bin"};d.ColorA=Color.FromRgb(6,8,11);d.ColorB=Color.FromRgb(31,35,40);d.Accent=Color.FromRgb(80,147,214);
             }
             else if (key == "SEGA32X")
             {
-                d.DisplayName="Sega 32X";d.Subtitle="32X";d.Shell="Sega32X";d.PrimaryBackend="ares";d.FallbackBackend="PicoDrive libretro";d.PrimaryExecutableNames=new string[]{"ares.exe"};d.FallbackExecutableNames=new string[]{"retroarch.exe"};d.GameExtensions=new string[]{".32x",".bin",".md",".zip"};d.ColorA=Color.FromRgb(4,5,6);d.ColorB=Color.FromRgb(27,29,31);d.Accent=Color.FromRgb(224,60,48);
+                d.DisplayName="Sega 32X";d.Subtitle="32X";d.Shell="Sega32X";d.PrimaryBackend="ares";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"ares.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".32x",".bin",".md",".zip"};d.ColorA=Color.FromRgb(4,5,6);d.ColorB=Color.FromRgb(27,29,31);d.Accent=Color.FromRgb(224,60,48);
             }
             else if (key == "GAMEGEAR")
             {
