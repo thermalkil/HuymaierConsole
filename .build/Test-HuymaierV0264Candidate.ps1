@@ -14,7 +14,7 @@ try {
     if([string]::IsNullOrWhiteSpace($text) -or $text -notmatch 'rc4UserFeedbackGate'){throw 'Could not load the reviewed v0.26.3 RC4 regression suite.'}
     $text=$text.Replace('native-console-fidelity-rc4-final','platform-expansion-rc1')
     $needle='$text=$text.Replace(''native-console-fidelity-rc3'',''platform-expansion-rc1'')'
-    $replacement=$needle+"`r`n            `$text=`$text.Replace('0.26.3','0.26.4')"
+    $replacement=$needle+"`r`n            `$text=`$text.Replace('0.26.3','0.26.4')`r`n            `$text=`$text.Replace('baseVersion -ne ''0.26.2''','baseVersion -ne ''0.26.3''')`r`n            `$text=`$text.Replace('v0.26.4 does not identify v0.26.2 as its stable base.','v0.26.4 does not identify v0.26.3 as its feature base.')"
     if($text -notmatch [regex]::Escape($needle)){throw 'Could not locate inherited RC3 build-identity adaptation hook.'}
     $text=$text.Replace($needle,$replacement)
     $text=$text.Replace('Final v0.26.3 validation record','Final v0.26.4 validation record')
