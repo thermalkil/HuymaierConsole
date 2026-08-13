@@ -26,6 +26,64 @@ function Add-Root([System.Collections.ArrayList]$Target,[string]$Value){
     [void]$Target.Add($full)
 }
 
+function Test-PathSegment([string]$Path,[string[]]$Names){
+    if([string]::IsNullOrWhiteSpace($Path)){return $false}
+    $parts=@($Path -split '[\\/]')
+    foreach($part in $parts){foreach($name in @($Names)){if([string]::Equals([string]$part,[string]$name,[StringComparison]::OrdinalIgnoreCase)){return $true}}}
+    return $false
+}
+function Get-NintendoScopedRoots([string]$Id,[System.Collections.ArrayList]$Roots){
+    $key=$Id.ToUpperInvariant()
+    if($key -notin @('WII','GAMECUBE')){return $Roots}
+    $aliases=if($key -eq 'WII'){@('Wii','Nintendo Wii')}else{@('GameCube','Game Cube','Nintendo GameCube')}
+    $scoped=New-Object System.Collections.ArrayList
+    foreach($root in @($Roots)){
+        $leaf='';try{$leaf=Split-Path -Leaf $root}catch{}
+        $alreadyScoped=$false
+        foreach($alias in $aliases){if([string]::Equals($leaf,$alias,[StringComparison]::OrdinalIgnoreCase)){$alreadyScoped=$true;break}}
+        if($alreadyScoped){Add-Root $scoped $root;continue}
+        $foundChild=$false
+        foreach($alias in $aliases){
+            try{
+                $candidate=Join-Path $root $alias
+                if(Test-Path -LiteralPath $candidate -PathType Container){Add-Root $scoped $candidate;$foundChild=$true}
+            }catch{}
+        }
+        if(-not $foundChild){Add-Root $scoped $root}
+    }
+    return $scoped
+}
+function Test-RawNintendoDiscHeader([string]$Path,[string]$Kind){
+    $stream=$null
+    try{
+        $stream=[IO.File]::Open($Path,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::ReadWrite)
+        $offset=if($Kind -eq 'WII'){0x18}else{0x1C}
+        if($stream.Length -lt ($offset+4)){return $false}
+        [void]$stream.Seek($offset,[IO.SeekOrigin]::Begin)
+        $bytes=New-Object byte[] 4
+        if($stream.Read($bytes,0,4) -ne 4){return $false}
+        if($Kind -eq 'WII'){return $bytes[0]-eq 0x5D -and $bytes[1]-eq 0x1C -and $bytes[2]-eq 0x9E -and $bytes[3]-eq 0xA3}
+        return $bytes[0]-eq 0xC2 -and $bytes[1]-eq 0x33 -and $bytes[2]-eq 0x9F -and $bytes[3]-eq 0x3D
+    }catch{return $false}finally{if($null -ne $stream){try{$stream.Dispose()}catch{}}}
+}
+function Test-PlatformGameFile([string]$Id,$File){
+    $key=$Id.ToUpperInvariant()
+    $ext=$File.Extension.ToLowerInvariant()
+    if($key -eq 'WII'){
+        if(Test-PathSegment $File.FullName @('GameCube','Game Cube','Nintendo GameCube')){return $false}
+        if($ext -eq '.iso'){return Test-RawNintendoDiscHeader $File.FullName 'WII'}
+        # GCM is a raw GameCube disc image and must never leak into Wii.
+        if($ext -eq '.gcm'){return $false}
+        return $true
+    }
+    if($key -eq 'GAMECUBE'){
+        if(Test-PathSegment $File.FullName @('Wii','Nintendo Wii')){return $false}
+        if($ext -eq '.iso' -or $ext -eq '.gcm'){return Test-RawNintendoDiscHeader $File.FullName 'GAMECUBE'}
+        return $true
+    }
+    return $true
+}
+
 function Count-ModernInstalledApplications([string]$Id,[System.Collections.ArrayList]$Roots){
     $seen=@{};$visited=0
     foreach($root in @($Roots)){
@@ -92,6 +150,7 @@ $settings=Read-JsonFile $SettingsPath
 if($null -eq $settings){$settings=Read-JsonFile $DefaultSettingsPath}
 $roots=New-Object System.Collections.ArrayList
 foreach($root in @(Get-Prop $settings 'gameFolders' @())){Add-Root $roots ([string]$root)}
+$roots=Get-NintendoScopedRoots $PlatformId $roots
 $extensions=@(Get-Extensions $PlatformId)
 $seen=@{}
 $filesVisited=0
@@ -106,6 +165,7 @@ foreach($root in @($roots)){
             $filesVisited++
             if($filesVisited -gt 100000){break}
             if($extensions -notcontains $file.Extension.ToLowerInvariant()){continue}
+            if(-not(Test-PlatformGameFile $PlatformId $file)){continue}
             try{$key=$file.FullName.ToLowerInvariant()}catch{$key=[string]$file.FullName}
             if($key){$seen[$key]=$true}
         }
