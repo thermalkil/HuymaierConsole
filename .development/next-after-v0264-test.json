@@ -1,5 +1,5 @@
 {
-  "recordedAtUtc": "2026-08-11T22:07:00Z",
+  "recordedAtUtc": "2026-08-13T13:00:00Z",
   "status": "queued-after-current-test-build",
   "priorities": [
     {
@@ -17,6 +17,10 @@
     {
       "id": "recomps-games-provider",
       "requirement": "Add a Recomps provider to Games with a retro-inspired presentation while following the Steam/GOG shelf and library model. Support importing a folder or a specific game executable, retain the executable as the launch target, and resolve/download cover art using the game name."
+    },
+    {
+      "id": "downloads-phase-and-eta-fallback",
+      "requirement": "Every active provider download/install must expose an explicit Huymaier phase state and ETA. Show Downloading while transfer activity is occurring, automatically transition to Installing when installation begins, and show an ETA for both phases. Prefer provider/backend-native state, progress, speed, and ETA when supplied. When a backend does not provide them, Huymaier must fall back to observing expected total size versus bytes/files transferred or destination growth, sample and smooth the current transfer/install throughput, and calculate ETA from remaining work divided by measured speed. Apply the fallback independently to both download and install phases so Downloads never sits in a generic or ambiguous active state merely because a provider omits telemetry."
     }
   ]
 }
