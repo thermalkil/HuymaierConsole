@@ -18,6 +18,11 @@ function Get-Prop($Object,[string]$Name,$Default){
     if($null -eq $p -or $null -eq $p.Value){return $Default}
     return $p.Value
 }
+function Set-Prop($Object,[string]$Name,$Value){
+    if($null -eq $Object){return}
+    $p=$Object.PSObject.Properties[$Name]
+    if($null -eq $p){$Object|Add-Member -NotePropertyName $Name -NotePropertyValue $Value -Force}else{$Object.$Name=$Value}
+}
 function Add-Root([System.Collections.ArrayList]$Target,[string]$Value){
     if(-not $Value){return}
     try{$full=[IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($Value.Trim())).TrimEnd('\')}catch{return}
@@ -53,6 +58,25 @@ function Get-NintendoScopedRoots([string]$Id,[System.Collections.ArrayList]$Root
     }
     return $scoped
 }
+function Save-NintendoScopedRoots([string]$Id,$Settings,[string]$Path,[object[]]$Before,[object[]]$After){
+    $key=$Id.ToUpperInvariant()
+    if($key -notin @('WII','GAMECUBE') -or $null -eq $Settings -or -not(Test-Path -LiteralPath $Path -PathType Leaf)){return}
+    $beforeNormalized=@($Before|ForEach-Object{[string]$_}|Where-Object{$_})
+    $afterNormalized=@($After|ForEach-Object{[string]$_}|Where-Object{$_})
+    if($beforeNormalized.Count -eq $afterNormalized.Count){
+        $same=$true
+        for($i=0;$i -lt $beforeNormalized.Count;$i++){if(-not [string]::Equals($beforeNormalized[$i],$afterNormalized[$i],[StringComparison]::OrdinalIgnoreCase)){$same=$false;break}}
+        if($same){return}
+    }
+    try{
+        $backup="$Path.pre-v0265-nintendo-root.bak"
+        if(-not(Test-Path -LiteralPath $backup -PathType Leaf)){Copy-Item -LiteralPath $Path -Destination $backup -Force}
+        Set-Prop $Settings 'gameFolders' ([object[]]$afterNormalized)
+        $tmp="$Path.v0265.tmp"
+        $Settings|ConvertTo-Json -Depth 30|Set-Content -LiteralPath $tmp -Encoding UTF8
+        Move-Item -LiteralPath $tmp -Destination $Path -Force
+    }catch{}
+}
 function Test-RawNintendoDiscHeader([string]$Path,[string]$Kind){
     $stream=$null
     try{
@@ -72,7 +96,6 @@ function Test-PlatformGameFile([string]$Id,$File){
     if($key -eq 'WII'){
         if(Test-PathSegment $File.FullName @('GameCube','Game Cube','Nintendo GameCube')){return $false}
         if($ext -eq '.iso'){return Test-RawNintendoDiscHeader $File.FullName 'WII'}
-        # GCM is a raw GameCube disc image and must never leak into Wii.
         if($ext -eq '.gcm'){return $false}
         return $true
     }
@@ -150,7 +173,9 @@ $settings=Read-JsonFile $SettingsPath
 if($null -eq $settings){$settings=Read-JsonFile $DefaultSettingsPath}
 $roots=New-Object System.Collections.ArrayList
 foreach($root in @(Get-Prop $settings 'gameFolders' @())){Add-Root $roots ([string]$root)}
+$configuredRoots=@($roots)
 $roots=Get-NintendoScopedRoots $PlatformId $roots
+Save-NintendoScopedRoots $PlatformId $settings $SettingsPath $configuredRoots @($roots)
 $extensions=@(Get-Extensions $PlatformId)
 $seen=@{}
 $filesVisited=0
