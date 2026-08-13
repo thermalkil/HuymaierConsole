@@ -1,10 +1,18 @@
 {
-  "recordedAtUtc": "2026-08-13T13:00:00Z",
+  "recordedAtUtc": "2026-08-13T13:47:00Z",
   "status": "queued-after-current-test-build",
   "priorities": [
     {
       "id": "wii-library-filtering",
       "requirement": "Fix Wii interface/library polling so files that are not actual Wii games are excluded from the native Wii game library."
+    },
+    {
+      "id": "console-exit-navigation-stutter",
+      "requirement": "Fix lag spikes, temporary hangs, and navigation stutter when leaving any native console interface and returning to the main Huymaier Console shell. Console teardown must not synchronously block main-shell input/rendering with library rescans, artwork disposal/reload, emulator/config discovery, controller reinitialization, or other heavyweight cleanup. Restore main-shell focus and controller navigation immediately, defer noncritical cleanup/background refresh work, and prevent duplicate refresh/rebuild work during the transition."
+    },
+    {
+      "id": "xbox-mode-startup-performance",
+      "requirement": "Make Huymaier Console startup in Xbox/home-experience mode materially faster. The console shell must become visible and controller-ready as early as possible and must not wait on provider scans, library refreshes, artwork/cache work, emulator discovery, download-history hydration, or other nonessential initialization. Move noncritical initialization off the startup critical path, cache stable discovery results where safe, avoid duplicate startup work, and benchmark the home-experience path so it is not slower to become usable than the normal Windows desktop startup path on the same machine."
     },
     {
       "id": "console-button-remapping",
