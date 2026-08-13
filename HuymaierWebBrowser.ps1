@@ -43,27 +43,39 @@ function New-HcBrowserButton {
 }
 
 function Initialize-HuymaierWebBrowser {
-    if($null -eq $script:Window -or $null -ne $script:HcBrowserOverlay){return}
+    param([switch]$Force)
+    if($null -eq $script:Window){return}
+
+    # Startup only needs the lightweight provider-auth bridge. WebView2 assembly
+    # loading, control construction and profile initialization are intentionally
+    # deferred until Web/authentication actually needs a browser.
+    if([string]::IsNullOrWhiteSpace([string]$script:HcBrowserAuthRequestPath)){
+        $script:HcBrowserReady=$false
+        $script:HcBrowserActive=$false
+        $script:HcBrowserFocusArea='Toolbar'
+        $script:HcBrowserToolbarIndex=4
+        $script:HcBrowserToolbarButtons=@()
+        $script:HcBrowserAuthRequestId=''
+        $script:HcBrowserAuthRequest=$null
+        $script:HcBrowserCompletionProbeBusy=$false
+        $script:HcBrowserAuthRequestPath=Join-Path $script:DataDir 'browser-auth-request.json'
+        $script:HcBrowserAuthResultDir=Join-Path $script:DataDir 'BrowserAuth'
+        $script:HcBrowserReadyPath=Join-Path $script:HcBrowserAuthResultDir 'native-browser.ready.json'
+        $script:HcBrowserSuppressedRequestId=''
+        New-Item -ItemType Directory -Force -Path $script:HcBrowserAuthResultDir|Out-Null
+        Remove-HcStaleBrowserAuthRequest -Startup
+    }
+    if($null -eq $script:HcBrowserAuthTimer){
+        $timer=New-Object System.Windows.Threading.DispatcherTimer
+        $timer.Interval=[TimeSpan]::FromMilliseconds(250)
+        $timer.Add_Tick({try{Poll-HcBrowserAuthRequest}catch{Write-Log "Browser auth bridge: $($_.Exception.Message)" 'WARN'}})
+        $timer.Start()
+        $script:HcBrowserAuthTimer=$timer
+    }
+    if(-not $Force -or $null -ne $script:HcBrowserOverlay){return}
+
     $root=$script:Window.Content
     if($null -eq $root -or -not ($root -is [System.Windows.Controls.Grid])){return}
-
-    $script:HcBrowserReady=$false
-    $script:HcBrowserActive=$false
-    $script:HcBrowserFocusArea='Toolbar'
-    $script:HcBrowserToolbarIndex=4
-    $script:HcBrowserToolbarButtons=@()
-    $script:HcBrowserAuthRequestId=''
-    $script:HcBrowserAuthRequest=$null
-    $script:HcBrowserCompletionProbeBusy=$false
-    $script:HcBrowserAuthRequestPath=Join-Path $script:DataDir 'browser-auth-request.json'
-    $script:HcBrowserAuthResultDir=Join-Path $script:DataDir 'BrowserAuth'
-    $script:HcBrowserReadyPath=Join-Path $script:HcBrowserAuthResultDir 'native-browser.ready.json'
-    $script:HcBrowserSuppressedRequestId=''
-    New-Item -ItemType Directory -Force -Path $script:HcBrowserAuthResultDir|Out-Null
-    # v0.25.2: a browser authorization request is transient process state, not
-    # a session that should survive a Console restart. Remove legacy/orphaned
-    # requests before WebView2 starts so a failed sign-in cannot trap the user.
-    Remove-HcStaleBrowserAuthRequest -Startup
 
     $overlay=New-Object System.Windows.Controls.Grid
     $overlay.Visibility='Collapsed';$overlay.Background='#FF060A12'
@@ -119,9 +131,6 @@ function Initialize-HuymaierWebBrowser {
         $fallbackTitle.Text='Native browser components missing'
         $fallbackText.Text='Re-run the v0.25.6 installer while connected to the internet. It downloads the official Microsoft WebView2 SDK components.'
     }
-
-    $timer=New-Object System.Windows.Threading.DispatcherTimer;$timer.Interval=[TimeSpan]::FromMilliseconds(250)
-    $timer.Add_Tick({try{Poll-HcBrowserAuthRequest}catch{Write-Log "Browser auth bridge: $($_.Exception.Message)" 'WARN'}});$timer.Start();$script:HcBrowserAuthTimer=$timer
 }
 
 function Initialize-HcBrowserCore {
@@ -236,7 +245,7 @@ function Update-HcBrowserToolbarVisuals {
 
 function Open-HuymaierBrowser {
     param([string]$Url='https://www.google.com',[string]$Title='Web')
-    Initialize-HuymaierWebBrowser
+    Initialize-HuymaierWebBrowser -Force
     if($null -eq $script:HcBrowserOverlay){return}
     if([string]::IsNullOrWhiteSpace($Url)){$Url='https://www.google.com'}
     if($Url -notmatch '^[a-zA-Z][a-zA-Z0-9+.-]*://'){$Url='https://'+$Url}
@@ -386,7 +395,6 @@ function Handle-HcBrowserController {
         }
     }else{$script:LastDirection='';$script:NextDirectionAt=[datetime]::MinValue}
 
-    # A selects the highlighted toolbar action or the highlighted webpage item.
     if(Is-NewButtonPress $Mask 4){
         if($script:HcBrowserFocusArea -eq 'Toolbar'){
             if($script:HcBrowserToolbarButtons.Count -gt 0){Invoke-HcBrowserToolbarAction ([string]$script:HcBrowserToolbarButtons[$script:HcBrowserToolbarIndex].Tag)}
@@ -394,11 +402,9 @@ function Handle-HcBrowserController {
     }
     if(Is-NewButtonPress $Mask 8){Invoke-HcBrowserToolbarAction 'Back'}
     if(Is-NewButtonPress $Mask 16){Open-HcBrowserEditableKeyboard $true}
-    # Y / Triangle always returns focus to the browser address controls.
     if(Is-NewButtonPress $Mask 32){$script:HcBrowserFocusArea='Toolbar';$script:HcBrowserToolbarIndex=4;Update-HcBrowserToolbarVisuals}
     if(Is-NewButtonPress $Mask 1024){Invoke-HcBrowserToolbarAction 'Back'}
     if(Is-NewButtonPress $Mask 2048){Invoke-HcBrowserToolbarAction 'Forward'}
-    # Menu/Options opens the browser toolbar; Guide/Home opens the main Console menu.
     if(Is-NewButtonPress $Mask 1){$script:HcBrowserFocusArea='Toolbar';$script:HcBrowserToolbarIndex=4;Update-HcBrowserToolbarVisuals}
     if(Is-NewButtonPress $Mask 2){if(Get-Command Show-HcMainMenu -ErrorAction SilentlyContinue){Show-HcMainMenu}}
     $script:LastGamepadMask=$Mask
@@ -408,7 +414,6 @@ function Handle-HcBrowserController {
 function Handle-HcBrowserKey {
     param($Key)
     if(-not $script:HcBrowserActive){return $false}
-    # The visible console menu always owns input above the browser overlay.
     if((Get-Command Test-HcMainMenuVisible -ErrorAction SilentlyContinue) -and (Test-HcMainMenuVisible)){return $false}
     switch([string]$Key){
         'Left'{Navigate-HcBrowser 'Left'}'Right'{Navigate-HcBrowser 'Right'}'Up'{Navigate-HcBrowser 'Up'}'Down'{Navigate-HcBrowser 'Down'}
@@ -440,11 +445,7 @@ function Poll-HcBrowserAuthRequest {
     }
     $requestId=[string]$request.Id;if(-not $requestId){return}
     if($requestId -eq [string]$script:HcBrowserSuppressedRequestId){return}
-    if($requestId -eq $script:HcBrowserAuthRequestId){
-        # v0.25.2: never force a dismissed authorization window back open. A
-        # fresh Connect/Reconnect action creates a new request ID when needed.
-        return
-    }
+    if($requestId -eq $script:HcBrowserAuthRequestId){return}
     $script:HcBrowserAuthRequestId=$requestId;$script:HcBrowserAuthRequest=$request;$script:HcBrowserCompletionProbeBusy=$false
     $title=[string]$request.Title;if(-not $title){$title='Account sign-in'}
     Open-HuymaierBrowser ([string]$request.Url) $title
@@ -487,7 +488,6 @@ function Test-HcBrowserAuthenticationCompletion {
         }
     }
 }
-
 
 function Stop-HuymaierWebBrowser {
     try{if($null -ne $script:HcBrowserAuthTimer){$script:HcBrowserAuthTimer.Stop()}}catch{}
