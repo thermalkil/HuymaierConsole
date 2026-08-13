@@ -8,10 +8,12 @@ $script:EmulatorPlatformRegistryStamp = [datetime]::MinValue
 $script:EmulatorShellProcesses = @{}
 $script:NativePlatformRetryAfter = [datetime]::MinValue
 $script:NativePlatformActive = $false
+$script:NativePlatformDeferredResumePending = $false
 
 function Suspend-HcRuntimeForNativePlatform {
     if($script:NativePlatformActive){return}
     $script:NativePlatformActive=$true
+    $script:NativePlatformDeferredResumePending=$false
     foreach($name in @('MainGamepadTimer','MainSystemTimer','MainClockTimer')){
         try{
             $timer=Get-Variable -Name $name -Scope Script -ValueOnly -ErrorAction SilentlyContinue
@@ -28,16 +30,35 @@ function Suspend-HcRuntimeForNativePlatform {
     }catch{$script:NativePlatformResumeFps=$false}
 }
 
+function Resume-HcDeferredRuntimeFromNativePlatform {
+    $script:NativePlatformDeferredResumePending=$false
+    try{
+        $timer=Get-Variable -Name MainSystemTimer -Scope Script -ValueOnly -ErrorAction SilentlyContinue
+        if($null -ne $timer){$timer.Start()}
+    }catch{}
+    try{if(Get-Command Set-BackgroundAnimationState -ErrorAction SilentlyContinue){Set-BackgroundAnimationState}}catch{}
+    try{if(Get-Command Set-FpsCounterState -ErrorAction SilentlyContinue){Set-FpsCounterState}}catch{}
+}
+
 function Resume-HcRuntimeFromNativePlatform {
     $script:NativePlatformActive=$false
-    foreach($name in @('MainClockTimer','MainSystemTimer','MainGamepadTimer')){
+    # Controller input and the visible clock are latency-sensitive. Restore them
+    # immediately; system polling, animated backgrounds and FPS hooks wait for a
+    # background dispatcher turn so they cannot hitch the first navigation input.
+    foreach($name in @('MainClockTimer','MainGamepadTimer')){
         try{
             $timer=Get-Variable -Name $name -Scope Script -ValueOnly -ErrorAction SilentlyContinue
             if($null -ne $timer){$timer.Start()}
         }catch{}
     }
-    try{if(Get-Command Set-BackgroundAnimationState -ErrorAction SilentlyContinue){Set-BackgroundAnimationState}}catch{}
-    try{if(Get-Command Set-FpsCounterState -ErrorAction SilentlyContinue){Set-FpsCounterState}}catch{}
+    if($script:NativePlatformDeferredResumePending){return}
+    $script:NativePlatformDeferredResumePending=$true
+    $resumeDeferred=[Action]{Resume-HcDeferredRuntimeFromNativePlatform}
+    try{
+        if($null -ne $script:Window){
+            [void]$script:Window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background,$resumeDeferred)
+        }else{Resume-HcDeferredRuntimeFromNativePlatform}
+    }catch{Resume-HcDeferredRuntimeFromNativePlatform}
 }
 
 function Read-HcEmulatorPlatformRegistry {
@@ -122,90 +143,91 @@ function Start-HcEmulatorPlatform {
     $platformRoot=Join-Path $script:BaseDir ("EmulatorPlatforms\"+$platformId.ToUpperInvariant())
     try{
         $isPs3=$platformId -ieq 'ps3'
-            $isPs2=$platformId -ieq 'ps2'
-            $isPs1=$platformId -ieq 'ps1'
-            $nativeTypeName=if($isPs3){'HuymaierConsole.NativeApp.Ps3XmbWindow'}elseif($isPs2){'HuymaierConsole.NativeApp.Ps2BbnWindow'}elseif($isPs1){'HuymaierConsole.NativeApp.Ps1ClassicWindow'}else{'HuymaierConsole.NativeApp.ConsolePlatformWindow'}
-            if([datetime]::UtcNow -lt $script:NativePlatformRetryAfter){return $true}
+        $isPs2=$platformId -ieq 'ps2'
+        $isPs1=$platformId -ieq 'ps1'
+        $nativeTypeName=if($isPs3){'HuymaierConsole.NativeApp.Ps3XmbWindow'}elseif($isPs2){'HuymaierConsole.NativeApp.Ps2BbnWindow'}elseif($isPs1){'HuymaierConsole.NativeApp.Ps1ClassicWindow'}else{'HuymaierConsole.NativeApp.ConsolePlatformWindow'}
+        if([datetime]::UtcNow -lt $script:NativePlatformRetryAfter){return $true}
 
-            # HuymaierConsole.exe publishes a concrete bridge object into this
-            # runspace. This is more reliable than PowerShell type-name lookup for
-            # classes compiled into the entry executable. Keep reflection as a
-            # compatibility fallback for an already-running native host.
-            $nativeBridge=Get-Variable -Name HuymaierNativeBridge -ValueOnly -ErrorAction SilentlyContinue
-            $nativeType=$null
-            if($null -eq $nativeBridge){
-                try{$nativeType=[System.Reflection.Assembly]::GetEntryAssembly().GetType($nativeTypeName,$false,$false)}catch{}
-                if($null -eq $nativeType){
-                    try{
-                        $nativeType=[AppDomain]::CurrentDomain.GetAssemblies()|ForEach-Object{$_.GetType($nativeTypeName,$false,$false)}|Where-Object{$null -ne $_}|Select-Object -First 1
-                    }catch{}
-                }
+        # HuymaierConsole.exe publishes a concrete bridge object into this
+        # runspace. This is more reliable than PowerShell type-name lookup for
+        # classes compiled into the entry executable. Keep reflection as a
+        # compatibility fallback for an already-running native host.
+        $nativeBridge=Get-Variable -Name HuymaierNativeBridge -ValueOnly -ErrorAction SilentlyContinue
+        $nativeType=$null
+        if($null -eq $nativeBridge){
+            try{$nativeType=[System.Reflection.Assembly]::GetEntryAssembly().GetType($nativeTypeName,$false,$false)}catch{}
+            if($null -eq $nativeType){
+                try{
+                    $nativeType=[AppDomain]::CurrentDomain.GetAssemblies()|ForEach-Object{$_.GetType($nativeTypeName,$false,$false)}|Where-Object{$null -ne $_}|Select-Object -First 1
+                }catch{}
             }
-            if($null -eq $nativeBridge -and $null -eq $nativeType){
-                $script:NativePlatformRetryAfter=[datetime]::UtcNow.AddSeconds(3)
-                Set-ConsoleNotice "The native $Platform view was not registered in the current Huymaier Console process. Close Huymaier Console and run the v0.25.6 installer once." 'ERROR'
-                Write-Log "Native $Platform bridge/type was not visible to the hosted PowerShell runspace." 'ERROR'
-                Render-Page
-                return $true
+        }
+        if($null -eq $nativeBridge -and $null -eq $nativeType){
+            $script:NativePlatformRetryAfter=[datetime]::UtcNow.AddSeconds(3)
+            Set-ConsoleNotice "The native $Platform view was not registered in the current Huymaier Console process. Close Huymaier Console and run the v0.25.6 installer once." 'ERROR'
+            Write-Log "Native $Platform bridge/type was not visible to the hosted PowerShell runspace." 'ERROR'
+            Render-Page
+            return $true
+        }
+        $script:LastGamepadMask=0
+        $script:LastDirection=''
+        $script:NextDirectionAt=[datetime]::MinValue
+        Suspend-HcRuntimeForNativePlatform
+        try{
+            # Keep the main window alive as the owner instead of hiding and
+            # reconstructing it. The fullscreen owned XMB covers it, while
+            # WPF handles modal activation and return safely in one process.
+            if($null -ne $nativeBridge){
+                if($isPs3){[void]$nativeBridge.ShowPs3Xmb($platformRoot,$script:BaseDir,$script:Window)}
+                elseif($isPs2){[void]$nativeBridge.ShowPs2Bbn($platformRoot,$script:BaseDir,$script:Window)}
+                elseif($isPs1){[void]$nativeBridge.ShowPs1Classic($platformRoot,$script:BaseDir,$script:Window)}
+                else{[void]$nativeBridge.ShowConsolePlatform($platformRoot,$script:BaseDir,$platformId,$script:Window)}
+            }else{
+                $constructorArgs=if($isPs3 -or $isPs2 -or $isPs1){[object[]]@($platformRoot,$script:BaseDir)}else{[object[]]@($platformRoot,$script:BaseDir,$platformId)}
+                $nativeWindow=[Activator]::CreateInstance($nativeType,$constructorArgs)
+                try{$nativeWindow.Owner=$script:Window}catch{}
+                [void]$nativeWindow.ShowDialog()
             }
+        }finally{
             $script:LastGamepadMask=0
             $script:LastDirection=''
             $script:NextDirectionAt=[datetime]::MinValue
-            Suspend-HcRuntimeForNativePlatform
+            $script:ControllerInputGuardUntil=[datetime]::Now.AddMilliseconds(750)
+            try{if('HuymaierConsole.NativeApp.NativeConsoleNavigation' -as [type]){[HuymaierConsole.NativeApp.NativeConsoleNavigation]::Reset()}}catch{}
             try{
-                # Keep the main window alive as the owner instead of hiding and
-                # reconstructing it. The fullscreen owned XMB covers it, while
-                # WPF handles modal activation and return safely in one process.
-                if($null -ne $nativeBridge){
-                    if($isPs3){[void]$nativeBridge.ShowPs3Xmb($platformRoot,$script:BaseDir,$script:Window)}
-                    elseif($isPs2){[void]$nativeBridge.ShowPs2Bbn($platformRoot,$script:BaseDir,$script:Window)}
-                    elseif($isPs1){[void]$nativeBridge.ShowPs1Classic($platformRoot,$script:BaseDir,$script:Window)}
-                    else{[void]$nativeBridge.ShowConsolePlatform($platformRoot,$script:BaseDir,$platformId,$script:Window)}
-                }else{
-                    $constructorArgs=if($isPs3 -or $isPs2 -or $isPs1){[object[]]@($platformRoot,$script:BaseDir)}else{[object[]]@($platformRoot,$script:BaseDir,$platformId)}
-                    $nativeWindow=[Activator]::CreateInstance($nativeType,$constructorArgs)
-                    try{$nativeWindow.Owner=$script:Window}catch{}
-                    [void]$nativeWindow.ShowDialog()
+                if('HuymaierConsole.Native.RawHidController' -as [type]){
+                    $mainHelper=New-Object System.Windows.Interop.WindowInteropHelper($script:Window)
+                    [void][HuymaierConsole.Native.RawHidController]::Register($mainHelper.Handle)
                 }
-            }finally{
-                $script:LastGamepadMask=0
-                $script:LastDirection=''
-                $script:NextDirectionAt=[datetime]::MinValue
-                $script:ControllerInputGuardUntil=[datetime]::Now.AddMilliseconds(750)
-                try{if('HuymaierConsole.NativeApp.NativeConsoleNavigation' -as [type]){[HuymaierConsole.NativeApp.NativeConsoleNavigation]::Reset()}}catch{}
-                try{
-                    if('HuymaierConsole.Native.RawHidController' -as [type]){
-                        $mainHelper=New-Object System.Windows.Interop.WindowInteropHelper($script:Window)
-                        [void][HuymaierConsole.Native.RawHidController]::Register($mainHelper.Handle)
-                    }
-                }catch{}
-                if($null -ne $script:Window){
-                    $script:NativePlatformReturnName=[string]$Platform
+            }catch{}
+            if($null -ne $script:Window){
+                $script:NativePlatformReturnName=[string]$Platform
+                $script:NativePlatformOpenQuickAccess=$false
+                try{if($null -ne $nativeBridge -and $nativeBridge.ConsumeQuickAccessRequest()){$script:NativePlatformOpenQuickAccess=$true}}catch{}
+                $restore=[Action]{
+                    # Focus and input ownership must return before any polling,
+                    # animation, FPS, library, artwork or provider work resumes.
+                    try{
+                        if('HuymaierConsole.NativeApp.NativeWindowActivation' -as [type]){
+                            [HuymaierConsole.NativeApp.NativeWindowActivation]::Restore($script:Window)
+                        }else{$script:Window.Activate()|Out-Null;$script:Window.Focus()|Out-Null}
+                    }catch{}
+                    Resume-HcRuntimeFromNativePlatform
+                    $script:ControllerInputGuardUntil=[datetime]::Now.AddMilliseconds(225)
+                    $pickerHandled=$false
+                    try{if(Get-Command Invoke-HcNativeConsolePickerRequest -ErrorAction SilentlyContinue){$pickerHandled=[bool](Invoke-HcNativeConsolePickerRequest -Platform $script:NativePlatformReturnName)}}catch{Write-Log "Native console picker handoff failed: $($_.Exception.Message)" 'ERROR'}
+                    if($pickerHandled){$script:NativePlatformOpenQuickAccess=$false;return}
+                    if($script:NativePlatformOpenQuickAccess -and (Get-Command Show-HcMainMenu -ErrorAction SilentlyContinue)){Show-HcMainMenu;Write-Log "Guide/Home returned from $($script:NativePlatformReturnName) to Huymaier Quick Access."}
                     $script:NativePlatformOpenQuickAccess=$false
-                    try{if($null -ne $nativeBridge -and $nativeBridge.ConsumeQuickAccessRequest()){$script:NativePlatformOpenQuickAccess=$true}}catch{}
-                    $restore=[Action]{
-                        # The main Console window and its visual tree stay alive behind
-                        # the modal native platform. Do not rebuild the page on return:
-                        # doing so raced deferred Library/artwork work and caused some
-                        # systems to crash or restore with a squeezed/empty right column.
-                        Resume-HcRuntimeFromNativePlatform
-                        try{
-                            if('HuymaierConsole.NativeApp.NativeWindowActivation' -as [type]){
-                                [HuymaierConsole.NativeApp.NativeWindowActivation]::Restore($script:Window)
-                            }else{$script:Window.Activate()|Out-Null;$script:Window.Focus()|Out-Null}
-                        }catch{}
-                        $script:ControllerInputGuardUntil=[datetime]::Now.AddMilliseconds(450)
-                        $pickerHandled=$false
-                        try{if(Get-Command Invoke-HcNativeConsolePickerRequest -ErrorAction SilentlyContinue){$pickerHandled=[bool](Invoke-HcNativeConsolePickerRequest -Platform $script:NativePlatformReturnName)}}catch{Write-Log "Native console picker handoff failed: $($_.Exception.Message)" 'ERROR'}
-                        if($pickerHandled){$script:NativePlatformOpenQuickAccess=$false;return}
-                        if($script:NativePlatformOpenQuickAccess -and (Get-Command Show-HcMainMenu -ErrorAction SilentlyContinue)){Show-HcMainMenu;Write-Log "Guide/Home returned from $($script:NativePlatformReturnName) to Huymaier Quick Access."}
-                        $script:NativePlatformOpenQuickAccess=$false
-                        Write-Log "Closed native emulator platform interface: $($script:NativePlatformReturnName); existing Console view restored in place."
-                    }
-                    try{[void]$script:Window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::ContextIdle,$restore)}
-                    catch{Resume-HcRuntimeFromNativePlatform}
-                }else{Resume-HcRuntimeFromNativePlatform}
-            }
+                    Write-Log "Closed native emulator platform interface: $($script:NativePlatformReturnName); shell input restored before deferred background runtime."
+                }
+                try{[void]$script:Window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Input,$restore)}
+                catch{
+                    try{$script:Window.Activate()|Out-Null;$script:Window.Focus()|Out-Null}catch{}
+                    Resume-HcRuntimeFromNativePlatform
+                }
+            }else{Resume-HcRuntimeFromNativePlatform}
+        }
         return $true
     }catch{
         Resume-HcRuntimeFromNativePlatform
@@ -218,8 +240,6 @@ function Start-HcEmulatorPlatform {
     }
     return $true
 }
-
-
 
 $script:EmulatorPlatformPickerRequest = $null
 
