@@ -69,7 +69,7 @@ $browserInitIndex=$browserText.IndexOf('function Initialize-HuymaierWebBrowser')
 $webViewConstructionIndex=$browserText.IndexOf('New-Object Microsoft.Web.WebView2.Wpf.WebView2')
 if($browserStateIndex -lt 0 -or $browserInitIndex -lt 0 -or $browserStateIndex -gt $browserInitIndex){throw 'Browser auth paths are not initialized before the lazy browser initializer can read them under StrictMode.'}
 if($webViewConstructionIndex -lt $browserInitIndex){throw 'WebView2 construction moved back into browser module load/startup instead of remaining lazy.'}
-if($browserText -match "HcBrowserToolbarButtons\[\$script:HcBrowserToolbarIndex\]\.Tag"){throw 'Browser controller routing regressed to the old button-only toolbar model; the actual address field would be unreachable.'}
+if($browserText -match 'HcBrowserToolbarButtons\[\$script:HcBrowserToolbarIndex\]\.Tag'){throw 'Browser controller routing regressed to the old button-only toolbar model; the actual address field would be unreachable.'}
 
 $progressText=Get-Content -Raw -LiteralPath $progressWorker -Encoding UTF8
 foreach($marker in @('Calculating ETA','Read-ProviderOutputTail','Start-WriteObservation','Update-ObservedWriteBytes','Incremental destination writes','Installing','Downloading','TelemetryKind')){if($progressText -notmatch [regex]::Escape($marker)){throw "Provider progress invariant missing: $marker"}}
