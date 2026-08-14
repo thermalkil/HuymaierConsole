@@ -1,6 +1,8 @@
 param(
     [Parameter(Mandatory=$true)][string]$TriggerPath,
     [Parameter(Mandatory=$true)][string]$CorePath,
+    [Parameter(Mandatory=$true)][string]$BootstrapPath,
+    [Parameter(Mandatory=$true)][string]$InstallerCorePath,
     [Parameter(Mandatory=$true)][string]$ManifestPath,
     [Parameter(Mandatory=$true)][string]$AppxManifestPath
 )
@@ -12,12 +14,16 @@ $version=[string]$trigger.version
 if([string]::IsNullOrWhiteSpace($version)){throw 'Candidate version stamping requires trigger.version.'}
 if($version -ne '0.26.5'){throw "This v0.26.5 stamping transform refuses unexpected version '$version'."}
 
-$core=[IO.File]::ReadAllText($CorePath,[Text.Encoding]::UTF8)
-$oldCore="$script:AppVersion = '0.26.4'"
-$newCore="$script:AppVersion = '$version'"
-if(([regex]::Matches($core,[regex]::Escape($oldCore))).Count -ne 1){throw 'Expected exactly one v0.26.4 AppVersion marker before candidate stamping.'}
-$core=$core.Replace($oldCore,$newCore)
-[IO.File]::WriteAllText($CorePath,$core,(New-Object Text.UTF8Encoding($false)))
+function Replace-ExactlyOnce([string]$Path,[string]$Old,[string]$New,[string]$Label){
+    $text=[IO.File]::ReadAllText($Path,[Text.Encoding]::UTF8)
+    if(([regex]::Matches($text,[regex]::Escape($Old))).Count -ne 1){throw "Expected exactly one $Label marker before candidate stamping."}
+    $text=$text.Replace($Old,$New)
+    [IO.File]::WriteAllText($Path,$text,(New-Object Text.UTF8Encoding($false)))
+}
+
+Replace-ExactlyOnce $CorePath "$script:AppVersion = '0.26.4'" "$script:AppVersion = '$version'" 'v0.26.4 AppVersion'
+Replace-ExactlyOnce $BootstrapPath "$script:ExpectedConsoleVersion='0.26.4'" "$script:ExpectedConsoleVersion='$version'" 'v0.26.4 bootstrap expected-version'
+Replace-ExactlyOnce $InstallerCorePath "$script:InstallVersion='0.26.4'" "$script:InstallVersion='$version'" 'v0.26.4 installer version'
 
 $manifest=Get-Content -Raw -LiteralPath $ManifestPath -Encoding UTF8|ConvertFrom-Json
 if([string]$manifest.version -ne '0.26.4'){throw "Expected source manifest version 0.26.4 before candidate stamping, found $($manifest.version)."}
@@ -47,4 +53,4 @@ if(([regex]::Matches($appx,[regex]::Escape($oldAppx))).Count -ne 1){throw 'Expec
 $appx=$appx.Replace($oldAppx,$newAppx)
 [IO.File]::WriteAllText($AppxManifestPath,$appx,(New-Object Text.UTF8Encoding($false)))
 
-Write-Host "Stamped release workspace as Huymaier Console v$version / performance-downloads-rc1."
+Write-Host "Stamped shell, bootstrap, installer, manifest and AppX as Huymaier Console v$version / performance-downloads-rc1."
