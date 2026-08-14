@@ -16,7 +16,7 @@ $override=@'
 # console-style pointer over the page instead: directional/left-stick input
 # moves it, A/Cross clicks, and X/Square requests text entry at the pointer.
 function Install-HcBrowserVirtualCursorScript {
-    $scriptText=@'
+    $scriptText=@"
 (()=>{
 if(window.__hcVirtualCursorInstalled){if(window.__hcCursorShow)window.__hcCursorShow();return;}
 window.__hcVirtualCursorInstalled=true;
@@ -41,7 +41,7 @@ window.__hcCursorScroll=(dx,dy)=>{window.scrollBy({left:dx,top:dy,behavior:'auto
 window.addEventListener('resize',window.__hcCursorRender,{passive:true});
 window.__hcCursorRender();
 })();
-'@
+"@
     Invoke-HcBrowserScriptAsync $scriptText
 }
 
