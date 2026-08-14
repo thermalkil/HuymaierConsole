@@ -17,14 +17,26 @@ function Replace-HcExact {
     if($value.IndexOf($Old,$first+$Old.Length,[StringComparison]::Ordinal) -ge 0){throw "Provider download optimizer found duplicate $Label blocks."}
     $Text.Value=$value.Substring(0,$first)+$New+$value.Substring($first+$Old.Length)
 }
-function Replace-HcUniqueLineContaining {
-    param([ref]$Text,[string]$Label,[string]$Needle,[string]$Replacement)
+function Replace-HcUniqueLineWithTokens {
+    param([ref]$Text,[string]$Label,[string[]]$Tokens,[string]$Replacement)
     $value=[string]$Text.Value
-    $pattern='(?m)^[^\r\n]*'+[regex]::Escape($Needle)+'[^\r\n]*$'
-    $matches=[regex]::Matches($value,$pattern)
+    $matches=New-Object System.Collections.ArrayList
+    $position=0
+    while($position -lt $value.Length){
+        $lineEnd=$value.IndexOf("`n",$position,[StringComparison]::Ordinal)
+        if($lineEnd -lt 0){$lineEnd=$value.Length}
+        $contentEnd=$lineEnd
+        if($contentEnd -gt $position -and $value[$contentEnd-1] -eq "`r"){$contentEnd--}
+        $line=$value.Substring($position,$contentEnd-$position)
+        $ok=$true
+        foreach($token in $Tokens){if($line.IndexOf($token,[StringComparison]::Ordinal) -lt 0){$ok=$false;break}}
+        if($ok){[void]$matches.Add([pscustomobject]@{Start=$position;Length=$contentEnd-$position})}
+        if($lineEnd -ge $value.Length){break}
+        $position=$lineEnd+1
+    }
     if($matches.Count -ne 1){throw "Provider download optimizer expected exactly one $Label line but found $($matches.Count)."}
     $match=$matches[0]
-    $Text.Value=$value.Substring(0,$match.Index)+$Replacement+$value.Substring($match.Index+$match.Length)
+    $Text.Value=$value.Substring(0,[int]$match.Start)+$Replacement+$value.Substring(([int]$match.Start+[int]$match.Length))
 }
 function Write-HcUtf8Bom {param([string]$Path,[string]$Text);$bom=New-Object Text.UTF8Encoding($true);[IO.File]::WriteAllText($Path,$Text,$bom)}
 
@@ -64,7 +76,7 @@ function Get-LegendaryTransferPhase{
 }
 function Update-LegendaryTransferTelemetry{
 '@
-Replace-HcUniqueLineContaining ([ref]$worker) 'Legendary state write' "Write-State `$true 'Downloading'" @'
+Replace-HcUniqueLineWithTokens ([ref]$worker) 'Legendary state write' @('Write-State',"'Downloading'",'$amount','$speed','-Quiet') @'
         $phase=Get-LegendaryTransferPhase $Text
         $visibleEta=if($phase -eq 'Installing'){-1}else{$script:TransferEtaSeconds}
         $etaText=Format-ProviderEtaValue $visibleEta
