@@ -14,13 +14,13 @@ $helper=@'
         // HUYMAIER_NINTENDO_DISPLAY_NAME_V1
         private static bool LooksLikeNintendoDiscId(string value)
         {
-            return !string.IsNullOrWhiteSpace(value) && Regex.IsMatch(value.Trim(), "^[A-Za-z0-9]{6}$");
+            return !string.IsNullOrWhiteSpace(value) && System.Text.RegularExpressions.Regex.IsMatch(value.Trim(), "^[A-Za-z0-9]{6}$");
         }
 
         private static string CleanNintendoContainerName(string value)
         {
             if (string.IsNullOrWhiteSpace(value)) return string.Empty;
-            string cleaned = Regex.Replace(value.Trim(), @"\s*[\[\(][A-Za-z0-9]{6}[\]\)]\s*$", string.Empty).Trim();
+            string cleaned = System.Text.RegularExpressions.Regex.Replace(value.Trim(), @"\s*[\[\(][A-Za-z0-9]{6}[\]\)]\s*$", string.Empty).Trim();
             return cleaned;
         }
 
@@ -34,8 +34,8 @@ $helper=@'
                 int read = stream.Read(titleBytes, 0, titleBytes.Length);
                 if (read <= 0) return string.Empty;
                 string title = Encoding.ASCII.GetString(titleBytes, 0, read).Trim('\0', ' ', '\t', '\r', '\n');
-                title = Regex.Replace(title, @"[\x00-\x1F\x7F]+", " ");
-                title = Regex.Replace(title, @"\s{2,}", " ").Trim();
+                title = System.Text.RegularExpressions.Regex.Replace(title, @"[\x00-\x1F\x7F]+", " ");
+                title = System.Text.RegularExpressions.Regex.Replace(title, @"\s{2,}", " ").Trim();
                 if (title.Length < 2 || LooksLikeNintendoDiscId(title)) return string.Empty;
                 return title;
             }
