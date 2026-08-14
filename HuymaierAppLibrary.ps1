@@ -332,12 +332,12 @@ function Get-PageDefinition {
         return [pscustomobject]@{Title=$name;Subtitle='App management';Hero=$category.ToUpperInvariant();HeroText='Curated app metadata and launch behavior.';Actions=[object[]]$actions.ToArray()}
     }
     if($Index -eq 2 -and $script:SubPage -eq 'AppCategoryPicker'){
-        $i=[int]$script:HcSelectedManagedAppIndex;$actions=New-Object System.Collections.ArrayList;foreach($category in $script:HcAppCategoryOrder){[void]$actions.Add((New-Action ("app-set-category:$i:$category") $category))};[void]$actions.Add((New-Action 'app-category-back' 'Back'))
+        $i=[int]$script:HcSelectedManagedAppIndex;$actions=New-Object System.Collections.ArrayList;foreach($category in $script:HcAppCategoryOrder){[void]$actions.Add((New-Action ("app-set-category:${i}:$category") $category))};[void]$actions.Add((New-Action 'app-category-back' 'Back'))
         return [pscustomobject]@{Title='App Category';Subtitle='Choose a category for this app.';Hero='CATEGORIES';HeroText=($script:HcAppCategoryOrder -join '  •  ');Actions=[object[]]$actions.ToArray()}
     }
     if($Index -eq 2 -and $script:SubPage -eq 'AppModePicker'){
         $i=[int]$script:HcSelectedManagedAppIndex
-        return [pscustomobject]@{Title='Launch Mode';Subtitle='Choose how this app opens from Huymaier Console.';Hero='CONTROLLER OR NATIVE';HeroText='Controller Mode uses the full-screen Huymaier browser wrapper.';Actions=@((New-Action "app-set-mode:$i:Native" 'Native' 'Use the installed Windows application.'),(New-Action "app-set-mode:$i:Controller" 'Controller Mode' 'Use the Huymaier browser cursor and on-screen keyboard.'),(New-Action 'app-category-back' 'Back'))}
+        return [pscustomobject]@{Title='Launch Mode';Subtitle='Choose how this app opens from Huymaier Console.';Hero='CONTROLLER OR NATIVE';HeroText='Controller Mode uses the full-screen Huymaier browser wrapper.';Actions=@((New-Action "app-set-mode:${i}:Native" 'Native' 'Use the installed Windows application.'),(New-Action "app-set-mode:${i}:Controller" 'Controller Mode' 'Use the Huymaier browser cursor and on-screen keyboard.'),(New-Action 'app-category-back' 'Back'))}
     }
     return (& $script:HcAppBaseGetPageDefinition $Index)
 }
