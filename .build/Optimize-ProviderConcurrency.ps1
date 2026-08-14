@@ -8,7 +8,24 @@ param(
 
 Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
-foreach($path in @($ProviderModulePath,$ProviderWorkerPath,$ProgressWorkerPath,$BootstrapPath,$ShellRedesignPath)){if(-not(Test-Path -LiteralPath $path -PathType Leaf)){throw "Provider concurrency transform input missing: $path"}}
+foreach($path in @($ProviderModulePath,$ProviderWorkerPath,$ProgressWorkerPath,$BootstrapPath,$ShellRedesignPath)){
+    if(-not(Test-Path -LiteralPath $path -PathType Leaf)){throw "Provider concurrency transform input missing: $path"}
+}
+
+function Replace-WorkerFunctionBlock {
+    param([string]$Text,[string]$Name,[string]$Replacement)
+    $marker='function '+$Name
+    $start=$Text.IndexOf($marker,[StringComparison]::Ordinal)
+    if($start -lt 0){throw "Provider concurrency transform could not find $Name."}
+    $searchFrom=$start+$marker.Length
+    $nextCrLf=$Text.IndexOf("`r`nfunction ",$searchFrom,[StringComparison]::Ordinal)
+    $nextLf=$Text.IndexOf("`nfunction ",$searchFrom,[StringComparison]::Ordinal)
+    $next=-1
+    if($nextCrLf -ge 0){$next=$nextCrLf+2}
+    if($nextLf -ge 0 -and ($next -lt 0 -or ($nextLf+1) -lt $next)){$next=$nextLf+1}
+    if($next -lt 0){throw "Provider concurrency transform could not find the end of $Name."}
+    return $Text.Substring(0,$start)+$Replacement.TrimEnd()+"`r`n"+$Text.Substring($next)
+}
 
 # Load the concurrent state layer after the legacy provider module so only
 # Install/Update behavior is overridden. Other provider operations retain their
@@ -51,7 +68,9 @@ if($worker -notmatch 'HUYMAIER_PROVIDER_TRANSFER_STATE_V1'){
     $worker=$worker.Replace($stateNeedle,$stateReplacement)
 
     $speedNeedle='InstallSizeBytes=[int64]$script:TransferInstallSizeBytes;DownloadSpeedBytesPerSec=[double]$script:TransferSpeedBytesPerSec;'
-    if($worker.Contains($speedNeedle)){$worker=$worker.Replace($speedNeedle,'InstallSizeBytes=[int64]$script:TransferInstallSizeBytes;DownloadSpeedBytesPerSec=[double]$script:TransferSpeedBytesPerSec;TransferSpeedBytesPerSec=[double]$script:TransferSpeedBytesPerSec;')}
+    if($worker.Contains($speedNeedle)){
+        $worker=$worker.Replace($speedNeedle,'InstallSizeBytes=[int64]$script:TransferInstallSizeBytes;DownloadSpeedBytesPerSec=[double]$script:TransferSpeedBytesPerSec;TransferSpeedBytesPerSec=[double]$script:TransferSpeedBytesPerSec;')
+    }
 
     $outNeedle='$outFile=Join-Path $env:TEMP ("huymaier-provider-out-"+[guid]::NewGuid().ToString(''N'')+''.txt'')'
     $errNeedle='$errFile=Join-Path $env:TEMP ("huymaier-provider-err-"+[guid]::NewGuid().ToString(''N'')+''.txt'')'
@@ -64,7 +83,8 @@ if($worker -notmatch 'HUYMAIER_PROVIDER_TRANSFER_STATE_V1'){
     $lockHelper=@'
 function Invoke-ProviderSharedStateLock{
     param([scriptblock]$Action)
-    $mutex=$null;$acquired=$false
+    $mutex=$null
+    $acquired=$false
     try{
         $mutex=New-Object Threading.Mutex($false,'Local\HuymaierConsole.ProviderSharedState')
         try{$acquired=$mutex.WaitOne(30000)}catch[Threading.AbandonedMutexException]{$acquired=$true}
@@ -78,47 +98,59 @@ function Invoke-ProviderSharedStateLock{
 '@
     $worker=$worker.Replace($catalogNeedle,$catalogNeedle+"`r`n"+$lockHelper.TrimEnd())
 
-    $saveProviderPattern='(?m)^function Save-ProviderNode\{.*\}$'
-    if(-not [regex]::IsMatch($worker,$saveProviderPattern)){throw 'Provider concurrency transform could not find Save-ProviderNode.'}
     $saveProvider=@'
 function Save-ProviderNode{
     param($Node)
     Invoke-ProviderSharedStateLock {
-        $catalog=Read-Catalog;$nodes=New-Object System.Collections.ArrayList;$done=$false
-        foreach($existing in @(Get-Prop $catalog 'Providers' @())){if([string]::Equals([string](Get-Prop $existing 'Id' ''),$Provider,[StringComparison]::OrdinalIgnoreCase)){[void]$nodes.Add($Node);$done=$true}else{[void]$nodes.Add($existing)}}
+        $catalog=Read-Catalog
+        $nodes=New-Object System.Collections.ArrayList
+        $done=$false
+        foreach($existing in @(Get-Prop $catalog 'Providers' @())){
+            if([string]::Equals([string](Get-Prop $existing 'Id' ''),$Provider,[StringComparison]::OrdinalIgnoreCase)){
+                [void]$nodes.Add($Node)
+                $done=$true
+            }else{[void]$nodes.Add($existing)}
+        }
         if(-not $done){[void]$nodes.Add($Node)}
         Write-AtomicJson $CatalogPath ([pscustomobject]@{Providers=[object[]]$nodes.ToArray();Updated=(Get-Date).ToString('o')})
     }|Out-Null
 }
 '@
-    $worker=[regex]::Replace($worker,$saveProviderPattern,[Text.RegularExpressions.MatchEvaluator]{param($m)$saveProvider.TrimEnd()},1)
+    $worker=Replace-WorkerFunctionBlock $worker 'Save-ProviderNode' $saveProvider
 
-    $saveManagedPattern='(?m)^function Save-ManagedInstall\{.*\}$'
-    $removeManagedPattern='(?m)^function Remove-ManagedInstall\{.*\}$'
-    if(-not [regex]::IsMatch($worker,$saveManagedPattern) -or -not [regex]::IsMatch($worker,$removeManagedPattern)){throw 'Provider concurrency transform could not find managed-install mutation functions.'}
     $saveManaged=@'
 function Save-ManagedInstall{
     param([string]$Id,[string]$Name,[string]$Path)
     Invoke-ProviderSharedStateLock {
-        $items=New-Object System.Collections.ArrayList;$done=$false
-        foreach($item in @(Read-ManagedInstalls)){if([string](Get-Prop $item 'Provider' '') -eq $Provider -and [string](Get-Prop $item 'Id' '') -eq $Id){[void]$items.Add([pscustomobject]@{Provider=$Provider;Id=$Id;Name=$Name;Path=$Path;Updated=(Get-Date).ToString('o')});$done=$true}else{[void]$items.Add($item)}}
+        $items=New-Object System.Collections.ArrayList
+        $done=$false
+        foreach($item in @(Read-ManagedInstalls)){
+            if([string](Get-Prop $item 'Provider' '') -eq $Provider -and [string](Get-Prop $item 'Id' '') -eq $Id){
+                [void]$items.Add([pscustomobject]@{Provider=$Provider;Id=$Id;Name=$Name;Path=$Path;Updated=(Get-Date).ToString('o')})
+                $done=$true
+            }else{[void]$items.Add($item)}
+        }
         if(-not $done){[void]$items.Add([pscustomobject]@{Provider=$Provider;Id=$Id;Name=$Name;Path=$Path;Updated=(Get-Date).ToString('o')})}
         Write-AtomicJson $managedPath ([object[]]$items.ToArray())
     }|Out-Null
 }
 '@
+    $worker=Replace-WorkerFunctionBlock $worker 'Save-ManagedInstall' $saveManaged
+
     $removeManaged=@'
 function Remove-ManagedInstall{
     param([string]$Id)
     Invoke-ProviderSharedStateLock {
         $items=New-Object System.Collections.ArrayList
-        foreach($item in @(Read-ManagedInstalls)){if(-not ([string](Get-Prop $item 'Provider' '') -eq $Provider -and [string](Get-Prop $item 'Id' '') -eq $Id)){[void]$items.Add($item)}}
+        foreach($item in @(Read-ManagedInstalls)){
+            $matches=([string](Get-Prop $item 'Provider' '') -eq $Provider -and [string](Get-Prop $item 'Id' '') -eq $Id)
+            if(-not $matches){[void]$items.Add($item)}
+        }
         Write-AtomicJson $managedPath ([object[]]$items.ToArray())
     }|Out-Null
 }
 '@
-    $worker=[regex]::Replace($worker,$saveManagedPattern,[Text.RegularExpressions.MatchEvaluator]{param($m)$saveManaged.TrimEnd()},1)
-    $worker=[regex]::Replace($worker,$removeManagedPattern,[Text.RegularExpressions.MatchEvaluator]{param($m)$removeManaged.TrimEnd()},1)
+    $worker=Replace-WorkerFunctionBlock $worker 'Remove-ManagedInstall' $removeManaged
     Set-Content -LiteralPath $ProviderWorkerPath -Value $worker -Encoding UTF8
 }
 
