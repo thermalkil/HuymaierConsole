@@ -81,8 +81,11 @@ try{
         "'HuymaierConsole.Native.AudioBridge' -as [type]",
         "'HuymaierConsole.Native.LegacyJoystick' -as [type]",
         "'HuymaierConsole.Native.FrameRateMonitor' -as [type]",
+        '$script:HcStartupStopwatch=[Diagnostics.Stopwatch]::StartNew()',
         '$script:Window.Add_ContentRendered',
-        'Deferred post-first-frame shell services initialized.',
+        'Startup timing: entering ShowDialog at',
+        'Startup timing: first rendered frame at',
+        'Startup timing: deferred shell services ready at',
         'FromMilliseconds(1800)'
     )){if($optimizedCore -notmatch [regex]::Escape($marker)){throw "Optimized startup marker missing: $marker"}}
     if($optimizedCore -match [regex]::Escape('FromMilliseconds(700)')){throw 'Optimized runtime still uses the old 700 ms initial-scan delay.'}
@@ -118,7 +121,7 @@ try{
     $nintendoOptimizerText=Get-Content -Raw -LiteralPath $nintendoOptimizer -Encoding UTF8
     if($nintendoOptimizerText -match 'PS2|PS3'){throw 'Nintendo ownership optimizer must not target PS2/PS3 presentation.'}
 
-    Write-Host 'v0.26.5 startup, normalized provider telemetry, complete Epic coordinator activation, incremental transfer observation and Nintendo ownership validation passed.'
+    Write-Host 'v0.26.5 startup timing, normalized provider telemetry, complete Epic coordinator activation, incremental transfer observation and Nintendo ownership validation passed.'
 }finally{
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
