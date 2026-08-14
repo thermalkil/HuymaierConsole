@@ -1,12 +1,12 @@
 {
-  "requestedAtUtc": "2026-08-14T15:17:00Z",
-  "attempt": 4,
+  "requestedAtUtc": "2026-08-14T16:18:00Z",
+  "attempt": 5,
   "candidate": "v0.26.5-rc1",
   "version": "0.26.5",
   "base_release": "v0.26.2",
   "base_asset": "HC262.zip",
   "package_root": "HC265",
   "asset_name": "HC265.zip",
-  "production_source": "d11cc7ac9e100608c1de98a4f2d36ea0d798271b",
-  "scope": "v0.26.5 RC1 retry after live cold-start exposed an uninitialized lazy-browser auth path and user testing exposed unusable controller navigation; browser state is now initialized before StrictMode reads, WebView2 remains lazy, the real Address/Search field is controller-focusable, A/X/Y controller text/navigation paths are deterministic, and source plus staged-package gates require the browser cold-start/controller contract while retaining compiled native 0.26.5/x64, startup, provider, Nintendo, installer, Steam, Game Bar and frozen PS1/PS2/PS3 gates"
+  "production_source": "8c92433390ae889e056db4de99ac94da64933262",
+  "scope": "v0.26.5 RC1 stabilization attempt after live testing exposed bare Wii disc IDs, unreliable website D-pad/text-entry behavior, insufficient ETA fallback/concurrency, and persistent shell hitching; this candidate resolves Wii/GameCube display names from descriptive folders or embedded ISO/WBFS metadata, adds a visible console-style browser cursor with real pointer hit-testing and native keyboard handoff, supports simultaneous Epic/GOG/Amazon Install/Update transfers with isolated state/output, per-transfer cards, smoothed observed-throughput ETA and estimated-size fallback, replaces repeated UI-thread state polling and platform-card process bursts with event-driven dirty-state observation plus staggered summary refreshes, and preserves compiled native 0.26.5/x64, installer rollback/tamper, Steam ownership, Game Bar/navigation, Wii/GameCube ownership and frozen PS1/PS2/PS3 presentation gates"
 }
