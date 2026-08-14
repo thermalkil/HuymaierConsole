@@ -10,6 +10,7 @@ $startupOptimizer=Join-Path $PSScriptRoot 'Optimize-HuymaierStartup.ps1'
 $nintendoOptimizer=Join-Path $PSScriptRoot 'Optimize-NintendoLibraryOwnership.ps1'
 $nintendoNameOptimizer=Join-Path $PSScriptRoot 'Optimize-NintendoDisplayNames.ps1'
 $dolphinOptimizer=Join-Path $PSScriptRoot 'Optimize-DolphinIntegration.ps1'
+$wiiArtworkAliasOptimizer=Join-Path $PSScriptRoot 'Optimize-WiiArtworkAliases.ps1'
 $appLibraryOptimizer=Join-Path $PSScriptRoot 'Optimize-AppLibrary.ps1'
 $providerOptimizer=Join-Path $PSScriptRoot 'Optimize-ProviderDownloads.ps1'
 $epicWatchOptimizer=Join-Path $PSScriptRoot 'Optimize-EpicTelemetryWatch.ps1'
@@ -42,7 +43,7 @@ $appLibrarySource=Join-Path $workspace 'HuymaierAppLibrary.ps1'
 $appInstallWorkerSource=Join-Path $workspace 'HuymaierAppInstallWorker.ps1'
 
 $requiredFiles=@(
-    $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$dolphinOptimizer,$appLibraryOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$providerPreflightOptimizer,$browserCursorOptimizer,$runtimeHitchOptimizer,$concurrentDownloadRefreshOptimizer,
+    $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$dolphinOptimizer,$wiiArtworkAliasOptimizer,$appLibraryOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$providerPreflightOptimizer,$browserCursorOptimizer,$runtimeHitchOptimizer,$concurrentDownloadRefreshOptimizer,
     $coreSource,$bootstrapSource,$installerCoreSource,$installerScriptSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource,
     $providerConcurrencySource,$providerConcurrencyUiSource,$providerTransferCoordinatorSource,$appLibrarySource,$appInstallWorkerSource
 )
@@ -58,6 +59,7 @@ try{
     & $nintendoOptimizer -NativePath $nativeConsoleSource
     & $nintendoNameOptimizer -ConsolePlatformsPath $nativeConsoleSource
     & $dolphinOptimizer -ConsolePlatformsPath $nativeConsoleSource
+    & $wiiArtworkAliasOptimizer -ConsolePlatformsPath $nativeConsoleSource
     & $providerOptimizer -ProviderModulePath $providerModuleSource -ProviderWorkerPath $providerWorkerSource -ProgressWorkerPath $progressWorkerSource -CoordinatorPath $coordinatorSource
     & $epicWatchOptimizer -BootstrapPath $bootstrapSource
     & $epicCoordinatorOptimizer -CoordinatorPath $coordinatorSource
