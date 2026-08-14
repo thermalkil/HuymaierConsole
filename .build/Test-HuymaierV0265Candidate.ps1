@@ -43,6 +43,8 @@ $core=Require-Text 'HuymaierConsole.ps1' @(
     "'HuymaierConsole.Native.AudioBridge' -as [type]",
     "'HuymaierConsole.Native.LegacyJoystick' -as [type]",
     "'HuymaierConsole.Native.FrameRateMonitor' -as [type]",
+    'HUYMAIER_CURATED_APP_LIBRARY_V1',
+    'HuymaierAppLibrary.ps1',
     'HUYMAIER_RUNTIME_HITCH_GUARD_V1',
     'FileSystemWatcher',
     'Update-HcRuntimeStateEvents',
@@ -55,9 +57,7 @@ $countStart=$core.IndexOf('function Get-PlatformCountSummary {',[StringCompariso
 $countEnd=$core.IndexOf('function New-PlatformCard {',[StringComparison]::Ordinal)
 if($countStart -lt 0 -or $countEnd -le $countStart){throw 'Staged shell platform-count renderer cannot be inspected.'}
 $countSegment=$core.Substring($countStart,$countEnd-$countStart)
-foreach($forbidden in @('Start-Ps1LibrarySummaryScan','Start-Ps2LibrarySummaryScan','Start-Ps3LibrarySummaryScan','Start-NativeConsoleLibrarySummaryScan $id')){
-    if($countSegment.IndexOf($forbidden,[StringComparison]::Ordinal) -ge 0){throw "Staged platform-card rendering still starts a summary worker: $forbidden"}
-}
+foreach($forbidden in @('Start-Ps1LibrarySummaryScan','Start-Ps2LibrarySummaryScan','Start-Ps3LibrarySummaryScan','Start-NativeConsoleLibrarySummaryScan $id')){if($countSegment.IndexOf($forbidden,[StringComparison]::Ordinal) -ge 0){throw "Staged platform-card rendering still starts a summary worker: $forbidden"}}
 if($core.IndexOf('Start-Ps1LibrarySummaryScan;Start-Ps2LibrarySummaryScan;Start-Ps3LibrarySummaryScan',[StringComparison]::Ordinal) -ge 0){throw 'Staged shell still contains the simultaneous console-summary worker burst.'}
 
 $bootstrap=Require-Text 'HuymaierBootstrap.ps1' @(
@@ -67,9 +67,10 @@ $bootstrap=Require-Text 'HuymaierBootstrap.ps1' @(
     'HuymaierProviderConcurrency.ps1',
     'HuymaierProviderConcurrencyUi.ps1',
     'HuymaierProviderTransferCoordinator.ps1',
+    'HuymaierAppLibrary.ps1',
+    'HuymaierAppInstallWorker.ps1',
     'HUYMAIER_CONCURRENT_PROVIDER_COORDINATOR_V1'
 )
-# The old single provider-state telemetry process must not be started at boot.
 if($bootstrap.IndexOf("    Start-ProviderTelemetryWatch`r`n",[StringComparison]::Ordinal) -ge 0 -or $bootstrap.IndexOf("    Start-ProviderTelemetryWatch`n",[StringComparison]::Ordinal) -ge 0){throw 'Staged bootstrap still starts the legacy single-state provider telemetry coordinator.'}
 
 $installerCore=Require-Text 'HuymaierInstallerCore.ps1' @("`$script:InstallVersion='0.26.5'")
@@ -80,13 +81,12 @@ $installerEntry=Require-Text 'Install-HuymaierConsole.ps1' @(
     "ValidationSource='installer'",
     'HuymaierProviderConcurrency.ps1',
     'HuymaierProviderConcurrencyUi.ps1',
-    'HuymaierProviderTransferCoordinator.ps1'
+    'HuymaierProviderTransferCoordinator.ps1',
+    'HuymaierAppLibrary.ps1',
+    'HuymaierAppInstallWorker.ps1'
 )
 $appx=Require-Text 'FSEPackage\AppxManifest.xml' @('Version="0.26.5.0"')
 
-# Browser state must be safe during cold startup under StrictMode, WebView2 stays
-# lazy, and websites are driven by a real console-style pointer rather than a
-# fragile DOM focus graph.
 $browser=Require-Text 'HuymaierWebBrowser.ps1' @(
     "`$script:HcBrowserAuthRequestPath = Join-Path `$script:DataDir 'browser-auth-request.json'",
     "`$script:HcBrowserAuthResultDir = Join-Path `$script:DataDir 'BrowserAuth'",
@@ -115,124 +115,59 @@ if($browserStateIndex -lt 0 -or $browserInitIndex -lt 0 -or $browserStateIndex -
 if($webViewConstructionIndex -lt $browserInitIndex){throw 'Staged browser constructs WebView2 during module load instead of lazily.'}
 if($browser -match 'HcBrowserToolbarButtons\[\$script:HcBrowserToolbarIndex\]\.Tag'){throw 'Staged browser regressed to button-only controller toolbar navigation.'}
 
-$nativeGameInput=Require-Text 'Native\HuymaierConsole.GameInput.cs' @(
-    'public static class HuymaierBuildStamp',
-    'public const string Version = "0.26.5";',
-    'public const string Architecture = "x64";'
-)
+$nativeGameInput=Require-Text 'Native\HuymaierConsole.GameInput.cs' @('public static class HuymaierBuildStamp','public const string Version = "0.26.5";','public const string Architecture = "x64";')
 $native=Require-Text 'Native\HuymaierConsole.ConsolePlatforms.cs' @(
-    'IsNintendoLibraryOwnedPath',
-    'IsNintendoRawDiscForCurrentShell',
-    'header[0x18] == 0x5D',
-    'header[0x1C] == 0xC2',
-    'if (!IsNintendoLibraryOwnedPath(path)) continue;',
-    'HUYMAIER_NINTENDO_DISPLAY_NAME_V1',
-    'ResolveLibraryDisplayName',
-    'ReadNintendoDiscTitle',
-    'extension.Equals(".wbfs"',
-    'ReadNintendoAsciiTitle',
-    'LooksLikeNintendoDiscId',
-    'return platform + " Game ("'
+    'IsNintendoLibraryOwnedPath','IsNintendoRawDiscForCurrentShell','header[0x18] == 0x5D','header[0x1C] == 0xC2','if (!IsNintendoLibraryOwnedPath(path)) continue;',
+    'HUYMAIER_NINTENDO_DISPLAY_NAME_V1','ResolveLibraryDisplayName','ReadNintendoDiscTitle','extension.Equals(".wbfs"','ReadNintendoAsciiTitle','LooksLikeNintendoDiscId','return platform + " Game ("',
+    'HUYMAIER_DOLPHIN_INTEGRATION_V1','GetDolphinUserRoots','GameCovers','ReadNintendoGameId','FindDolphinArtwork','FindDolphinArtworkBySaveCode',
+    'ReadWiiSaveBannerMetadata','CreateWiiSaveCard','GameCode','Description','Modified','FormatBytes(save.Size)'
 )
 if($native -match 'Name = CleanName\(Path\.GetFileNameWithoutExtension\(path\)\),'){throw 'Staged native scanner can still expose a bare six-character Wii/GameCube disc ID as its display title.'}
 if($native -match 'LeftShoulder[^\r\n]{0,200}SwitchPage' -or $native -match 'RightShoulder[^\r\n]{0,200}SwitchPage'){throw 'LB/RB shoulder buttons switch ordinary native platform pages in v0.26.5.'}
+$dolphinPos=$native.IndexOf('string dolphin=FindDolphinArtwork(gamePath,title)',[StringComparison]::Ordinal)
+$genericPos=$native.IndexOf('string emulator=FindEmulatorArtwork(gamePath,title)',[StringComparison]::Ordinal)
+if($dolphinPos -lt 0 -or $genericPos -lt 0 -or $dolphinPos -gt $genericPos){throw 'Staged Wii/GameCube artwork does not prefer Dolphin GameCovers before generic artwork matching.'}
 
-# Verify the build stamp in the exact compiled host that ships.
 $exePath=Join-Path $StageRoot 'HuymaierConsole.exe'
 if(-not(Test-Path -LiteralPath $exePath -PathType Leaf)){throw 'v0.26.5 compiled native host is missing.'}
 try{$nativeAssembly=[Reflection.Assembly]::LoadFile([IO.Path]::GetFullPath($exePath))}catch{throw "Could not load compiled HuymaierConsole.exe for build-stamp verification: $($_.Exception.Message)"}
 $stampType=$nativeAssembly.GetType('HuymaierConsole.NativeApp.HuymaierBuildStamp',$false)
 if($null -eq $stampType){throw 'Compiled HuymaierConsole.exe has no HuymaierBuildStamp type.'}
 $flags=[Reflection.BindingFlags]::Public -bor [Reflection.BindingFlags]::Static
-$versionField=$stampType.GetField('Version',$flags)
-$architectureField=$stampType.GetField('Architecture',$flags)
-$compiledVersion=if($null -ne $versionField){[string]$versionField.GetValue($null)}else{''}
-$compiledArchitecture=if($null -ne $architectureField){[string]$architectureField.GetValue($null)}else{''}
+$versionField=$stampType.GetField('Version',$flags);$architectureField=$stampType.GetField('Architecture',$flags)
+$compiledVersion=if($null -ne $versionField){[string]$versionField.GetValue($null)}else{''};$compiledArchitecture=if($null -ne $architectureField){[string]$architectureField.GetValue($null)}else{''}
 if($compiledVersion -ne '0.26.5' -or $compiledArchitecture -ne 'x64'){throw "Compiled native host build stamp mismatch. Native=$compiledVersion/$compiledArchitecture Expected=0.26.5/x64."}
 Write-Host "Compiled native host build stamp verified: $compiledVersion/$compiledArchitecture"
 
-$providerModule=Require-Text 'HuymaierGameProviders.ps1' @(
-    'Get-ProviderDownloadDisplay',
-    'Format-ProviderDownloadEta',
-    'InstallProcessedBytes',
-    'InstallSpeedBytesPerSec',
-    'HUYMAIER_PROVIDER_CONCURRENCY_V1',
-    'HuymaierProviderConcurrency.ps1'
-)
-$providerWorker=Require-Text 'HuymaierGameProviderWorker.ps1' @(
-    'Get-LegendaryTransferPhase',
-    'Format-ProviderEtaValue',
-    'Installing',
-    'Calculating ETA',
-    'Write-State $true $phase',
-    'HUYMAIER_PROVIDER_TRANSFER_STATE_V1',
-    'TransferId=$script:TransferId',
-    'Local\HuymaierConsole.ProviderSharedState',
-    'huymaier-provider-out-"+$captureId'
-)
-$progressWorker=Require-Text 'HuymaierProviderProgressWorker.ps1' @(
-    "ValidateSet('Epic','GOG','Amazon')",
-    'Read-ProviderOutputTail',
-    'Start-WriteObservation',
-    'Update-ObservedWriteBytes',
-    'Incremental destination writes',
-    'Calculating ETA',
-    'HUYMAIER_PROVIDER_PROGRESS_TRANSFER_ID_V1',
-    '[string]$TransferId',
-    '[regex]::Escape($TransferId)'
-)
+$providerModule=Require-Text 'HuymaierGameProviders.ps1' @('Get-ProviderDownloadDisplay','Format-ProviderDownloadEta','InstallProcessedBytes','InstallSpeedBytesPerSec','HUYMAIER_PROVIDER_CONCURRENCY_V1','HuymaierProviderConcurrency.ps1')
+$providerWorker=Require-Text 'HuymaierGameProviderWorker.ps1' @('Get-LegendaryTransferPhase','Format-ProviderEtaValue','Installing','Calculating ETA','Write-State $true $phase','HUYMAIER_PROVIDER_TRANSFER_STATE_V1','TransferId=$script:TransferId','Local\HuymaierConsole.ProviderSharedState','huymaier-provider-out-"+$captureId')
+$progressWorker=Require-Text 'HuymaierProviderProgressWorker.ps1' @("ValidateSet('Epic','GOG','Amazon')",'Read-ProviderOutputTail','Start-WriteObservation','Update-ObservedWriteBytes','Incremental destination writes','Calculating ETA','HUYMAIER_PROVIDER_PROGRESS_TRANSFER_ID_V1','[string]$TransferId','[regex]::Escape($TransferId)')
 if($progressWorker -match 'Directory\]::EnumerateFiles|Directory\.EnumerateFiles'){throw 'Release fallback telemetry reintroduced recursive install-tree rescans.'}
-$coordinator=Require-Text 'HuymaierProviderTelemetryCoordinator.ps1' @(
-    "@('Epic','GOG','Amazon')",
-    "@('Install','Update')",
-    'TelemetrySource',
-    'InstallSpeedBytesPerSec',
-    'TransferSpeedBytesPerSec'
-)
+$coordinator=Require-Text 'HuymaierProviderTelemetryCoordinator.ps1' @("@('Epic','GOG','Amazon')","@('Install','Update')",'TelemetrySource','InstallSpeedBytesPerSec','TransferSpeedBytesPerSec')
 if($coordinator -match [regex]::Escape("@('GOG','Amazon')")){throw 'Release telemetry coordinator still contains a GOG/Amazon-only activation path.'}
-
-$concurrency=Require-Text 'HuymaierProviderConcurrency.ps1' @(
-    '$Mode -notin @(''Install'',''Update'')',
-    'ProviderTransferRoot',
-    'Get-GameProviderActiveTransfers',
-    'Get-HcProviderTransferEtaText',
-    'Calculating ETA...',
-    'transfer-'+"`$transferId"+'.json'
-)
-$concurrencyUi=Require-Text 'HuymaierProviderConcurrencyUi.ps1' @(
-    'Get-HcActiveDownloadStates',
-    'Add-HcActiveDownloadCard',
-    'foreach($state in $active)',
-    'Update-HcActiveDownloadVisuals',
-    'Update-HcDownloadHistory',
-    'Recently Downloaded & Installed'
-)
-$transferCoordinator=Require-Text 'HuymaierProviderTransferCoordinator.ps1' @(
-    'provider-transfers.json',
-    'ExpectedDownloadBytes',
-    'ExpectedInstallBytes',
-    'Get-ExpectedSizes',
-    'Estimated total size + observed throughput',
-    'Start-TransferMonitor',
-    'Merge-TransferProgress'
-)
+$concurrency=Require-Text 'HuymaierProviderConcurrency.ps1' @('$Mode -notin @(''Install'',''Update'')','ProviderTransferRoot','Get-GameProviderActiveTransfers','Get-HcProviderTransferEtaText','Calculating ETA...','transfer-'+"`$transferId"+'.json')
+$concurrencyUi=Require-Text 'HuymaierProviderConcurrencyUi.ps1' @('Get-HcActiveDownloadStates','Add-HcActiveDownloadCard','foreach($state in $active)','Update-HcActiveDownloadVisuals','Update-HcDownloadHistory','Recently Downloaded & Installed')
+$transferCoordinator=Require-Text 'HuymaierProviderTransferCoordinator.ps1' @('provider-transfers.json','ExpectedDownloadBytes','ExpectedInstallBytes','Get-ExpectedSizes','Estimated total size + observed throughput','Start-TransferMonitor','Merge-TransferProgress')
 $telemetry=Require-Text 'HuymaierProviderTelemetry.ps1' @('Get-HcSmoothedTelemetryRate','Get-HcTelemetryEtaSeconds')
 
-foreach($required in @(
-    'HuymaierProviderTelemetry.ps1','HuymaierProviderProgressWorker.ps1','HuymaierProviderTelemetryCoordinator.ps1',
-    'HuymaierProviderConcurrency.ps1','HuymaierProviderConcurrencyUi.ps1','HuymaierProviderTransferCoordinator.ps1'
-)){
-    Require-File $required|Out-Null
-}
-foreach($scriptFile in @(
-    'HuymaierConsole.ps1','HuymaierBootstrap.ps1','Install-HuymaierConsole.ps1','HuymaierGameProviders.ps1','HuymaierGameProviderWorker.ps1',
-    'HuymaierProviderProgressWorker.ps1','HuymaierProviderTelemetry.ps1','HuymaierProviderTelemetryCoordinator.ps1',
-    'HuymaierProviderConcurrency.ps1','HuymaierProviderConcurrencyUi.ps1','HuymaierProviderTransferCoordinator.ps1','HuymaierShellRedesign.ps1','HuymaierWebBrowser.ps1'
-)){
-    Assert-Ps51Parse $scriptFile
-}
+$appLibrary=Require-Text 'HuymaierAppLibrary.ps1' @(
+    'function Render-HcAppsRoot','Your curated console app library','apps-store','apps-manage','Remove-HcManagedApp','PreferredLaunchMode','Open-HuymaierBrowser',
+    "'Streaming'","'Music'","'Video'","'Utilities'","'Tools'",'Get-HcCuratedAppCatalog','Start-HcNativeCatalogInstall','Get-HcActiveDownloadStates','Update-HcDownloadHistory'
+)
+$appsStart=$appLibrary.IndexOf('function Render-HcAppsRoot',[StringComparison]::Ordinal);$appsEnd=$appLibrary.IndexOf('$script:HcAppBaseGetPageDefinition',[StringComparison]::Ordinal)
+if($appsStart -lt 0 -or $appsEnd -le $appsStart){throw 'Staged curated Apps root cannot be inspected.'}
+if($appLibrary.Substring($appsStart,$appsEnd-$appsStart).IndexOf('Get-HcWindowsApps',[StringComparison]::Ordinal) -ge 0){throw 'Staged Apps home still enumerates every Windows Start app.'}
+$appWorker=Require-Text 'HuymaierAppInstallWorker.ps1' @('winget','install','--source','msstore','EtaSeconds','Calculating ETA...','StatePath','CatalogId')
 
-# PS1/PS2/PS3 source presentation remains frozen from the validated v0.26.4 production source.
+foreach($required in @(
+    'HuymaierProviderTelemetry.ps1','HuymaierProviderProgressWorker.ps1','HuymaierProviderTelemetryCoordinator.ps1','HuymaierProviderConcurrency.ps1','HuymaierProviderConcurrencyUi.ps1','HuymaierProviderTransferCoordinator.ps1',
+    'HuymaierAppLibrary.ps1','HuymaierAppInstallWorker.ps1'
+)){Require-File $required|Out-Null}
+foreach($scriptFile in @(
+    'HuymaierConsole.ps1','HuymaierBootstrap.ps1','Install-HuymaierConsole.ps1','HuymaierGameProviders.ps1','HuymaierGameProviderWorker.ps1','HuymaierProviderProgressWorker.ps1','HuymaierProviderTelemetry.ps1','HuymaierProviderTelemetryCoordinator.ps1',
+    'HuymaierProviderConcurrency.ps1','HuymaierProviderConcurrencyUi.ps1','HuymaierProviderTransferCoordinator.ps1','HuymaierShellRedesign.ps1','HuymaierWebBrowser.ps1','HuymaierAppLibrary.ps1','HuymaierAppInstallWorker.ps1'
+)){Assert-Ps51Parse $scriptFile}
+
 $realGit=(Get-Command git.exe -ErrorAction Stop).Source
 $psChanges=@(& $realGit diff --name-only 91bd40877bd0d5ee5d0f86748a2356a446d75bc6 -- 'EmulatorPlatforms/PS1' 'EmulatorPlatforms/PS2' 'EmulatorPlatforms/PS3' 'Native/HuymaierConsole.Ps1.cs')
 if($psChanges.Count){throw ('Frozen PS1/PS2/PS3 presentation source changed in v0.26.5: '+($psChanges -join ', '))}
@@ -249,6 +184,11 @@ $validation|Add-Member -NotePropertyName concurrentProviderTransfersGate -NotePr
 $validation|Add-Member -NotePropertyName derivedEtaGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName nintendoOwnershipGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName nintendoDisplayNameGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName dolphinArtworkGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName wiiSaveManagerGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName curatedAppsGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName nativeAppInstallGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName controllerAppModeGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName playStationPresentationFreezeGate -NotePropertyValue 'success' -Force
 $validation|ConvertTo-Json -Depth 10|Set-Content -LiteralPath $ValidationPath -Encoding UTF8
-Write-Host 'v0.26.5 release-shaped version/native stamp, browser cursor, hitch guard, concurrent transfers/derived ETA, Nintendo ownership/titles and PlayStation freeze gates passed.'
+Write-Host 'v0.26.5 release-shaped native stamp, browser cursor, hitch guard, concurrent transfers/ETA, Dolphin artwork/Wii saves, curated Apps/controller mode and PlayStation freeze gates passed.'
