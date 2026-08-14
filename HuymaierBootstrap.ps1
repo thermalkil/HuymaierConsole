@@ -15,6 +15,9 @@ $storefrontModulePath=Join-Path $baseDir 'HuymaierStorefronts.ps1'
 $storefrontWorkerPath=Join-Path $baseDir 'HuymaierStorefrontWorker.ps1'
 $providerModulePath=Join-Path $baseDir 'HuymaierGameProviders.ps1'
 $providerWorkerPath=Join-Path $baseDir 'HuymaierGameProviderWorker.ps1'
+$providerTelemetryPath=Join-Path $baseDir 'HuymaierProviderTelemetry.ps1'
+$providerProgressWorkerPath=Join-Path $baseDir 'HuymaierProviderProgressWorker.ps1'
+$providerTelemetryCoordinatorPath=Join-Path $baseDir 'HuymaierProviderTelemetryCoordinator.ps1'
 $artworkWorkerPath=Join-Path $baseDir 'HuymaierArtworkWorker.ps1'
 $gameExperiencePath=Join-Path $baseDir 'HuymaierGameExperience.ps1'
 $shellRedesignPath=Join-Path $baseDir 'HuymaierShellRedesign.ps1'
@@ -25,6 +28,7 @@ $manifestPath=Join-Path $baseDir 'manifest.json'
 $installIncompleteMarker=Join-Path $dataDir 'install-incomplete.json'
 $gameInputBridgePath=Join-Path $baseDir 'HuymaierGameInputBridge.dll'
 $preflightCachePath=Join-Path $dataDir 'startup-preflight-v1.json'
+$script:ProviderTelemetryCoordinatorProcess=$null
 New-Item -ItemType Directory -Force -Path $dataDir,$logDir|Out-Null
 
 function Write-BootstrapLog {
@@ -62,6 +66,9 @@ function Get-PowerShellPreflightEntries {
         [pscustomobject]@{Path=$storefrontWorkerPath;Label='Storefront worker'},
         [pscustomobject]@{Path=$providerModulePath;Label='Game provider hub'},
         [pscustomobject]@{Path=$providerWorkerPath;Label='Game provider worker'},
+        [pscustomobject]@{Path=$providerTelemetryPath;Label='Provider telemetry helpers'},
+        [pscustomobject]@{Path=$providerProgressWorkerPath;Label='Provider progress worker'},
+        [pscustomobject]@{Path=$providerTelemetryCoordinatorPath;Label='Provider telemetry coordinator'},
         [pscustomobject]@{Path=$artworkWorkerPath;Label='Online artwork worker'},
         [pscustomobject]@{Path=$gameExperiencePath;Label='Unified game experience'},
         [pscustomobject]@{Path=$shellRedesignPath;Label='Shell redesign'},
@@ -193,6 +200,37 @@ function Exit-HuymaierSingleInstance {
     }catch{}
 }
 
+function Quote-BootstrapArgument {
+    param([string]$Value)
+    if($null -eq $Value){return '""'}
+    return '"'+$Value.Replace('"','')+'"'
+}
+
+function Start-ProviderTelemetryCoordinator {
+    if(-not(Test-Path -LiteralPath $providerTelemetryCoordinatorPath -PathType Leaf)){return}
+    try{
+        $powershell="$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
+        $arguments=@(
+            '-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Quote-BootstrapArgument $providerTelemetryCoordinatorPath),
+            '-ParentPid',[string]$PID,'-BaseDir',(Quote-BootstrapArgument $baseDir),'-DataDir',(Quote-BootstrapArgument $dataDir)
+        )
+        $process=Start-Process -FilePath $powershell -ArgumentList $arguments -WindowStyle Hidden -PassThru
+        try{$process.PriorityClass='BelowNormal'}catch{}
+        $script:ProviderTelemetryCoordinatorProcess=$process
+        Write-BootstrapLog 'Provider telemetry coordinator started at below-normal priority.'
+    }catch{Write-BootstrapLog "Provider telemetry coordinator could not start: $($_.Exception.Message)" 'WARN'}
+}
+
+function Stop-ProviderTelemetryCoordinator {
+    try{
+        if($null -ne $script:ProviderTelemetryCoordinatorProcess){
+            $script:ProviderTelemetryCoordinatorProcess.Refresh()
+            if(-not $script:ProviderTelemetryCoordinatorProcess.HasExited){Stop-Process -Id $script:ProviderTelemetryCoordinatorProcess.Id -Force -ErrorAction SilentlyContinue}
+        }
+    }catch{}
+    $script:ProviderTelemetryCoordinatorProcess=$null
+}
+
 try{
     Assert-HuymaierInstallIntegrity
     Invoke-PowerShellSyntaxPreflight
@@ -203,12 +241,15 @@ try{
     }
 
     Write-BootstrapLog "Huymaier Console v$script:ExpectedConsoleVersion integrity preflight and single-instance gate passed."
+    Start-ProviderTelemetryCoordinator
     try{
         if($Windowed){& $corePath -Windowed}else{& $corePath}
     }finally{
+        Stop-ProviderTelemetryCoordinator
         Exit-HuymaierSingleInstance
     }
 }catch{
+    Stop-ProviderTelemetryCoordinator
     $message=$_.Exception.Message
     Write-BootstrapLog "v$script:ExpectedConsoleVersion preflight/startup failed:`n$message" 'FATAL'
     try{
