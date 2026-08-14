@@ -40,12 +40,16 @@ jobs:
             '.\.build\Set-HuymaierCandidateVersion.ps1',
             '.\.build\Build-HuymaierReleaseCandidate.ps1',
             '.\.build\Test-HuymaierV0265Candidate.ps1',
+            '.\.build\Optimize-AppLibrary.ps1',
+            '.\.build\Optimize-DolphinIntegration.ps1',
             '.\.build\Optimize-ControllerBrowserCursor.ps1',
             '.\.build\Optimize-NintendoDisplayNames.ps1',
             '.\.build\Optimize-ProviderConcurrency.ps1',
             '.\.build\Optimize-ProviderConcurrencyPreflight.ps1',
             '.\.build\Optimize-RuntimeHitching.ps1',
             '.\.build\Optimize-ConcurrentDownloadRefresh.ps1',
+            '.\HuymaierAppLibrary.ps1',
+            '.\HuymaierAppInstallWorker.ps1',
             '.\.development\v0.26.5\Test-v0265-Stabilization.ps1'
           )){
             $t=$null;$e=$null
@@ -96,7 +100,18 @@ jobs:
           retention-days: 30
       - name: Record candidate status
         if: always()
+        continue-on-error: true
         shell: powershell
         env: {BUILD_RESULT: '${{ job.status }}', CANDIDATE: '${{ steps.request.outputs.candidate }}', PRODUCTION_SOURCE: '${{ steps.request.outputs.production_source }}'}
         run: |
-          $ErrorActionPreference='Stop';git reset -- FSEPackage/HuymaierFSEHost.exe 2>$null;$status=[ordered]@{candidate=$env:CANDIDATE;result=$env:BUILD_RESULT;runId=$env:GITHUB_RUN_ID;runAttempt=$env:GITHUB_RUN_ATTEMPT;commit=$env:GITHUB_SHA;productionSource=$env:PRODUCTION_SOURCE;recordedAtUtc=[DateTime]::UtcNow.ToString('o')};$status|ConvertTo-Json|Set-Content '.development\v0.26.5\candidate-status.json' -Encoding UTF8;git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com';git add '.development\v0.26.5\candidate-status.json';if(-not(git diff --cached --quiet)){git commit -m "Record $env:CANDIDATE candidate status";git push origin HEAD:feature/v0.26.5-performance-and-downloads
+          $ErrorActionPreference='Stop'
+          git reset -- FSEPackage/HuymaierFSEHost.exe 2>$null
+          $status=[ordered]@{candidate=$env:CANDIDATE;result=$env:BUILD_RESULT;runId=$env:GITHUB_RUN_ID;runAttempt=$env:GITHUB_RUN_ATTEMPT;commit=$env:GITHUB_SHA;productionSource=$env:PRODUCTION_SOURCE;recordedAtUtc=[DateTime]::UtcNow.ToString('o')}
+          $status|ConvertTo-Json|Set-Content '.development\v0.26.5\candidate-status.json' -Encoding UTF8
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add '.development\v0.26.5\candidate-status.json'
+          if(-not(git diff --cached --quiet)){
+            git commit -m "Record $env:CANDIDATE candidate status"
+            git push origin HEAD:feature/v0.26.5-performance-and-downloads
+          }
