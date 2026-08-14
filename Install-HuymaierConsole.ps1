@@ -11,10 +11,61 @@ if(-not(Test-Path -LiteralPath $core -PathType Leaf)){
     exit 1
 }
 
+function Write-HuymaierStartupPreflightCache {
+    param([string]$InstallRoot,[string]$Version='0.26.4')
+    try{
+        $entries=@(
+            'HuymaierConsole.ps1',
+            'HuymaierLibraryWorker.ps1',
+            'HuymaierPs1LibraryWorker.ps1',
+            'HuymaierStorefronts.ps1',
+            'HuymaierStorefrontWorker.ps1',
+            'HuymaierGameProviders.ps1',
+            'HuymaierGameProviderWorker.ps1',
+            'HuymaierProviderTelemetry.ps1',
+            'HuymaierProviderProgressWorker.ps1',
+            'HuymaierProviderTelemetryCoordinator.ps1',
+            'HuymaierArtworkWorker.ps1',
+            'HuymaierGameExperience.ps1',
+            'HuymaierShellRedesign.ps1',
+            'HuymaierGameBar.ps1'
+        )
+        $files=New-Object System.Collections.ArrayList
+        foreach($name in $entries){
+            $path=Join-Path $InstallRoot $name
+            if(-not(Test-Path -LiteralPath $path -PathType Leaf)){return}
+            $item=Get-Item -LiteralPath $path -ErrorAction Stop
+            [void]$files.Add([pscustomobject]@{
+                Name=[IO.Path]::GetFileName($item.FullName)
+                Length=[int64]$item.Length
+                LastWriteUtcTicks=[int64]$item.LastWriteTimeUtc.Ticks
+            })
+        }
+        $cache=[pscustomobject]@{
+            SchemaVersion=1
+            ConsoleVersion=$Version
+            BaseDir=[IO.Path]::GetFullPath($InstallRoot).TrimEnd('\')
+            Files=[object[]]$files.ToArray()
+            ValidatedAtUtc=[DateTime]::UtcNow.ToString('o')
+            ValidationSource='installer'
+        }
+        $path=Join-Path $InstallRoot 'startup-preflight-v1.json'
+        $temp="$path.$PID.tmp"
+        $cache|ConvertTo-Json -Depth 6|Set-Content -LiteralPath $temp -Encoding UTF8
+        Move-Item -LiteralPath $temp -Destination $path -Force
+    }catch{
+        # Cache creation is only a performance optimization. The bootstrap will
+        # perform the normal fail-closed syntax preflight if this seed is absent.
+    }
+}
+
 # Seed the process exit state because an interactive successful PowerShell
 # script invocation may never create $LASTEXITCODE. The installer core uses
 # explicit `exit 1` for a transactional failure, which updates this value; a
 # normal interactive success leaves the seeded 0 unchanged.
 $global:LASTEXITCODE=0
 & $core -PackageRoot $PSScriptRoot -SilentUpdate:$SilentUpdate
+if([int]$global:LASTEXITCODE -eq 0){
+    Write-HuymaierStartupPreflightCache -InstallRoot (Join-Path $env:LOCALAPPDATA 'Huymaier Console') -Version '0.26.4'
+}
 exit ([int]$global:LASTEXITCODE)
