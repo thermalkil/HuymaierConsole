@@ -27,36 +27,41 @@ function Add-Root([System.Collections.ArrayList]$Target,[string]$Value){
     if(-not $Value){return}
     try{$full=[IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($Value.Trim())).TrimEnd('\')}catch{return}
     if(-not(Test-Path -LiteralPath $full -PathType Container)){return}
-    foreach($existing in @($Target)){if([string]::Equals([string]$existing,$full,[StringComparison]::OrdinalIgnoreCase)){return}}
+    foreach($existing in $Target){if([string]::Equals([string]$existing,$full,[StringComparison]::OrdinalIgnoreCase)){return}}
     [void]$Target.Add($full)
 }
 
 function Test-PathSegment([string]$Path,[string[]]$Names){
     if([string]::IsNullOrWhiteSpace($Path)){return $false}
     $parts=@($Path -split '[\\/]')
-    foreach($part in $parts){foreach($name in @($Names)){if([string]::Equals([string]$part,[string]$name,[StringComparison]::OrdinalIgnoreCase)){return $true}}}
+    foreach($part in $parts){foreach($name in $Names){if([string]::Equals([string]$part,[string]$name,[StringComparison]::OrdinalIgnoreCase)){return $true}}}
     return $false
 }
 function Get-NintendoScopedRoots([string]$Id,[System.Collections.ArrayList]$Roots){
     $key=$Id.ToUpperInvariant()
-    if($key -notin @('WII','GAMECUBE')){return $Roots}
-    $aliases=if($key -eq 'WII'){@('Wii','Nintendo Wii')}else{@('GameCube','Game Cube','Nintendo GameCube')}
+    if($key -notin @('WII','GAMECUBE')){return ,([object[]]$Roots.ToArray())}
+    [string[]]$aliases=if($key -eq 'WII'){@('Wii','Nintendo Wii')}else{@('GameCube','Game Cube','Nintendo GameCube')}
     $scoped=New-Object System.Collections.ArrayList
-    foreach($root in @($Roots)){
-        $leaf='';try{$leaf=Split-Path -Leaf $root}catch{}
+    foreach($rootValue in $Roots){
+        $root=[string]$rootValue
+        if([string]::IsNullOrWhiteSpace($root)){continue}
+        $leaf=''
+        try{$leaf=[IO.Path]::GetFileName($root.TrimEnd('\','/'))}catch{}
         $alreadyScoped=$false
         foreach($alias in $aliases){if([string]::Equals($leaf,$alias,[StringComparison]::OrdinalIgnoreCase)){$alreadyScoped=$true;break}}
         if($alreadyScoped){Add-Root $scoped $root;continue}
-        $foundChild=$false
-        foreach($alias in $aliases){
-            try{
-                $candidate=Join-Path $root $alias
-                if(Test-Path -LiteralPath $candidate -PathType Container){Add-Root $scoped $candidate;$foundChild=$true}
-            }catch{}
-        }
-        if(-not $foundChild){Add-Root $scoped $root}
+
+        $matchingChildren=New-Object System.Collections.ArrayList
+        try{
+            foreach($child in Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue){
+                foreach($alias in $aliases){
+                    if([string]::Equals([string]$child.Name,$alias,[StringComparison]::OrdinalIgnoreCase)){[void]$matchingChildren.Add([string]$child.FullName);break}
+                }
+            }
+        }catch{}
+        if($matchingChildren.Count -gt 0){foreach($childPath in $matchingChildren){Add-Root $scoped ([string]$childPath)}}else{Add-Root $scoped $root}
     }
-    return $scoped
+    return ,([object[]]$scoped.ToArray())
 }
 function Save-NintendoScopedRoots([string]$Id,$Settings,[string]$Path,[object[]]$Before,[object[]]$After){
     $key=$Id.ToUpperInvariant()
@@ -109,13 +114,13 @@ function Test-PlatformGameFile([string]$Id,$File){
 
 function Count-ModernInstalledApplications([string]$Id,[System.Collections.ArrayList]$Roots){
     $seen=@{};$visited=0
-    foreach($root in @($Roots)){
+    foreach($root in $Roots){
         $candidates=New-Object System.Collections.ArrayList
         [void]$candidates.Add($root)
         if($Id -eq 'VITA'){
             foreach($candidate in @((Join-Path $root 'ux0\app'),(Join-Path $root 'Vita3K\ux0\app'))){if(Test-Path -LiteralPath $candidate -PathType Container){[void]$candidates.Add($candidate)}}
         }
-        foreach($base in @($candidates)){
+        foreach($base in $candidates){
             if(-not(Test-Path -LiteralPath $base -PathType Container)){continue}
             try{
                 foreach($eboot in Get-ChildItem -LiteralPath $base -Filter 'eboot.bin' -File -Recurse -ErrorAction SilentlyContinue){
@@ -173,18 +178,20 @@ $settings=Read-JsonFile $SettingsPath
 if($null -eq $settings){$settings=Read-JsonFile $DefaultSettingsPath}
 $roots=New-Object System.Collections.ArrayList
 foreach($root in @(Get-Prop $settings 'gameFolders' @())){Add-Root $roots ([string]$root)}
-$configuredRoots=@($roots)
-$roots=Get-NintendoScopedRoots $PlatformId $roots
-Save-NintendoScopedRoots $PlatformId $settings $SettingsPath $configuredRoots @($roots)
+$configuredRoots=[object[]]$roots.ToArray()
+$scopedRoots=[object[]](Get-NintendoScopedRoots $PlatformId $roots)
+$roots=New-Object System.Collections.ArrayList
+foreach($root in $scopedRoots){Add-Root $roots ([string]$root)}
+Save-NintendoScopedRoots $PlatformId $settings $SettingsPath $configuredRoots ([object[]]$roots.ToArray())
 $extensions=@(Get-Extensions $PlatformId)
 $seen=@{}
 $filesVisited=0
 if($PlatformId.ToUpperInvariant() -in @('PS4','VITA')){
     $modern=Count-ModernInstalledApplications $PlatformId $roots
-    $result=[ordered]@{Platform=$PlatformId.ToUpperInvariant();Count=[int]$modern.Count;UpdatedAt=(Get-Date).ToString('o');Error='';Roots=@($roots);FilesVisited=[int]$modern.Visited}
+    $result=[ordered]@{Platform=$PlatformId.ToUpperInvariant();Count=[int]$modern.Count;UpdatedAt=(Get-Date).ToString('o');Error='';Roots=[object[]]$roots.ToArray();FilesVisited=[int]$modern.Visited}
     $dir=Split-Path -Parent $ResultPath;if($dir){New-Item -ItemType Directory -Force -Path $dir|Out-Null};$result|ConvertTo-Json -Depth 5|Set-Content -LiteralPath $ResultPath -Encoding UTF8;exit 0
 }
-foreach($root in @($roots)){
+foreach($root in $roots){
     try{
         foreach($file in Get-ChildItem -LiteralPath $root -File -Recurse -ErrorAction SilentlyContinue){
             $filesVisited++
@@ -202,7 +209,7 @@ $result=[ordered]@{
     Count=$seen.Count
     UpdatedAt=(Get-Date).ToString('o')
     Error=''
-    Roots=@($roots)
+    Roots=[object[]]$roots.ToArray()
     FilesVisited=$filesVisited
 }
 $dir=Split-Path -Parent $ResultPath
