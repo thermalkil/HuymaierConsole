@@ -70,7 +70,7 @@ $browserInitIndex=$browser.IndexOf('function Initialize-HuymaierWebBrowser')
 $webViewConstructionIndex=$browser.IndexOf('New-Object Microsoft.Web.WebView2.Wpf.WebView2')
 if($browserStateIndex -lt 0 -or $browserInitIndex -lt 0 -or $browserStateIndex -gt $browserInitIndex){throw 'Staged browser can read auth state before initialization under StrictMode.'}
 if($webViewConstructionIndex -lt $browserInitIndex){throw 'Staged browser constructs WebView2 during module load instead of lazily.'}
-if($browser -match "HcBrowserToolbarButtons\[\$script:HcBrowserToolbarIndex\]\.Tag"){throw 'Staged browser regressed to button-only controller toolbar navigation.'}
+if($browser -match 'HcBrowserToolbarButtons\[\$script:HcBrowserToolbarIndex\]\.Tag'){throw 'Staged browser regressed to button-only controller toolbar navigation.'}
 
 $nativeGameInput=Require-Text 'Native\HuymaierConsole.GameInput.cs' @(
     'public static class HuymaierBuildStamp',
