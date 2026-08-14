@@ -1,12 +1,9 @@
-{
-  "candidate": "v0.26.5-rc1",
-  "result": "success",
-  "runId": "31818677626",
-  "runAttempt": "1",
-  "commit": "4cdbc9ae9277a8e27c152a54beada96e057d11fb",
-  "productionSource": "8c92433390ae889e056db4de99ac94da64933262",
-  "artifactId": "9226123078",
-  "sha256": "5956cd71975371a983c155018a345ddcff786168e29e75503047d7d46f45fef4",
-  "recordedAtUtc": "2026-08-14T16:23:00Z",
-  "note": "All package-quality gates and artifact upload succeeded; workflow bookkeeping step failed after upload, so this status record was repaired directly from the validated run and independently verified artifact hash."
+﻿{
+    "candidate":  "v0.26.5-rc1",
+    "result":  "success",
+    "runId":  "31823863196",
+    "runAttempt":  "1",
+    "commit":  "cff4a487d5adc408ca3be05b509ed38fa62d1aa6",
+    "productionSource":  "dc14caf6b8ff4f49a79a33de57e7dd18caf394be",
+    "recordedAtUtc":  "2026-08-14T17:26:38.1115332Z"
 }
