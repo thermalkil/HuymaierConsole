@@ -79,7 +79,7 @@ $bridge=Require-Text 'Native\HuymaierGameInputBridge.cpp' @(
     'GameInputGamepadA',
     'GameInputGamepadX'
 )
-$host=Require-Text 'Native\HuymaierStreamingCursorHost.cs' @(
+$hostText=Require-Text 'Native\HuymaierStreamingCursorHost.cs' @(
     'HC_ReadGamepadPointerState',
     'WS_POPUP',
     'SetWindowPos',
