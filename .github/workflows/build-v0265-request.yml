@@ -40,8 +40,11 @@ jobs:
             '.\.build\Set-HuymaierCandidateVersion.ps1',
             '.\.build\Build-HuymaierReleaseCandidate.ps1',
             '.\.build\Test-HuymaierV0265Candidate.ps1',
+            '.\.build\Test-HuymaierV0265StreamingCandidate.ps1',
             '.\.build\Optimize-AppLibrary.ps1',
+            '.\.build\Optimize-StreamingController.ps1',
             '.\.build\Optimize-DolphinIntegration.ps1',
+            '.\.build\Optimize-WiiArtworkAliases.ps1',
             '.\.build\Optimize-ControllerBrowserCursor.ps1',
             '.\.build\Optimize-NintendoDisplayNames.ps1',
             '.\.build\Optimize-ProviderConcurrency.ps1',
@@ -50,7 +53,9 @@ jobs:
             '.\.build\Optimize-ConcurrentDownloadRefresh.ps1',
             '.\HuymaierAppLibrary.ps1',
             '.\HuymaierAppInstallWorker.ps1',
-            '.\.development\v0.26.5\Test-v0265-Stabilization.ps1'
+            '.\HuymaierStreamingController.ps1',
+            '.\.development\v0.26.5\Test-v0265-Stabilization.ps1',
+            '.\.development\v0.26.5\Test-v0265-StreamingController.ps1'
           )){
             $t=$null;$e=$null
             [void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p),[ref]$t,[ref]$e)
@@ -62,6 +67,7 @@ jobs:
           $ErrorActionPreference='Stop'
           & '.\.development\v0.26.5\Test-v0265-PerformanceAndOwnership.ps1'
           & '.\.development\v0.26.5\Test-v0265-Stabilization.ps1'
+          & '.\.development\v0.26.5\Test-v0265-StreamingController.ps1'
           & '.\.development\v0.26.5\Test-NintendoLibraryOwnership.ps1'
       - name: Build exact x64 FSE Home host
         shell: powershell
@@ -80,6 +86,10 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference='Stop';$stage=Join-Path $env:RUNNER_TEMP ('hc-stage\${{ steps.request.outputs.package_root }}');$validation=Join-Path $env:HC_CANDIDATE_OUTPUT 'candidate-validation.json';& .\.build\Test-HuymaierV0265Candidate.ps1 -StageRoot $stage -ValidationPath $validation
+      - name: Run staged smooth cursor and native streaming gates
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';$stage=Join-Path $env:RUNNER_TEMP ('hc-stage\${{ steps.request.outputs.package_root }}');$validation=Join-Path $env:HC_CANDIDATE_OUTPUT 'candidate-validation.json';& .\.build\Test-HuymaierV0265StreamingCandidate.ps1 -StageRoot $stage -ValidationPath $validation
       - name: Run Steam owned-library behavior tests
         shell: powershell
         run: |
