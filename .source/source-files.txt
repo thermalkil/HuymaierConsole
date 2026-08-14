@@ -114,9 +114,12 @@ HuymaierNativeConsoleLibraryWorker.ps1
 HuymaierNativeDisplay.cs
 HuymaierNativeInput.cs
 HuymaierPerformance.cs
+HuymaierProviderConcurrency.ps1
+HuymaierProviderConcurrencyUi.ps1
 HuymaierProviderProgressWorker.ps1
 HuymaierProviderTelemetry.ps1
 HuymaierProviderTelemetryCoordinator.ps1
+HuymaierProviderTransferCoordinator.ps1
 HuymaierPs1LibraryWorker.ps1
 HuymaierPs2LibraryWorker.ps1
 HuymaierPs3LibraryWorker.ps1
