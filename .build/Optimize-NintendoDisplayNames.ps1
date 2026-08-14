@@ -20,7 +20,7 @@ $helper=@'
         private static string CleanNintendoContainerName(string value)
         {
             if (string.IsNullOrWhiteSpace(value)) return string.Empty;
-            string cleaned = Regex.Replace(value.Trim(), @"\s*[\[(][A-Za-z0-9]{6}[\])]]\s*$", string.Empty).Trim();
+            string cleaned = Regex.Replace(value.Trim(), @"\s*[\[\(][A-Za-z0-9]{6}[\]\)]\s*$", string.Empty).Trim();
             return cleaned;
         }
 
