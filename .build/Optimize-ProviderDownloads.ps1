@@ -17,6 +17,15 @@ function Replace-HcExact {
     if($value.IndexOf($Old,$first+$Old.Length,[StringComparison]::Ordinal) -ge 0){throw "Provider download optimizer found duplicate $Label blocks."}
     $Text.Value=$value.Substring(0,$first)+$New+$value.Substring($first+$Old.Length)
 }
+function Replace-HcUniqueLineContaining {
+    param([ref]$Text,[string]$Label,[string]$Needle,[string]$Replacement)
+    $value=[string]$Text.Value
+    $pattern='(?m)^[^\r\n]*'+[regex]::Escape($Needle)+'[^\r\n]*$'
+    $matches=[regex]::Matches($value,$pattern)
+    if($matches.Count -ne 1){throw "Provider download optimizer expected exactly one $Label line but found $($matches.Count)."}
+    $match=$matches[0]
+    $Text.Value=$value.Substring(0,$match.Index)+$Replacement+$value.Substring($match.Index+$match.Length)
+}
 function Write-HcUtf8Bom {param([string]$Path,[string]$Text);$bom=New-Object Text.UTF8Encoding($true);[IO.File]::WriteAllText($Path,$Text,$bom)}
 
 $worker=[IO.File]::ReadAllText($ProviderWorkerPath,[Text.Encoding]::UTF8)
@@ -55,9 +64,7 @@ function Get-LegendaryTransferPhase{
 }
 function Update-LegendaryTransferTelemetry{
 '@
-Replace-HcExact ([ref]$worker) 'Legendary state write' @'
-        Write-State $true 'Downloading' "$amount  •  $speed" $(if($progress -ge 0){$progress}else{5}) -Quiet
-'@ @'
+Replace-HcUniqueLineContaining ([ref]$worker) 'Legendary state write' "Write-State `$true 'Downloading'" @'
         $phase=Get-LegendaryTransferPhase $Text
         $visibleEta=if($phase -eq 'Installing'){-1}else{$script:TransferEtaSeconds}
         $etaText=Format-ProviderEtaValue $visibleEta
