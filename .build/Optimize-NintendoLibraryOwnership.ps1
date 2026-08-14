@@ -7,37 +7,18 @@ $ErrorActionPreference='Stop'
 if(-not(Test-Path -LiteralPath $NativePath -PathType Leaf)){throw "Nintendo library optimizer could not find $NativePath"}
 $text=[IO.File]::ReadAllText($NativePath,[Text.Encoding]::UTF8)
 
-$old=@'
-        private void RefreshLibrary(bool showNotice)
-        {
-            if (definition.Shell == "PS4" || definition.Shell == "Vita") { RefreshModernPlayStationLibrary(showNotice); return; }
-            List<ConsolePlatformGame> found = new List<ConsolePlatformGame>();
-            HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (string folder in settings.gameFolders.ToArray())
-            {
-                if (!Directory.Exists(folder)) continue;
-                try
-                {
-                    foreach (string path in Directory.EnumerateFiles(folder, "*.*", SearchOption.AllDirectories))
-                    {
-                        string extension = Path.GetExtension(path);
-                        if (!definition.GameExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase)) continue;
-                        if (!seen.Add(path)) continue;
-                        found.Add(new ConsolePlatformGame { Name = CleanName(Path.GetFileNameWithoutExtension(path)), Path = path, Cover = FindCover(path) });
-                    }
-                }
-                catch { }
-            }
-            games = found.OrderBy(delegate(ConsolePlatformGame g) { return g.Name; }, StringComparer.CurrentCultureIgnoreCase).ToList();
-            SaveCachedGames();
-            selected = 0;
-            if (showNotice) ShowNotice("Library refreshed — " + games.Count.ToString(CultureInfo.InvariantCulture) + " games");
-            RenderPage();
-            QueueConsoleArtworkRefresh();
-        }
-'@
+function Replace-HcExact {
+    param([string]$Label,[string]$Old,[string]$New)
+    $first=$script:text.IndexOf($Old,[StringComparison]::Ordinal)
+    if($first -lt 0){throw "Nintendo library optimizer could not find the expected $Label block."}
+    if($script:text.IndexOf($Old,$first+$Old.Length,[StringComparison]::Ordinal) -ge 0){throw "Nintendo library optimizer found duplicate $Label blocks."}
+    $script:text=$script:text.Substring(0,$first)+$New+$script:text.Substring($first+$Old.Length)
+}
 
-$new=@'
+Replace-HcExact 'QueueLibraryRefresh insertion point' @'
+        private void QueueLibraryRefresh()
+        {
+'@ @'
         private bool IsNintendoLibraryOwnedPath(string path)
         {
             if (definition.Shell != "Wii" && definition.Shell != "GameCube") return true;
@@ -90,40 +71,25 @@ $new=@'
             catch { return false; }
         }
 
-        private void RefreshLibrary(bool showNotice)
+        private void QueueLibraryRefresh()
         {
-            if (definition.Shell == "PS4" || definition.Shell == "Vita") { RefreshModernPlayStationLibrary(showNotice); return; }
-            List<ConsolePlatformGame> found = new List<ConsolePlatformGame>();
-            HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (string folder in settings.gameFolders.ToArray())
-            {
-                if (!Directory.Exists(folder)) continue;
-                try
-                {
-                    foreach (string path in Directory.EnumerateFiles(folder, "*.*", SearchOption.AllDirectories))
-                    {
-                        string extension = Path.GetExtension(path);
+'@
+
+Replace-HcExact 'async library ownership filter' @'
+                            if (!extensions.Contains(extension, StringComparer.OrdinalIgnoreCase) || !seen.Add(path)) continue;
+'@ @'
+                            if (!extensions.Contains(extension, StringComparer.OrdinalIgnoreCase) || !IsNintendoLibraryOwnedPath(path) || !seen.Add(path)) continue;
+'@
+
+Replace-HcExact 'manual library ownership filter' @'
+                        if (!definition.GameExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase)) continue;
+                        if (!seen.Add(path)) continue;
+'@ @'
                         if (!definition.GameExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase)) continue;
                         if (!IsNintendoLibraryOwnedPath(path)) continue;
                         if (!seen.Add(path)) continue;
-                        found.Add(new ConsolePlatformGame { Name = CleanName(Path.GetFileNameWithoutExtension(path)), Path = path, Cover = FindCover(path) });
-                    }
-                }
-                catch { }
-            }
-            games = found.OrderBy(delegate(ConsolePlatformGame g) { return g.Name; }, StringComparer.CurrentCultureIgnoreCase).ToList();
-            SaveCachedGames();
-            selected = 0;
-            if (showNotice) ShowNotice("Library refreshed — " + games.Count.ToString(CultureInfo.InvariantCulture) + " games");
-            RenderPage();
-            QueueConsoleArtworkRefresh();
-        }
 '@
 
-$first=$text.IndexOf($old,[StringComparison]::Ordinal)
-if($first -lt 0){throw 'Nintendo library optimizer could not find the expected RefreshLibrary block.'}
-if($text.IndexOf($old,$first+$old.Length,[StringComparison]::Ordinal) -ge 0){throw 'Nintendo library optimizer found duplicate RefreshLibrary blocks.'}
-$text=$text.Substring(0,$first)+$new+$text.Substring($first+$old.Length)
 $bom=New-Object Text.UTF8Encoding($true)
 [IO.File]::WriteAllText($NativePath,$text,$bom)
-Write-Host 'Applied Wii/GameCube native visible-library ownership filtering.'
+Write-Host 'Applied Wii/GameCube ownership filtering to async and manual native library scans.'
