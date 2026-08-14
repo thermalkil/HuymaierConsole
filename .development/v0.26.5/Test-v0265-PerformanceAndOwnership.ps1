@@ -43,7 +43,8 @@ $installerText=Get-Content -Raw -LiteralPath $installer -Encoding UTF8
 foreach($marker in @('Write-HuymaierStartupPreflightCache','ValidationSource=''installer''')){if($installerText -notmatch [regex]::Escape($marker)){throw "Installer startup-cache invariant missing: $marker"}}
 
 $progressText=Get-Content -Raw -LiteralPath $progressWorker -Encoding UTF8
-foreach($marker in @('Calculating ETA','Read-ProviderOutputTail','Get-ObservedWriteBytes','Installing','Downloading','TelemetryKind')){if($progressText -notmatch [regex]::Escape($marker)){throw "Provider progress invariant missing: $marker"}}
+foreach($marker in @('Calculating ETA','Read-ProviderOutputTail','Start-WriteObservation','Update-ObservedWriteBytes','Incremental destination writes','Installing','Downloading','TelemetryKind')){if($progressText -notmatch [regex]::Escape($marker)){throw "Provider progress invariant missing: $marker"}}
+if($progressText -match 'Directory\]::EnumerateFiles|Directory\.EnumerateFiles'){throw 'Provider fallback telemetry must not recursively rescan the install tree.'}
 $coordinatorText=Get-Content -Raw -LiteralPath $coordinator -Encoding UTF8
 foreach($marker in @("@('GOG','Amazon')","@('Install','Update')",'TelemetrySource','InstallSpeedBytesPerSec','TransferSpeedBytesPerSec')){if($coordinatorText -notmatch [regex]::Escape($marker)){throw "Provider coordinator source invariant missing: $marker"}}
 
@@ -99,6 +100,7 @@ try{
     foreach($marker in @('Get-ProviderDownloadDisplay','Format-ProviderDownloadEta','InstallProcessedBytes','InstallSpeedBytesPerSec','Progress calculating…')){if($optimizedProviderModule -notmatch [regex]::Escape($marker)){throw "Downloads presentation marker missing: $marker"}}
     $optimizedProgress=Get-Content -Raw -LiteralPath $tempProgressWorker -Encoding UTF8
     if($optimizedProgress -notmatch [regex]::Escape("ValidateSet('Epic','GOG','Amazon')")){throw 'Fallback progress sampler does not cover Epic, GOG and Amazon.'}
+    if($optimizedProgress -match 'Directory\]::EnumerateFiles|Directory\.EnumerateFiles'){throw 'Transformed fallback sampler reintroduced recursive directory scans.'}
     $optimizedCoordinator=Get-Content -Raw -LiteralPath $tempCoordinator -Encoding UTF8
     if($optimizedCoordinator -notmatch [regex]::Escape("@('Epic','GOG','Amazon')")){throw 'Fallback telemetry coordinator does not cover Epic, GOG and Amazon.'}
     $optimizedBootstrap=Get-Content -Raw -LiteralPath $tempBootstrap -Encoding UTF8
@@ -112,7 +114,7 @@ try{
     $nintendoOptimizerText=Get-Content -Raw -LiteralPath $nintendoOptimizer -Encoding UTF8
     if($nintendoOptimizerText -match 'PS2|PS3'){throw 'Nintendo ownership optimizer must not target PS2/PS3 presentation.'}
 
-    Write-Host 'v0.26.5 startup, normalized provider telemetry and Nintendo ownership transformation validation passed.'
+    Write-Host 'v0.26.5 startup, normalized provider telemetry, incremental transfer observation and Nintendo ownership validation passed.'
 }finally{
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
