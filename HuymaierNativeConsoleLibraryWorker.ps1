@@ -39,7 +39,7 @@ function Test-PathSegment([string]$Path,[string[]]$Names){
 }
 function Get-NintendoScopedRoots([string]$Id,[System.Collections.ArrayList]$Roots){
     $key=$Id.ToUpperInvariant()
-    if($key -notin @('WII','GAMECUBE')){return ,([object[]]$Roots.ToArray())}
+    if($key -notin @('WII','GAMECUBE')){return $Roots.ToArray()}
     [string[]]$aliases=if($key -eq 'WII'){@('Wii','Nintendo Wii')}else{@('GameCube','Game Cube','Nintendo GameCube')}
     $scoped=New-Object System.Collections.ArrayList
     foreach($rootValue in $Roots){
@@ -61,7 +61,7 @@ function Get-NintendoScopedRoots([string]$Id,[System.Collections.ArrayList]$Root
         }catch{}
         if($matchingChildren.Count -gt 0){foreach($childPath in $matchingChildren){Add-Root $scoped ([string]$childPath)}}else{Add-Root $scoped $root}
     }
-    return ,([object[]]$scoped.ToArray())
+    return $scoped.ToArray()
 }
 function Save-NintendoScopedRoots([string]$Id,$Settings,[string]$Path,[object[]]$Before,[object[]]$After){
     $key=$Id.ToUpperInvariant()
@@ -179,7 +179,7 @@ if($null -eq $settings){$settings=Read-JsonFile $DefaultSettingsPath}
 $roots=New-Object System.Collections.ArrayList
 foreach($root in @(Get-Prop $settings 'gameFolders' @())){Add-Root $roots ([string]$root)}
 $configuredRoots=[object[]]$roots.ToArray()
-$scopedRoots=[object[]](Get-NintendoScopedRoots $PlatformId $roots)
+$scopedRoots=@(Get-NintendoScopedRoots $PlatformId $roots)
 $roots=New-Object System.Collections.ArrayList
 foreach($root in $scopedRoots){Add-Root $roots ([string]$root)}
 Save-NintendoScopedRoots $PlatformId $settings $SettingsPath $configuredRoots ([object[]]$roots.ToArray())
