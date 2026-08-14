@@ -29,7 +29,7 @@ $installIncompleteMarker=Join-Path $dataDir 'install-incomplete.json'
 $gameInputBridgePath=Join-Path $baseDir 'HuymaierGameInputBridge.dll'
 $preflightCachePath=Join-Path $dataDir 'startup-preflight-v1.json'
 $script:ProviderTelemetryWatcher=$null
-$script:ProviderTelemetrySubscription=$null
+$script:ProviderTelemetrySubscriptions=@()
 $script:ProviderTelemetryPidPath=Join-Path (Join-Path $dataDir 'GameProviders') 'provider-telemetry-coordinator.pid'
 New-Item -ItemType Directory -Force -Path $dataDir,$logDir|Out-Null
 
@@ -242,22 +242,28 @@ function Start-ProviderTelemetryWatch {
                 Set-Content -LiteralPath $ctx.PidPath -Value ([string]$process.Id) -Encoding ASCII
             }catch{}
         }
-        $subscription=Register-ObjectEvent -InputObject $watcher -EventName Changed -MessageData $context -Action $action
+        $subscriptions=New-Object System.Collections.ArrayList
+        foreach($eventName in @('Changed','Created')){
+            $sourceIdentifier="Huymaier.ProviderTelemetry.$eventName.$PID"
+            $job=Register-ObjectEvent -InputObject $watcher -EventName $eventName -SourceIdentifier $sourceIdentifier -MessageData $context -Action $action
+            [void]$subscriptions.Add([pscustomobject]@{SourceIdentifier=$sourceIdentifier;Job=$job})
+        }
         $watcher.EnableRaisingEvents=$true
         $script:ProviderTelemetryWatcher=$watcher
-        $script:ProviderTelemetrySubscription=$subscription
+        $script:ProviderTelemetrySubscriptions=[object[]]$subscriptions.ToArray()
         Write-BootstrapLog 'Provider telemetry is event-driven; no telemetry PowerShell process is started during normal boot.'
     }catch{Write-BootstrapLog "Provider telemetry watcher could not start: $($_.Exception.Message)" 'WARN'}
 }
 
 function Stop-ProviderTelemetryWatch {
-    try{
-        if($null -ne $script:ProviderTelemetryWatcher){$script:ProviderTelemetryWatcher.EnableRaisingEvents=$false}
-        if($null -ne $script:ProviderTelemetrySubscription){Unregister-Event -SubscriptionId $script:ProviderTelemetrySubscription.Id -ErrorAction SilentlyContinue;Remove-Job -Id $script:ProviderTelemetrySubscription.Id -Force -ErrorAction SilentlyContinue}
-    }catch{}
+    try{if($null -ne $script:ProviderTelemetryWatcher){$script:ProviderTelemetryWatcher.EnableRaisingEvents=$false}}catch{}
+    foreach($subscription in @($script:ProviderTelemetrySubscriptions)){
+        try{Unregister-Event -SourceIdentifier ([string]$subscription.SourceIdentifier) -ErrorAction SilentlyContinue}catch{}
+        try{if($null -ne $subscription.Job){Remove-Job -Id $subscription.Job.Id -Force -ErrorAction SilentlyContinue}}catch{}
+    }
+    $script:ProviderTelemetrySubscriptions=@()
     try{if($null -ne $script:ProviderTelemetryWatcher){$script:ProviderTelemetryWatcher.Dispose()}}catch{}
     $script:ProviderTelemetryWatcher=$null
-    $script:ProviderTelemetrySubscription=$null
     try{
         if(Test-Path -LiteralPath $script:ProviderTelemetryPidPath -PathType Leaf){
             $coordinatorPid=0;try{$coordinatorPid=[int](Get-Content -Raw -LiteralPath $script:ProviderTelemetryPidPath)}catch{}
