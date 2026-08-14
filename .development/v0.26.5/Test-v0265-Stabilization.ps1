@@ -31,12 +31,17 @@ try{
     $telemetryCoordinator=Copy-TestFile 'HuymaierProviderTelemetryCoordinator.ps1'
     $shell=Copy-TestFile 'HuymaierShellRedesign.ps1'
     $browser=Copy-TestFile 'HuymaierWebBrowser.ps1'
+    $appLibrary=Copy-TestFile 'HuymaierAppLibrary.ps1'
+    $appInstallWorker=Copy-TestFile 'HuymaierAppInstallWorker.ps1'
 
-    # Match release-wrapper ordering exactly.
+    # Match release-wrapper ordering exactly (version stamping is intentionally
+    # omitted because this test validates feature transforms, not RC identity).
     & (Join-Path $repo '.build\Optimize-ProviderConcurrencyPreflight.ps1') -BootstrapPath $bootstrap -InstallerScriptPath $installer
+    & (Join-Path $repo '.build\Optimize-AppLibrary.ps1') -CorePath $core -BootstrapPath $bootstrap -InstallerScriptPath $installer
     & (Join-Path $repo '.build\Optimize-HuymaierStartup.ps1') -CorePath $core
     & (Join-Path $repo '.build\Optimize-NintendoLibraryOwnership.ps1') -NativePath $native
     & (Join-Path $repo '.build\Optimize-NintendoDisplayNames.ps1') -ConsolePlatformsPath $native
+    & (Join-Path $repo '.build\Optimize-DolphinIntegration.ps1') -ConsolePlatformsPath $native
     & (Join-Path $repo '.build\Optimize-ProviderDownloads.ps1') -ProviderModulePath $provider -ProviderWorkerPath $providerWorker -ProgressWorkerPath $progressWorker -CoordinatorPath $telemetryCoordinator
     & (Join-Path $repo '.build\Optimize-EpicTelemetryWatch.ps1') -BootstrapPath $bootstrap
     & (Join-Path $repo '.build\Optimize-ProviderCoordinatorEpicActivation.ps1') -CoordinatorPath $telemetryCoordinator
@@ -45,10 +50,10 @@ try{
     & (Join-Path $repo '.build\Optimize-RuntimeHitching.ps1') -ConsolePath $core
     & (Join-Path $repo '.build\Optimize-ConcurrentDownloadRefresh.ps1') -ConsolePath $core
 
-    foreach($path in @($core,$bootstrap,$installer,$provider,$providerWorker,$progressWorker,$telemetryCoordinator,$shell,$browser)){Assert-Ps51Parse $path}
+    foreach($path in @($core,$bootstrap,$installer,$provider,$providerWorker,$progressWorker,$telemetryCoordinator,$shell,$browser,$appLibrary,$appInstallWorker)){Assert-Ps51Parse $path}
     foreach($relative in @(
-        'HuymaierProviderConcurrency.ps1','HuymaierProviderConcurrencyUi.ps1','HuymaierProviderTransferCoordinator.ps1',
-        '.build\Optimize-ControllerBrowserCursor.ps1','.build\Optimize-NintendoDisplayNames.ps1','.build\Optimize-ProviderConcurrency.ps1',
+        'HuymaierProviderConcurrency.ps1','HuymaierProviderConcurrencyUi.ps1','HuymaierProviderTransferCoordinator.ps1','HuymaierAppLibrary.ps1','HuymaierAppInstallWorker.ps1',
+        '.build\Optimize-ControllerBrowserCursor.ps1','.build\Optimize-NintendoDisplayNames.ps1','.build\Optimize-DolphinIntegration.ps1','.build\Optimize-AppLibrary.ps1','.build\Optimize-ProviderConcurrency.ps1',
         '.build\Optimize-ProviderConcurrencyPreflight.ps1','.build\Optimize-RuntimeHitching.ps1','.build\Optimize-ConcurrentDownloadRefresh.ps1'
     )){Assert-Ps51Parse (Join-Path $repo $relative)}
 
@@ -59,17 +64,22 @@ try{
         'Open-HcBrowserCursorKeyboard','BrowserInputSecure','Show-HcBrowserAddressKeyboard','Open-HcBrowserCursorKeyboard $true $false','Open-HcBrowserCursorKeyboard $false $true'
     )){Assert-Contains $browserText $required "Browser cursor transform is missing $required."}
 
-    # Wii/GameCube display names: no bare filename/ID title path remains.
+    # Wii/GameCube display names plus Dolphin-native artwork/save integration.
     $nativeText=Get-Content -Raw -LiteralPath $native -Encoding UTF8
     foreach($required in @(
         'HUYMAIER_NINTENDO_DISPLAY_NAME_V1','ResolveLibraryDisplayName','ReadNintendoDiscTitle','extension.Equals(".wbfs"',
-        'ReadNintendoAsciiTitle','LooksLikeNintendoDiscId','return platform + " Game ("','GameCube'
-    )){Assert-Contains $nativeText $required "Nintendo title transform is missing $required."}
+        'ReadNintendoAsciiTitle','LooksLikeNintendoDiscId','return platform + " Game ("','GameCube',
+        'HUYMAIER_DOLPHIN_INTEGRATION_V1','GetDolphinUserRoots','GameCovers','ReadNintendoGameId','FindDolphinArtwork','FindDolphinArtworkBySaveCode',
+        'ReadWiiSaveBannerMetadata','CreateWiiSaveCard','GameCode','Description','Modified','FormatBytes(save.Size)'
+    )){Assert-Contains $nativeText $required "Nintendo/Dolphin transform is missing $required."}
     Assert-NotContains $nativeText 'Name = CleanName(Path.GetFileNameWithoutExtension(path)),' 'A visible native scanner still exposes bare file/disc IDs as titles.'
     $resolvedCount=([regex]::Matches($nativeText,[regex]::Escape('Name = ResolveLibraryDisplayName(path),'))).Count
     if($resolvedCount -lt 2){throw "Expected both native scanner title assignments to use ResolveLibraryDisplayName; found $resolvedCount."}
+    $dolphinPos=$nativeText.IndexOf('string dolphin=FindDolphinArtwork(gamePath,title)',[StringComparison]::Ordinal)
+    $genericPos=$nativeText.IndexOf('string emulator=FindEmulatorArtwork(gamePath,title)',[StringComparison]::Ordinal)
+    if($dolphinPos -lt 0 -or $genericPos -lt 0 -or $dolphinPos -gt $genericPos){throw 'Dolphin artwork is not preferred ahead of generic artwork matching.'}
 
-    # Validate the raw offsets with synthetic ISO/WBFS data, no copyrighted ROM needed.
+    # Validate raw Nintendo offsets with synthetic ISO/WBFS data, no copyrighted ROM needed.
     $iso=New-Object byte[] 256
     [Text.Encoding]::ASCII.GetBytes('R22E01').CopyTo($iso,0)
     $iso[0x18]=0x5D;$iso[0x19]=0x1C;$iso[0x1A]=0x9E;$iso[0x1B]=0xA3
@@ -84,13 +94,33 @@ try{
     $wbfsTitle=[Text.Encoding]::ASCII.GetString($wbfs,$wbfsSectorSize+0x20,0x60).Trim([char]0,' ')
     if($wbfsTitle -ne 'Synthetic WBFS Title'){throw "Synthetic WBFS title offset failed: '$wbfsTitle'"}
 
+    # Curated Apps: Apps home must never enumerate the machine automatically.
+    $coreText=Get-Content -Raw -LiteralPath $core -Encoding UTF8
+    $bootstrapText=Get-Content -Raw -LiteralPath $bootstrap -Encoding UTF8
+    $installerText=Get-Content -Raw -LiteralPath $installer -Encoding UTF8
+    $appText=Get-Content -Raw -LiteralPath $appLibrary -Encoding UTF8
+    $appWorkerText=Get-Content -Raw -LiteralPath $appInstallWorker -Encoding UTF8
+    foreach($required in @('HUYMAIER_CURATED_APP_LIBRARY_V1','HuymaierAppLibrary.ps1')){Assert-Contains $coreText $required "Main shell is missing curated Apps loader marker $required."}
+    foreach($required in @('HuymaierAppLibrary.ps1','HuymaierAppInstallWorker.ps1')){
+        Assert-Contains $bootstrapText $required "Bootstrap preflight is missing $required."
+        Assert-Contains $installerText $required "Installer preflight cache is missing $required."
+    }
+    foreach($required in @(
+        'function Render-HcAppsRoot','apps-store','apps-manage','Remove-HcManagedApp','PreferredLaunchMode','Open-HuymaierBrowser',
+        "'Streaming'","'Music'","'Video'","'Utilities'","'Tools'",'Get-HcCuratedAppCatalog','Start-HcNativeCatalogInstall','Get-HcActiveDownloadStates','Update-HcDownloadHistory'
+    )){Assert-Contains $appText $required "Curated Apps module is missing $required."}
+    $appsStart=$appText.IndexOf('function Render-HcAppsRoot',[StringComparison]::Ordinal)
+    $appsEnd=$appText.IndexOf('$script:HcAppBaseGetPageDefinition',[StringComparison]::Ordinal)
+    if($appsStart -lt 0 -or $appsEnd -le $appsStart){throw 'Could not inspect curated Apps root renderer.'}
+    $appsRoot=$appText.Substring($appsStart,$appsEnd-$appsStart)
+    Assert-NotContains $appsRoot 'Get-HcWindowsApps' 'Apps root still auto-enumerates every Windows Start app.'
+    foreach($required in @('winget','install','--source','msstore','EtaSeconds','Calculating ETA...','StatePath','CatalogId')){Assert-Contains $appWorkerText $required "Native App install worker is missing $required."}
+
     # Concurrent provider transformation: isolated state/output and shared-state locking.
     $providerText=Get-Content -Raw -LiteralPath $provider -Encoding UTF8
     $workerText=Get-Content -Raw -LiteralPath $providerWorker -Encoding UTF8
     $progressText=Get-Content -Raw -LiteralPath $progressWorker -Encoding UTF8
     $shellText=Get-Content -Raw -LiteralPath $shell -Encoding UTF8
-    $bootstrapText=Get-Content -Raw -LiteralPath $bootstrap -Encoding UTF8
-    $installerText=Get-Content -Raw -LiteralPath $installer -Encoding UTF8
     foreach($required in @('HUYMAIER_PROVIDER_CONCURRENCY_V1','HuymaierProviderConcurrency.ps1')){Assert-Contains $providerText $required "Provider module is missing concurrency marker $required."}
     foreach($required in @('HUYMAIER_PROVIDER_TRANSFER_STATE_V1','TransferId=$script:TransferId','Local\HuymaierConsole.ProviderSharedState','huymaier-provider-out-"+$captureId')){Assert-Contains $workerText $required "Provider worker concurrency transform is missing $required."}
     foreach($required in @('HUYMAIER_PROVIDER_PROGRESS_TRANSFER_ID_V1','[string]$TransferId','[regex]::Escape($TransferId)')){Assert-Contains $progressText $required "Progress worker is missing per-transfer isolation marker $required."}
@@ -104,35 +134,25 @@ try{
     $concurrencyText=Get-Content -Raw (Join-Path $repo 'HuymaierProviderConcurrency.ps1') -Encoding UTF8
     $concurrencyUiText=Get-Content -Raw (Join-Path $repo 'HuymaierProviderConcurrencyUi.ps1') -Encoding UTF8
     $transferCoordinatorText=Get-Content -Raw (Join-Path $repo 'HuymaierProviderTransferCoordinator.ps1') -Encoding UTF8
-    foreach($required in @(
-        '$Mode -notin @(''Install'',''Update'')','ProviderTransferRoot','Get-GameProviderActiveTransfers','Get-HcProviderTransferEtaText','Calculating ETA...'
-    )){Assert-Contains $concurrencyText $required "Concurrent provider layer is missing $required."}
+    foreach($required in @('$Mode -notin @(''Install'',''Update'')','ProviderTransferRoot','Get-GameProviderActiveTransfers','Get-HcProviderTransferEtaText','Calculating ETA...')){Assert-Contains $concurrencyText $required "Concurrent provider layer is missing $required."}
     foreach($required in @('Get-HcActiveDownloadStates','Add-HcActiveDownloadCard','foreach($state in $active)','Update-HcActiveDownloadVisuals','Update-HcDownloadHistory')){Assert-Contains $concurrencyUiText $required "Concurrent Downloads UI is missing $required."}
     foreach($required in @('ExpectedDownloadBytes','Estimated total size + observed throughput','provider-transfers.json','Get-ExpectedSizes','Start-TransferMonitor')){Assert-Contains $transferCoordinatorText $required "Transfer coordinator is missing $required."}
     $telemetryText=Get-Content -Raw (Join-Path $repo 'HuymaierProviderTelemetry.ps1') -Encoding UTF8
     foreach($required in @('Get-HcSmoothedTelemetryRate','Get-HcTelemetryEtaSeconds')){Assert-Contains $telemetryText $required "Provider telemetry helper is missing $required."}
 
     # Hitch guard: no summary-worker burst in platform rendering; dirty-state watcher drives updates.
-    $coreText=Get-Content -Raw -LiteralPath $core -Encoding UTF8
-    foreach($required in @(
-        'HUYMAIER_RUNTIME_HITCH_GUARD_V1','FileSystemWatcher','Update-HcRuntimeStateEvents','Invoke-HcIncrementalConsoleCountRefresh',
-        'HcDownloadHistoryDirty','Stop-HcRuntimeStateWatcher','HUYMAIER_CONCURRENT_DOWNLOAD_REFRESH_V1'
-    )){Assert-Contains $coreText $required "Runtime hitch/download refresh guard is missing $required."}
+    foreach($required in @('HUYMAIER_RUNTIME_HITCH_GUARD_V1','FileSystemWatcher','Update-HcRuntimeStateEvents','Invoke-HcIncrementalConsoleCountRefresh','HcDownloadHistoryDirty','Stop-HcRuntimeStateWatcher','HUYMAIER_CONCURRENT_DOWNLOAD_REFRESH_V1')){Assert-Contains $coreText $required "Runtime hitch/download refresh guard is missing $required."}
     Assert-Contains $coreText "if(`$lower.EndsWith('provider-transfers.json')){Add-HcRuntimeDirtyPath `$script:ProviderStatePath}" 'Transfer aggregate events do not wake the Downloads UI.'
     $countStart=$coreText.IndexOf('function Get-PlatformCountSummary {',[StringComparison]::Ordinal)
     $countEnd=$coreText.IndexOf('function New-PlatformCard {',[StringComparison]::Ordinal)
     if($countStart -lt 0 -or $countEnd -le $countStart){throw 'Could not inspect transformed platform-count renderer.'}
     $countSegment=$coreText.Substring($countStart,$countEnd-$countStart)
-    foreach($forbidden in @('Start-Ps1LibrarySummaryScan','Start-Ps2LibrarySummaryScan','Start-Ps3LibrarySummaryScan','Start-NativeConsoleLibrarySummaryScan $id')){
-        Assert-NotContains $countSegment $forbidden "Platform-card rendering still starts a worker: $forbidden"
-    }
+    foreach($forbidden in @('Start-Ps1LibrarySummaryScan','Start-Ps2LibrarySummaryScan','Start-Ps3LibrarySummaryScan','Start-NativeConsoleLibrarySummaryScan $id')){Assert-NotContains $countSegment $forbidden "Platform-card rendering still starts a worker: $forbidden"}
     Assert-NotContains $coreText 'Start-Ps1LibrarySummaryScan;Start-Ps2LibrarySummaryScan;Start-Ps3LibrarySummaryScan' 'The old simultaneous console-summary worker burst survived.'
 
     $sources=@(Get-Content -LiteralPath (Join-Path $repo '.source\source-files.txt') -Encoding UTF8)
-    foreach($required in @('HuymaierProviderConcurrency.ps1','HuymaierProviderConcurrencyUi.ps1','HuymaierProviderTransferCoordinator.ps1')){
-        if($sources -notcontains $required){throw "Release source list is missing $required."}
-    }
-    Write-Host 'v0.26.5 stabilization transform gate passed: browser cursor, Nintendo titles, concurrent provider transfers/ETA, and runtime hitch guards.'
+    foreach($required in @('HuymaierProviderConcurrency.ps1','HuymaierProviderConcurrencyUi.ps1','HuymaierProviderTransferCoordinator.ps1','HuymaierAppLibrary.ps1','HuymaierAppInstallWorker.ps1')){if($sources -notcontains $required){throw "Release source list is missing $required."}}
+    Write-Host 'v0.26.5 stabilization transform gate passed: browser cursor, Dolphin Wii art/save UI, curated Apps, concurrent transfers/ETA, and runtime hitch guards.'
 }finally{
     Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
 }
