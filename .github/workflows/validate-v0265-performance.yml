@@ -1,0 +1,98 @@
+name: Validate Huymaier Console v0.26.5 Performance
+
+on:
+  push:
+    branches:
+      - feature/v0.26.5-performance-and-downloads
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: huymaier-v0265-performance-validation
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Parse v0.26.5 PowerShell with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $files=Get-ChildItem -LiteralPath . -Recurse -File -Filter '*.ps1' | Where-Object { $_.FullName -notmatch '\\.git\\' }
+          foreach($file in $files){
+            $tokens=$null;$errors=$null
+            [void][Management.Automation.Language.Parser]::ParseFile($file.FullName,[ref]$tokens,[ref]$errors)
+            if($errors.Count){
+              $errors|ForEach-Object{Write-Host "$($file.FullName):$($_.Extent.StartLineNumber): $($_.Message)"}
+              throw "PowerShell 5.1 parse failed: $($file.Name)"
+            }
+          }
+
+      - name: Validate startup telemetry and deterministic transforms
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          & '.\.development\v0.26.5\Test-v0265-PerformanceAndOwnership.ps1'
+
+      - name: Validate Wii and GameCube library ownership fixture
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          & '.\.development\v0.26.5\Test-NintendoLibraryOwnership.ps1'
+
+      - name: Validate controller and Game Bar invariants
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $platformNative=Get-Content -Raw 'Native\HuymaierConsole.ConsolePlatforms.cs' -Encoding UTF8
+          if($platformNative -match 'LeftShoulder[^\r\n]{0,200}SwitchPage' -or $platformNative -match 'RightShoulder[^\r\n]{0,200}SwitchPage'){throw 'Shoulder buttons may not switch native console pages.'}
+          foreach($required in @('TryProcessLibraryLetterJump','OpenNativeBackendSettings','RequestHuymaierPicker')){if($platformNative -notmatch [regex]::Escape($required)){throw "Native navigation/settings invariant missing: $required"}}
+          $nativeSet=$platformNative+(Get-Content -Raw 'Native\HuymaierConsole.NativeApp.cs' -Encoding UTF8)+(Get-Content -Raw 'Native\HuymaierConsole.SystemOverlay.cs' -Encoding UTF8)+(Get-Content -Raw 'Native\HuymaierConsole.GameInput.cs' -Encoding UTF8)
+          foreach($required in @('HuymaierGameBarHost','BlocksNativeNavigation','ConsumeGuidePress')){if($nativeSet -notmatch [regex]::Escape($required)){throw "Guide/Game Bar invariant missing: $required"}}
+
+      - name: Compile transformed exact x64 native host source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Windows.Forms,System.Drawing,System.Web.Extensions
+          $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          if(-not(Test-Path -LiteralPath $csc)){throw 'Framework64 csc.exe missing.'}
+          $tempNative=Join-Path $env:RUNNER_TEMP 'HuymaierConsole.ConsolePlatforms.v0265.cs'
+          Copy-Item -LiteralPath 'Native\HuymaierConsole.ConsolePlatforms.cs' -Destination $tempNative -Force
+          & '.\.build\Optimize-NintendoLibraryOwnership.ps1' -NativePath $tempNative
+          $automation=[Management.Automation.PSObject].Assembly.Location
+          $refs=@([Uri].Assembly.Location,[Linq.Enumerable].Assembly.Location,[System.Xaml.XamlReader].Assembly.Location,[Xml.XmlDocument].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,[Windows.Window].Assembly.Location,[Windows.Forms.Form].Assembly.Location,[Drawing.Bitmap].Assembly.Location,[Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,$automation)|Select-Object -Unique
+          $sources=@(
+            'Native\HuymaierConsole.NativeApp.cs',
+            'Native\HuymaierConsole.Ps1.cs',
+            $tempNative,
+            'Native\HuymaierConsole.SystemOverlay.cs',
+            'Native\HuymaierConsole.GameInput.cs',
+            'HuymaierNativeInput.cs',
+            'HuymaierNativeDisplay.cs',
+            'HuymaierNativeAudio.cs',
+            'HuymaierPerformance.cs',
+            'EmulatorPlatforms\Shared\Huymaier.P3T.cs'
+          )
+          $out=Join-Path $env:RUNNER_TEMP 'HuymaierConsole-v0265-validation.dll'
+          $args=@('/noconfig','/nologo','/target:library','/platform:x64','/optimize+',('/out:'+$out))
+          foreach($r in $refs){$args+=('/reference:'+$r)}
+          $args+=$sources
+          & $csc @args
+          if($LASTEXITCODE -ne 0 -or -not(Test-Path -LiteralPath $out)){throw 'v0.26.5 transformed x64 native compile failed.'}
+
+      - name: Validate release payload contains transfer telemetry helpers
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $sources=@(Get-Content '.source\source-files.txt' -Encoding UTF8)
+          foreach($required in @('HuymaierProviderTelemetry.ps1','HuymaierProviderProgressWorker.ps1','HuymaierProviderTelemetryCoordinator.ps1')){
+            if($sources -notcontains $required){throw "Release payload is missing $required"}
+          }
