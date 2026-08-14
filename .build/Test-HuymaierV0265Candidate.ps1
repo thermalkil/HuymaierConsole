@@ -46,6 +46,11 @@ $installerEntry=Require-Text 'Install-HuymaierConsole.ps1' @(
 )
 $appx=Require-Text 'FSEPackage\AppxManifest.xml' @('Version="0.26.5.0"')
 
+$nativeGameInput=Require-Text 'Native\HuymaierConsole.GameInput.cs' @(
+    'public static class HuymaierBuildStamp',
+    'public const string Version = "0.26.5";',
+    'public const string Architecture = "x64";'
+)
 $native=Require-Text 'Native\HuymaierConsole.ConsolePlatforms.cs' @(
     'IsNintendoLibraryOwnedPath',
     'IsNintendoRawDiscForCurrentShell',
@@ -54,6 +59,22 @@ $native=Require-Text 'Native\HuymaierConsole.ConsolePlatforms.cs' @(
     'if (!IsNintendoLibraryOwnedPath(path)) continue;'
 )
 if($native -match 'LeftShoulder[^\r\n]{0,200}SwitchPage' -or $native -match 'RightShoulder[^\r\n]{0,200}SwitchPage'){throw 'LB/RB shoulder buttons switch ordinary native platform pages in v0.26.5.'}
+
+# Verify the build stamp in the exact compiled managed/native host that ships.
+$exePath=Join-Path $StageRoot 'HuymaierConsole.exe'
+if(-not(Test-Path -LiteralPath $exePath -PathType Leaf)){throw 'v0.26.5 compiled native host is missing.'}
+try{$nativeAssembly=[Reflection.Assembly]::LoadFile([IO.Path]::GetFullPath($exePath))}catch{throw "Could not load compiled HuymaierConsole.exe for build-stamp verification: $($_.Exception.Message)"}
+$stampType=$nativeAssembly.GetType('HuymaierConsole.NativeApp.HuymaierBuildStamp',$false)
+if($null -eq $stampType){throw 'Compiled HuymaierConsole.exe has no HuymaierBuildStamp type.'}
+$flags=[Reflection.BindingFlags]::Public -bor [Reflection.BindingFlags]::Static
+$versionField=$stampType.GetField('Version',$flags)
+$architectureField=$stampType.GetField('Architecture',$flags)
+$compiledVersion=if($null -ne $versionField){[string]$versionField.GetValue($null)}else{''}
+$compiledArchitecture=if($null -ne $architectureField){[string]$architectureField.GetValue($null)}else{''}
+if($compiledVersion -ne '0.26.5' -or $compiledArchitecture -ne 'x64'){
+    throw "Compiled native host build stamp mismatch. Native=$compiledVersion/$compiledArchitecture Expected=0.26.5/x64."
+}
+Write-Host "Compiled native host build stamp verified: $compiledVersion/$compiledArchitecture"
 
 $providerModule=Require-Text 'HuymaierGameProviders.ps1' @(
     'Get-ProviderDownloadDisplay',
@@ -98,9 +119,10 @@ if($psChanges.Count){throw ('Frozen PS1/PS2/PS3 presentation source changed in v
 
 $validation=Get-Content -Raw -LiteralPath $ValidationPath -Encoding UTF8|ConvertFrom-Json
 $validation|Add-Member -NotePropertyName version0265ConsistencyGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName nativeHostBuildStampGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName startupPerformanceGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName providerTelemetryGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName nintendoOwnershipGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName playStationPresentationFreezeGate -NotePropertyValue 'success' -Force
 $validation|ConvertTo-Json -Depth 10|Set-Content -LiteralPath $ValidationPath -Encoding UTF8
-Write-Host 'v0.26.5 release-shaped version, startup, provider telemetry, Nintendo ownership and PlayStation freeze gates passed.'
+Write-Host 'v0.26.5 release-shaped version, compiled native stamp, startup, provider telemetry, Nintendo ownership and PlayStation freeze gates passed.'
