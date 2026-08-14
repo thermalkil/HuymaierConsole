@@ -15,6 +15,15 @@ function Replace-HcExact {
     $script:text=$script:text.Substring(0,$first)+$New+$script:text.Substring($first+$Old.Length)
 }
 
+Replace-HcExact 'startup stopwatch' @'
+Set-StrictMode -Version 2.0
+$ErrorActionPreference = 'Stop'
+'@ @'
+Set-StrictMode -Version 2.0
+$ErrorActionPreference = 'Stop'
+$script:HcStartupStopwatch=[Diagnostics.Stopwatch]::StartNew()
+'@
+
 Replace-HcExact 'native display Add-Type' @'
 try {
     if (Test-Path $script:NativeDisplayPath) { Add-Type -Path $script:NativeDisplayPath -ErrorAction Stop }
@@ -74,12 +83,13 @@ Replace-HcExact 'pre-show visual/audio startup' @'
     $script:Window.Add_ContentRendered({
         if($script:HcDeferredStartupInitialized){return}
         $script:HcDeferredStartupInitialized=$true
+        try{Write-Log ("Startup timing: first rendered frame at {0} ms." -f $script:HcStartupStopwatch.ElapsedMilliseconds)}catch{}
         $initializeDeferred=[Action]{
             try{Set-BackgroundAnimationState}catch{Write-Log "Deferred background animation startup failed: $($_.Exception.Message)" 'WARN'}
             try{Set-FpsCounterState}catch{Write-Log "Deferred FPS startup failed: $($_.Exception.Message)" 'WARN'}
             try{Initialize-UiFeedback}catch{Write-Log "Deferred UI feedback startup failed: $($_.Exception.Message)" 'WARN'}
             try{Initialize-BackgroundMusic}catch{Write-Log "Deferred background music startup failed: $($_.Exception.Message)" 'WARN'}
-            Write-Log 'Deferred post-first-frame shell services initialized.'
+            try{Write-Log ("Startup timing: deferred shell services ready at {0} ms." -f $script:HcStartupStopwatch.ElapsedMilliseconds)}catch{}
         }
         try{[void]$script:Window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background,$initializeDeferred)}
         catch{& $initializeDeferred}
@@ -92,6 +102,15 @@ Replace-HcExact 'initial library scan delay' @'
         $script:InitialScanTimer.Interval = [TimeSpan]::FromMilliseconds(1800)
 '@
 
+Replace-HcExact 'show-dialog timing' @'
+    Write-Log "Huymaier Console v$($script:AppVersion) started."
+    $script:Window.ShowDialog() | Out-Null
+'@ @'
+    Write-Log "Huymaier Console v$($script:AppVersion) started."
+    try{Write-Log ("Startup timing: entering ShowDialog at {0} ms." -f $script:HcStartupStopwatch.ElapsedMilliseconds)}catch{}
+    $script:Window.ShowDialog() | Out-Null
+'@
+
 $bom=New-Object Text.UTF8Encoding($true)
 [IO.File]::WriteAllText($CorePath,$text,$bom)
-Write-Host 'Applied deterministic packaged startup optimizations to HuymaierConsole.ps1.'
+Write-Host 'Applied deterministic packaged startup optimizations and first-frame timing markers to HuymaierConsole.ps1.'
