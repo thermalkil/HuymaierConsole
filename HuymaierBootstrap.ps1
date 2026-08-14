@@ -24,6 +24,7 @@ $logDir=Join-Path $dataDir 'Logs'
 $manifestPath=Join-Path $baseDir 'manifest.json'
 $installIncompleteMarker=Join-Path $dataDir 'install-incomplete.json'
 $gameInputBridgePath=Join-Path $baseDir 'HuymaierGameInputBridge.dll'
+$preflightCachePath=Join-Path $dataDir 'startup-preflight-v1.json'
 New-Item -ItemType Directory -Force -Path $dataDir,$logDir|Out-Null
 
 function Write-BootstrapLog {
@@ -32,6 +33,13 @@ function Write-BootstrapLog {
         $path=Join-Path $logDir "$(Get-Date -Format 'yyyy-MM-dd').log"
         "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff') [$Level] $Message"|Add-Content -Path $path -Encoding UTF8
     }catch{}
+}
+
+function Get-ObjectProperty {
+    param($Object,[string]$Name,$Default=$null)
+    if($null -eq $Object){return $Default}
+    try{$property=$Object.PSObject.Properties[$Name];if($null -ne $property -and $null -ne $property.Value){return $property.Value}}catch{}
+    return $Default
 }
 
 function Test-PowerShellFile {
@@ -43,6 +51,87 @@ function Test-PowerShellFile {
     $details=New-Object System.Text.StringBuilder
     foreach($parseError in $parseErrors){[void]$details.AppendLine(("{0} line {1}, column {2}: {3}" -f $Label,$parseError.Extent.StartLineNumber,$parseError.Extent.StartColumnNumber,$parseError.Message))}
     throw $details.ToString().Trim()
+}
+
+function Get-PowerShellPreflightEntries {
+    return @(
+        [pscustomobject]@{Path=$corePath;Label='Main shell'},
+        [pscustomobject]@{Path=$libraryWorkerPath;Label='Library worker'},
+        [pscustomobject]@{Path=$ps1LibraryWorkerPath;Label='PlayStation 1 library worker'},
+        [pscustomobject]@{Path=$storefrontModulePath;Label='Storefront hub'},
+        [pscustomobject]@{Path=$storefrontWorkerPath;Label='Storefront worker'},
+        [pscustomobject]@{Path=$providerModulePath;Label='Game provider hub'},
+        [pscustomobject]@{Path=$providerWorkerPath;Label='Game provider worker'},
+        [pscustomobject]@{Path=$artworkWorkerPath;Label='Online artwork worker'},
+        [pscustomobject]@{Path=$gameExperiencePath;Label='Unified game experience'},
+        [pscustomobject]@{Path=$shellRedesignPath;Label='Shell redesign'},
+        [pscustomobject]@{Path=$gameBarPath;Label='Huymaier Game Bar'}
+    )
+}
+
+function Get-PowerShellFileSignature {
+    param([string]$Path,[string]$Label)
+    if(-not(Test-Path -LiteralPath $Path -PathType Leaf)){throw "$Label is missing: $Path"}
+    $item=Get-Item -LiteralPath $Path -ErrorAction Stop
+    return [pscustomobject]@{
+        Name=[IO.Path]::GetFileName($item.FullName)
+        Length=[int64]$item.Length
+        LastWriteUtcTicks=[int64]$item.LastWriteTimeUtc.Ticks
+    }
+}
+
+function Test-PowerShellPreflightCache {
+    param([object[]]$Entries)
+    if(-not(Test-Path -LiteralPath $preflightCachePath -PathType Leaf)){return $false}
+    try{
+        $cache=Get-Content -Raw -LiteralPath $preflightCachePath -Encoding UTF8|ConvertFrom-Json
+        if([int](Get-ObjectProperty $cache 'SchemaVersion' 0) -ne 1){return $false}
+        if(-not [string]::Equals([string](Get-ObjectProperty $cache 'ConsoleVersion' ''),$script:ExpectedConsoleVersion,[StringComparison]::OrdinalIgnoreCase)){return $false}
+        $cachedBase=[string](Get-ObjectProperty $cache 'BaseDir' '')
+        $currentBase=[IO.Path]::GetFullPath($baseDir).TrimEnd('\')
+        if(-not [string]::Equals($cachedBase,$currentBase,[StringComparison]::OrdinalIgnoreCase)){return $false}
+        $cachedFiles=@(Get-ObjectProperty $cache 'Files' @())
+        if($cachedFiles.Count -ne $Entries.Count){return $false}
+        for($i=0;$i -lt $Entries.Count;$i++){
+            $entry=$Entries[$i]
+            $signature=Get-PowerShellFileSignature ([string]$entry.Path) ([string]$entry.Label)
+            $cached=$cachedFiles[$i]
+            if(-not [string]::Equals([string](Get-ObjectProperty $cached 'Name' ''),[string]$signature.Name,[StringComparison]::OrdinalIgnoreCase)){return $false}
+            if([int64](Get-ObjectProperty $cached 'Length' -1) -ne [int64]$signature.Length){return $false}
+            if([int64](Get-ObjectProperty $cached 'LastWriteUtcTicks' -1) -ne [int64]$signature.LastWriteUtcTicks){return $false}
+        }
+        return $true
+    }catch{return $false}
+}
+
+function Save-PowerShellPreflightCache {
+    param([object[]]$Entries)
+    $files=New-Object System.Collections.ArrayList
+    foreach($entry in $Entries){[void]$files.Add((Get-PowerShellFileSignature ([string]$entry.Path) ([string]$entry.Label)))}
+    $cache=[pscustomobject]@{
+        SchemaVersion=1
+        ConsoleVersion=$script:ExpectedConsoleVersion
+        BaseDir=[IO.Path]::GetFullPath($baseDir).TrimEnd('\')
+        Files=[object[]]$files.ToArray()
+        ValidatedAtUtc=[DateTime]::UtcNow.ToString('o')
+    }
+    $temp="$preflightCachePath.$PID.tmp"
+    $cache|ConvertTo-Json -Depth 6|Set-Content -LiteralPath $temp -Encoding UTF8
+    Move-Item -LiteralPath $temp -Destination $preflightCachePath -Force
+}
+
+function Invoke-PowerShellSyntaxPreflight {
+    $entries=[object[]](Get-PowerShellPreflightEntries)
+    $timer=[Diagnostics.Stopwatch]::StartNew()
+    if(Test-PowerShellPreflightCache $entries){
+        $timer.Stop()
+        Write-BootstrapLog ("Startup syntax cache hit; skipped reparsing {0} unchanged PowerShell files in {1} ms." -f $entries.Count,$timer.ElapsedMilliseconds)
+        return
+    }
+    foreach($entry in $entries){Test-PowerShellFile ([string]$entry.Path) ([string]$entry.Label)}
+    Save-PowerShellPreflightCache $entries
+    $timer.Stop()
+    Write-BootstrapLog ("Startup syntax cache refreshed after validating {0} PowerShell files in {1} ms." -f $entries.Count,$timer.ElapsedMilliseconds)
 }
 
 function Get-HuymaierNativeAssembly {
@@ -106,24 +195,14 @@ function Exit-HuymaierSingleInstance {
 
 try{
     Assert-HuymaierInstallIntegrity
-    Test-PowerShellFile $corePath 'Main shell'
-    Test-PowerShellFile $libraryWorkerPath 'Library worker'
-    Test-PowerShellFile $ps1LibraryWorkerPath 'PlayStation 1 library worker'
-    Test-PowerShellFile $storefrontModulePath 'Storefront hub'
-    Test-PowerShellFile $storefrontWorkerPath 'Storefront worker'
-    Test-PowerShellFile $providerModulePath 'Game provider hub'
-    Test-PowerShellFile $providerWorkerPath 'Game provider worker'
-    Test-PowerShellFile $artworkWorkerPath 'Online artwork worker'
-    Test-PowerShellFile $gameExperiencePath 'Unified game experience'
-    Test-PowerShellFile $shellRedesignPath 'Shell redesign'
-    Test-PowerShellFile $gameBarPath 'Huymaier Game Bar'
+    Invoke-PowerShellSyntaxPreflight
 
     if(-not(Enter-HuymaierSingleInstance)){
         Write-BootstrapLog 'Duplicate Huymaier Console launch was blocked by the native single-instance gate.' 'WARN'
         exit 0
     }
 
-    Write-BootstrapLog 'Huymaier Console v0.26.2 integrity preflight and single-instance gate passed.'
+    Write-BootstrapLog "Huymaier Console v$script:ExpectedConsoleVersion integrity preflight and single-instance gate passed."
     try{
         if($Windowed){& $corePath -Windowed}else{& $corePath}
     }finally{
@@ -131,7 +210,7 @@ try{
     }
 }catch{
     $message=$_.Exception.Message
-    Write-BootstrapLog "v0.26.2 preflight/startup failed:`n$message" 'FATAL'
+    Write-BootstrapLog "v$script:ExpectedConsoleVersion preflight/startup failed:`n$message" 'FATAL'
     try{
         Add-Type -AssemblyName PresentationFramework
         [System.Windows.MessageBox]::Show("Huymaier Console could not start safely.`n`n$message`n`nThe error was saved to:`n$logDir",'Huymaier Console','OK','Error')|Out-Null
