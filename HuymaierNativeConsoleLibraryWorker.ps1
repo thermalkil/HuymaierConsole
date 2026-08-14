@@ -37,31 +37,40 @@ function Test-PathSegment([string]$Path,[string[]]$Names){
     foreach($part in $parts){foreach($name in $Names){if([string]::Equals([string]$part,[string]$name,[StringComparison]::OrdinalIgnoreCase)){return $true}}}
     return $false
 }
-function Get-NintendoScopedRoots([string]$Id,[System.Collections.ArrayList]$Roots){
+function Add-NintendoScopedRoots([string]$Id,[System.Collections.ArrayList]$Source,[System.Collections.ArrayList]$Target){
     $key=$Id.ToUpperInvariant()
-    if($key -notin @('WII','GAMECUBE')){return $Roots.ToArray()}
+    if($key -notin @('WII','GAMECUBE')){
+        foreach($rootValue in $Source){Add-Root $Target ([string]$rootValue)}
+        return
+    }
     [string[]]$aliases=if($key -eq 'WII'){@('Wii','Nintendo Wii')}else{@('GameCube','Game Cube','Nintendo GameCube')}
-    $scoped=New-Object System.Collections.ArrayList
-    foreach($rootValue in $Roots){
+    foreach($rootValue in $Source){
         $root=[string]$rootValue
         if([string]::IsNullOrWhiteSpace($root)){continue}
         $leaf=''
         try{$leaf=[IO.Path]::GetFileName($root.TrimEnd('\','/'))}catch{}
         $alreadyScoped=$false
-        foreach($alias in $aliases){if([string]::Equals($leaf,$alias,[StringComparison]::OrdinalIgnoreCase)){$alreadyScoped=$true;break}}
-        if($alreadyScoped){Add-Root $scoped $root;continue}
+        foreach($alias in $aliases){
+            if([string]::Equals($leaf,$alias,[StringComparison]::OrdinalIgnoreCase)){$alreadyScoped=$true;break}
+        }
+        if($alreadyScoped){Add-Root $Target $root;continue}
 
-        $matchingChildren=New-Object System.Collections.ArrayList
+        $matchedChild=$false
         try{
-            foreach($child in Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue){
+            foreach($childPath in [IO.Directory]::GetDirectories($root)){
+                $childName=''
+                try{$childName=[IO.Path]::GetFileName(([string]$childPath).TrimEnd('\','/'))}catch{}
                 foreach($alias in $aliases){
-                    if([string]::Equals([string]$child.Name,$alias,[StringComparison]::OrdinalIgnoreCase)){[void]$matchingChildren.Add([string]$child.FullName);break}
+                    if([string]::Equals($childName,$alias,[StringComparison]::OrdinalIgnoreCase)){
+                        Add-Root $Target ([string]$childPath)
+                        $matchedChild=$true
+                        break
+                    }
                 }
             }
         }catch{}
-        if($matchingChildren.Count -gt 0){foreach($childPath in $matchingChildren){Add-Root $scoped ([string]$childPath)}}else{Add-Root $scoped $root}
+        if(-not $matchedChild){Add-Root $Target $root}
     }
-    return $scoped.ToArray()
 }
 function Save-NintendoScopedRoots([string]$Id,$Settings,[string]$Path,[object[]]$Before,[object[]]$After){
     $key=$Id.ToUpperInvariant()
@@ -176,12 +185,11 @@ function Get-Extensions([string]$Id){
 
 $settings=Read-JsonFile $SettingsPath
 if($null -eq $settings){$settings=Read-JsonFile $DefaultSettingsPath}
+$configuredRootList=New-Object System.Collections.ArrayList
+foreach($root in @(Get-Prop $settings 'gameFolders' @())){Add-Root $configuredRootList ([string]$root)}
+$configuredRoots=[object[]]$configuredRootList.ToArray()
 $roots=New-Object System.Collections.ArrayList
-foreach($root in @(Get-Prop $settings 'gameFolders' @())){Add-Root $roots ([string]$root)}
-$configuredRoots=[object[]]$roots.ToArray()
-$scopedRoots=@(Get-NintendoScopedRoots $PlatformId $roots)
-$roots=New-Object System.Collections.ArrayList
-foreach($root in $scopedRoots){Add-Root $roots ([string]$root)}
+Add-NintendoScopedRoots $PlatformId $configuredRootList $roots
 Save-NintendoScopedRoots $PlatformId $settings $SettingsPath $configuredRoots ([object[]]$roots.ToArray())
 $extensions=@(Get-Extensions $PlatformId)
 $seen=@{}
