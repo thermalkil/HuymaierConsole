@@ -2,6 +2,7 @@
 #include <GameInput.h>
 #include <atomic>
 #include <mutex>
+#include <cstdint>
 
 // Microsoft.GameInput 3.x exposes the current API through a versioned
 // namespace. Keep this bridge explicit so future SDK upgrades fail at compile
@@ -58,6 +59,20 @@ namespace
         }
         return 0;
     }
+
+    uint32_t NormalizePointerButtons(GameInputGamepadButtons buttons)
+    {
+        uint32_t mask = 0;
+        if ((buttons & GameInputGamepadA) != 0) mask |= 0x0001;              // confirm / left click
+        if ((buttons & GameInputGamepadB) != 0) mask |= 0x0002;              // back / escape
+        if ((buttons & GameInputGamepadX) != 0) mask |= 0x0004;              // keyboard
+        if ((buttons & GameInputGamepadY) != 0) mask |= 0x0008;
+        if ((buttons & GameInputGamepadLeftShoulder) != 0) mask |= 0x0010;
+        if ((buttons & GameInputGamepadRightShoulder) != 0) mask |= 0x0020;
+        if ((buttons & GameInputGamepadMenu) != 0) mask |= 0x0040;
+        if ((buttons & GameInputGamepadView) != 0) mask |= 0x0080;
+        return mask;
+    }
 }
 
 extern "C" __declspec(dllexport) int __cdecl HC_GameInputInitialize()
@@ -108,6 +123,51 @@ extern "C" __declspec(dllexport) int __cdecl HC_ConsumeGuidePress()
 extern "C" __declspec(dllexport) int __cdecl HC_ConsumeSharePress()
 {
     return ConsumeEdge(g_sharePresses);
+}
+
+// Continuous normalized state used only for controller-pointer surfaces.  The
+// shell keeps its existing edge/navigation stack; this API does not alter
+// controller assignment or emulator behavior.
+extern "C" __declspec(dllexport) int __cdecl HC_ReadGamepadPointerState(
+    float* leftX,
+    float* leftY,
+    float* rightX,
+    float* rightY,
+    float* leftTrigger,
+    float* rightTrigger,
+    uint32_t* buttons)
+{
+    if (leftX) *leftX = 0.0f;
+    if (leftY) *leftY = 0.0f;
+    if (rightX) *rightX = 0.0f;
+    if (rightY) *rightY = 0.0f;
+    if (leftTrigger) *leftTrigger = 0.0f;
+    if (rightTrigger) *rightTrigger = 0.0f;
+    if (buttons) *buttons = 0;
+
+    std::lock_guard<std::mutex> guard(g_lock);
+    if (g_gameInput == nullptr)
+        return 0;
+
+    IGameInputReading* reading = nullptr;
+    HRESULT result = g_gameInput->GetCurrentReading(GameInputKindGamepad, nullptr, &reading);
+    if (FAILED(result) || reading == nullptr)
+        return 0;
+
+    GameInputGamepadState state{};
+    bool valid = reading->GetGamepadState(&state);
+    reading->Release();
+    if (!valid)
+        return 0;
+
+    if (leftX) *leftX = state.leftThumbstickX;
+    if (leftY) *leftY = state.leftThumbstickY;
+    if (rightX) *rightX = state.rightThumbstickX;
+    if (rightY) *rightY = state.rightThumbstickY;
+    if (leftTrigger) *leftTrigger = state.leftTrigger;
+    if (rightTrigger) *rightTrigger = state.rightTrigger;
+    if (buttons) *buttons = NormalizePointerButtons(state.buttons);
+    return 1;
 }
 
 extern "C" __declspec(dllexport) void __cdecl HC_GameInputShutdown()
