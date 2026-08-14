@@ -10,7 +10,7 @@ foreach($path in @($CorePath,$BootstrapPath,$InstallerScriptPath)){if(-not(Test-
 
 $core=Get-Content -Raw -LiteralPath $CorePath -Encoding UTF8
 if($core -notmatch 'HUYMAIER_CURATED_APP_LIBRARY_V1'){
-    $pathNeedle="$script:ShellRedesignModulePath = Join-Path $script:BaseDir 'HuymaierShellRedesign.ps1'"
+    $pathNeedle='$script:ShellRedesignModulePath = Join-Path $script:BaseDir ''HuymaierShellRedesign.ps1'''
     if(-not $core.Contains($pathNeedle)){throw 'App-library transform could not find shell redesign module path.'}
     $core=$core.Replace($pathNeedle,$pathNeedle+"`r`n`$script:AppLibraryModulePath = Join-Path `$script:BaseDir 'HuymaierAppLibrary.ps1'")
     $loadNeedle='if (Test-Path -LiteralPath $script:EmulatorPlatformsModulePath) {'
@@ -28,10 +28,10 @@ if (Test-Path -LiteralPath $script:AppLibraryModulePath) {
 
 $bootstrap=Get-Content -Raw -LiteralPath $BootstrapPath -Encoding UTF8
 if($bootstrap -notmatch 'HUYMAIER_APP_LIBRARY_PREFLIGHT_V1'){
-    $pathNeedle="$shellRedesignPath=Join-Path $baseDir 'HuymaierShellRedesign.ps1'"
+    $pathNeedle='$shellRedesignPath=Join-Path $baseDir ''HuymaierShellRedesign.ps1'''
     if(-not $bootstrap.Contains($pathNeedle)){throw 'App-library transform could not find bootstrap shell path.'}
     $bootstrap=$bootstrap.Replace($pathNeedle,$pathNeedle+"`r`n# HUYMAIER_APP_LIBRARY_PREFLIGHT_V1`r`n`$appLibraryPath=Join-Path `$baseDir 'HuymaierAppLibrary.ps1'`r`n`$appInstallWorkerPath=Join-Path `$baseDir 'HuymaierAppInstallWorker.ps1'")
-    $entryNeedle="        [pscustomobject]@{Path=`$shellRedesignPath;Label='Shell redesign'},"
+    $entryNeedle='        [pscustomobject]@{Path=$shellRedesignPath;Label=''Shell redesign''},'
     if(-not $bootstrap.Contains($entryNeedle)){throw 'App-library transform could not find bootstrap shell preflight entry.'}
     $entries=$entryNeedle+"`r`n        [pscustomobject]@{Path=`$appLibraryPath;Label='Curated app library'},`r`n        [pscustomobject]@{Path=`$appInstallWorkerPath;Label='Native app install worker'},"
     $bootstrap=$bootstrap.Replace($entryNeedle,$entries)
