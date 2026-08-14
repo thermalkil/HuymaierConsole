@@ -55,23 +55,13 @@ function Get-LegendaryTransferPhase{
 }
 function Update-LegendaryTransferTelemetry{
 '@
-Replace-HcExact ([ref]$worker) 'Legendary visible transfer state' @'
-    if($changed -or $progress -ge 0){
-        $amount=if($script:TransferTotalBytes -gt 0){"$(Format-ProviderByteValue $script:TransferDownloadedBytes) / $(Format-ProviderByteValue $script:TransferTotalBytes)"}elseif($script:TransferDownloadedBytes -gt 0){Format-ProviderByteValue $script:TransferDownloadedBytes}else{'Preparing download…'}
-        $speed=if($script:TransferSpeedBytesPerSec -gt 0){Format-ProviderSpeedValue $script:TransferSpeedBytesPerSec}else{'Measuring speed…'}
+Replace-HcExact ([ref]$worker) 'Legendary state write' @'
         Write-State $true 'Downloading' "$amount  •  $speed" $(if($progress -ge 0){$progress}else{5}) -Quiet
-        return $true
-    }
 '@ @'
-    if($changed -or $progress -ge 0){
         $phase=Get-LegendaryTransferPhase $Text
-        $amount=if($script:TransferTotalBytes -gt 0){"$(Format-ProviderByteValue $script:TransferDownloadedBytes) / $(Format-ProviderByteValue $script:TransferTotalBytes)"}elseif($script:TransferDownloadedBytes -gt 0){Format-ProviderByteValue $script:TransferDownloadedBytes}else{'Measuring activity…'}
-        $speed=if($script:TransferSpeedBytesPerSec -gt 0){Format-ProviderSpeedValue $script:TransferSpeedBytesPerSec}else{'Measuring speed…'}
         $visibleEta=if($phase -eq 'Installing'){-1}else{$script:TransferEtaSeconds}
         $etaText=Format-ProviderEtaValue $visibleEta
         Write-State $true $phase "$phase  •  $amount  •  $speed  •  $etaText" $(if($progress -ge 0){$progress}else{5}) -Quiet
-        return $true
-    }
 '@
 Write-HcUtf8Bom $ProviderWorkerPath $worker
 
