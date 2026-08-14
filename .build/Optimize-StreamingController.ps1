@@ -80,9 +80,14 @@ if($LASTEXITCODE -ne 0 -or -not(Test-Path $streamingCursorExe)){throw 'x64 Huyma
     if(-not $builder.Contains($requiredNeedle)){throw 'Streaming-controller transform could not find required production payload list.'}
     $builder=$builder.Replace($requiredNeedle,"'HuymaierGameInputBridge.dll','HuymaierConsole.exe','HuymaierStreamingCursorHost.exe','Restore-HuymaierWindowsSettings.ps1'")
 
-    $archNeedle='$headers=(& $dumpbin /nologo /headers $exe) -join "`n";if($headers -notmatch ''(?i)machine \(x64\)|8664 machine''){throw ''HuymaierConsole.exe is not x64.''}'
+    $archNeedle=@'
+$headers=(& $dumpbin /nologo /headers $exe) -join "`n";if($headers -notmatch '(?i)machine \(x64\)|8664 machine'){throw 'HuymaierConsole.exe is not x64.'}
+'@
     if(-not $builder.Contains($archNeedle)){throw 'Streaming-controller transform could not find native host architecture gate.'}
-    $archBlock=$archNeedle+"`r`n`$streamHeaders=(& `$dumpbin /nologo /headers `$streamingCursorExe) -join \"``n\";if(`$streamHeaders -notmatch '(?i)machine \\(x64\\)|8664 machine'){throw 'HuymaierStreamingCursorHost.exe is not x64.'}"
+    $archBlock=@'
+$headers=(& $dumpbin /nologo /headers $exe) -join "`n";if($headers -notmatch '(?i)machine \(x64\)|8664 machine'){throw 'HuymaierConsole.exe is not x64.'}
+$streamHeaders=(& $dumpbin /nologo /headers $streamingCursorExe) -join "`n";if($streamHeaders -notmatch '(?i)machine \(x64\)|8664 machine'){throw 'HuymaierStreamingCursorHost.exe is not x64.'}
+'@
     $builder=$builder.Replace($archNeedle,$archBlock)
     Set-Content -LiteralPath $CoreBuilderPath -Value $builder -Encoding UTF8
 }
