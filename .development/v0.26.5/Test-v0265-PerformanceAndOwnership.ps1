@@ -16,8 +16,9 @@ $startupOptimizer=Join-Path $repo '.build\Optimize-HuymaierStartup.ps1'
 $nintendoOptimizer=Join-Path $repo '.build\Optimize-NintendoLibraryOwnership.ps1'
 $providerOptimizer=Join-Path $repo '.build\Optimize-ProviderDownloads.ps1'
 $epicWatchOptimizer=Join-Path $repo '.build\Optimize-EpicTelemetryWatch.ps1'
+$epicCoordinatorOptimizer=Join-Path $repo '.build\Optimize-ProviderCoordinatorEpicActivation.ps1'
 
-foreach($required in @($core,$native,$bootstrap,$installer,$providerModule,$providerWorker,$progressWorker,$coordinator,$telemetry,$startupOptimizer,$nintendoOptimizer,$providerOptimizer,$epicWatchOptimizer)){
+foreach($required in @($core,$native,$bootstrap,$installer,$providerModule,$providerWorker,$progressWorker,$coordinator,$telemetry,$startupOptimizer,$nintendoOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer)){
     if(-not(Test-Path -LiteralPath $required -PathType Leaf)){throw "Required v0.26.5 source is missing: $required"}
 }
 
@@ -28,7 +29,7 @@ function Assert-PowerShellParse {
     if($errors.Count){$errors|ForEach-Object{Write-Host "$Path line $($_.Extent.StartLineNumber): $($_.Message)"};throw "PowerShell parse failed: $Path"}
 }
 
-foreach($ps1 in @($bootstrap,$installer,$providerModule,$providerWorker,$progressWorker,$coordinator,$telemetry,$startupOptimizer,$nintendoOptimizer,$providerOptimizer,$epicWatchOptimizer)){Assert-PowerShellParse $ps1}
+foreach($ps1 in @($bootstrap,$installer,$providerModule,$providerWorker,$progressWorker,$coordinator,$telemetry,$startupOptimizer,$nintendoOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer)){Assert-PowerShellParse $ps1}
 
 $bootstrapText=Get-Content -Raw -LiteralPath $bootstrap -Encoding UTF8
 foreach($marker in @(
@@ -70,6 +71,7 @@ try{
     & $nintendoOptimizer -NativePath $tempNative
     & $providerOptimizer -ProviderModulePath $tempProviderModule -ProviderWorkerPath $tempProviderWorker -ProgressWorkerPath $tempProgressWorker -CoordinatorPath $tempCoordinator
     & $epicWatchOptimizer -BootstrapPath $tempBootstrap
+    & $epicCoordinatorOptimizer -CoordinatorPath $tempCoordinator
 
     foreach($ps1 in @($tempCore,$tempBootstrap,$tempProviderModule,$tempProviderWorker,$tempProgressWorker,$tempCoordinator)){Assert-PowerShellParse $ps1}
 
@@ -102,19 +104,21 @@ try{
     if($optimizedProgress -notmatch [regex]::Escape("ValidateSet('Epic','GOG','Amazon')")){throw 'Fallback progress sampler does not cover Epic, GOG and Amazon.'}
     if($optimizedProgress -match 'Directory\]::EnumerateFiles|Directory\.EnumerateFiles'){throw 'Transformed fallback sampler reintroduced recursive directory scans.'}
     $optimizedCoordinator=Get-Content -Raw -LiteralPath $tempCoordinator -Encoding UTF8
-    if($optimizedCoordinator -notmatch [regex]::Escape("@('Epic','GOG','Amazon')")){throw 'Fallback telemetry coordinator does not cover Epic, GOG and Amazon.'}
+    $allProviderList="@('Epic','GOG','Amazon')"
+    if(([regex]::Matches($optimizedCoordinator,[regex]::Escape($allProviderList))).Count -lt 2){throw 'Fallback telemetry coordinator did not expand both guard and activation paths to Epic, GOG and Amazon.'}
+    if($optimizedCoordinator -match [regex]::Escape("@('GOG','Amazon')")){throw 'Fallback telemetry coordinator still contains a GOG/Amazon-only activation path.'}
     $optimizedBootstrap=Get-Content -Raw -LiteralPath $tempBootstrap -Encoding UTF8
-    if($optimizedBootstrap -notmatch [regex]::Escape("@('Epic','GOG','Amazon')")){throw 'Event-driven telemetry watcher does not wake for Epic, GOG and Amazon.'}
+    if($optimizedBootstrap -notmatch [regex]::Escape($allProviderList)){throw 'Event-driven telemetry watcher does not wake for Epic, GOG and Amazon.'}
 
     # Confirm PlayStation-specific presentation sources remain outside all v0.26.5 transforms.
-    foreach($optimizerPath in @($startupOptimizer,$nintendoOptimizer,$providerOptimizer,$epicWatchOptimizer)){
+    foreach($optimizerPath in @($startupOptimizer,$nintendoOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer)){
         $optimizerText=Get-Content -Raw -LiteralPath $optimizerPath -Encoding UTF8
         if($optimizerText -match 'HuymaierConsole\.Ps1\.cs'){throw "v0.26.5 optimizer targets frozen PS1 presentation source: $optimizerPath"}
     }
     $nintendoOptimizerText=Get-Content -Raw -LiteralPath $nintendoOptimizer -Encoding UTF8
     if($nintendoOptimizerText -match 'PS2|PS3'){throw 'Nintendo ownership optimizer must not target PS2/PS3 presentation.'}
 
-    Write-Host 'v0.26.5 startup, normalized provider telemetry, incremental transfer observation and Nintendo ownership validation passed.'
+    Write-Host 'v0.26.5 startup, normalized provider telemetry, complete Epic coordinator activation, incremental transfer observation and Nintendo ownership validation passed.'
 }finally{
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
