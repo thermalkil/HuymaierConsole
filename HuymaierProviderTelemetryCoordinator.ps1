@@ -170,7 +170,7 @@ try{
             $mode=[string](Get-Prop $state 'Mode' '')
             $phase=[string](Get-Prop $state 'Phase' '')
             $workerPid=[int](Get-Prop $state 'WorkerPid' 0)
-            if($provider -in @('GOG','Amazon') -and $mode -in @('Install','Update') -and $phase -in @('Install','Update','Downloading','Installing') -and Test-ProcessAlive $workerPid){
+            if($provider -in @('GOG','Amazon') -and $mode -in @('Install','Update') -and $phase -in @('Install','Update','Downloading','Installing') -and (Test-ProcessAlive $workerPid)){
                 $active=$true
                 $key="$provider|$mode|$([string](Get-Prop $state 'GameId' ''))|$workerPid"
                 if($key -ne $operationKey){Stop-ProgressProcess;$operationKey=$key;Start-ProgressMonitor $state}
