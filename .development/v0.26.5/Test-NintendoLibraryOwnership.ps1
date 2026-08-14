@@ -32,9 +32,11 @@ try{
     & $worker -PlatformId WII -SettingsPath $settingsPath -DefaultSettingsPath $defaultPath -ResultPath $resultPath
     $result=Get-Content -Raw -LiteralPath $resultPath|ConvertFrom-Json
     $saved=Get-Content -Raw -LiteralPath $settingsPath|ConvertFrom-Json
+    $resultRootText=((@($result.Roots)|ForEach-Object{"[$_]"}) -join ', ')
+    $savedRootText=((@($saved.gameFolders)|ForEach-Object{"[$_]"}) -join ', ')
     Write-Host ("Wii expected root: {0}" -f $wii)
-    Write-Host ("Wii result roots ({0}): {1}" -f @($result.Roots).Count,(@($result.Roots)|ForEach-Object{"[$_]"} -join ', '))
-    Write-Host ("Wii saved roots ({0}): {1}" -f @($saved.gameFolders).Count,(@($saved.gameFolders)|ForEach-Object{"[$_]"} -join ', '))
+    Write-Host ("Wii result roots ({0}): {1}" -f @($result.Roots).Count,$resultRootText)
+    Write-Host ("Wii saved roots ({0}): {1}" -f @($saved.gameFolders).Count,$savedRootText)
     if([int]$result.Count -ne 2){throw "Wii fixture expected exactly 2 Wii-owned games, got $($result.Count)."}
     if(@($result.Roots).Count -ne 1 -or -not [string]::Equals([string]$result.Roots[0],$wii,[StringComparison]::OrdinalIgnoreCase)){throw 'Wii shared-parent root did not narrow to the Wii child.'}
     if(@($saved.gameFolders).Count -ne 1 -or -not [string]::Equals([string]$saved.gameFolders[0],$wii,[StringComparison]::OrdinalIgnoreCase)){throw 'Wii resolved root was not persisted for the native renderer.'}
@@ -46,9 +48,11 @@ try{
     & $worker -PlatformId GAMECUBE -SettingsPath $gcSettings -DefaultSettingsPath $defaultPath -ResultPath $gcResult
     $gcData=Get-Content -Raw -LiteralPath $gcResult|ConvertFrom-Json
     $gcSaved=Get-Content -Raw -LiteralPath $gcSettings|ConvertFrom-Json
+    $gcResultRootText=((@($gcData.Roots)|ForEach-Object{"[$_]"}) -join ', ')
+    $gcSavedRootText=((@($gcSaved.gameFolders)|ForEach-Object{"[$_]"}) -join ', ')
     Write-Host ("GameCube expected root: {0}" -f $gc)
-    Write-Host ("GameCube result roots ({0}): {1}" -f @($gcData.Roots).Count,(@($gcData.Roots)|ForEach-Object{"[$_]"} -join ', '))
-    Write-Host ("GameCube saved roots ({0}): {1}" -f @($gcSaved.gameFolders).Count,(@($gcSaved.gameFolders)|ForEach-Object{"[$_]"} -join ', '))
+    Write-Host ("GameCube result roots ({0}): {1}" -f @($gcData.Roots).Count,$gcResultRootText)
+    Write-Host ("GameCube saved roots ({0}): {1}" -f @($gcSaved.gameFolders).Count,$gcSavedRootText)
     if([int]$gcData.Count -ne 2){throw "GameCube fixture expected exactly 2 GameCube-owned games, got $($gcData.Count)."}
     if(@($gcData.Roots).Count -ne 1 -or -not [string]::Equals([string]$gcData.Roots[0],$gc,[StringComparison]::OrdinalIgnoreCase)){throw 'GameCube shared-parent root did not narrow to the GameCube child.'}
 
