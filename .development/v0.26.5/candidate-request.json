@@ -1,12 +1,12 @@
 {
-  "requestedAtUtc": "2026-08-14T14:53:00Z",
-  "attempt": 3,
+  "requestedAtUtc": "2026-08-14T15:17:00Z",
+  "attempt": 4,
   "candidate": "v0.26.5-rc1",
   "version": "0.26.5",
   "base_release": "v0.26.2",
   "base_asset": "HC262.zip",
   "package_root": "HC265",
   "asset_name": "HC265.zip",
-  "production_source": "555eba25ab61938864f6e90974d95ed193d937aa",
-  "scope": "v0.26.5 RC1 retry after live startup exposed stale compiled native build stamp; candidate transform now stamps Native/HuymaierConsole.GameInput.cs to 0.26.5 and release-stage validation loads the exact compiled HuymaierConsole.exe to require HuymaierBuildStamp 0.26.5/x64 before artifact upload; all prior startup, provider, Nintendo, controller, installer, Steam and PS1/PS2/PS3 freeze gates remain"
+  "production_source": "d11cc7ac9e100608c1de98a4f2d36ea0d798271b",
+  "scope": "v0.26.5 RC1 retry after live cold-start exposed an uninitialized lazy-browser auth path and user testing exposed unusable controller navigation; browser state is now initialized before StrictMode reads, WebView2 remains lazy, the real Address/Search field is controller-focusable, A/X/Y controller text/navigation paths are deterministic, and source plus staged-package gates require the browser cold-start/controller contract while retaining compiled native 0.26.5/x64, startup, provider, Nintendo, installer, Steam, Game Bar and frozen PS1/PS2/PS3 gates"
 }
