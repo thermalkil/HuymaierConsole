@@ -7,6 +7,7 @@ $core=Join-Path $repo 'HuymaierConsole.ps1'
 $native=Join-Path $repo 'Native\HuymaierConsole.ConsolePlatforms.cs'
 $bootstrap=Join-Path $repo 'HuymaierBootstrap.ps1'
 $installer=Join-Path $repo 'Install-HuymaierConsole.ps1'
+$browser=Join-Path $repo 'HuymaierWebBrowser.ps1'
 $providerModule=Join-Path $repo 'HuymaierGameProviders.ps1'
 $providerWorker=Join-Path $repo 'HuymaierGameProviderWorker.ps1'
 $progressWorker=Join-Path $repo 'HuymaierProviderProgressWorker.ps1'
@@ -18,7 +19,7 @@ $providerOptimizer=Join-Path $repo '.build\Optimize-ProviderDownloads.ps1'
 $epicWatchOptimizer=Join-Path $repo '.build\Optimize-EpicTelemetryWatch.ps1'
 $epicCoordinatorOptimizer=Join-Path $repo '.build\Optimize-ProviderCoordinatorEpicActivation.ps1'
 
-foreach($required in @($core,$native,$bootstrap,$installer,$providerModule,$providerWorker,$progressWorker,$coordinator,$telemetry,$startupOptimizer,$nintendoOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer)){
+foreach($required in @($core,$native,$bootstrap,$installer,$browser,$providerModule,$providerWorker,$progressWorker,$coordinator,$telemetry,$startupOptimizer,$nintendoOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer)){
     if(-not(Test-Path -LiteralPath $required -PathType Leaf)){throw "Required v0.26.5 source is missing: $required"}
 }
 
@@ -29,7 +30,7 @@ function Assert-PowerShellParse {
     if($errors.Count){$errors|ForEach-Object{Write-Host "$Path line $($_.Extent.StartLineNumber): $($_.Message)"};throw "PowerShell parse failed: $Path"}
 }
 
-foreach($ps1 in @($bootstrap,$installer,$providerModule,$providerWorker,$progressWorker,$coordinator,$telemetry,$startupOptimizer,$nintendoOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer)){Assert-PowerShellParse $ps1}
+foreach($ps1 in @($bootstrap,$installer,$browser,$providerModule,$providerWorker,$progressWorker,$coordinator,$telemetry,$startupOptimizer,$nintendoOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer)){Assert-PowerShellParse $ps1}
 
 $bootstrapText=Get-Content -Raw -LiteralPath $bootstrap -Encoding UTF8
 foreach($marker in @(
@@ -42,6 +43,33 @@ foreach($marker in @(
 
 $installerText=Get-Content -Raw -LiteralPath $installer -Encoding UTF8
 foreach($marker in @('Write-HuymaierStartupPreflightCache','ValidationSource=''installer''')){if($installerText -notmatch [regex]::Escape($marker)){throw "Installer startup-cache invariant missing: $marker"}}
+
+# The native browser must be safe to dot-source under StrictMode before WebView2
+# is constructed, and its controller contract must expose a real address/search
+# focus item plus deterministic toolbar/web and text-entry paths.
+$browserText=Get-Content -Raw -LiteralPath $browser -Encoding UTF8
+foreach($marker in @(
+    "`$script:HcBrowserAuthRequestPath = Join-Path `$script:DataDir 'browser-auth-request.json'",
+    "`$script:HcBrowserAuthResultDir = Join-Path `$script:DataDir 'BrowserAuth'",
+    "`$script:HcBrowserReadyPath = Join-Path `$script:HcBrowserAuthResultDir 'native-browser.ready.json'",
+    "Add-HcBrowserToolbarItem `$address 'Address'",
+    "Show-NativeKeyboard -Title 'Search or enter address'",
+    "-Mode 'BrowserAddress'",
+    "'BrowserInputSecure'",
+    'Invoke-HcBrowserControllerType',
+    "Set-HcBrowserFocusArea 'Toolbar'",
+    "Set-HcBrowserFocusArea 'Web'",
+    "document.addEventListener('focusin'",
+    'window.__hcActivate',
+    'window.__hcSetValue',
+    'ConvertTo-HcBrowserDestination'
+)){if($browserText -notmatch [regex]::Escape($marker)){throw "Controller browser invariant missing: $marker"}}
+$browserStateIndex=$browserText.IndexOf("`$script:HcBrowserAuthRequestPath = Join-Path")
+$browserInitIndex=$browserText.IndexOf('function Initialize-HuymaierWebBrowser')
+$webViewConstructionIndex=$browserText.IndexOf('New-Object Microsoft.Web.WebView2.Wpf.WebView2')
+if($browserStateIndex -lt 0 -or $browserInitIndex -lt 0 -or $browserStateIndex -gt $browserInitIndex){throw 'Browser auth paths are not initialized before the lazy browser initializer can read them under StrictMode.'}
+if($webViewConstructionIndex -lt $browserInitIndex){throw 'WebView2 construction moved back into browser module load/startup instead of remaining lazy.'}
+if($browserText -match "HcBrowserToolbarButtons\[\$script:HcBrowserToolbarIndex\]\.Tag"){throw 'Browser controller routing regressed to the old button-only toolbar model; the actual address field would be unreachable.'}
 
 $progressText=Get-Content -Raw -LiteralPath $progressWorker -Encoding UTF8
 foreach($marker in @('Calculating ETA','Read-ProviderOutputTail','Start-WriteObservation','Update-ObservedWriteBytes','Incremental destination writes','Installing','Downloading','TelemetryKind')){if($progressText -notmatch [regex]::Escape($marker)){throw "Provider progress invariant missing: $marker"}}
@@ -121,7 +149,7 @@ try{
     $nintendoOptimizerText=Get-Content -Raw -LiteralPath $nintendoOptimizer -Encoding UTF8
     if($nintendoOptimizerText -match 'PS2|PS3'){throw 'Nintendo ownership optimizer must not target PS2/PS3 presentation.'}
 
-    Write-Host 'v0.26.5 startup timing, normalized provider telemetry, complete Epic coordinator activation, incremental transfer observation and Nintendo ownership validation passed.'
+    Write-Host 'v0.26.5 startup timing, browser cold-start/controller navigation, normalized provider telemetry, complete Epic coordinator activation, incremental transfer observation and Nintendo ownership validation passed.'
 }finally{
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
