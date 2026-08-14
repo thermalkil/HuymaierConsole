@@ -13,6 +13,7 @@ $providerOptimizer=Join-Path $PSScriptRoot 'Optimize-ProviderDownloads.ps1'
 $epicWatchOptimizer=Join-Path $PSScriptRoot 'Optimize-EpicTelemetryWatch.ps1'
 $epicCoordinatorOptimizer=Join-Path $PSScriptRoot 'Optimize-ProviderCoordinatorEpicActivation.ps1'
 $providerConcurrencyOptimizer=Join-Path $PSScriptRoot 'Optimize-ProviderConcurrency.ps1'
+$providerPreflightOptimizer=Join-Path $PSScriptRoot 'Optimize-ProviderConcurrencyPreflight.ps1'
 $browserCursorOptimizer=Join-Path $PSScriptRoot 'Optimize-ControllerBrowserCursor.ps1'
 $runtimeHitchOptimizer=Join-Path $PSScriptRoot 'Optimize-RuntimeHitching.ps1'
 $workspace=$env:GITHUB_WORKSPACE
@@ -36,7 +37,7 @@ $providerConcurrencyUiSource=Join-Path $workspace 'HuymaierProviderConcurrencyUi
 $providerTransferCoordinatorSource=Join-Path $workspace 'HuymaierProviderTransferCoordinator.ps1'
 
 $requiredFiles=@(
-    $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$browserCursorOptimizer,$runtimeHitchOptimizer,
+    $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$providerPreflightOptimizer,$browserCursorOptimizer,$runtimeHitchOptimizer,
     $coreSource,$bootstrapSource,$installerCoreSource,$installerScriptSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource,
     $providerConcurrencySource,$providerConcurrencyUiSource,$providerTransferCoordinatorSource
 )
@@ -46,6 +47,7 @@ $originals=@{}
 foreach($path in @($coreSource,$bootstrapSource,$installerCoreSource,$installerScriptSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource)){$originals[$path]=[IO.File]::ReadAllBytes($path)}
 try{
     & $versionStamper -TriggerPath $TriggerPath -CorePath $coreSource -BootstrapPath $bootstrapSource -InstallerCorePath $installerCoreSource -InstallerScriptPath $installerScriptSource -ManifestPath $manifestSource -AppxManifestPath $appxManifestSource -NativeGameInputPath $nativeGameInputSource
+    & $providerPreflightOptimizer -BootstrapPath $bootstrapSource -InstallerScriptPath $installerScriptSource
     & $startupOptimizer -CorePath $coreSource
     & $nintendoOptimizer -NativePath $nativeConsoleSource
     & $nintendoNameOptimizer -ConsolePlatformsPath $nativeConsoleSource
