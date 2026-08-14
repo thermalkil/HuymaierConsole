@@ -41,6 +41,12 @@ jobs:
           $ErrorActionPreference='Stop'
           & '.\.development\v0.26.5\Test-v0265-PerformanceAndOwnership.ps1'
 
+      - name: Validate v0.26.5 stabilization transforms
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          & '.\.development\v0.26.5\Test-v0265-Stabilization.ps1'
+
       - name: Validate Wii and GameCube library ownership fixture
         shell: powershell
         run: |
@@ -67,6 +73,7 @@ jobs:
           $tempNative=Join-Path $env:RUNNER_TEMP 'HuymaierConsole.ConsolePlatforms.v0265.cs'
           Copy-Item -LiteralPath 'Native\HuymaierConsole.ConsolePlatforms.cs' -Destination $tempNative -Force
           & '.\.build\Optimize-NintendoLibraryOwnership.ps1' -NativePath $tempNative
+          & '.\.build\Optimize-NintendoDisplayNames.ps1' -ConsolePlatformsPath $tempNative
           $automation=[Management.Automation.PSObject].Assembly.Location
           $refs=@([Uri].Assembly.Location,[Linq.Enumerable].Assembly.Location,[System.Xaml.XamlReader].Assembly.Location,[Xml.XmlDocument].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,[Windows.Window].Assembly.Location,[Windows.Forms.Form].Assembly.Location,[Drawing.Bitmap].Assembly.Location,[Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,$automation)|Select-Object -Unique
           $sources=@(
@@ -88,11 +95,18 @@ jobs:
           & $csc @args
           if($LASTEXITCODE -ne 0 -or -not(Test-Path -LiteralPath $out)){throw 'v0.26.5 transformed x64 native compile failed.'}
 
-      - name: Validate release payload contains transfer telemetry helpers
+      - name: Validate release payload contains transfer runtime
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
           $sources=@(Get-Content '.source\source-files.txt' -Encoding UTF8)
-          foreach($required in @('HuymaierProviderTelemetry.ps1','HuymaierProviderProgressWorker.ps1','HuymaierProviderTelemetryCoordinator.ps1')){
+          foreach($required in @(
+            'HuymaierProviderTelemetry.ps1',
+            'HuymaierProviderProgressWorker.ps1',
+            'HuymaierProviderTelemetryCoordinator.ps1',
+            'HuymaierProviderConcurrency.ps1',
+            'HuymaierProviderConcurrencyUi.ps1',
+            'HuymaierProviderTransferCoordinator.ps1'
+          )){
             if($sources -notcontains $required){throw "Release payload is missing $required"}
           }
