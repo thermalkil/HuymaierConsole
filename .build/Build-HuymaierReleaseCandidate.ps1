@@ -5,22 +5,26 @@ Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
 
 $coreBuilder=Join-Path $PSScriptRoot 'Build-HuymaierReleaseCandidate.Core.ps1'
-$optimizer=Join-Path $PSScriptRoot 'Optimize-HuymaierStartup.ps1'
+$startupOptimizer=Join-Path $PSScriptRoot 'Optimize-HuymaierStartup.ps1'
+$nintendoOptimizer=Join-Path $PSScriptRoot 'Optimize-NintendoLibraryOwnership.ps1'
 $workspace=$env:GITHUB_WORKSPACE
 if([string]::IsNullOrWhiteSpace($workspace)){$workspace=(Split-Path -Parent $PSScriptRoot)}
 $coreSource=Join-Path $workspace 'HuymaierConsole.ps1'
+$nativeConsoleSource=Join-Path $workspace 'Native\HuymaierConsole.ConsolePlatforms.cs'
 
-foreach($required in @($coreBuilder,$optimizer,$coreSource)){
-    if(-not(Test-Path -LiteralPath $required -PathType Leaf)){throw "Candidate startup wrapper is missing required file: $required"}
+foreach($required in @($coreBuilder,$startupOptimizer,$nintendoOptimizer,$coreSource,$nativeConsoleSource)){
+    if(-not(Test-Path -LiteralPath $required -PathType Leaf)){throw "Candidate optimization wrapper is missing required file: $required"}
 }
 
-$original=[IO.File]::ReadAllBytes($coreSource)
+$coreOriginal=[IO.File]::ReadAllBytes($coreSource)
+$nativeOriginal=[IO.File]::ReadAllBytes($nativeConsoleSource)
 try{
-    & $optimizer -CorePath $coreSource
+    & $startupOptimizer -CorePath $coreSource
+    & $nintendoOptimizer -NativePath $nativeConsoleSource
     & $coreBuilder -TriggerPath $TriggerPath
 }finally{
-    # The candidate contains the deterministic optimized runtime, while the
-    # checked-out source tree is restored byte-for-byte for later workflow
-    # validation/diff gates and for reproducible developer source state.
-    [IO.File]::WriteAllBytes($coreSource,$original)
+    # Candidate bytes are built from deterministic optimized workspace sources,
+    # while the checkout is restored exactly for later source/freeze diff gates.
+    [IO.File]::WriteAllBytes($coreSource,$coreOriginal)
+    [IO.File]::WriteAllBytes($nativeConsoleSource,$nativeOriginal)
 }
