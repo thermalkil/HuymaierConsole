@@ -1,12 +1,12 @@
 {
-  "requestedAtUtc": "2026-08-14T14:46:00Z",
-  "attempt": 2,
+  "requestedAtUtc": "2026-08-14T14:53:00Z",
+  "attempt": 3,
   "candidate": "v0.26.5-rc1",
   "version": "0.26.5",
   "base_release": "v0.26.2",
   "base_asset": "HC262.zip",
   "package_root": "HC265",
   "asset_name": "HC265.zip",
-  "production_source": "a1fbfefa785632f1219d3a79de284ce424c18578",
-  "scope": "same validated v0.26.5 performance/downloads production source plus corrected release-stage assertion location; faster Xbox-home startup, responsive native-console return, explicit Downloading/Installing telemetry with truthful ETA fallback, deterministic Wii/GameCube library ownership, frozen PS1/PS2/PS3 presentation, and inherited installer/Steam integrity gates"
+  "production_source": "555eba25ab61938864f6e90974d95ed193d937aa",
+  "scope": "v0.26.5 RC1 retry after live startup exposed stale compiled native build stamp; candidate transform now stamps Native/HuymaierConsole.GameInput.cs to 0.26.5 and release-stage validation loads the exact compiled HuymaierConsole.exe to require HuymaierBuildStamp 0.26.5/x64 before artifact upload; all prior startup, provider, Nintendo, controller, installer, Steam and PS1/PS2/PS3 freeze gates remain"
 }
