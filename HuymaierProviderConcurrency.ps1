@@ -147,9 +147,8 @@ function Start-GameProviderWorker {
         $powershell="$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
         $process=Start-Process -FilePath $powershell -ArgumentList (Get-HcProviderTransferWorkerArguments $Mode $Provider $GameId $GameName $InstallPath $statePath) -WindowStyle Hidden -PassThru
         $script:ProviderWorkerProcesses[$transferId]=$process
-        # Do not rewrite the transfer state after process launch: the worker owns
-        # this file from here onward. Avoiding a second UI write prevents a race
-        # where an early Downloading state could be replaced by Starting again.
+        # The worker owns the state file after launch. Avoid a second UI write
+        # that could race an early Downloading state back to Starting.
         Write-Log "Concurrent provider worker started: $Provider / $Mode / $GameName / $transferId / PID $($process.Id)"
         Set-ConsoleNotice "${Provider}: $GameName added to active downloads." 'INFO'
     }catch{
