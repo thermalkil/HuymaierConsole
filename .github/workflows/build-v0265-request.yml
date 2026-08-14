@@ -1,0 +1,85 @@
+name: Build Huymaier Console v0.26.5 Requested Candidate
+on:
+  push:
+    branches: [feature/v0.26.5-performance-and-downloads]
+    paths: ['.development/v0.26.5/candidate-request.json']
+permissions: {contents: write}
+concurrency: {group: huymaier-v0265-requested-candidate, cancel-in-progress: false}
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Check out exact requested source SHA
+        uses: actions/checkout@v4
+        with: {ref: '${{ github.sha }}', fetch-depth: 0}
+      - name: Read and validate request
+        id: request
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $path='.development\v0.26.5\candidate-request.json'
+          $data=Get-Content -Raw $path -Encoding UTF8|ConvertFrom-Json
+          foreach($required in @('candidate','version','base_release','base_asset','package_root','asset_name','production_source')){if([string]::IsNullOrWhiteSpace([string]$data.$required)){throw "Candidate request missing $required"}}
+          if([string]$data.version-ne'0.26.5'){throw 'Candidate version is not 0.26.5'}
+          if([string]$data.base_release-ne'v0.26.2'-or[string]$data.base_asset-ne'HC262.zip'){throw 'v0.26.5 must stage from the published v0.26.2 / HC262.zip runtime baseline'}
+          if([string]$data.package_root-ne'HC265'-or[string]$data.asset_name-ne'HC265.zip'){throw 'v0.26.5 package identity must be HC265'}
+          $parent=(& git rev-parse HEAD^).Trim()
+          if([string]$data.production_source-ne$parent){throw "Candidate production_source $($data.production_source) is not exact request parent $parent"}
+          $m=Get-Content -Raw manifest.json -Encoding UTF8|ConvertFrom-Json
+          if([string]$m.version-ne'0.26.4'-or[string]$m.build-ne'platform-expansion-rc1'){throw 'v0.26.5 source checkout no longer descends from the finalized v0.26.4 RC1 identity before deterministic candidate stamping'}
+          "path=$path"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "candidate=$([string]$data.candidate)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "asset=$([string]$data.asset_name)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "package_root=$([string]$data.package_root)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "production_source=$([string]$data.production_source)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+      - name: Parse v0.26.5 release gates
+        shell: powershell
+        run: |
+          foreach($p in @('.\.build\Set-HuymaierCandidateVersion.ps1','.\.build\Build-HuymaierReleaseCandidate.ps1','.\.build\Test-HuymaierV0265Candidate.ps1')){$t=$null;$e=$null;[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p),[ref]$t,[ref]$e);if($e.Count){$e|ForEach-Object{Write-Host "$p : $($_.Message)"};throw "$p failed PowerShell 5.1 parse"}}
+      - name: Revalidate exact v0.26.5 source behavior
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          & '.\.development\v0.26.5\Test-v0265-PerformanceAndOwnership.ps1'
+          & '.\.development\v0.26.5\Test-NintendoLibraryOwnership.ps1'
+      - name: Build exact x64 FSE Home host
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';$csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe';if(-not(Test-Path $csc)){throw 'Framework64 csc missing'};$source=Join-Path $env:GITHUB_WORKSPACE 'HuymaierFSEHost.cs';$output=Join-Path $env:GITHUB_WORKSPACE 'FSEPackage\HuymaierFSEHost.exe';$systemAssembly=[Diagnostics.Process].Assembly.Location;& $csc /noconfig /nologo /target:winexe /platform:x64 /optimize+ ('/reference:'+$systemAssembly) ('/out:'+$output) $source;if($LASTEXITCODE-ne0-or-not(Test-Path $output)){throw 'x64 FSE Home host compilation failed'};git add -N -f FSEPackage/HuymaierFSEHost.exe
+      - name: Build exact release-shaped HC265 candidate
+        shell: powershell
+        env: {GH_TOKEN: '${{ github.token }}'}
+        run: |
+          $ErrorActionPreference='Stop';& .\.build\Build-HuymaierReleaseCandidate.ps1 -TriggerPath '${{ steps.request.outputs.path }}'
+      - name: Run installer and integrity failure-injection suite
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';$stage=Join-Path $env:RUNNER_TEMP ('hc-stage\${{ steps.request.outputs.package_root }}');$validation=Join-Path $env:HC_CANDIDATE_OUTPUT 'candidate-validation.json';& .\.build\Test-HuymaierCandidate.ps1 -StageRoot $stage -ValidationPath $validation
+      - name: Run v0.26.5 release-shaped gates
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';$stage=Join-Path $env:RUNNER_TEMP ('hc-stage\${{ steps.request.outputs.package_root }}');$validation=Join-Path $env:HC_CANDIDATE_OUTPUT 'candidate-validation.json';& .\.build\Test-HuymaierV0265Candidate.ps1 -StageRoot $stage -ValidationPath $validation
+      - name: Run Steam owned-library behavior tests
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';$stage=Join-Path $env:RUNNER_TEMP ('hc-stage\${{ steps.request.outputs.package_root }}');$validation=Join-Path $env:HC_CANDIDATE_OUTPUT 'candidate-validation.json';& .\.build\Test-HuymaierV0262SteamOwnership.ps1 -StageRoot $stage -ValidationPath $validation
+      - name: Verify final candidate hash matches validation record
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop';$validation=Get-Content -Raw (Join-Path $env:HC_CANDIDATE_OUTPUT 'candidate-validation.json') -Encoding UTF8|ConvertFrom-Json;$zip=Join-Path $env:HC_CANDIDATE_OUTPUT '${{ steps.request.outputs.asset }}';$hash=(Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant();if($hash-ne[string]$validation.sha256){throw "Final ZIP hash $hash differs from validation $($validation.sha256)"};Write-Host "Final HC265 SHA-256: $hash"
+      - name: Upload exact v0.26.5 candidate bytes
+        uses: actions/upload-artifact@v4
+        with:
+          name: '${{ steps.request.outputs.candidate }}'
+          path: |
+            ${{ env.HC_CANDIDATE_OUTPUT }}\${{ steps.request.outputs.asset }}
+            ${{ env.HC_CANDIDATE_OUTPUT }}\${{ steps.request.outputs.asset }}.sha256
+            ${{ env.HC_CANDIDATE_OUTPUT }}\candidate-validation.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Record candidate status
+        if: always()
+        shell: powershell
+        env: {BUILD_RESULT: '${{ job.status }}', CANDIDATE: '${{ steps.request.outputs.candidate }}', PRODUCTION_SOURCE: '${{ steps.request.outputs.production_source }}'}
+        run: |
+          $ErrorActionPreference='Stop';git reset -- FSEPackage/HuymaierFSEHost.exe 2>$null;$status=[ordered]@{candidate=$env:CANDIDATE;result=$env:BUILD_RESULT;runId=$env:GITHUB_RUN_ID;runAttempt=$env:GITHUB_RUN_ATTEMPT;commit=$env:GITHUB_SHA;productionSource=$env:PRODUCTION_SOURCE;recordedAtUtc=[DateTime]::UtcNow.ToString('o')};$status|ConvertTo-Json|Set-Content '.development\v0.26.5\candidate-status.json' -Encoding UTF8;git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com';git add '.development\v0.26.5\candidate-status.json';if(-not(git diff --cached --quiet)){git commit -m "Record $env:CANDIDATE candidate status";git push origin HEAD:feature/v0.26.5-performance-and-downloads}
