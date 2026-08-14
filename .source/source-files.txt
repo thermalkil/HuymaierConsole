@@ -95,6 +95,8 @@ EmulatorPlatforms/Xbox360/settings.default.json
 FSEPackage/AppxManifest.xml
 FSEPackage/CustomCapability.SCCD
 FSEPackage/Public/.keep
+HuymaierAppInstallWorker.ps1
+HuymaierAppLibrary.ps1
 HuymaierArtworkWorker.ps1
 HuymaierBootstrap.ps1
 HuymaierConsole.ps1
