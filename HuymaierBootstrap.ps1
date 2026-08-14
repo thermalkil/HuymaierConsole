@@ -28,7 +28,9 @@ $manifestPath=Join-Path $baseDir 'manifest.json'
 $installIncompleteMarker=Join-Path $dataDir 'install-incomplete.json'
 $gameInputBridgePath=Join-Path $baseDir 'HuymaierGameInputBridge.dll'
 $preflightCachePath=Join-Path $dataDir 'startup-preflight-v1.json'
-$script:ProviderTelemetryCoordinatorProcess=$null
+$script:ProviderTelemetryWatcher=$null
+$script:ProviderTelemetrySubscription=$null
+$script:ProviderTelemetryPidPath=Join-Path (Join-Path $dataDir 'GameProviders') 'provider-telemetry-coordinator.pid'
 New-Item -ItemType Directory -Force -Path $dataDir,$logDir|Out-Null
 
 function Write-BootstrapLog {
@@ -200,35 +202,69 @@ function Exit-HuymaierSingleInstance {
     }catch{}
 }
 
-function Quote-BootstrapArgument {
-    param([string]$Value)
-    if($null -eq $Value){return '""'}
-    return '"'+$Value.Replace('"','')+'"'
-}
-
-function Start-ProviderTelemetryCoordinator {
+function Start-ProviderTelemetryWatch {
     if(-not(Test-Path -LiteralPath $providerTelemetryCoordinatorPath -PathType Leaf)){return}
+    $providerRoot=Join-Path $dataDir 'GameProviders'
+    New-Item -ItemType Directory -Force -Path $providerRoot|Out-Null
+    $statePath=Join-Path $providerRoot 'provider-state.json'
     try{
-        $powershell="$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
-        $arguments=@(
-            '-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Quote-BootstrapArgument $providerTelemetryCoordinatorPath),
-            '-ParentPid',[string]$PID,'-BaseDir',(Quote-BootstrapArgument $baseDir),'-DataDir',(Quote-BootstrapArgument $dataDir)
-        )
-        $process=Start-Process -FilePath $powershell -ArgumentList $arguments -WindowStyle Hidden -PassThru
-        try{$process.PriorityClass='BelowNormal'}catch{}
-        $script:ProviderTelemetryCoordinatorProcess=$process
-        Write-BootstrapLog 'Provider telemetry coordinator started at below-normal priority.'
-    }catch{Write-BootstrapLog "Provider telemetry coordinator could not start: $($_.Exception.Message)" 'WARN'}
+        $watcher=New-Object IO.FileSystemWatcher $providerRoot,'provider-state.json'
+        $watcher.NotifyFilter=[IO.NotifyFilters]::LastWrite -bor [IO.NotifyFilters]::Size -bor [IO.NotifyFilters]::FileName
+        $context=[pscustomobject]@{
+            StatePath=$statePath
+            CoordinatorPath=$providerTelemetryCoordinatorPath
+            BaseDir=$baseDir
+            DataDir=$dataDir
+            ParentPid=$PID
+            PidPath=$script:ProviderTelemetryPidPath
+        }
+        $action={
+            $ctx=$event.MessageData
+            try{
+                if($null -eq $ctx -or -not(Test-Path -LiteralPath $ctx.StatePath -PathType Leaf)){return}
+                $state=$null;try{$state=Get-Content -Raw -LiteralPath $ctx.StatePath -Encoding UTF8|ConvertFrom-Json}catch{return}
+                if($null -eq $state -or -not [bool]$state.Busy){return}
+                $provider=[string]$state.Provider;$mode=[string]$state.Mode;$workerPid=[int]$state.WorkerPid
+                if($provider -notin @('GOG','Amazon') -or $mode -notin @('Install','Update') -or $workerPid -le 0){return}
+                if(Test-Path -LiteralPath $ctx.PidPath -PathType Leaf){
+                    $existing=0;try{$existing=[int](Get-Content -Raw -LiteralPath $ctx.PidPath)}catch{}
+                    if($existing -gt 0){try{$p=Get-Process -Id $existing -ErrorAction Stop;if(-not $p.HasExited){return}}catch{}}
+                    Remove-Item -LiteralPath $ctx.PidPath -Force -ErrorAction SilentlyContinue
+                }
+                $powershell="$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
+                $quote={param([string]$v);'"'+([string]$v).Replace('"','')+'"'}
+                $args=@(
+                    '-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(& $quote $ctx.CoordinatorPath),
+                    '-ParentPid',[string]$ctx.ParentPid,'-BaseDir',(& $quote $ctx.BaseDir),'-DataDir',(& $quote $ctx.DataDir)
+                )
+                $process=Start-Process -FilePath $powershell -ArgumentList $args -WindowStyle Hidden -PassThru
+                try{$process.PriorityClass='BelowNormal'}catch{}
+                Set-Content -LiteralPath $ctx.PidPath -Value ([string]$process.Id) -Encoding ASCII
+            }catch{}
+        }
+        $subscription=Register-ObjectEvent -InputObject $watcher -EventName Changed -MessageData $context -Action $action
+        $watcher.EnableRaisingEvents=$true
+        $script:ProviderTelemetryWatcher=$watcher
+        $script:ProviderTelemetrySubscription=$subscription
+        Write-BootstrapLog 'Provider telemetry is event-driven; no telemetry PowerShell process is started during normal boot.'
+    }catch{Write-BootstrapLog "Provider telemetry watcher could not start: $($_.Exception.Message)" 'WARN'}
 }
 
-function Stop-ProviderTelemetryCoordinator {
+function Stop-ProviderTelemetryWatch {
     try{
-        if($null -ne $script:ProviderTelemetryCoordinatorProcess){
-            $script:ProviderTelemetryCoordinatorProcess.Refresh()
-            if(-not $script:ProviderTelemetryCoordinatorProcess.HasExited){Stop-Process -Id $script:ProviderTelemetryCoordinatorProcess.Id -Force -ErrorAction SilentlyContinue}
+        if($null -ne $script:ProviderTelemetryWatcher){$script:ProviderTelemetryWatcher.EnableRaisingEvents=$false}
+        if($null -ne $script:ProviderTelemetrySubscription){Unregister-Event -SubscriptionId $script:ProviderTelemetrySubscription.Id -ErrorAction SilentlyContinue;Remove-Job -Id $script:ProviderTelemetrySubscription.Id -Force -ErrorAction SilentlyContinue}
+    }catch{}
+    try{if($null -ne $script:ProviderTelemetryWatcher){$script:ProviderTelemetryWatcher.Dispose()}}catch{}
+    $script:ProviderTelemetryWatcher=$null
+    $script:ProviderTelemetrySubscription=$null
+    try{
+        if(Test-Path -LiteralPath $script:ProviderTelemetryPidPath -PathType Leaf){
+            $coordinatorPid=0;try{$coordinatorPid=[int](Get-Content -Raw -LiteralPath $script:ProviderTelemetryPidPath)}catch{}
+            if($coordinatorPid -gt 0){Stop-Process -Id $coordinatorPid -Force -ErrorAction SilentlyContinue}
+            Remove-Item -LiteralPath $script:ProviderTelemetryPidPath -Force -ErrorAction SilentlyContinue
         }
     }catch{}
-    $script:ProviderTelemetryCoordinatorProcess=$null
 }
 
 try{
@@ -241,15 +277,15 @@ try{
     }
 
     Write-BootstrapLog "Huymaier Console v$script:ExpectedConsoleVersion integrity preflight and single-instance gate passed."
-    Start-ProviderTelemetryCoordinator
+    Start-ProviderTelemetryWatch
     try{
         if($Windowed){& $corePath -Windowed}else{& $corePath}
     }finally{
-        Stop-ProviderTelemetryCoordinator
+        Stop-ProviderTelemetryWatch
         Exit-HuymaierSingleInstance
     }
 }catch{
-    Stop-ProviderTelemetryCoordinator
+    Stop-ProviderTelemetryWatch
     $message=$_.Exception.Message
     Write-BootstrapLog "v$script:ExpectedConsoleVersion preflight/startup failed:`n$message" 'FATAL'
     try{
