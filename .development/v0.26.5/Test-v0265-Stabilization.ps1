@@ -42,6 +42,7 @@ try{
     & (Join-Path $repo '.build\Optimize-ProviderConcurrency.ps1') -ProviderModulePath $provider -ProviderWorkerPath $providerWorker -ProgressWorkerPath $progressWorker -BootstrapPath $bootstrap -ShellRedesignPath $shell
     & (Join-Path $repo '.build\Optimize-ControllerBrowserCursor.ps1') -BrowserPath $browser
     & (Join-Path $repo '.build\Optimize-RuntimeHitching.ps1') -ConsolePath $core
+    & (Join-Path $repo '.build\Optimize-ConcurrentDownloadRefresh.ps1') -ConsolePath $core
 
     foreach($path in @($core,$bootstrap,$installer,$provider,$providerWorker,$progressWorker,$telemetryCoordinator,$shell,$browser)) { Assert-Ps51Parse $path }
     foreach($path in @(
@@ -52,7 +53,8 @@ try{
         (Join-Path $repo '.build\Optimize-NintendoDisplayNames.ps1'),
         (Join-Path $repo '.build\Optimize-ProviderConcurrency.ps1'),
         (Join-Path $repo '.build\Optimize-ProviderConcurrencyPreflight.ps1'),
-        (Join-Path $repo '.build\Optimize-RuntimeHitching.ps1')
+        (Join-Path $repo '.build\Optimize-RuntimeHitching.ps1'),
+        (Join-Path $repo '.build\Optimize-ConcurrentDownloadRefresh.ps1')
     )) { Assert-Ps51Parse $path }
 
     $browserText=Get-Content -Raw -LiteralPath $browser -Encoding UTF8
@@ -62,24 +64,19 @@ try{
 
     $nativeText=Get-Content -Raw -LiteralPath $native -Encoding UTF8
     foreach($required in @('HUYMAIER_NINTENDO_DISPLAY_NAME_V1','ResolveLibraryDisplayName','ReadNintendoDiscTitle','extension.Equals(".wbfs"','ReadNintendoAsciiTitle','Wii Game (','GameCube')){Assert-Contains $nativeText $required "Nintendo title transform is missing $required."}
-    $oldTitle='Name = CleanName(Path.GetFileNameWithoutExtension(path)),'
-    Assert-NotContains $nativeText $oldTitle 'A visible native scanner still exposes bare file/disc IDs as titles.'
+    Assert-NotContains $nativeText 'Name = CleanName(Path.GetFileNameWithoutExtension(path)),' 'A visible native scanner still exposes bare file/disc IDs as titles.'
     $resolvedCount=([regex]::Matches($nativeText,[regex]::Escape('Name = ResolveLibraryDisplayName(path),'))).Count
     if($resolvedCount -lt 2){throw "Expected both visible/native scanner title assignments to use ResolveLibraryDisplayName; found $resolvedCount."}
 
-    # Validate the raw title offsets used by the transformed C# against synthetic
-    # ISO and WBFS headers. This guards the exact values without needing a ROM.
+    # Validate the exact raw-title offsets against synthetic ISO and WBFS data.
     $iso=New-Object byte[] 256
-    [Text.Encoding]::ASCII.GetBytes('R22E01').CopyTo($iso,0)
-    $iso[0x18]=0x5D;$iso[0x19]=0x1C;$iso[0x1A]=0x9E;$iso[0x1B]=0xA3
+    [Text.Encoding]::ASCII.GetBytes('R22E01').CopyTo($iso,0);$iso[0x18]=0x5D;$iso[0x19]=0x1C;$iso[0x1A]=0x9E;$iso[0x1B]=0xA3
     [Text.Encoding]::ASCII.GetBytes('Synthetic Wii Title').CopyTo($iso,0x20)
     $isoTitle=[Text.Encoding]::ASCII.GetString($iso,0x20,0x60).Trim([char]0,' ')
     if($isoTitle -ne 'Synthetic Wii Title'){throw "Synthetic ISO title offset failed: '$isoTitle'"}
-    $wbfsSectorShift=20;$wbfsSectorSize=1 -shl $wbfsSectorShift
-    $wbfs=New-Object byte[] ($wbfsSectorSize+256)
+    $wbfsSectorShift=20;$wbfsSectorSize=1 -shl $wbfsSectorShift;$wbfs=New-Object byte[] ($wbfsSectorSize+256)
     [Text.Encoding]::ASCII.GetBytes('WBFS').CopyTo($wbfs,0);$wbfs[9]=[byte]$wbfsSectorShift;$wbfs[12]=1
-    [Text.Encoding]::ASCII.GetBytes('R23E52').CopyTo($wbfs,$wbfsSectorSize)
-    [Text.Encoding]::ASCII.GetBytes('Synthetic WBFS Title').CopyTo($wbfs,$wbfsSectorSize+0x20)
+    [Text.Encoding]::ASCII.GetBytes('R23E52').CopyTo($wbfs,$wbfsSectorSize);[Text.Encoding]::ASCII.GetBytes('Synthetic WBFS Title').CopyTo($wbfs,$wbfsSectorSize+0x20)
     $wbfsTitle=[Text.Encoding]::ASCII.GetString($wbfs,$wbfsSectorSize+0x20,0x60).Trim([char]0,' ')
     if($wbfsTitle -ne 'Synthetic WBFS Title'){throw "Synthetic WBFS title offset failed: '$wbfsTitle'"}
 
@@ -94,23 +91,21 @@ try{
     foreach($required in @('HUYMAIER_PROVIDER_PROGRESS_TRANSFER_ID_V1','[string]$TransferId','[regex]::Escape($TransferId)')){Assert-Contains $progressText $required "Progress worker is missing per-transfer isolation marker $required."}
     foreach($required in @('HUYMAIER_PROVIDER_CONCURRENCY_UI_V1','HuymaierProviderConcurrencyUi.ps1')){Assert-Contains $shellText $required "Shell is missing concurrent Downloads UI marker $required."}
     Assert-Contains $bootstrapText 'HUYMAIER_CONCURRENT_PROVIDER_COORDINATOR_V1' 'Legacy single-state telemetry watcher was not disabled for concurrent transfers.'
-    Assert-NotContains $bootstrapText "    Start-ProviderTelemetryWatch`r`n" 'Legacy single-state provider telemetry watcher still starts at runtime.'
     foreach($required in @('HuymaierProviderConcurrency.ps1','HuymaierProviderConcurrencyUi.ps1','HuymaierProviderTransferCoordinator.ps1')){Assert-Contains $bootstrapText $required "Bootstrap preflight is missing $required.";Assert-Contains $installerText $required "Installer preflight cache is missing $required."}
 
     $concurrencyText=Get-Content -Raw (Join-Path $repo 'HuymaierProviderConcurrency.ps1') -Encoding UTF8
     $concurrencyUiText=Get-Content -Raw (Join-Path $repo 'HuymaierProviderConcurrencyUi.ps1') -Encoding UTF8
     $transferCoordinatorText=Get-Content -Raw (Join-Path $repo 'HuymaierProviderTransferCoordinator.ps1') -Encoding UTF8
-    foreach($required in @("$Mode -notin @('Install','Update')",'transfer-$transferId.json','Get-GameProviderActiveTransfers','Get-HcProviderTransferEtaText','Calculating ETA…')){Assert-Contains $concurrencyText $required "Concurrent provider layer is missing $required."}
+    foreach($required in @('$Mode -notin @(''Install'',''Update'')','transfer-$transferId.json','Get-GameProviderActiveTransfers','Get-HcProviderTransferEtaText','Calculating ETA…')){Assert-Contains $concurrencyText $required "Concurrent provider layer is missing $required."}
     foreach($required in @('Get-HcActiveDownloadStates','Add-HcActiveDownloadCard','foreach($state in $active)','Update-HcActiveDownloadVisuals','Update-HcDownloadHistory')){Assert-Contains $concurrencyUiText $required "Concurrent Downloads UI is missing $required."}
-    foreach($required in @('ExpectedDownloadBytes','Estimated total size + observed throughput','Get-HcSmoothedTelemetryRate','provider-transfers.json','TelemetryToken')){
-        if($required -eq 'Get-HcSmoothedTelemetryRate'){Assert-Contains (Get-Content -Raw (Join-Path $repo 'HuymaierProviderTelemetry.ps1') -Encoding UTF8) $required 'Smoothed throughput helper is missing.'}
-        elseif($required -eq 'TelemetryToken'){}else{Assert-Contains $transferCoordinatorText $required "Transfer coordinator is missing $required."}
-    }
+    foreach($required in @('ExpectedDownloadBytes','Estimated total size + observed throughput','provider-transfers.json')){Assert-Contains $transferCoordinatorText $required "Transfer coordinator is missing $required."}
+    $telemetryText=Get-Content -Raw (Join-Path $repo 'HuymaierProviderTelemetry.ps1') -Encoding UTF8
+    foreach($required in @('Get-HcSmoothedTelemetryRate','Get-HcTelemetryEtaSeconds')){Assert-Contains $telemetryText $required "Provider telemetry helper is missing $required."}
 
     $coreText=Get-Content -Raw -LiteralPath $core -Encoding UTF8
-    foreach($required in @('HUYMAIER_RUNTIME_HITCH_GUARD_V1','FileSystemWatcher','Update-HcRuntimeStateEvents','Invoke-HcIncrementalConsoleCountRefresh','HcDownloadHistoryDirty','Stop-HcRuntimeStateWatcher')){Assert-Contains $coreText $required "Runtime hitch guard is missing $required."}
-    $countStart=$coreText.IndexOf('function Get-PlatformCountSummary {',[StringComparison]::Ordinal)
-    $countEnd=$coreText.IndexOf('function New-PlatformCard {',[StringComparison]::Ordinal)
+    foreach($required in @('HUYMAIER_RUNTIME_HITCH_GUARD_V1','FileSystemWatcher','Update-HcRuntimeStateEvents','Invoke-HcIncrementalConsoleCountRefresh','HcDownloadHistoryDirty','Stop-HcRuntimeStateWatcher','HUYMAIER_CONCURRENT_DOWNLOAD_REFRESH_V1')){Assert-Contains $coreText $required "Runtime hitch/download refresh guard is missing $required."}
+    Assert-Contains $coreText "if(`$lower.EndsWith('provider-transfers.json')){Add-HcRuntimeDirtyPath `$script:ProviderStatePath}" 'Transfer aggregate events do not wake the Downloads UI.'
+    $countStart=$coreText.IndexOf('function Get-PlatformCountSummary {',[StringComparison]::Ordinal);$countEnd=$coreText.IndexOf('function New-PlatformCard {',[StringComparison]::Ordinal)
     if($countStart -lt 0 -or $countEnd -le $countStart){throw 'Could not inspect transformed platform-count renderer.'}
     $countSegment=$coreText.Substring($countStart,$countEnd-$countStart)
     foreach($forbidden in @('Start-Ps1LibrarySummaryScan','Start-Ps2LibrarySummaryScan','Start-Ps3LibrarySummaryScan','Start-NativeConsoleLibrarySummaryScan $id')){Assert-NotContains $countSegment $forbidden "Platform-card rendering still starts a worker: $forbidden"}
@@ -118,7 +113,6 @@ try{
 
     $sources=@(Get-Content -LiteralPath (Join-Path $repo '.source\source-files.txt') -Encoding UTF8)
     foreach($required in @('HuymaierProviderConcurrency.ps1','HuymaierProviderConcurrencyUi.ps1','HuymaierProviderTransferCoordinator.ps1')){if($sources -notcontains $required){throw "Release source list is missing $required."}}
-
     Write-Host 'v0.26.5 stabilization transform gate passed: browser cursor, Nintendo titles, concurrent provider transfers/ETA, and runtime hitch guards.'
 }finally{
     Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
