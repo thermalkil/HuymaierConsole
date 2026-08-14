@@ -20,7 +20,7 @@ if([string]$manifest.build -ne 'performance-downloads-rc1'){throw 'Candidate man
 if([string]$manifest.builtFrom -ne 'HC262.zip'){throw 'v0.26.5 candidate no longer records the published HC262.zip package staging baseline.'}
 
 $core=Require-Text 'HuymaierConsole.ps1' @(
-    "$script:AppVersion = '0.26.5'",
+    "`$script:AppVersion = '0.26.5'",
     'Startup timing: entering ShowDialog at',
     'Startup timing: first rendered frame at',
     'Startup timing: deferred shell services ready at',
@@ -31,14 +31,14 @@ $core=Require-Text 'HuymaierConsole.ps1' @(
     "'HuymaierConsole.Native.FrameRateMonitor' -as [type]"
 )
 $bootstrap=Require-Text 'HuymaierBootstrap.ps1' @(
-    "$script:ExpectedConsoleVersion='0.26.5'",
+    "`$script:ExpectedConsoleVersion='0.26.5'",
     'startup-preflight-v1.json',
     'Test-PowerShellPreflightCache',
     'Start-ProviderTelemetryWatch',
     "@('Epic','GOG','Amazon')"
 )
 $installer=Require-Text 'HuymaierInstallerCore.ps1' @(
-    "$script:InstallVersion='0.26.5'",
+    "`$script:InstallVersion='0.26.5'",
     'Write-HuymaierStartupPreflightCache',
     "ValidationSource='installer'"
 )
