@@ -21,9 +21,9 @@ function Replace-ExactlyOnce([string]$Path,[string]$Old,[string]$New,[string]$La
     [IO.File]::WriteAllText($Path,$text,(New-Object Text.UTF8Encoding($false)))
 }
 
-Replace-ExactlyOnce $CorePath "$script:AppVersion = '0.26.4'" "$script:AppVersion = '$version'" 'v0.26.4 AppVersion'
-Replace-ExactlyOnce $BootstrapPath "$script:ExpectedConsoleVersion='0.26.4'" "$script:ExpectedConsoleVersion='$version'" 'v0.26.4 bootstrap expected-version'
-Replace-ExactlyOnce $InstallerCorePath "$script:InstallVersion='0.26.4'" "$script:InstallVersion='$version'" 'v0.26.4 installer version'
+Replace-ExactlyOnce $CorePath "`$script:AppVersion = '0.26.4'" "`$script:AppVersion = '$version'" 'v0.26.4 AppVersion'
+Replace-ExactlyOnce $BootstrapPath "`$script:ExpectedConsoleVersion='0.26.4'" "`$script:ExpectedConsoleVersion='$version'" 'v0.26.4 bootstrap expected-version'
+Replace-ExactlyOnce $InstallerCorePath "`$script:InstallVersion='0.26.4'" "`$script:InstallVersion='$version'" 'v0.26.4 installer version'
 
 $manifest=Get-Content -Raw -LiteralPath $ManifestPath -Encoding UTF8|ConvertFrom-Json
 if([string]$manifest.version -ne '0.26.4'){throw "Expected source manifest version 0.26.4 before candidate stamping, found $($manifest.version)."}
