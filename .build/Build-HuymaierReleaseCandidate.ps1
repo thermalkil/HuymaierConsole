@@ -8,9 +8,13 @@ $coreBuilder=Join-Path $PSScriptRoot 'Build-HuymaierReleaseCandidate.Core.ps1'
 $versionStamper=Join-Path $PSScriptRoot 'Set-HuymaierCandidateVersion.ps1'
 $startupOptimizer=Join-Path $PSScriptRoot 'Optimize-HuymaierStartup.ps1'
 $nintendoOptimizer=Join-Path $PSScriptRoot 'Optimize-NintendoLibraryOwnership.ps1'
+$nintendoNameOptimizer=Join-Path $PSScriptRoot 'Optimize-NintendoDisplayNames.ps1'
 $providerOptimizer=Join-Path $PSScriptRoot 'Optimize-ProviderDownloads.ps1'
 $epicWatchOptimizer=Join-Path $PSScriptRoot 'Optimize-EpicTelemetryWatch.ps1'
 $epicCoordinatorOptimizer=Join-Path $PSScriptRoot 'Optimize-ProviderCoordinatorEpicActivation.ps1'
+$providerConcurrencyOptimizer=Join-Path $PSScriptRoot 'Optimize-ProviderConcurrency.ps1'
+$browserCursorOptimizer=Join-Path $PSScriptRoot 'Optimize-ControllerBrowserCursor.ps1'
+$runtimeHitchOptimizer=Join-Path $PSScriptRoot 'Optimize-RuntimeHitching.ps1'
 $workspace=$env:GITHUB_WORKSPACE
 if([string]::IsNullOrWhiteSpace($workspace)){$workspace=(Split-Path -Parent $PSScriptRoot)}
 $coreSource=Join-Path $workspace 'HuymaierConsole.ps1'
@@ -24,22 +28,32 @@ $providerModuleSource=Join-Path $workspace 'HuymaierGameProviders.ps1'
 $providerWorkerSource=Join-Path $workspace 'HuymaierGameProviderWorker.ps1'
 $progressWorkerSource=Join-Path $workspace 'HuymaierProviderProgressWorker.ps1'
 $coordinatorSource=Join-Path $workspace 'HuymaierProviderTelemetryCoordinator.ps1'
+$shellRedesignSource=Join-Path $workspace 'HuymaierShellRedesign.ps1'
+$browserSource=Join-Path $workspace 'HuymaierWebBrowser.ps1'
+$providerConcurrencySource=Join-Path $workspace 'HuymaierProviderConcurrency.ps1'
+$providerConcurrencyUiSource=Join-Path $workspace 'HuymaierProviderConcurrencyUi.ps1'
+$providerTransferCoordinatorSource=Join-Path $workspace 'HuymaierProviderTransferCoordinator.ps1'
 
 $requiredFiles=@(
-    $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,
-    $coreSource,$bootstrapSource,$installerCoreSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource
+    $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$browserCursorOptimizer,$runtimeHitchOptimizer,
+    $coreSource,$bootstrapSource,$installerCoreSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource,
+    $providerConcurrencySource,$providerConcurrencyUiSource,$providerTransferCoordinatorSource
 )
 foreach($required in $requiredFiles){if(-not(Test-Path -LiteralPath $required -PathType Leaf)){throw "Candidate optimization wrapper is missing required file: $required"}}
 
 $originals=@{}
-foreach($path in @($coreSource,$bootstrapSource,$installerCoreSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource)){$originals[$path]=[IO.File]::ReadAllBytes($path)}
+foreach($path in @($coreSource,$bootstrapSource,$installerCoreSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource)){$originals[$path]=[IO.File]::ReadAllBytes($path)}
 try{
     & $versionStamper -TriggerPath $TriggerPath -CorePath $coreSource -BootstrapPath $bootstrapSource -InstallerCorePath $installerCoreSource -ManifestPath $manifestSource -AppxManifestPath $appxManifestSource -NativeGameInputPath $nativeGameInputSource
     & $startupOptimizer -CorePath $coreSource
     & $nintendoOptimizer -NativePath $nativeConsoleSource
+    & $nintendoNameOptimizer -ConsolePlatformsPath $nativeConsoleSource
     & $providerOptimizer -ProviderModulePath $providerModuleSource -ProviderWorkerPath $providerWorkerSource -ProgressWorkerPath $progressWorkerSource -CoordinatorPath $coordinatorSource
     & $epicWatchOptimizer -BootstrapPath $bootstrapSource
     & $epicCoordinatorOptimizer -CoordinatorPath $coordinatorSource
+    & $providerConcurrencyOptimizer -ProviderModulePath $providerModuleSource -ProviderWorkerPath $providerWorkerSource -ProgressWorkerPath $progressWorkerSource -BootstrapPath $bootstrapSource -ShellRedesignPath $shellRedesignSource
+    & $browserCursorOptimizer -BrowserPath $browserSource
+    & $runtimeHitchOptimizer -ConsolePath $coreSource
     & $coreBuilder -TriggerPath $TriggerPath
 }finally{
     # Candidate bytes are built from deterministic optimized/stamped workspace sources,
