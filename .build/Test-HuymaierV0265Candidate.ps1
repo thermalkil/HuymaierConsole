@@ -37,8 +37,10 @@ $bootstrap=Require-Text 'HuymaierBootstrap.ps1' @(
     'Start-ProviderTelemetryWatch',
     "@('Epic','GOG','Amazon')"
 )
-$installer=Require-Text 'HuymaierInstallerCore.ps1' @(
-    "`$script:InstallVersion='0.26.5'",
+$installerCore=Require-Text 'HuymaierInstallerCore.ps1' @(
+    "`$script:InstallVersion='0.26.5'"
+)
+$installerEntry=Require-Text 'Install-HuymaierConsole.ps1' @(
     'Write-HuymaierStartupPreflightCache',
     "ValidationSource='installer'"
 )
