@@ -14,9 +14,10 @@ $epicCoordinatorOptimizer=Join-Path $PSScriptRoot 'Optimize-ProviderCoordinatorE
 $workspace=$env:GITHUB_WORKSPACE
 if([string]::IsNullOrWhiteSpace($workspace)){$workspace=(Split-Path -Parent $PSScriptRoot)}
 $coreSource=Join-Path $workspace 'HuymaierConsole.ps1'
+$bootstrapSource=Join-Path $workspace 'HuymaierBootstrap.ps1'
+$installerCoreSource=Join-Path $workspace 'HuymaierInstallerCore.ps1'
 $manifestSource=Join-Path $workspace 'manifest.json'
 $appxManifestSource=Join-Path $workspace 'FSEPackage\AppxManifest.xml'
-$bootstrapSource=Join-Path $workspace 'HuymaierBootstrap.ps1'
 $nativeConsoleSource=Join-Path $workspace 'Native\HuymaierConsole.ConsolePlatforms.cs'
 $providerModuleSource=Join-Path $workspace 'HuymaierGameProviders.ps1'
 $providerWorkerSource=Join-Path $workspace 'HuymaierGameProviderWorker.ps1'
@@ -25,14 +26,14 @@ $coordinatorSource=Join-Path $workspace 'HuymaierProviderTelemetryCoordinator.ps
 
 $requiredFiles=@(
     $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,
-    $coreSource,$manifestSource,$appxManifestSource,$bootstrapSource,$nativeConsoleSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource
+    $coreSource,$bootstrapSource,$installerCoreSource,$manifestSource,$appxManifestSource,$nativeConsoleSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource
 )
 foreach($required in $requiredFiles){if(-not(Test-Path -LiteralPath $required -PathType Leaf)){throw "Candidate optimization wrapper is missing required file: $required"}}
 
 $originals=@{}
-foreach($path in @($coreSource,$manifestSource,$appxManifestSource,$bootstrapSource,$nativeConsoleSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource)){$originals[$path]=[IO.File]::ReadAllBytes($path)}
+foreach($path in @($coreSource,$bootstrapSource,$installerCoreSource,$manifestSource,$appxManifestSource,$nativeConsoleSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource)){$originals[$path]=[IO.File]::ReadAllBytes($path)}
 try{
-    & $versionStamper -TriggerPath $TriggerPath -CorePath $coreSource -ManifestPath $manifestSource -AppxManifestPath $appxManifestSource
+    & $versionStamper -TriggerPath $TriggerPath -CorePath $coreSource -BootstrapPath $bootstrapSource -InstallerCorePath $installerCoreSource -ManifestPath $manifestSource -AppxManifestPath $appxManifestSource
     & $startupOptimizer -CorePath $coreSource
     & $nintendoOptimizer -NativePath $nativeConsoleSource
     & $providerOptimizer -ProviderModulePath $providerModuleSource -ProviderWorkerPath $providerWorkerSource -ProgressWorkerPath $progressWorkerSource -CoordinatorPath $coordinatorSource
