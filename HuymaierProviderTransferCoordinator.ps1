@@ -38,10 +38,9 @@ function Convert-SizeTextBytes {
     try{
         $value=[double]::Parse($m.Groups[1].Value,[Globalization.CultureInfo]::InvariantCulture)
         if(Get-Command Convert-HcTelemetrySizeToBytes -ErrorAction SilentlyContinue){return [int64](Convert-HcTelemetrySizeToBytes $value $m.Groups[2].Value)}
-        switch($m.Groups[2].Value.ToUpperInvariant()){'GB'{return [int64]($value*1GB)}'GIB'{return [int64]($value*1GB)}'MB'{return [int64]($value*1MB)}'MIB'{return [int64]($value*1MB)}'KB'{return [int64]($value*1KB)}'KIB'{return [int64]($value*1KB)}default{return [int64]$value}}
+        switch($m.Groups[2].Value.ToUpperInvariant()){'TB'{return [int64]($value*1TB)}'TIB'{return [int64]($value*1TB)}'GB'{return [int64]($value*1GB)}'GIB'{return [int64]($value*1GB)}'MB'{return [int64]($value*1MB)}'MIB'{return [int64]($value*1MB)}'KB'{return [int64]($value*1KB)}'KIB'{return [int64]($value*1KB)}default{return [int64]$value}}
     }catch{return [int64]0}
 }
-
 function Get-CatalogGame {
     param([string]$Provider,[string]$GameId)
     $catalog=Read-Json $catalogPath
@@ -62,8 +61,8 @@ function Get-ExpectedSizes {
         if($install -le 0){foreach($name in @('InstallSizeBytes','InstalledSizeBytes','SizeBytes')){$candidate=[int64](Get-Prop $game $name 0);if($candidate -gt 0){$install=$candidate;break}}}
         if($install -le 0){$install=Convert-SizeTextBytes ([string](Get-Prop $game 'SizeText' ''))}
     }
-    # If the backend exposes only installed size, it is still a better ETA basis
-    # than refusing to estimate. Mark it approximate so the UI can say so.
+    # If only installed size is known, use it as an explicit estimate rather
+    # than withholding ETA indefinitely. The UI marks this as approximate.
     if($download -le 0 -and $install -gt 0){$download=$install;$estimated=$true}
     if($install -le 0 -and $download -gt 0){$install=$download;$estimated=$true}
     return [pscustomobject]@{Download=[int64]$download;Install=[int64]$install;Estimated=[bool]$estimated}
@@ -71,21 +70,25 @@ function Get-ExpectedSizes {
 function Get-ConfiguredInstallRoot {
     param([string]$Provider)
     $config=Read-Json $configPath
-    foreach($entry in @(Get-Prop $config 'ProviderInstallRoots' @())){if([string]::Equals([string](Get-Prop $entry 'Provider' ''),$Provider,[StringComparison]::OrdinalIgnoreCase)){if([string](Get-Prop $entry 'Path' '')){return [string](Get-Prop $entry 'Path' '')}}}
+    foreach($entry in @(Get-Prop $config 'ProviderInstallRoots' @())){
+        if([string]::Equals([string](Get-Prop $entry 'Provider' ''),$Provider,[StringComparison]::OrdinalIgnoreCase)){
+            $path=[string](Get-Prop $entry 'Path' '');if($path){return $path}
+        }
+    }
     return (Join-Path 'C:\Games' $Provider)
 }
 function Get-ManagedInstallPath {
     param([string]$Provider,[string]$GameId)
-    foreach($item in @(Read-Json $managedPath)){if([string]::Equals([string](Get-Prop $item 'Provider' ''),$Provider,[StringComparison]::OrdinalIgnoreCase) -and [string]::Equals([string](Get-Prop $item 'Id' ''),$GameId,[StringComparison]::OrdinalIgnoreCase)){return [string](Get-Prop $item 'Path' '')}}
+    foreach($item in @(Read-Json $managedPath)){
+        if([string]::Equals([string](Get-Prop $item 'Provider' ''),$Provider,[StringComparison]::OrdinalIgnoreCase) -and [string]::Equals([string](Get-Prop $item 'Id' ''),$GameId,[StringComparison]::OrdinalIgnoreCase)){return [string](Get-Prop $item 'Path' '')}
+    }
     return ''
 }
 function Get-WatchPath {
     param($State)
-    $explicit=[string](Get-Prop $State 'InstallPath' '')
-    if($explicit){return $explicit}
+    $explicit=[string](Get-Prop $State 'InstallPath' '');if($explicit){return $explicit}
     $provider=[string](Get-Prop $State 'Provider' '');$gameId=[string](Get-Prop $State 'GameId' '');$mode=[string](Get-Prop $State 'Mode' '')
-    $managed=Get-ManagedInstallPath $provider $gameId
-    if($mode -eq 'Update' -and $managed){return $managed}
+    $managed=Get-ManagedInstallPath $provider $gameId;if($mode -eq 'Update' -and $managed){return $managed}
     return Get-ConfiguredInstallRoot $provider
 }
 
@@ -108,7 +111,11 @@ function Start-TransferMonitor {
     Remove-Item -LiteralPath $progressPath -Force -ErrorAction SilentlyContinue
     $powershell="$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
     $args=@('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(Quote-Arg $progressWorkerPath),'-Provider',$provider,'-TransferId',$Id,'-StatePath',(Quote-Arg $StatePath),'-ProgressPath',(Quote-Arg $progressPath),'-WatchPath',(Quote-Arg (Get-WatchPath $State)),'-WorkerPid',[string]$pidValue,'-TelemetryHelperPath',(Quote-Arg $telemetryHelperPath),'-ExpectedDownloadBytes',[string]$sizes.Download,'-ExpectedInstallBytes',[string]$sizes.Install)
-    try{$p=Start-Process -FilePath $powershell -ArgumentList $args -WindowStyle Hidden -PassThru;try{$p.PriorityClass='BelowNormal'}catch{};$script:Monitors[$Id]=[pscustomobject]@{Process=$p;ProgressPath=$progressPath;StatePath=$StatePath;WorkerPid=$pidValue;Estimated=[bool]$sizes.Estimated}}catch{}
+    try{
+        $p=Start-Process -FilePath $powershell -ArgumentList $args -WindowStyle Hidden -PassThru
+        try{$p.PriorityClass='BelowNormal'}catch{}
+        $script:Monitors[$Id]=[pscustomobject]@{Process=$p;ProgressPath=$progressPath;StatePath=$StatePath;WorkerPid=$pidValue;Estimated=[bool]$sizes.Estimated}
+    }catch{}
 }
 function Merge-TransferProgress {
     param([string]$Id,[string]$StatePath,$State)
@@ -116,18 +123,28 @@ function Merge-TransferProgress {
     $entry=$script:Monitors[$Id]
     $progress=Read-Json ([string]$entry.ProgressPath)
     if($null -eq $progress -or -not [bool](Get-Prop $progress 'Busy' $false)){return $State}
-    if([int](Get-Prop $progress 'WorkerPid' 0) -ne [int](Get-Prop $State 'WorkerPid' 0)){return $State}
+    $expectedPid=[int](Get-Prop $State 'WorkerPid' 0);$expectedUpdated=[string](Get-Prop $State 'Updated' '')
+    if([int](Get-Prop $progress 'WorkerPid' 0) -ne $expectedPid){return $State}
     try{if(([DateTime]::UtcNow-[DateTime]::Parse([string](Get-Prop $progress 'Updated' ''))).TotalSeconds -gt 4){return $State}}catch{return $State}
+
     $phase=[string](Get-Prop $progress 'Phase' [string](Get-Prop $State 'Phase' 'Downloading'))
     if($phase -in @('Downloading','Installing')){Set-Prop $State 'Phase' $phase}
     $current=[int64](Get-Prop $progress 'CurrentBytes' 0);$downloadTotal=[int64](Get-Prop $progress 'TotalBytes' 0);$installTotal=[int64](Get-Prop $progress 'InstallSizeBytes' 0);$rate=[double](Get-Prop $progress 'SpeedBytesPerSec' 0);$eta=[int64](Get-Prop $progress 'EtaSeconds' -1);$pct=[int](Get-Prop $progress 'Progress' -1)
-    if($phase -eq 'Installing'){Set-Prop $State 'InstallProcessedBytes' $current;if($rate -gt 0){Set-Prop $State 'InstallSpeedBytesPerSec' $rate}}else{if($current -gt 0){Set-Prop $State 'DownloadedBytes' $current}}
-    if($downloadTotal -gt 0){Set-Prop $State 'TotalBytes' $downloadTotal};if($installTotal -gt 0){Set-Prop $State 'InstallSizeBytes' $installTotal};if($rate -gt 0){Set-Prop $State 'TransferSpeedBytesPerSec' $rate;if($phase -eq 'Downloading'){Set-Prop $State 'DownloadSpeedBytesPerSec' $rate}}
+    if($phase -eq 'Installing'){Set-Prop $State 'InstallProcessedBytes' $current;if($rate -gt 0){Set-Prop $State 'InstallSpeedBytesPerSec' $rate}}elseif($current -gt 0){Set-Prop $State 'DownloadedBytes' $current}
+    if($downloadTotal -gt 0){Set-Prop $State 'TotalBytes' $downloadTotal};if($installTotal -gt 0){Set-Prop $State 'InstallSizeBytes' $installTotal}
+    if($rate -gt 0){Set-Prop $State 'TransferSpeedBytesPerSec' $rate;if($phase -eq 'Downloading'){Set-Prop $State 'DownloadSpeedBytesPerSec' $rate}}
     if($eta -ge 0){Set-Prop $State 'EtaSeconds' $eta};if($pct -ge 0){Set-Prop $State 'Progress' $pct}
     Set-Prop $State 'TelemetryUpdated' ([string](Get-Prop $progress 'Updated' ''))
     Set-Prop $State 'TelemetrySource' $(if([bool]$entry.Estimated){'Estimated total size + observed throughput'}else{[string](Get-Prop $progress 'TelemetryKind' 'Observed throughput')})
     Set-Prop $State 'EtaEstimated' ([bool]$entry.Estimated)
     Set-Prop $State 'Message' ([string](Get-Prop $progress 'Message' ([string](Get-Prop $State 'Message' '')))
+
+    # Do not overwrite a newer provider-native state update. Merge fallback data
+    # only when the worker PID and its Updated token still match our snapshot.
+    $latest=Read-Json $StatePath
+    if($null -eq $latest -or -not [bool](Get-Prop $latest 'Busy' $false)){return $(if($null -ne $latest){$latest}else{$State})}
+    if([int](Get-Prop $latest 'WorkerPid' 0) -ne $expectedPid -or -not [string]::Equals([string](Get-Prop $latest 'Updated' ''),$expectedUpdated,[StringComparison]::Ordinal)){return $latest}
+    Write-AtomicJson $StatePath $State
     return $State
 }
 
@@ -136,17 +153,16 @@ function Read-TransferStates {
     foreach($file in @(Get-ChildItem -LiteralPath $transferRoot -Filter 'transfer-*.json' -File -ErrorAction SilentlyContinue)){
         $state=Read-Json $file.FullName;if($null -eq $state){continue}
         $id=Get-TransferId $file.FullName $state;Set-Prop $state 'TransferId' $id;Set-Prop $state 'StatePath' $file.FullName
-        $busy=[bool](Get-Prop $state 'Busy' $false);$workerPid=[int](Get-Prop $state 'WorkerPid' 0)
+        $busy=[bool](Get-Prop $state 'Busy' $false);$workerPid=[int](Get-Prop $state 'WorkerPid' 0);$mode=[string](Get-Prop $state 'Mode' '')
         if($busy -and $workerPid -gt 0 -and -not(Test-ProcessAlive $workerPid)){
             Set-Prop $state 'Busy' $false;Set-Prop $state 'Phase' 'Failed';Set-Prop $state 'Error' 'Provider worker ended unexpectedly.';Set-Prop $state 'Updated' ([DateTime]::UtcNow.ToString('o'));Write-AtomicJson $file.FullName $state;$busy=$false
         }
-        if($busy -and [string](Get-Prop $state 'Mode' '') -in @('Install','Update')){Start-TransferMonitor $id $file.FullName $state;$state=Merge-TransferProgress $id $file.FullName $state;Write-AtomicJson $file.FullName $state}
+        if($busy -and $mode -in @('Install','Update')){Start-TransferMonitor $id $file.FullName $state;$state=Merge-TransferProgress $id $file.FullName $state}
         else{Stop-TransferMonitor $id}
         [void]$items.Add($state)
     }
     return [object[]]$items.ToArray()
 }
-
 function Prune-TransferStates {
     param([object[]]$States)
     $cutoff=[DateTime]::UtcNow.AddDays(-7)
@@ -155,22 +171,23 @@ function Prune-TransferStates {
     foreach($state in $completed){$index++;$updated=[datetime]::MinValue;try{$updated=[datetime]::Parse([string](Get-Prop $state 'Updated' ''))}catch{};$id=[string](Get-Prop $state 'TransferId' '');if($updated -ge $cutoff -and $index -le 100){$keep[$id]=$true}}
     foreach($state in $completed){$id=[string](Get-Prop $state 'TransferId' '');if($id -and -not $keep.ContainsKey($id)){try{Remove-Item -LiteralPath ([string](Get-Prop $state 'StatePath' '')) -Force -ErrorAction SilentlyContinue}catch{}}}
 }
-
 function Publish-TransferAggregate {
     param([object[]]$States)
     $ordered=@($States|Sort-Object @{Expression={[bool](Get-Prop $_ 'Busy' $false)};Descending=$true},@{Expression={try{[datetime]::Parse([string](Get-Prop $_ 'Updated' ''))}catch{[datetime]::MinValue}};Descending=$true})
     $signature=ConvertTo-Json -InputObject ([object[]]$ordered) -Depth 16 -Compress
-    if($signature -ne $script:LastAggregateSignature){
-        $script:LastAggregateSignature=$signature
-        Write-AtomicJson $aggregatePath ([pscustomobject]@{Transfers=[object[]]$ordered;Updated=[DateTime]::UtcNow.ToString('o')})
-    }
+    if($signature -ne $script:LastAggregateSignature){$script:LastAggregateSignature=$signature;Write-AtomicJson $aggregatePath ([pscustomobject]@{Transfers=[object[]]$ordered;Updated=[DateTime]::UtcNow.ToString('o')})}
+
     $active=@($ordered|Where-Object{[bool](Get-Prop $_ 'Busy' $false)})
     if($active.Count -gt 1){
         $latest=$active[0]
-        $legacy=[pscustomobject]@{Busy=$true;Provider='Multiple';Mode='Install';Phase='Downloading';Message=("{0} provider downloads/installations are active." -f $active.Count);Progress=-1;Error='';GameId='';GameName=("{0} active downloads" -f $active.Count);WorkerPid=0;StartedAt=[string](Get-Prop $latest 'StartedAt' '');Updated=[string](Get-Prop $latest 'Updated' ([DateTime]::UtcNow.ToString('o'));ActiveTransferCount=$active.Count)}
-    }elseif($active.Count -eq 1){$legacy=$active[0]}
-    elseif($ordered.Count -gt 0){$legacy=$ordered[0]}
-    else{$legacy=[pscustomobject]@{Busy=$false;Provider='';Mode='';Phase='Ready';Message='Direct game providers are ready.';Progress=-1;Error='';GameId='';GameName='';WorkerPid=0;Updated=[DateTime]::UtcNow.ToString('o');ActiveTransferCount=0}}
+        $legacy=[pscustomobject]@{Busy=$true;Provider='Multiple';Mode='Install';Phase='Downloading';Message=("{0} provider downloads/installations are active." -f $active.Count);Progress=-1;Error='';GameId='';GameName=("{0} active downloads" -f $active.Count);WorkerPid=0;StartedAt=[string](Get-Prop $latest 'StartedAt' '');Updated=[string](Get-Prop $latest 'Updated' ([DateTime]::UtcNow.ToString('o'));ActiveTransferCount=$active.Count}
+    }elseif($active.Count -eq 1){
+        $legacy=$active[0]
+    }elseif($ordered.Count -gt 0){
+        $legacy=$ordered[0]
+    }else{
+        $legacy=[pscustomobject]@{Busy=$false;Provider='';Mode='';Phase='Ready';Message='Direct game providers are ready.';Progress=-1;Error='';GameId='';GameName='';WorkerPid=0;Updated=[DateTime]::UtcNow.ToString('o');ActiveTransferCount=0}
+    }
     $legacySignature=ConvertTo-Json -InputObject $legacy -Depth 16 -Compress
     if($legacySignature -ne $script:LastLegacySignature){$script:LastLegacySignature=$legacySignature;Write-AtomicJson $legacyStatePath $legacy}
 }
