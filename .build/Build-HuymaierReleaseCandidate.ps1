@@ -12,6 +12,7 @@ $nintendoNameOptimizer=Join-Path $PSScriptRoot 'Optimize-NintendoDisplayNames.ps
 $dolphinOptimizer=Join-Path $PSScriptRoot 'Optimize-DolphinIntegration.ps1'
 $wiiArtworkAliasOptimizer=Join-Path $PSScriptRoot 'Optimize-WiiArtworkAliases.ps1'
 $appLibraryOptimizer=Join-Path $PSScriptRoot 'Optimize-AppLibrary.ps1'
+$streamingControllerOptimizer=Join-Path $PSScriptRoot 'Optimize-StreamingController.ps1'
 $providerOptimizer=Join-Path $PSScriptRoot 'Optimize-ProviderDownloads.ps1'
 $epicWatchOptimizer=Join-Path $PSScriptRoot 'Optimize-EpicTelemetryWatch.ps1'
 $epicCoordinatorOptimizer=Join-Path $PSScriptRoot 'Optimize-ProviderCoordinatorEpicActivation.ps1'
@@ -41,20 +42,23 @@ $providerConcurrencyUiSource=Join-Path $workspace 'HuymaierProviderConcurrencyUi
 $providerTransferCoordinatorSource=Join-Path $workspace 'HuymaierProviderTransferCoordinator.ps1'
 $appLibrarySource=Join-Path $workspace 'HuymaierAppLibrary.ps1'
 $appInstallWorkerSource=Join-Path $workspace 'HuymaierAppInstallWorker.ps1'
+$streamingControllerSource=Join-Path $workspace 'HuymaierStreamingController.ps1'
+$streamingCursorSource=Join-Path $workspace 'Native\HuymaierStreamingCursorHost.cs'
 
 $requiredFiles=@(
-    $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$dolphinOptimizer,$wiiArtworkAliasOptimizer,$appLibraryOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$providerPreflightOptimizer,$browserCursorOptimizer,$runtimeHitchOptimizer,$concurrentDownloadRefreshOptimizer,
+    $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$dolphinOptimizer,$wiiArtworkAliasOptimizer,$appLibraryOptimizer,$streamingControllerOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$providerPreflightOptimizer,$browserCursorOptimizer,$runtimeHitchOptimizer,$concurrentDownloadRefreshOptimizer,
     $coreSource,$bootstrapSource,$installerCoreSource,$installerScriptSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource,
-    $providerConcurrencySource,$providerConcurrencyUiSource,$providerTransferCoordinatorSource,$appLibrarySource,$appInstallWorkerSource
+    $providerConcurrencySource,$providerConcurrencyUiSource,$providerTransferCoordinatorSource,$appLibrarySource,$appInstallWorkerSource,$streamingControllerSource,$streamingCursorSource
 )
 foreach($required in $requiredFiles){if(-not(Test-Path -LiteralPath $required -PathType Leaf)){throw "Candidate optimization wrapper is missing required file: $required"}}
 
 $originals=@{}
-foreach($path in @($coreSource,$bootstrapSource,$installerCoreSource,$installerScriptSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource)){$originals[$path]=[IO.File]::ReadAllBytes($path)}
+foreach($path in @($coreBuilder,$coreSource,$bootstrapSource,$installerCoreSource,$installerScriptSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource)){$originals[$path]=[IO.File]::ReadAllBytes($path)}
 try{
     & $versionStamper -TriggerPath $TriggerPath -CorePath $coreSource -BootstrapPath $bootstrapSource -InstallerCorePath $installerCoreSource -InstallerScriptPath $installerScriptSource -ManifestPath $manifestSource -AppxManifestPath $appxManifestSource -NativeGameInputPath $nativeGameInputSource
     & $providerPreflightOptimizer -BootstrapPath $bootstrapSource -InstallerScriptPath $installerScriptSource
     & $appLibraryOptimizer -CorePath $coreSource -BootstrapPath $bootstrapSource -InstallerScriptPath $installerScriptSource
+    & $streamingControllerOptimizer -CorePath $coreSource -BootstrapPath $bootstrapSource -InstallerScriptPath $installerScriptSource -CoreBuilderPath $coreBuilder
     & $startupOptimizer -CorePath $coreSource
     & $nintendoOptimizer -NativePath $nativeConsoleSource
     & $nintendoNameOptimizer -ConsolePlatformsPath $nativeConsoleSource
