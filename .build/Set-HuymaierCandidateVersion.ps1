@@ -4,7 +4,8 @@ param(
     [Parameter(Mandatory=$true)][string]$BootstrapPath,
     [Parameter(Mandatory=$true)][string]$InstallerCorePath,
     [Parameter(Mandatory=$true)][string]$ManifestPath,
-    [Parameter(Mandatory=$true)][string]$AppxManifestPath
+    [Parameter(Mandatory=$true)][string]$AppxManifestPath,
+    [Parameter(Mandatory=$true)][string]$NativeGameInputPath
 )
 Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
@@ -24,6 +25,7 @@ function Replace-ExactlyOnce([string]$Path,[string]$Old,[string]$New,[string]$La
 Replace-ExactlyOnce $CorePath "`$script:AppVersion = '0.26.4'" "`$script:AppVersion = '$version'" 'v0.26.4 AppVersion'
 Replace-ExactlyOnce $BootstrapPath "`$script:ExpectedConsoleVersion='0.26.4'" "`$script:ExpectedConsoleVersion='$version'" 'v0.26.4 bootstrap expected-version'
 Replace-ExactlyOnce $InstallerCorePath "`$script:InstallVersion='0.26.4'" "`$script:InstallVersion='$version'" 'v0.26.4 installer version'
+Replace-ExactlyOnce $NativeGameInputPath 'public const string Version = "0.26.4";' ('public const string Version = "'+$version+'";') 'v0.26.4 native build stamp'
 
 $manifest=Get-Content -Raw -LiteralPath $ManifestPath -Encoding UTF8|ConvertFrom-Json
 if([string]$manifest.version -ne '0.26.4'){throw "Expected source manifest version 0.26.4 before candidate stamping, found $($manifest.version)."}
@@ -53,4 +55,4 @@ if(([regex]::Matches($appx,[regex]::Escape($oldAppx))).Count -ne 1){throw 'Expec
 $appx=$appx.Replace($oldAppx,$newAppx)
 [IO.File]::WriteAllText($AppxManifestPath,$appx,(New-Object Text.UTF8Encoding($false)))
 
-Write-Host "Stamped shell, bootstrap, installer, manifest and AppX as Huymaier Console v$version / performance-downloads-rc1."
+Write-Host "Stamped shell, bootstrap, installer, native build stamp, manifest and AppX as Huymaier Console v$version / performance-downloads-rc1."
