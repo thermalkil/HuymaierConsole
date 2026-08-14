@@ -8,8 +8,6 @@ foreach($path in @($BootstrapPath,$InstallerScriptPath)){if(-not(Test-Path -Lite
 
 $bootstrap=Get-Content -Raw -LiteralPath $BootstrapPath -Encoding UTF8
 if($bootstrap -notmatch 'HuymaierProviderTransferCoordinator.ps1'){
-    $pathNeedle="$providerTelemetryCoordinatorPath=Join-Path $baseDir 'HuymaierProviderTelemetryCoordinator.ps1'"
-    # The strings above intentionally refer to the staged script text, not this optimizer's variables.
     $pathNeedle='$providerTelemetryCoordinatorPath=Join-Path $baseDir ''HuymaierProviderTelemetryCoordinator.ps1'''
     if(-not $bootstrap.Contains($pathNeedle)){throw 'Provider preflight transform could not find bootstrap provider coordinator path.'}
     $pathReplacement=$pathNeedle+"`r`n"+'$providerConcurrencyPath=Join-Path $baseDir ''HuymaierProviderConcurrency.ps1'''+"`r`n"+'$providerConcurrencyUiPath=Join-Path $baseDir ''HuymaierProviderConcurrencyUi.ps1'''+"`r`n"+'$providerTransferCoordinatorPath=Join-Path $baseDir ''HuymaierProviderTransferCoordinator.ps1'''
