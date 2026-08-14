@@ -27,9 +27,6 @@ function Replace-WorkerFunctionBlock {
     return $Text.Substring(0,$start)+$Replacement.TrimEnd()+"`r`n"+$Text.Substring($next)
 }
 
-# Load the concurrent state layer after the legacy provider module so only
-# Install/Update behavior is overridden. Other provider operations retain their
-# known-good implementation.
 $provider=Get-Content -Raw -LiteralPath $ProviderModulePath -Encoding UTF8
 if($provider -notmatch 'HUYMAIER_PROVIDER_CONCURRENCY_V1'){
     $provider += @'
@@ -41,8 +38,6 @@ if(Test-Path -LiteralPath $concurrencyModule -PathType Leaf){. $concurrencyModul
     Set-Content -LiteralPath $ProviderModulePath -Value $provider -Encoding UTF8
 }
 
-# Load the multi-card Downloads renderer after ShellRedesign has defined its
-# completion ledger and base transfer UI functions.
 $shell=Get-Content -Raw -LiteralPath $ShellRedesignPath -Encoding UTF8
 if($shell -notmatch 'HUYMAIER_PROVIDER_CONCURRENCY_UI_V1'){
     $shell += @'
@@ -54,8 +49,6 @@ if(Test-Path -LiteralPath $concurrencyUi -PathType Leaf){. $concurrencyUi}
     Set-Content -LiteralPath $ShellRedesignPath -Value $shell -Encoding UTF8
 }
 
-# Each transfer gets its own redirected provider-output pair so simultaneous
-# progress monitors cannot accidentally parse another game's backend output.
 $worker=Get-Content -Raw -LiteralPath $ProviderWorkerPath -Encoding UTF8
 if($worker -notmatch 'HUYMAIER_PROVIDER_TRANSFER_STATE_V1'){
     $started='$startedAt=(Get-Date).ToString(''o'')'
@@ -87,7 +80,7 @@ function Invoke-ProviderSharedStateLock{
     $acquired=$false
     try{
         $mutex=New-Object Threading.Mutex($false,'Local\HuymaierConsole.ProviderSharedState')
-        try{$acquired=$mutex.WaitOne(30000)}catch[Threading.AbandonedMutexException]{$acquired=$true}
+        try{$acquired=$mutex.WaitOne(30000)}catch [Threading.AbandonedMutexException]{$acquired=$true}
         if(-not $acquired){throw 'Timed out waiting for the provider state lock.'}
         return & $Action
     }finally{
@@ -154,8 +147,6 @@ function Remove-ManagedInstall{
     Set-Content -LiteralPath $ProviderWorkerPath -Value $worker -Encoding UTF8
 }
 
-# Progress workers filter redirected output by TransferId, while keeping the old
-# broad scan as compatibility behavior when no transfer id was supplied.
 $progress=Get-Content -Raw -LiteralPath $ProgressWorkerPath -Encoding UTF8
 if($progress -notmatch 'HUYMAIER_PROVIDER_PROGRESS_TRANSFER_ID_V1'){
     $providerParam='(?m)^(\s*\[Parameter\(Mandatory=\$true\)\]\[ValidateSet\([^\r\n]+\)\]\[string\]\$Provider,\r?)$'
@@ -168,9 +159,6 @@ if($progress -notmatch 'HUYMAIER_PROVIDER_PROGRESS_TRANSFER_ID_V1'){
     Set-Content -LiteralPath $ProgressWorkerPath -Value $progress -Encoding UTF8
 }
 
-# The new transfer coordinator owns fallback telemetry per state file. Prevent
-# the legacy single-state watcher from launching a second coordinator against
-# provider-state.json.
 $bootstrap=Get-Content -Raw -LiteralPath $BootstrapPath -Encoding UTF8
 if($bootstrap -notmatch 'HUYMAIER_CONCURRENT_PROVIDER_COORDINATOR_V1'){
     $call="    Start-ProviderTelemetryWatch`r`n"
