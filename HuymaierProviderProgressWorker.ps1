@@ -16,10 +16,14 @@ if($TelemetryHelperPath -and (Test-Path -LiteralPath $TelemetryHelperPath -PathT
 $started=[DateTime]::UtcNow
 $lastSample=$started
 $lastBytes=[int64]0
-$highWater=[int64]0
+$observedBytes=[int64]0
+$phaseBaselineBytes=[int64]0
 $smoothedRate=[double]0
-$gameId='';$gameName='';$mode='Install';$phase='Downloading'
+$gameId='';$gameName='';$mode='Install';$phase='Downloading';$lastPhase='Downloading'
 $tempCutoff=$started.AddSeconds(-4)
+$script:ObservedFileLengths=@{}
+$script:WriteWatcher=$null
+$script:WriteWatcherSource='Huymaier.ProviderWrites.'+$PID
 
 function Get-Prop {param($Object,[string]$Name,$Default=$null);if($null -eq $Object){return $Default};try{$p=$Object.PSObject.Properties[$Name];if($null -ne $p -and $null -ne $p.Value){return $p.Value}}catch{};return $Default}
 function Read-State {if(-not(Test-Path -LiteralPath $StatePath -PathType Leaf)){return $null};try{return Get-Content -Raw -LiteralPath $StatePath|ConvertFrom-Json}catch{return $null}}
@@ -50,27 +54,72 @@ function Get-Eta {
     if(Get-Command Get-HcTelemetryEtaSeconds -ErrorAction SilentlyContinue){return [int64](Get-HcTelemetryEtaSeconds $Current $Total $Rate $Progress ([math]::Max(0,([DateTime]::UtcNow-$started).TotalSeconds)))}
     if($Total -gt 0 -and $Rate -gt 1){return [int64][math]::Ceiling([math]::Max(0,$Total-$Current)/$Rate)};return [int64]-1
 }
-function Get-ObservedWriteBytes {
-    param([string]$Root)
-    if([string]::IsNullOrWhiteSpace($Root) -or -not(Test-Path -LiteralPath $Root -PathType Container)){return [int64]0}
-    $cutoff=$started.AddSeconds(-3);$sum=[int64]0;$visited=0
+function Get-ExistingWatchRoot {
+    param([string]$Path)
+    if([string]::IsNullOrWhiteSpace($Path)){return ''}
+    $candidate=$Path
+    while($candidate){
+        if(Test-Path -LiteralPath $candidate -PathType Container){return $candidate}
+        try{$parent=Split-Path -Parent $candidate}catch{$parent=''}
+        if(-not $parent -or [string]::Equals($parent,$candidate,[StringComparison]::OrdinalIgnoreCase)){break}
+        $candidate=$parent
+    }
+    return ''
+}
+function Start-WriteObservation {
+    if($null -ne $script:WriteWatcher){return $true}
+    $root=Get-ExistingWatchRoot $WatchPath
+    if(-not $root){return $false}
     try{
-        foreach($path in [IO.Directory]::EnumerateFiles($Root,'*',[IO.SearchOption]::AllDirectories)){
-            if(++$visited -gt 50000){break}
-            try{$file=New-Object IO.FileInfo($path);if($file.LastWriteTimeUtc -ge $cutoff){$sum+=[int64]$file.Length}}catch{}
+        $watcher=New-Object IO.FileSystemWatcher $root,'*'
+        $watcher.IncludeSubdirectories=$true
+        $watcher.NotifyFilter=[IO.NotifyFilters]::FileName -bor [IO.NotifyFilters]::Size -bor [IO.NotifyFilters]::LastWrite
+        $watcher.InternalBufferSize=32768
+        [void](Register-ObjectEvent -InputObject $watcher -EventName Changed -SourceIdentifier ($script:WriteWatcherSource+'.Changed'))
+        [void](Register-ObjectEvent -InputObject $watcher -EventName Created -SourceIdentifier ($script:WriteWatcherSource+'.Created'))
+        [void](Register-ObjectEvent -InputObject $watcher -EventName Renamed -SourceIdentifier ($script:WriteWatcherSource+'.Renamed'))
+        $watcher.EnableRaisingEvents=$true
+        $script:WriteWatcher=$watcher
+        return $true
+    }catch{return $false}
+}
+function Stop-WriteObservation {
+    try{if($null -ne $script:WriteWatcher){$script:WriteWatcher.EnableRaisingEvents=$false}}catch{}
+    foreach($suffix in @('Changed','Created','Renamed')){
+        $id=$script:WriteWatcherSource+'.'+$suffix
+        try{Unregister-Event -SourceIdentifier $id -ErrorAction SilentlyContinue}catch{}
+        try{Get-Event -SourceIdentifier $id -ErrorAction SilentlyContinue|Remove-Event -ErrorAction SilentlyContinue}catch{}
+    }
+    try{if($null -ne $script:WriteWatcher){$script:WriteWatcher.Dispose()}}catch{}
+    $script:WriteWatcher=$null
+}
+function Update-ObservedWriteBytes {
+    [int64]$added=0
+    foreach($suffix in @('Changed','Created','Renamed')){
+        $id=$script:WriteWatcherSource+'.'+$suffix
+        $events=@(Get-Event -SourceIdentifier $id -ErrorAction SilentlyContinue)
+        foreach($evt in $events){
+            try{
+                $full=[string]$evt.SourceEventArgs.FullPath
+                if($full -and (Test-Path -LiteralPath $full -PathType Leaf)){
+                    $length=[int64](Get-Item -LiteralPath $full -ErrorAction Stop).Length
+                    $key=$full.ToLowerInvariant();$before=[int64]0
+                    if($script:ObservedFileLengths.ContainsKey($key)){$before=[int64]$script:ObservedFileLengths[$key]}
+                    if($length -gt $before){$added+=($length-$before)}
+                    $script:ObservedFileLengths[$key]=$length
+                }
+            }catch{}
+            try{Remove-Event -EventIdentifier $evt.EventIdentifier -ErrorAction SilentlyContinue}catch{}
         }
-    }catch{}
-    return $sum
+    }
+    return $added
 }
 function Read-ProviderOutputTail {
     $parts=New-Object System.Collections.ArrayList
     try{
         $files=Get-ChildItem -LiteralPath $env:TEMP -File -ErrorAction SilentlyContinue|Where-Object{$_.Name -match '^huymaier-provider-(out|err)-.*\.txt$' -and $_.LastWriteTimeUtc -ge $tempCutoff}|Sort-Object LastWriteTimeUtc -Descending|Select-Object -First 6
         foreach($file in @($files)){
-            try{
-                $lines=@(Get-Content -LiteralPath $file.FullName -Tail 100 -ErrorAction SilentlyContinue)
-                if($lines.Count -gt 0){[void]$parts.Add(($lines -join "`n"))}
-            }catch{}
+            try{$lines=@(Get-Content -LiteralPath $file.FullName -Tail 100 -ErrorAction SilentlyContinue);if($lines.Count -gt 0){[void]$parts.Add(($lines -join "`n"))}}catch{}
         }
     }catch{}
     return ([string]::Join("`n",[object[]]$parts.ToArray()))
@@ -93,6 +142,7 @@ function Write-Progress {
 try{
     $initial=Read-State
     if($null -ne $initial){$gameId=[string](Get-Prop $initial 'GameId' '');$gameName=[string](Get-Prop $initial 'GameName' '');$mode=[string](Get-Prop $initial 'Mode' 'Install')}
+    [void](Start-WriteObservation)
     Write-Progress $true 'Downloading' -1 0 $ExpectedDownloadBytes $ExpectedInstallBytes 0 -1 'Preparing download telemetry…' 'Fallback monitor'
     while(Test-WorkerAlive){
         $state=Read-State
@@ -102,12 +152,8 @@ try{
             if($statePid -gt 0 -and $statePid -ne $WorkerPid){break}
             $gameId=[string](Get-Prop $state 'GameId' $gameId);$gameName=[string](Get-Prop $state 'GameName' $gameName);$mode=[string](Get-Prop $state 'Mode' $mode)
         }
-
-        $observed=Get-ObservedWriteBytes $WatchPath
-        if($observed -gt $highWater){$highWater=$observed}
-        $now=[DateTime]::UtcNow;$seconds=[math]::Max(.15,($now-$lastSample).TotalSeconds);$delta=[math]::Max([int64]0,$highWater-$lastBytes);$instant=$delta/$seconds
-        $smoothedRate=Get-SmoothedRate $smoothedRate $instant
-        $lastBytes=$highWater;$lastSample=$now
+        if($null -eq $script:WriteWatcher){[void](Start-WriteObservation)}
+        $observedBytes+=[int64](Update-ObservedWriteBytes)
 
         $output=Read-ProviderOutputTail
         $native=Get-ParsedOutputTelemetry $output
@@ -119,22 +165,39 @@ try{
         $nativeInstallTotal=[int64](Get-Prop $native 'InstallSizeBytes' 0)
         $downloadTotal=if($nativeDownloadTotal -gt 0){$nativeDownloadTotal}else{$ExpectedDownloadBytes}
         $installTotal=if($nativeInstallTotal -gt 0){$nativeInstallTotal}else{$ExpectedInstallBytes}
-        if($phase -eq 'Downloading' -and $downloadTotal -gt 0 -and $nativeCurrent -le 0 -and $highWater -ge [int64]($downloadTotal*0.97)){$phase='Installing'}
+        if($phase -eq 'Downloading' -and $downloadTotal -gt 0 -and $nativeCurrent -le 0 -and $observedBytes -ge [int64]($downloadTotal*0.97)){$phase='Installing'}
 
-        $current=if($nativeCurrent -gt 0){$nativeCurrent}else{$highWater}
+        if($phase -ne $lastPhase){
+            $phaseBaselineBytes=$observedBytes
+            $lastBytes=$observedBytes
+            $smoothedRate=0
+            $lastSample=[DateTime]::UtcNow
+            $lastPhase=$phase
+        }
+        [int64]$phaseObserved=[math]::Max([int64]0,$observedBytes-$phaseBaselineBytes)
+        $now=[DateTime]::UtcNow;$seconds=[math]::Max(.15,($now-$lastSample).TotalSeconds);$delta=[math]::Max([int64]0,$observedBytes-$lastBytes);$instant=$delta/$seconds
+        $smoothedRate=Get-SmoothedRate $smoothedRate $instant
+        $lastBytes=$observedBytes;$lastSample=$now
+
+        $installNativeCurrent=($phase -eq 'Installing' -and $nativeInstallTotal -gt 0 -and $nativeCurrent -gt 0)
+        $current=if($phase -eq 'Installing'){if($installNativeCurrent){$nativeCurrent}else{$phaseObserved}}else{if($nativeCurrent -gt 0){$nativeCurrent}else{$observedBytes}}
         $total=if($phase -eq 'Installing'){$installTotal}else{$downloadTotal}
         $nativeRate=[double](Get-Prop $native 'SpeedBytesPerSec' 0)
-        $rate=if($nativeRate -gt 0){$nativeRate}else{$smoothedRate}
+        $rate=if($phase -eq 'Downloading' -and $nativeRate -gt 0){$nativeRate}else{$smoothedRate}
         $progress=[int](Get-Prop $native 'Progress' -1)
+        if($phase -eq 'Installing' -and -not $installNativeCurrent){$progress=-1}
         if($progress -lt 0 -and $total -gt 0){$progress=[int][math]::Min(99,[math]::Round(($current/[double]$total)*100))}
         $nativeEta=[int64](Get-Prop $native 'EtaSeconds' -1)
-        $eta=if($nativeEta -ge 0){$nativeEta}else{Get-Eta $current $total $rate $progress}
-        $source=if([bool](Get-Prop $native 'HasNativeProgress' $false) -or [bool](Get-Prop $native 'HasNativeSpeed' $false) -or [bool](Get-Prop $native 'HasNativeEta' $false)){'Backend output + fallback'}else{'Observed destination growth'}
+        $useNativeEta=($phase -eq 'Downloading' -and $nativeEta -ge 0) -or ($phase -eq 'Installing' -and $nativeInstallTotal -gt 0 -and $nativeEta -ge 0)
+        $eta=if($useNativeEta){$nativeEta}else{Get-Eta $current $total $rate $progress}
+        $hasNative=[bool](Get-Prop $native 'HasNativeProgress' $false) -or [bool](Get-Prop $native 'HasNativeSpeed' $false) -or [bool](Get-Prop $native 'HasNativeEta' $false)
+        $source=if($hasNative){'Backend output + incremental fallback'}else{'Incremental destination writes'}
         $amount=if($total -gt 0){(Format-ByteText $current)+' / '+(Format-ByteText $total)}elseif($current -gt 0){Format-ByteText $current}else{'Measuring activity…'}
         $message="$phase  •  $amount  •  $(Format-SpeedText $rate)  •  $(Format-EtaText $eta)"
         Write-Progress $true $phase $progress $current $downloadTotal $installTotal $rate $eta $message $source
-        Start-Sleep -Milliseconds 900
+        Start-Sleep -Milliseconds 750
     }
 }finally{
-    Write-Progress $false $phase -1 $highWater $ExpectedDownloadBytes $ExpectedInstallBytes 0 -1 'Provider telemetry monitor stopped.' 'Fallback monitor'
+    Stop-WriteObservation
+    Write-Progress $false $phase -1 ([math]::Max([int64]0,$observedBytes-$phaseBaselineBytes)) $ExpectedDownloadBytes $ExpectedInstallBytes 0 -1 'Provider telemetry monitor stopped.' 'Fallback monitor'
 }
