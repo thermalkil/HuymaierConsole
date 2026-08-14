@@ -1,0 +1,12 @@
+{
+  "requestedAtUtc": "2026-08-14T14:38:00Z",
+  "attempt": 1,
+  "candidate": "v0.26.5-rc1",
+  "version": "0.26.5",
+  "base_release": "v0.26.2",
+  "base_asset": "HC262.zip",
+  "package_root": "HC265",
+  "asset_name": "HC265.zip",
+  "production_source": "4e56d2877e7bd7e54d3db1198495a06d6968599b",
+  "scope": "validated v0.26.5 performance/downloads candidate: faster Xbox-home startup, responsive native-console return, explicit Downloading/Installing telemetry with truthful ETA fallback, deterministic Wii/GameCube library ownership, frozen PS1/PS2/PS3 presentation, and inherited installer/Steam integrity gates"
+}
