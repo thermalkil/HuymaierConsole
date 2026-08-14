@@ -69,14 +69,18 @@ try{
     Add-Type -AssemblyName System.Windows.Forms,System.Drawing
     $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
     if(-not(Test-Path -LiteralPath $csc -PathType Leaf)){throw 'Framework64 csc.exe is missing.'}
+    $systemRef=[Uri].Assembly.Location
+    $formsRef=[Windows.Forms.Form].Assembly.Location
+    $drawingRef=[Drawing.Bitmap].Assembly.Location
     $hostOut=Join-Path $temp 'HuymaierStreamingCursorHost.exe'
-    $hostArgs=@('/noconfig','/nologo','/target:winexe','/platform:x64','/optimize+',('/out:'+$hostOut),('/reference:'+([Windows.Forms.Form].Assembly.Location)),('/reference:'+([Drawing.Bitmap].Assembly.Location)),(Join-Path $repo 'Native\HuymaierStreamingCursorHost.cs'))
+    $hostArgs=@('/noconfig','/nologo','/target:winexe','/platform:x64','/optimize+',('/out:'+$hostOut),('/reference:'+$systemRef),('/reference:'+$formsRef),('/reference:'+$drawingRef),(Join-Path $repo 'Native\HuymaierStreamingCursorHost.cs'))
     & $csc @hostArgs
     if($LASTEXITCODE -ne 0 -or -not(Test-Path -LiteralPath $hostOut -PathType Leaf)){throw 'Streaming cursor host x64 compilation failed.'}
     Assert-X64Pe $hostOut
 
     $managedOut=Join-Path $temp 'HuymaierGameInputManaged.dll'
-    & $csc /noconfig /nologo /target:library /platform:x64 /optimize+ ('/out:'+$managedOut) (Join-Path $repo 'Native\HuymaierConsole.GameInput.cs')
+    $managedArgs=@('/noconfig','/nologo','/target:library','/platform:x64','/optimize+',('/out:'+$managedOut),('/reference:'+$systemRef),(Join-Path $repo 'Native\HuymaierConsole.GameInput.cs'))
+    & $csc @managedArgs
     if($LASTEXITCODE -ne 0 -or -not(Test-Path -LiteralPath $managedOut -PathType Leaf)){throw 'Managed GameInput pointer bridge x64 compilation failed.'}
     Assert-X64Pe $managedOut
 
