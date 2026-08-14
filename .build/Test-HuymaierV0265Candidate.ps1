@@ -46,6 +46,32 @@ $installerEntry=Require-Text 'Install-HuymaierConsole.ps1' @(
 )
 $appx=Require-Text 'FSEPackage\AppxManifest.xml' @('Version="0.26.5.0"')
 
+# Browser state must be safe during cold startup under StrictMode, while actual
+# WebView2 creation stays lazy. The staged browser must also retain the full
+# controller-first toolbar/web/text-entry contract used by provider sign-in.
+$browser=Require-Text 'HuymaierWebBrowser.ps1' @(
+    "`$script:HcBrowserAuthRequestPath = Join-Path `$script:DataDir 'browser-auth-request.json'",
+    "`$script:HcBrowserAuthResultDir = Join-Path `$script:DataDir 'BrowserAuth'",
+    "`$script:HcBrowserReadyPath = Join-Path `$script:HcBrowserAuthResultDir 'native-browser.ready.json'",
+    "Add-HcBrowserToolbarItem `$address 'Address'",
+    "Show-NativeKeyboard -Title 'Search or enter address'",
+    "-Mode 'BrowserAddress'",
+    "'BrowserInputSecure'",
+    'Invoke-HcBrowserControllerType',
+    "Set-HcBrowserFocusArea 'Toolbar'",
+    "Set-HcBrowserFocusArea 'Web'",
+    "document.addEventListener('focusin'",
+    'window.__hcActivate',
+    'window.__hcSetValue',
+    'ConvertTo-HcBrowserDestination'
+)
+$browserStateIndex=$browser.IndexOf("`$script:HcBrowserAuthRequestPath = Join-Path")
+$browserInitIndex=$browser.IndexOf('function Initialize-HuymaierWebBrowser')
+$webViewConstructionIndex=$browser.IndexOf('New-Object Microsoft.Web.WebView2.Wpf.WebView2')
+if($browserStateIndex -lt 0 -or $browserInitIndex -lt 0 -or $browserStateIndex -gt $browserInitIndex){throw 'Staged browser can read auth state before initialization under StrictMode.'}
+if($webViewConstructionIndex -lt $browserInitIndex){throw 'Staged browser constructs WebView2 during module load instead of lazily.'}
+if($browser -match "HcBrowserToolbarButtons\[\$script:HcBrowserToolbarIndex\]\.Tag"){throw 'Staged browser regressed to button-only controller toolbar navigation.'}
+
 $nativeGameInput=Require-Text 'Native\HuymaierConsole.GameInput.cs' @(
     'public static class HuymaierBuildStamp',
     'public const string Version = "0.26.5";',
@@ -120,9 +146,11 @@ if($psChanges.Count){throw ('Frozen PS1/PS2/PS3 presentation source changed in v
 $validation=Get-Content -Raw -LiteralPath $ValidationPath -Encoding UTF8|ConvertFrom-Json
 $validation|Add-Member -NotePropertyName version0265ConsistencyGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName nativeHostBuildStampGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName browserColdStartGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName browserControllerNavigationGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName startupPerformanceGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName providerTelemetryGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName nintendoOwnershipGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName playStationPresentationFreezeGate -NotePropertyValue 'success' -Force
 $validation|ConvertTo-Json -Depth 10|Set-Content -LiteralPath $ValidationPath -Encoding UTF8
-Write-Host 'v0.26.5 release-shaped version, compiled native stamp, startup, provider telemetry, Nintendo ownership and PlayStation freeze gates passed.'
+Write-Host 'v0.26.5 release-shaped version, compiled native stamp, browser cold-start/controller navigation, startup, provider telemetry, Nintendo ownership and PlayStation freeze gates passed.'
