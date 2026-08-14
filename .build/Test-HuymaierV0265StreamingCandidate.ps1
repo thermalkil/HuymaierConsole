@@ -111,9 +111,24 @@ Require-File 'HuymaierGameInputBridge.dll'|Out-Null
 if($runtime.IndexOf("if([string]::Equals(`$mode,'Native',[StringComparison]::OrdinalIgnoreCase) -and `$aumid -and `$category -eq 'Streaming')",[StringComparison]::Ordinal) -lt 0){throw 'Staged native Streaming category is not routed through the native cursor host.'}
 if($runtime.IndexOf("Start-Process -FilePath `$script:HcStreamingCursorHostPath",[StringComparison]::Ordinal) -lt 0){throw 'Staged streaming runtime does not start the isolated cursor host.'}
 
-# The Wii cover fix is intentionally separate from the pretty display name. The
-# candidate must retain that hidden legacy key during background artwork refresh.
-if($nintendo.IndexOf('FindEmulatorArtwork(game.Path,game.Name)',[StringComparison]::Ordinal) -ge 0){throw 'Staged Wii/GameCube background artwork refresh still keys lookup from the pretty display name.'}
+# The Wii cover fix is intentionally separate from the pretty display name. Scope
+# the negative check to QueueConsoleArtworkRefresh only: other platform code may
+# legitimately call FindEmulatorArtwork with game.Name elsewhere in this class.
+$refreshStart=$nintendo.IndexOf('private void QueueConsoleArtworkRefresh()',[StringComparison]::Ordinal)
+$refreshEnd=$nintendo.IndexOf('private void LaunchGame(',[math]::Max(0,$refreshStart),[StringComparison]::Ordinal)
+if($refreshStart -lt 0 -or $refreshEnd -le $refreshStart){throw 'Staged Wii artwork alias gate could not isolate QueueConsoleArtworkRefresh.'}
+$refreshScope=$nintendo.Substring($refreshStart,$refreshEnd-$refreshStart)
+foreach($required in @(
+    'HUYMAIER_WII_ARTWORK_ALIAS_V1',
+    'string legacyKey=CleanName(Path.GetFileNameWithoutExtension(game.Path))',
+    'string artworkTitle=game.Name',
+    'FindDolphinArtwork(game.Path,artworkTitle)',
+    'FindEmulatorArtwork(game.Path,artworkTitle)'
+)){
+    if($refreshScope.IndexOf($required,[StringComparison]::Ordinal) -lt 0){throw "Staged QueueConsoleArtworkRefresh is missing Wii artwork alias invariant: $required"}
+}
+$oldRefresh='string cover=FindEmulatorArtwork(game.Path,game.Name);if(String.IsNullOrWhiteSpace(cover))cover=TryDownloadConsoleCover(game);'
+if($refreshScope.IndexOf($oldRefresh,[StringComparison]::Ordinal) -ge 0){throw 'Staged QueueConsoleArtworkRefresh still uses the pretty display name as the Wii/GameCube artwork key.'}
 
 $validation=Get-Content -Raw -LiteralPath $ValidationPath -Encoding UTF8|ConvertFrom-Json
 $validation|Add-Member -NotePropertyName smoothBrowserCursorGate -NotePropertyValue 'success' -Force
