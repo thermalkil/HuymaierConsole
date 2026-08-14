@@ -20,6 +20,7 @@ if([string]::IsNullOrWhiteSpace($workspace)){$workspace=(Split-Path -Parent $PSS
 $coreSource=Join-Path $workspace 'HuymaierConsole.ps1'
 $bootstrapSource=Join-Path $workspace 'HuymaierBootstrap.ps1'
 $installerCoreSource=Join-Path $workspace 'HuymaierInstallerCore.ps1'
+$installerScriptSource=Join-Path $workspace 'Install-HuymaierConsole.ps1'
 $manifestSource=Join-Path $workspace 'manifest.json'
 $appxManifestSource=Join-Path $workspace 'FSEPackage\AppxManifest.xml'
 $nativeGameInputSource=Join-Path $workspace 'Native\HuymaierConsole.GameInput.cs'
@@ -36,15 +37,15 @@ $providerTransferCoordinatorSource=Join-Path $workspace 'HuymaierProviderTransfe
 
 $requiredFiles=@(
     $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$browserCursorOptimizer,$runtimeHitchOptimizer,
-    $coreSource,$bootstrapSource,$installerCoreSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource,
+    $coreSource,$bootstrapSource,$installerCoreSource,$installerScriptSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource,
     $providerConcurrencySource,$providerConcurrencyUiSource,$providerTransferCoordinatorSource
 )
 foreach($required in $requiredFiles){if(-not(Test-Path -LiteralPath $required -PathType Leaf)){throw "Candidate optimization wrapper is missing required file: $required"}}
 
 $originals=@{}
-foreach($path in @($coreSource,$bootstrapSource,$installerCoreSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource)){$originals[$path]=[IO.File]::ReadAllBytes($path)}
+foreach($path in @($coreSource,$bootstrapSource,$installerCoreSource,$installerScriptSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource)){$originals[$path]=[IO.File]::ReadAllBytes($path)}
 try{
-    & $versionStamper -TriggerPath $TriggerPath -CorePath $coreSource -BootstrapPath $bootstrapSource -InstallerCorePath $installerCoreSource -ManifestPath $manifestSource -AppxManifestPath $appxManifestSource -NativeGameInputPath $nativeGameInputSource
+    & $versionStamper -TriggerPath $TriggerPath -CorePath $coreSource -BootstrapPath $bootstrapSource -InstallerCorePath $installerCoreSource -InstallerScriptPath $installerScriptSource -ManifestPath $manifestSource -AppxManifestPath $appxManifestSource -NativeGameInputPath $nativeGameInputSource
     & $startupOptimizer -CorePath $coreSource
     & $nintendoOptimizer -NativePath $nativeConsoleSource
     & $nintendoNameOptimizer -ConsolePlatformsPath $nativeConsoleSource
