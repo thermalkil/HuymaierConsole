@@ -5,23 +5,20 @@ $ErrorActionPreference='Stop'
 $repo=Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $core=Join-Path $repo 'HuymaierConsole.ps1'
 $native=Join-Path $repo 'Native\HuymaierConsole.ConsolePlatforms.cs'
-$startupOptimizer=Join-Path $repo '.build\Optimize-HuymaierStartup.ps1'
-$nintendoOptimizer=Join-Path $repo '.build\Optimize-NintendoLibraryOwnership.ps1'
 $bootstrap=Join-Path $repo 'HuymaierBootstrap.ps1'
 $installer=Join-Path $repo 'Install-HuymaierConsole.ps1'
+$providerModule=Join-Path $repo 'HuymaierGameProviders.ps1'
+$providerWorker=Join-Path $repo 'HuymaierGameProviderWorker.ps1'
 $progressWorker=Join-Path $repo 'HuymaierProviderProgressWorker.ps1'
 $coordinator=Join-Path $repo 'HuymaierProviderTelemetryCoordinator.ps1'
 $telemetry=Join-Path $repo 'HuymaierProviderTelemetry.ps1'
+$startupOptimizer=Join-Path $repo '.build\Optimize-HuymaierStartup.ps1'
+$nintendoOptimizer=Join-Path $repo '.build\Optimize-NintendoLibraryOwnership.ps1'
+$providerOptimizer=Join-Path $repo '.build\Optimize-ProviderDownloads.ps1'
+$epicWatchOptimizer=Join-Path $repo '.build\Optimize-EpicTelemetryWatch.ps1'
 
-foreach($required in @($core,$native,$startupOptimizer,$nintendoOptimizer,$bootstrap,$installer,$progressWorker,$coordinator,$telemetry)){
+foreach($required in @($core,$native,$bootstrap,$installer,$providerModule,$providerWorker,$progressWorker,$coordinator,$telemetry,$startupOptimizer,$nintendoOptimizer,$providerOptimizer,$epicWatchOptimizer)){
     if(-not(Test-Path -LiteralPath $required -PathType Leaf)){throw "Required v0.26.5 source is missing: $required"}
-}
-
-function Assert-ContainsOnce {
-    param([string]$Text,[string]$Value,[string]$Label)
-    $first=$Text.IndexOf($Value,[StringComparison]::Ordinal)
-    if($first -lt 0){throw "$Label is missing."}
-    if($Text.IndexOf($Value,$first+$Value.Length,[StringComparison]::Ordinal) -ge 0){throw "$Label appears more than once."}
 }
 
 function Assert-PowerShellParse {
@@ -31,7 +28,7 @@ function Assert-PowerShellParse {
     if($errors.Count){$errors|ForEach-Object{Write-Host "$Path line $($_.Extent.StartLineNumber): $($_.Message)"};throw "PowerShell parse failed: $Path"}
 }
 
-foreach($ps1 in @($bootstrap,$installer,$progressWorker,$coordinator,$telemetry,$startupOptimizer,$nintendoOptimizer)){Assert-PowerShellParse $ps1}
+foreach($ps1 in @($bootstrap,$installer,$providerModule,$providerWorker,$progressWorker,$coordinator,$telemetry,$startupOptimizer,$nintendoOptimizer,$providerOptimizer,$epicWatchOptimizer)){Assert-PowerShellParse $ps1}
 
 $bootstrapText=Get-Content -Raw -LiteralPath $bootstrap -Encoding UTF8
 foreach($marker in @(
@@ -48,19 +45,32 @@ foreach($marker in @('Write-HuymaierStartupPreflightCache','ValidationSource=''i
 $progressText=Get-Content -Raw -LiteralPath $progressWorker -Encoding UTF8
 foreach($marker in @('Calculating ETA','Read-ProviderOutputTail','Get-ObservedWriteBytes','Installing','Downloading','TelemetryKind')){if($progressText -notmatch [regex]::Escape($marker)){throw "Provider progress invariant missing: $marker"}}
 $coordinatorText=Get-Content -Raw -LiteralPath $coordinator -Encoding UTF8
-foreach($marker in @("@('GOG','Amazon')","@('Install','Update')",'TelemetrySource','InstallSpeedBytesPerSec','TransferSpeedBytesPerSec')){if($coordinatorText -notmatch [regex]::Escape($marker)){throw "Provider coordinator invariant missing: $marker"}}
+foreach($marker in @("@('GOG','Amazon')","@('Install','Update')",'TelemetrySource','InstallSpeedBytesPerSec','TransferSpeedBytesPerSec')){if($coordinatorText -notmatch [regex]::Escape($marker)){throw "Provider coordinator source invariant missing: $marker"}}
 
 $tempRoot=Join-Path $env:TEMP ('huymaier-v0265-validation-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $tempRoot|Out-Null
 try{
     $tempCore=Join-Path $tempRoot 'HuymaierConsole.ps1'
     $tempNative=Join-Path $tempRoot 'HuymaierConsole.ConsolePlatforms.cs'
+    $tempBootstrap=Join-Path $tempRoot 'HuymaierBootstrap.ps1'
+    $tempProviderModule=Join-Path $tempRoot 'HuymaierGameProviders.ps1'
+    $tempProviderWorker=Join-Path $tempRoot 'HuymaierGameProviderWorker.ps1'
+    $tempProgressWorker=Join-Path $tempRoot 'HuymaierProviderProgressWorker.ps1'
+    $tempCoordinator=Join-Path $tempRoot 'HuymaierProviderTelemetryCoordinator.ps1'
     Copy-Item -LiteralPath $core -Destination $tempCore -Force
     Copy-Item -LiteralPath $native -Destination $tempNative -Force
+    Copy-Item -LiteralPath $bootstrap -Destination $tempBootstrap -Force
+    Copy-Item -LiteralPath $providerModule -Destination $tempProviderModule -Force
+    Copy-Item -LiteralPath $providerWorker -Destination $tempProviderWorker -Force
+    Copy-Item -LiteralPath $progressWorker -Destination $tempProgressWorker -Force
+    Copy-Item -LiteralPath $coordinator -Destination $tempCoordinator -Force
 
     & $startupOptimizer -CorePath $tempCore
     & $nintendoOptimizer -NativePath $tempNative
-    Assert-PowerShellParse $tempCore
+    & $providerOptimizer -ProviderModulePath $tempProviderModule -ProviderWorkerPath $tempProviderWorker -ProgressWorkerPath $tempProgressWorker -CoordinatorPath $tempCoordinator
+    & $epicWatchOptimizer -BootstrapPath $tempBootstrap
+
+    foreach($ps1 in @($tempCore,$tempBootstrap,$tempProviderModule,$tempProviderWorker,$tempProgressWorker,$tempCoordinator)){Assert-PowerShellParse $ps1}
 
     $optimizedCore=Get-Content -Raw -LiteralPath $tempCore -Encoding UTF8
     foreach($marker in @(
@@ -83,13 +93,26 @@ try{
         'if (!IsNintendoLibraryOwnedPath(path)) continue;'
     )){if($optimizedNative -notmatch [regex]::Escape($marker)){throw "Nintendo native ownership marker missing: $marker"}}
 
-    # Confirm PlayStation-specific source files are outside both v0.26.5 transforms.
-    $startupOptimizerText=Get-Content -Raw -LiteralPath $startupOptimizer -Encoding UTF8
+    $optimizedProviderWorker=Get-Content -Raw -LiteralPath $tempProviderWorker -Encoding UTF8
+    foreach($marker in @('Get-LegendaryTransferPhase','Format-ProviderEtaValue','Installing','Calculating ETA','Write-State $true $phase')){if($optimizedProviderWorker -notmatch [regex]::Escape($marker)){throw "Epic normalized telemetry marker missing: $marker"}}
+    $optimizedProviderModule=Get-Content -Raw -LiteralPath $tempProviderModule -Encoding UTF8
+    foreach($marker in @('Get-ProviderDownloadDisplay','Format-ProviderDownloadEta','InstallProcessedBytes','InstallSpeedBytesPerSec','Progress calculating…')){if($optimizedProviderModule -notmatch [regex]::Escape($marker)){throw "Downloads presentation marker missing: $marker"}}
+    $optimizedProgress=Get-Content -Raw -LiteralPath $tempProgressWorker -Encoding UTF8
+    if($optimizedProgress -notmatch [regex]::Escape("ValidateSet('Epic','GOG','Amazon')")){throw 'Fallback progress sampler does not cover Epic, GOG and Amazon.'}
+    $optimizedCoordinator=Get-Content -Raw -LiteralPath $tempCoordinator -Encoding UTF8
+    if($optimizedCoordinator -notmatch [regex]::Escape("@('Epic','GOG','Amazon')")){throw 'Fallback telemetry coordinator does not cover Epic, GOG and Amazon.'}
+    $optimizedBootstrap=Get-Content -Raw -LiteralPath $tempBootstrap -Encoding UTF8
+    if($optimizedBootstrap -notmatch [regex]::Escape("@('Epic','GOG','Amazon')")){throw 'Event-driven telemetry watcher does not wake for Epic, GOG and Amazon.'}
+
+    # Confirm PlayStation-specific presentation sources remain outside all v0.26.5 transforms.
+    foreach($optimizerPath in @($startupOptimizer,$nintendoOptimizer,$providerOptimizer,$epicWatchOptimizer)){
+        $optimizerText=Get-Content -Raw -LiteralPath $optimizerPath -Encoding UTF8
+        if($optimizerText -match 'HuymaierConsole\.Ps1\.cs'){throw "v0.26.5 optimizer targets frozen PS1 presentation source: $optimizerPath"}
+    }
     $nintendoOptimizerText=Get-Content -Raw -LiteralPath $nintendoOptimizer -Encoding UTF8
-    if($startupOptimizerText -match 'HuymaierConsole\.Ps1\.cs' -or $nintendoOptimizerText -match 'HuymaierConsole\.Ps1\.cs'){throw 'v0.26.5 optimizers must not target PS1 presentation source.'}
     if($nintendoOptimizerText -match 'PS2|PS3'){throw 'Nintendo ownership optimizer must not target PS2/PS3 presentation.'}
 
-    Write-Host 'v0.26.5 startup, provider telemetry and Nintendo ownership transformation validation passed.'
+    Write-Host 'v0.26.5 startup, normalized provider telemetry and Nintendo ownership transformation validation passed.'
 }finally{
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
