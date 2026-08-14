@@ -129,6 +129,7 @@ HuymaierSelfUpdater.ps1
 HuymaierShellRedesign.ps1
 HuymaierStorefronts.ps1
 HuymaierStorefrontWorker.ps1
+HuymaierStreamingController.ps1
 HuymaierUpdateWorker.ps1
 HuymaierWebBrowser.ps1
 Install-HuymaierConsole.cmd
@@ -139,6 +140,7 @@ manifest.json
 Native/HuymaierConsole.ConsolePlatforms.cs
 Native/HuymaierConsole.NativeApp.cs
 Native/HuymaierConsole.Ps1.cs
+Native/HuymaierStreamingCursorHost.cs
 Register-HuymaierFSEHome.ps1
 RELEASE_NOTES.txt
 THIRD_PARTY_NOTICES.txt
