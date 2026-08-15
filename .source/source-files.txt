@@ -6,7 +6,6 @@ EmulatorPlatforms/3DS/settings.default.json
 EmulatorPlatforms/Arcade/platform.json
 EmulatorPlatforms/Arcade/settings.default.json
 EmulatorPlatforms/Atari2600/platform.json
-EmulatorPlatforms/Atari2600/settings.default.json
 EmulatorPlatforms/AtariLynx/platform.json
 EmulatorPlatforms/AtariLynx/settings.default.json
 EmulatorPlatforms/Dreamcast/platform.json
@@ -131,6 +130,7 @@ HuymaierShellRedesign.ps1
 HuymaierStorefronts.ps1
 HuymaierStorefrontWorker.ps1
 HuymaierStreamingController.ps1
+HuymaierUnifiedCursor.ps1
 HuymaierUpdateWorker.ps1
 HuymaierWebBrowser.ps1
 Install-HuymaierConsole.cmd
@@ -145,6 +145,7 @@ Native/HuymaierConsole.Ps1.cs
 Native/HuymaierConsole.SystemOverlay.cs
 Native/HuymaierGameInputBridge.cpp
 Native/HuymaierStreamingCursorHost.cs
+Native/HuymaierUnifiedCursorHost.cs
 Register-HuymaierFSEHome.ps1
 RELEASE_NOTES.txt
 THIRD_PARTY_NOTICES.txt
