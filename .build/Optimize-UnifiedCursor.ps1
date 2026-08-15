@@ -10,7 +10,7 @@ foreach($path in @($CorePath,$BootstrapPath,$InstallerScriptPath,$CoreBuilderPat
 
 $core=Get-Content -Raw -LiteralPath $CorePath -Encoding UTF8
 if($core -notmatch 'HUYMAIER_UNIFIED_CURSOR_RUNTIME_V1'){
-    $pathNeedle="$script:StreamingControllerModulePath = Join-Path $script:BaseDir 'HuymaierStreamingController.ps1'"
+    $pathNeedle='$script:StreamingControllerModulePath = Join-Path $script:BaseDir ''HuymaierStreamingController.ps1'''
     if(-not $core.Contains($pathNeedle)){throw 'Unified cursor requires streaming-controller transform first.'}
     $core=$core.Replace($pathNeedle,$pathNeedle+"`r`n`$script:UnifiedCursorModulePath = Join-Path `$script:BaseDir 'HuymaierUnifiedCursor.ps1'")
     $loadNeedle=@'
@@ -40,7 +40,7 @@ if (Test-Path -LiteralPath $script:UnifiedCursorModulePath) {
 
 $bootstrap=Get-Content -Raw -LiteralPath $BootstrapPath -Encoding UTF8
 if($bootstrap -notmatch 'HUYMAIER_UNIFIED_CURSOR_PREFLIGHT_V1'){
-    $pathNeedle="$script:streamingControllerPath=Join-Path $baseDir 'HuymaierStreamingController.ps1'"
+    $pathNeedle='$streamingControllerPath=Join-Path $baseDir ''HuymaierStreamingController.ps1'''
     if(-not $bootstrap.Contains($pathNeedle)){throw 'Unified cursor requires streaming bootstrap preflight first.'}
     $bootstrap=$bootstrap.Replace($pathNeedle,$pathNeedle+"`r`n# HUYMAIER_UNIFIED_CURSOR_PREFLIGHT_V1`r`n`$unifiedCursorPath=Join-Path `$baseDir 'HuymaierUnifiedCursor.ps1'")
     $entryNeedle="        [pscustomobject]@{Path=`$streamingControllerPath;Label='Streaming controller runtime'},"
