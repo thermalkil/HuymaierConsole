@@ -38,7 +38,32 @@ foreach($binaryName in @('HuymaierModelPreviewWorker.exe','HuymaierLiveModel3D.d
     $pe=[BitConverter]::ToInt32($bytes,0x3C);$machine=[BitConverter]::ToUInt16($bytes,$pe+4);if($machine -ne 0x8664){throw ("$binaryName is not x64 (machine 0x{0:X4})." -f $machine)}
 }
 
+# The finished 3D Models option must ship real geometry. The atlas is fallback
+# only and cannot satisfy these gates.
+$liveDir=Join-Path $StageRoot 'Assets\Models\Live'
+if(-not(Test-Path -LiteralPath $liveDir -PathType Container)){throw 'Staged candidate is missing Assets\Models\Live.'}
+$frameNames=@($map.atlas.frames.PSObject.Properties|ForEach-Object{[string]$_.Name}|Sort-Object)
+if($frameNames.Count -ne 50){throw "Model map exposes $($frameNames.Count) frames instead of 50."}
+$stagedGlbs=@(Get-ChildItem -LiteralPath $liveDir -Filter '*.glb' -File)
+if($stagedGlbs.Count -ne 50){throw "Staged candidate contains $($stagedGlbs.Count) live GLBs instead of 50."}
+foreach($frame in $frameNames){
+    $path=Join-Path $liveDir ($frame+'.glb')
+    if(-not(Test-Path -LiteralPath $path -PathType Leaf)){throw "Staged live GLB missing for map frame: $frame"}
+    $bytes=[IO.File]::ReadAllBytes($path)
+    if($bytes.Length -lt 256 -or $bytes[0]-ne0x67 -or $bytes[1]-ne0x6c -or $bytes[2]-ne0x54 -or $bytes[3]-ne0x46){throw "Staged live GLB header invalid: $frame"}
+}
+
+Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Web.Extensions
+Add-Type -Path (Join-Path $StageRoot 'HuymaierLiveModel3D.dll')
+foreach($frame in $frameNames){
+    $view=New-Object HuymaierConsole.Modeling.LiveModelView -ArgumentList (Join-Path $liveDir ($frame+'.glb'))
+    if($null -eq $view){throw "Staged live Viewport3D could not instantiate: $frame"}
+    $yaw=[double]$view.Yaw;$zoom=[double]$view.ZoomDistance
+    $view.Rotate(2,1);$view.Zoom(.1);$view.SetScalePercent(120)
+    if([math]::Abs([double]$view.Yaw-$yaw)-lt .5 -or [math]::Abs([double]$view.ZoomDistance-$zoom)-lt .05){throw "Staged live model interaction failed: $frame"}
+}
+
 $validation=Get-Content -Raw -LiteralPath $ValidationPath -Encoding UTF8|ConvertFrom-Json
-foreach($gate in @('platformModelSettingGate','platformModelPersistenceGate','platformModelScaleGate','platformModelMapCoverageGate','platformModelWorkerX64Gate','platformModelLiveViewport3DGate','platformModelViewerControlGate','platformModelAtlasFallbackGate')){$validation|Add-Member -NotePropertyName $gate -NotePropertyValue 'success' -Force}
+foreach($gate in @('platformModelSettingGate','platformModelPersistenceGate','platformModelScaleGate','platformModelMapCoverageGate','platformModelWorkerX64Gate','platformModelLiveViewport3DGate','platformModelViewerControlGate','platformModelAtlasFallbackGate','platformModelBuiltInGlbCountGate','platformModelBuiltInGlbLoadGate','platformModelBuiltInInteractiveGate')){$validation|Add-Member -NotePropertyName $gate -NotePropertyValue 'success' -Force}
 $validation|ConvertTo-Json -Depth 10|Set-Content -LiteralPath $ValidationPath -Encoding UTF8
-foreach($gate in @('platformModelSettingGate','platformModelPersistenceGate','platformModelScaleGate','platformModelMapCoverageGate','platformModelWorkerX64Gate','platformModelLiveViewport3DGate','platformModelViewerControlGate','platformModelAtlasFallbackGate')){Write-Host ($gate+': success')}
+foreach($gate in @('platformModelSettingGate','platformModelPersistenceGate','platformModelScaleGate','platformModelMapCoverageGate','platformModelWorkerX64Gate','platformModelLiveViewport3DGate','platformModelViewerControlGate','platformModelAtlasFallbackGate','platformModelBuiltInGlbCountGate','platformModelBuiltInGlbLoadGate','platformModelBuiltInInteractiveGate')){Write-Host ($gate+': success')}
