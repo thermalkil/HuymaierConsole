@@ -1,12 +1,12 @@
 {
-  "requestedAtUtc": "2026-08-14T19:19:00Z",
-  "attempt": 9,
+  "requestedAtUtc": "2026-08-15T07:47:00Z",
+  "attempt": 10,
   "candidate": "v0.26.5-rc1",
   "version": "0.26.5",
   "base_release": "v0.26.2",
   "base_asset": "HC262.zip",
   "package_root": "HC265",
   "asset_name": "HC265.zip",
-  "production_source": "9fc961b522b613c2e92472b0c2ca6a17ef612816",
-  "scope": "v0.26.5 RC1 attempt 9 from exact green source. Runtime/package implementation is unchanged from attempt 8; only the Wii artwork staged assertion is corrected to inspect QueueConsoleArtworkRefresh structurally rather than globally banning a legitimate multi-platform game.Name artwork call elsewhere in ConsolePlatforms.cs. Required runtime behavior: preserve pretty Wii/GameCube display names while using hidden legacy Nintendo/Dolphin IDs for cover matching; smooth time-based analog Web cursor with right-stick scrolling and shared 40-200% Cursor Speed; installed native Streaming apps launch without WebView through the isolated x64 controller-mouse helper with monitor-filling borderless fullscreen presentation, A/Cross click, B/Circle back/Escape, X/Square text keyboard and right-stick scrolling; native app art prefers installed AppX/MSIX package assets with cached service-icon fallback. Keep curated/removable categorized Apps, Microsoft Store installs, concurrent downloads, derived ETA, hitch guards, Dolphin Wii save manager, compiled 0.26.5/x64 stamp, installer rollback/tamper, Steam ownership, Game Bar/navigation, Nintendo ownership and frozen PS1/PS2/PS3 presentation gates. Upload only after the corrected staged smooth-cursor/native-streaming/x64-helper/Wii-artwork-alias gate passes."
+  "production_source": "b4085fffe04266dfd5ee578c52b4bd881eb092a1",
+  "scope": "v0.26.5 RC1 attempt 10 fixes the two cursor failures reported from attempt 9. Native streaming cursor: enable ordinary background GameInput in the isolated helper path with GameInputEnableBackgroundInput while preserving Guide/Share background handling; after the native streaming target is fullscreen, initialize the controller cursor at the center of that target monitor rather than inheriting Huymaier's parked physical mouse position; use a radial 2-D deadzone/response curve so native diagonals preserve stick angle and normalized speed. Web cursor: stop issuing per-controller-poll ExecuteScript delta moves; publish a radial 2-D analog velocity vector to an in-page requestAnimationFrame loop so motion is display-frame smooth and true diagonals move simultaneously, while right-stick scrolling and the shared 40-200% Cursor Speed remain intact. The staged candidate must reject the old parked-pointer, axis-by-axis native movement, and per-poll Web delta patterns and must record browserRafCursorGate and nativeStreamingBackgroundInputGate success. Preserve attempt 9's Wii/GameCube hidden artwork alias with pretty display names, native streaming/fullscreen/app artwork, curated Apps, Dolphin Wii saves/artwork, provider concurrency/ETA, hitch guards, compiled 0.26.5/x64 native stamp, installer rollback/tamper, Steam ownership, Game Bar/navigation, Nintendo ownership, and frozen PS1/PS2/PS3 presentation gates."
 }
