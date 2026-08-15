@@ -107,7 +107,7 @@ $modelAtlasBase64=($modelAtlasParts|ForEach-Object{(Get-Content -Raw -LiteralPat
 $modelAtlasBytes=[Convert]::FromBase64String($modelAtlasBase64)
 $modelAtlasHasher=[Security.Cryptography.SHA256]::Create()
 try{$modelAtlasSha=[BitConverter]::ToString($modelAtlasHasher.ComputeHash($modelAtlasBytes)).Replace('-','').ToLowerInvariant()}finally{$modelAtlasHasher.Dispose()}
-if($modelAtlasSha -ne 'f9c4c973d1b269ffc79e51544caf63eb494df75eb04ff4924a7947fe0a9fe650'){throw "3D model atlas SHA mismatch: $modelAtlasSha"}
+if($modelAtlasSha -ne 'fb46ad288c506e2c628f4bf06025deb66af17d26b4fff02baa2950de13d7342f'){throw "3D model atlas SHA mismatch: $modelAtlasSha"}
 if($modelAtlasBytes.Length -lt 1024 -or $modelAtlasBytes[0] -ne 0x89 -or $modelAtlasBytes[1] -ne 0x50 -or $modelAtlasBytes[2] -ne 0x4E -or $modelAtlasBytes[3] -ne 0x47){throw '3D model atlas payload is not a valid PNG.'}
 $modelAtlasPath=Join-Path $stage 'Assets\Models\platform-models.png'
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $modelAtlasPath)|Out-Null
