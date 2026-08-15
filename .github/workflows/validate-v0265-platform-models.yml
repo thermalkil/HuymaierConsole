@@ -1,0 +1,27 @@
+name: Validate Huymaier Console v0.26.5 Platform Models
+
+on:
+  push:
+    branches:
+      - feature/v0.26.5-performance-and-downloads
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: huymaier-v0265-platform-model-validation
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate platform model presentation
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          & '.\.development\v0.26.5\Test-v0265-PlatformModels.ps1'
