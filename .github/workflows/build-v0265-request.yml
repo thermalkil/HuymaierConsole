@@ -47,11 +47,10 @@ jobs:
             '.\.build\Optimize-StreamingController.ps1',
             '.\.build\Optimize-UnifiedCursor.ps1',
             '.\.build\Optimize-Platform3DModels.ps1',
-            '.\.build\Optimize-BuiltInLiveModels.ps1',
+            '.\.build\Optimize-User3DModels.ps1',
             '.\.build\Optimize-DolphinIntegration.ps1',
             '.\.build\Optimize-WiiArtworkAliases.ps1',
             '.\.build\Optimize-GameCubeHubNavigation.ps1',
-            '.\.build\Optimize-ControllerBrowserCursor.ps1',
             '.\.build\Optimize-NintendoDisplayNames.ps1',
             '.\.build\Optimize-ProviderConcurrency.ps1',
             '.\.build\Optimize-ProviderConcurrencyPreflight.ps1',
@@ -65,6 +64,7 @@ jobs:
             '.\HuymaierPlatformModels.ps1',
             '.\HuymaierPlatformAtlas.ps1',
             '.\HuymaierLivePlatformModels.ps1',
+            '.\HuymaierUser3DModels.ps1',
             '.\.development\v0.26.5\Prepare-v0265-PlatformModelValidation.ps1',
             '.\.development\v0.26.5\Test-v0265-Stabilization.ps1',
             '.\.development\v0.26.5\Test-v0265-StreamingController.ps1',
@@ -72,7 +72,7 @@ jobs:
             '.\.development\v0.26.5\Test-v0265-DownloadRefreshPolicy.ps1',
             '.\.development\v0.26.5\Test-v0265-GameCubeHubNavigation.ps1',
             '.\.development\v0.26.5\Test-v0265-PlatformModels.ps1',
-            '.\.development\v0.26.5\Test-v0265-BuiltInLiveModels.ps1'
+            '.\.development\v0.26.5\Test-v0265-User3DModels.ps1'
           )){
             $t=$null;$e=$null
             [void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p),[ref]$t,[ref]$e)
@@ -91,13 +91,9 @@ jobs:
           & '.\.development\v0.26.5\Test-NintendoLibraryOwnership.ps1'
           $restore=@('HuymaierConsole.ps1','HuymaierBootstrap.ps1','Install-HuymaierConsole.ps1','.build/Build-HuymaierReleaseCandidate.Core.ps1')
           try {
-            # The platform-model validators intentionally test the same transform
-            # ordering used by the release builder. Prepare those prerequisites,
-            # validate both the live runtime and all 50 built-in GLBs, then put
-            # the checkout back to the exact requested source before packaging.
             & '.\.development\v0.26.5\Prepare-v0265-PlatformModelValidation.ps1'
             & '.\.development\v0.26.5\Test-v0265-PlatformModels.ps1'
-            & '.\.development\v0.26.5\Test-v0265-BuiltInLiveModels.ps1'
+            & '.\.development\v0.26.5\Test-v0265-User3DModels.ps1'
           }
           finally {
             & git checkout -- @restore
@@ -124,7 +120,7 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference='Stop';$stage=Join-Path $env:RUNNER_TEMP ('hc-stage\${{ steps.request.outputs.package_root }}');$validation=Join-Path $env:HC_CANDIDATE_OUTPUT 'candidate-validation.json';& .\.build\Test-HuymaierV0265StreamingCandidate.ps1 -StageRoot $stage -ValidationPath $validation
-      - name: Run staged 3D platform model gates
+      - name: Run staged user 3D platform model gates
         shell: powershell
         run: |
           $ErrorActionPreference='Stop';$stage=Join-Path $env:RUNNER_TEMP ('hc-stage\${{ steps.request.outputs.package_root }}');$validation=Join-Path $env:HC_CANDIDATE_OUTPUT 'candidate-validation.json';& .\.build\Test-HuymaierV0265PlatformModelsCandidate.ps1 -StageRoot $stage -ValidationPath $validation
