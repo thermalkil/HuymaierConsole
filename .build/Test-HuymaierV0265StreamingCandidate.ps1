@@ -47,87 +47,34 @@ $installer=Require-Text 'Install-HuymaierConsole.ps1' @(
     'HuymaierStreamingController.ps1'
 )
 $runtime=Require-Text 'HuymaierStreamingController.ps1' @(
-    'ControllerCursorSpeed',
-    'controller-cursor-speed-slider',
-    'Convert-HcCursorAxis',
-    'Update-HcSmoothBrowserPointer',
-    'Move-HcBrowserVirtualCursorDelta',
-    'Scroll-HcBrowserVirtualCursorDelta',
-    'Set-HcBrowserAnalogDrive',
-    'Stop-HcBrowserAnalogDrive',
-    'requestAnimationFrame(tick)',
-    '__hcCursorDriveState',
-    '__hcCursorDrive=(x,y,speed)',
-    'magnitude=[math]::Sqrt',
-    '1500.0',
-    'Right Stick Scroll',
-    'Start-HcNativeStreamingApp',
-    'HuymaierStreamingCursorHost.exe',
-    'Get-HcAppxArtworkCandidate',
-    'favicon.ico',
-    'ControllerMouseEnabled',
-    'FullscreenPresentation',
+    'ControllerCursorSpeed','controller-cursor-speed-slider','Convert-HcCursorAxis','Update-HcSmoothBrowserPointer','Move-HcBrowserVirtualCursorDelta','Scroll-HcBrowserVirtualCursorDelta',
+    'Set-HcBrowserAnalogDrive','Stop-HcBrowserAnalogDrive','requestAnimationFrame(tick)','__hcCursorDriveState','__hcCursorDrive=(x,y,speed)','magnitude=[math]::Sqrt',
+    '1500.0','Right Stick Scroll','Start-HcNativeStreamingApp','HuymaierStreamingCursorHost.exe','Get-HcAppxArtworkCandidate','favicon.ico','ControllerMouseEnabled','FullscreenPresentation',
     'Native app mode uses the installed Windows streaming app directly; WebView is not involved.'
 )
 $managed=Require-Text 'Native\HuymaierConsole.GameInput.cs' @(
-    'public const string Version = "0.26.5";',
-    'public const string Architecture = "x64";',
-    'HuymaierPointerState',
-    'HuymaierPointerInput',
-    'HC_ReadGamepadPointerState',
-    'ReadPointerState'
+    'public const string Version = "0.26.5";','public const string Architecture = "x64";','HuymaierPointerState','HuymaierPointerInput','HC_ReadGamepadPointerState','ReadPointerState'
 )
 $bridge=Require-Text 'Native\HuymaierGameInputBridge.cpp' @(
-    'HC_ReadGamepadPointerState',
-    'GetCurrentReading(GameInputKindGamepad',
-    'leftThumbstickX',
-    'rightThumbstickY',
-    'GameInputGamepadA',
-    'GameInputGamepadX',
-    'GameInputEnableBackgroundInput',
-    'GameInputEnableBackgroundGuideButton',
-    'GameInputEnableBackgroundShareButton',
-    'HuymaierConsole.PointerStateV1',
-    'TryReadSharedPointerState',
-    'OpenFileMappingW',
-    'GetTickCount64',
-    'if (TryReadSharedPointerState'
+    'HC_ReadGamepadPointerState','GetCurrentReading(GameInputKindGamepad','leftThumbstickX','rightThumbstickY','GameInputGamepadA','GameInputGamepadX',
+    'GameInputEnableBackgroundInput','GameInputEnableBackgroundGuideButton','GameInputEnableBackgroundShareButton',
+    'HuymaierConsole.PointerStateV1','TryReadSharedPointerState','OpenFileMappingW','GetTickCount64','if (TryReadSharedPointerState',
+    'kSharedGuideBit','ConsumeSharedGuideEdge','g_sharedGuideDown','g_lastGuideDeliveredAt','HC_ConsumeGuidePress','now - previous < 300'
 )
 $nativeInput=Require-Text 'HuymaierNativeInput.cs' @(
-    'HUYMAIER_SONY_POINTER_SHARED_STATE_V1',
-    'MemoryMappedFile.CreateOrOpen',
-    'Local\\HuymaierConsole.PointerStateV1',
-    'PublishPointerState(productId, lx, ly, rx, ry, buttons1, buttons2)',
-    'byte rx = report[stateBase + 2]',
-    'byte ry = report[stateBase + 3]',
-    'NormalizePointerAxis(ly, true)',
-    'BuildPointerButtons(buttons1, buttons2)',
-    'GetTickCount64()'
+    'HUYMAIER_SONY_POINTER_SHARED_STATE_V1','MemoryMappedFile.CreateOrOpen','Local\\HuymaierConsole.PointerStateV1',
+    'PublishPointerState(productId, lx, ly, rx, ry, buttons1, buttons2, buttons3)','byte rx = report[stateBase + 2]','byte ry = report[stateBase + 3]',
+    'NormalizePointerAxis(ly, true)','BuildPointerButtons(buttons1, buttons2, buttons3)','pointerButtons |= 0x0100','GetTickCount64()'
+)
+$overlay=Require-Text 'Native\HuymaierConsole.SystemOverlay.cs' @(
+    'HUYMAIER_EXTERNAL_GAMEBAR_OWNER_V1','GWLP_HWNDPARENT','SetWindowLongPtr64','AttachExternalOwner(handle, targetWindow)','SetWindowOwner','DetachExternalOwner','externalOwnerWindow','HWND_TOPMOST'
 )
 $hostText=Require-Text 'Native\HuymaierStreamingCursorHost.cs' @(
-    'HC_ReadGamepadPointerState',
-    'WS_POPUP',
-    'SetWindowPos',
-    'MonitorFromWindow',
-    'ApplyDeadzoneCurve',
-    '1500.0',
-    'LeftClick',
-    'ShowOnScreenKeyboard',
-    'MOUSEEVENTF_WHEEL',
-    'TextInputHost',
-    'parentProcessId',
-    'IsPointerForegroundAllowed',
-    'RestoreWindow',
-    'launchBounds',
-    'SetCursorPos((int)Math.Round(cursorX)',
-    'Math.Sqrt(rawX * rawX + rawY * rawY)',
-    'magnitude > 0.14'
+    'HC_ReadGamepadPointerState','WS_POPUP','SetWindowPos','MonitorFromWindow','ApplyDeadzoneCurve','1500.0','LeftClick','ShowOnScreenKeyboard','MOUSEEVENTF_WHEEL',
+    'TextInputHost','parentProcessId','IsPointerForegroundAllowed','RestoreWindow','launchBounds','SetCursorPos((int)Math.Round(cursorX)','Math.Sqrt(rawX * rawX + rawY * rawY)','magnitude > 0.14'
 )
 $nintendo=Require-Text 'Native\HuymaierConsole.ConsolePlatforms.cs' @(
-    'HUYMAIER_WII_ARTWORK_ALIAS_V1',
-    'string legacyKey=CleanName(Path.GetFileNameWithoutExtension(game.Path))',
-    'string cover=FindDolphinArtwork(game.Path,artworkTitle)',
-    'FindEmulatorArtwork(game.Path,artworkTitle)'
+    'HUYMAIER_WII_ARTWORK_ALIAS_V1','string legacyKey=CleanName(Path.GetFileNameWithoutExtension(game.Path))','string cover=FindDolphinArtwork(game.Path,artworkTitle)','FindEmulatorArtwork(game.Path,artworkTitle)'
 )
 
 foreach($scriptFile in @('HuymaierConsole.ps1','HuymaierBootstrap.ps1','Install-HuymaierConsole.ps1','HuymaierStreamingController.ps1')){Assert-Ps51Parse $scriptFile}
@@ -135,30 +82,23 @@ Assert-X64Pe 'HuymaierStreamingCursorHost.exe'
 Assert-X64Pe 'HuymaierConsole.exe'
 Require-File 'HuymaierGameInputBridge.dll'|Out-Null
 
-# Explicitly reject the cursor failure modes reported from prior RCs.
+# Explicitly reject cursor and overlay failure modes reported from prior RCs.
 if($hostText.IndexOf('if (NativeMethods.GetCursorPos(out point))',[StringComparison]::Ordinal) -ge 0){throw 'Staged native streaming cursor still inherits Huymaier''s parked physical pointer.'}
 if($hostText.IndexOf('double moveX = ApplyDeadzoneCurve(lx);',[StringComparison]::Ordinal) -ge 0){throw 'Staged native streaming movement still shapes X/Y independently.'}
 if($runtime.IndexOf('Move-HcBrowserVirtualCursorDelta ($x*$maxPixelsPerSecond*$dt)',[StringComparison]::Ordinal) -ge 0){throw 'Staged browser analog cursor still emits per-poll delta scripts instead of RAF drive state.'}
+if($overlay.IndexOf('DisposeTaskPreviews(); telemetryTimer.Stop();`r`n            try { Hide();',[StringComparison]::Ordinal) -ge 0){throw 'Staged external Game Bar still hides without detaching the native app owner.'}
 
 # Confirm the helper is a standalone shipped executable and native streaming does
 # not silently route back through WebView when an installed AUMID is available.
 if($runtime.IndexOf("if([string]::Equals(`$mode,'Native',[StringComparison]::OrdinalIgnoreCase) -and `$aumid -and `$category -eq 'Streaming')",[StringComparison]::Ordinal) -lt 0){throw 'Staged native Streaming category is not routed through the native cursor host.'}
 if($runtime.IndexOf("Start-Process -FilePath `$script:HcStreamingCursorHostPath",[StringComparison]::Ordinal) -lt 0){throw 'Staged streaming runtime does not start the isolated cursor host.'}
 
-# The Wii cover fix is intentionally separate from the pretty display name. Scope
-# the negative check to QueueConsoleArtworkRefresh only: other platform code may
-# legitimately call FindEmulatorArtwork with game.Name elsewhere in this class.
+# The Wii cover fix is intentionally separate from the pretty display name.
 $refreshStart=$nintendo.IndexOf('private void QueueConsoleArtworkRefresh()',[StringComparison]::Ordinal)
 $refreshEnd=$nintendo.IndexOf('private void LaunchGame(',[math]::Max(0,$refreshStart),[StringComparison]::Ordinal)
 if($refreshStart -lt 0 -or $refreshEnd -le $refreshStart){throw 'Staged Wii artwork alias gate could not isolate QueueConsoleArtworkRefresh.'}
 $refreshScope=$nintendo.Substring($refreshStart,$refreshEnd-$refreshStart)
-foreach($required in @(
-    'HUYMAIER_WII_ARTWORK_ALIAS_V1',
-    'string legacyKey=CleanName(Path.GetFileNameWithoutExtension(game.Path))',
-    'string artworkTitle=game.Name',
-    'FindDolphinArtwork(game.Path,artworkTitle)',
-    'FindEmulatorArtwork(game.Path,artworkTitle)'
-)){
+foreach($required in @('HUYMAIER_WII_ARTWORK_ALIAS_V1','string legacyKey=CleanName(Path.GetFileNameWithoutExtension(game.Path))','string artworkTitle=game.Name','FindDolphinArtwork(game.Path,artworkTitle)','FindEmulatorArtwork(game.Path,artworkTitle)')){
     if($refreshScope.IndexOf($required,[StringComparison]::Ordinal) -lt 0){throw "Staged QueueConsoleArtworkRefresh is missing Wii artwork alias invariant: $required"}
 }
 $oldRefresh='string cover=FindEmulatorArtwork(game.Path,game.Name);if(String.IsNullOrWhiteSpace(cover))cover=TryDownloadConsoleCover(game);'
@@ -171,9 +111,11 @@ $validation|Add-Member -NotePropertyName cursorSpeedSettingGate -NotePropertyVal
 $validation|Add-Member -NotePropertyName nativeStreamingControllerGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName nativeStreamingBackgroundInputGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName sonyHidPointerBackendGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName sonyHidGuideGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName externalNativeGameBarGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName nativeStreamingFullscreenGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName streamingAppArtworkGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName wiiArtworkAliasGate -NotePropertyValue 'success' -Force
 $validation|ConvertTo-Json -Depth 20|Set-Content -LiteralPath $ValidationPath -Encoding UTF8
 
-Write-Host 'Staged v0.26.5 Sony HID shared pointer, RAF browser cursor, native streaming background-input/fullscreen, app artwork and Wii artwork-alias gates passed.'
+Write-Host 'Staged v0.26.5 Sony HID pointer/Guide, external native-app Game Bar, RAF browser cursor, native streaming fullscreen, app artwork and Wii artwork-alias gates passed.'
