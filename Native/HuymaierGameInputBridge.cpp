@@ -30,6 +30,97 @@ namespace
     std::atomic<long> g_guidePresses(0);
     std::atomic<long> g_sharePresses(0);
 
+    // Sony controllers already have a proven WM_INPUT path in HuymaierNativeInput.
+    // The shell publishes its continuous axes/buttons here so Web and the isolated
+    // streaming cursor helper use the exact same controller backend as navigation.
+    static const wchar_t* kPointerMapName = L"Local\\HuymaierConsole.PointerStateV1";
+    static const int32_t kPointerMagic = 0x31504348; // HCP1
+    HANDLE g_pointerMapping = nullptr;
+    const unsigned char* g_pointerBytes = nullptr;
+
+#pragma pack(push, 1)
+    struct SharedPointerState
+    {
+        int32_t magic;
+        int32_t version;
+        int32_t sequence;
+        int32_t productId;
+        uint64_t tickCount64;
+        float leftX;
+        float leftY;
+        float rightX;
+        float rightY;
+        uint32_t buttons;
+    };
+#pragma pack(pop)
+
+    void CloseSharedPointerState()
+    {
+        if (g_pointerBytes != nullptr)
+        {
+            UnmapViewOfFile(g_pointerBytes);
+            g_pointerBytes = nullptr;
+        }
+        if (g_pointerMapping != nullptr)
+        {
+            CloseHandle(g_pointerMapping);
+            g_pointerMapping = nullptr;
+        }
+    }
+
+    bool EnsureSharedPointerState()
+    {
+        if (g_pointerBytes != nullptr) return true;
+        HANDLE mapping = OpenFileMappingW(FILE_MAP_READ, FALSE, kPointerMapName);
+        if (mapping == nullptr) return false;
+        const unsigned char* bytes = static_cast<const unsigned char*>(MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, sizeof(SharedPointerState)));
+        if (bytes == nullptr)
+        {
+            CloseHandle(mapping);
+            return false;
+        }
+        g_pointerMapping = mapping;
+        g_pointerBytes = bytes;
+        return true;
+    }
+
+    bool TryReadSharedPointerState(
+        float* leftX,
+        float* leftY,
+        float* rightX,
+        float* rightY,
+        float* leftTrigger,
+        float* rightTrigger,
+        uint32_t* buttons)
+    {
+        if (!EnsureSharedPointerState()) return false;
+        const volatile SharedPointerState* shared = reinterpret_cast<const volatile SharedPointerState*>(g_pointerBytes);
+        const int32_t seqBefore = shared->sequence;
+        MemoryBarrier();
+        if ((seqBefore & 1) != 0 || shared->magic != kPointerMagic || shared->version != 1) return false;
+
+        const uint64_t stamp = shared->tickCount64;
+        const float lx = shared->leftX;
+        const float ly = shared->leftY;
+        const float rx = shared->rightX;
+        const float ry = shared->rightY;
+        const uint32_t pointerButtons = shared->buttons;
+        MemoryBarrier();
+        const int32_t seqAfter = shared->sequence;
+        if (seqBefore != seqAfter || (seqAfter & 1) != 0) return false;
+
+        const uint64_t now = GetTickCount64();
+        if (stamp == 0 || now < stamp || now - stamp > 750) return false;
+        if (leftX) *leftX = lx;
+        if (leftY) *leftY = ly;
+        if (rightX) *rightX = rx;
+        if (rightY) *rightY = ry;
+        if (leftTrigger) *leftTrigger = 0.0f;
+        if (rightTrigger) *rightTrigger = 0.0f;
+        if (buttons) *buttons = pointerButtons;
+        return true;
+    }
+
     void CALLBACK OnSystemButton(
         GameInputCallbackToken,
         void*,
@@ -84,13 +175,12 @@ extern "C" __declspec(dllexport) int __cdecl HC_GameInputInitialize()
     IGameInput* input = nullptr;
     HRESULT result = GameInputCreate(&input);
     if (FAILED(result) || input == nullptr)
-        return 0;
+    {
+        // The Sony HID shared-state path can still service pointer reads even if
+        // GameInput itself is unavailable for the controller.
+        return EnsureSharedPointerState() ? 1 : 0;
+    }
 
-    // Huymaier Console intentionally owns the system Guide button while it is
-    // running, including when an external game/app has foreground focus. The
-    // native streaming cursor helper is itself backgrounded while the Windows
-    // streaming app owns focus, so ordinary gamepad readings must also remain
-    // available in the background for that isolated pointer surface.
     input->SetFocusPolicy(static_cast<GameInputFocusPolicy>(
         GameInputEnableBackgroundInput |
         GameInputEnableBackgroundGuideButton |
@@ -107,7 +197,7 @@ extern "C" __declspec(dllexport) int __cdecl HC_GameInputInitialize()
     if (FAILED(result))
     {
         input->Release();
-        return 0;
+        return EnsureSharedPointerState() ? 1 : 0;
     }
 
     g_gameInput = input;
@@ -148,6 +238,12 @@ extern "C" __declspec(dllexport) int __cdecl HC_ReadGamepadPointerState(
     if (rightTrigger) *rightTrigger = 0.0f;
     if (buttons) *buttons = 0;
 
+    // Prefer the shell's proven Sony Raw HID state whenever it is fresh. This is
+    // what makes DualSense/DualShock pointer motion identical in Web and native
+    // streaming apps, including while Huymaier is backgrounded.
+    if (TryReadSharedPointerState(leftX, leftY, rightX, rightY, leftTrigger, rightTrigger, buttons))
+        return 1;
+
     std::lock_guard<std::mutex> guard(g_lock);
     if (g_gameInput == nullptr)
         return 0;
@@ -187,6 +283,7 @@ extern "C" __declspec(dllexport) void __cdecl HC_GameInputShutdown()
     }
     g_gameInput = nullptr;
     g_callbackRegistered = false;
+    CloseSharedPointerState();
     g_guidePresses.store(0, std::memory_order_release);
     g_sharePresses.store(0, std::memory_order_release);
 }
