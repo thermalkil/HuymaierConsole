@@ -7,6 +7,11 @@ Set-StrictMode -Version 2.0
 $script:HcStreamingCursorHostPath=Join-Path $script:BaseDir 'HuymaierStreamingCursorHost.exe'
 $script:HcStreamingArtworkRoot=Join-Path $script:DataDir 'AppArtwork'
 $script:HcSmoothBrowserCursorLastAt=[datetime]::MinValue
+$script:HcBrowserDriveLastX=0.0
+$script:HcBrowserDriveLastY=0.0
+$script:HcBrowserDriveLastSpeed=0.0
+$script:HcBrowserDriveLastSentAt=[datetime]::MinValue
+$script:HcBrowserDriveActive=$false
 $script:HcStreamingBaseGetPageDefinition=${function:Get-PageDefinition}
 $script:HcStreamingBaseAdjustSelectedSlider=${function:Adjust-SelectedSlider}
 $script:HcStreamingBaseStartManagedApp=${function:Start-HcManagedApp}
@@ -64,6 +69,57 @@ function Move-HcBrowserVirtualCursorDelta {
     Invoke-HcBrowserScriptAsync "window.__hcCursorMove?window.__hcCursorMove($dx,$dy):false"
 }
 
+function Set-HcBrowserAnalogDrive {
+    param([double]$X,[double]$Y,[double]$PixelsPerSecond)
+    if(-not(Get-Command Install-HcBrowserVirtualCursorScript -ErrorAction SilentlyContinue)){return}
+    Install-HcBrowserVirtualCursorScript
+    $ci=[Globalization.CultureInfo]::InvariantCulture
+    $xText=$X.ToString('0.####',$ci)
+    $yText=$Y.ToString('0.####',$ci)
+    $speedText=$PixelsPerSecond.ToString('0.##',$ci)
+    $scriptText=@"
+(()=>{if(!window.__hcCursor)return false;
+if(!window.__hcCursorDriveState){
+  window.__hcCursorDriveState={x:0,y:0,speed:0,last:performance.now(),raf:0};
+  const tick=(now)=>{
+    const s=window.__hcCursorDriveState;
+    let dt=(now-s.last)/1000;s.last=now;
+    if(dt<0||dt>0.05)dt=0.016;
+    if((Math.abs(s.x)>0.0001||Math.abs(s.y)>0.0001)&&window.__hcCursor){
+      window.__hcCursor.x+=s.x*s.speed*dt;
+      window.__hcCursor.y+=s.y*s.speed*dt;
+      if(window.__hcCursorRender)window.__hcCursorRender();
+    }
+    s.raf=requestAnimationFrame(tick);
+  };
+  window.__hcCursorDrive=(x,y,speed)=>{const s=window.__hcCursorDriveState;s.x=x;s.y=y;s.speed=speed;return true;};
+  window.__hcCursorDriveState.raf=requestAnimationFrame(tick);
+}
+return window.__hcCursorDrive($xText,$yText,$speedText);
+})()
+"@
+    Invoke-HcBrowserScriptAsync $scriptText
+    $script:HcBrowserDriveLastX=$X
+    $script:HcBrowserDriveLastY=$Y
+    $script:HcBrowserDriveLastSpeed=$PixelsPerSecond
+    $script:HcBrowserDriveLastSentAt=Get-Date
+    $script:HcBrowserDriveActive=([math]::Abs($X) -gt 0.0001 -or [math]::Abs($Y) -gt 0.0001)
+}
+
+function Stop-HcBrowserAnalogDrive {
+    if(-not $script:HcBrowserDriveActive -and $script:HcBrowserDriveLastSpeed -eq 0.0){return}
+    try{
+        if(Get-Command Invoke-HcBrowserScriptAsync -ErrorAction SilentlyContinue){
+            Invoke-HcBrowserScriptAsync 'window.__hcCursorDrive?window.__hcCursorDrive(0,0,0):false'
+        }
+    }catch{}
+    $script:HcBrowserDriveLastX=0.0
+    $script:HcBrowserDriveLastY=0.0
+    $script:HcBrowserDriveLastSpeed=0.0
+    $script:HcBrowserDriveLastSentAt=Get-Date
+    $script:HcBrowserDriveActive=$false
+}
+
 function Scroll-HcBrowserVirtualCursorDelta {
     param([double]$X,[double]$Y)
     if(-not(Get-Command Install-HcBrowserVirtualCursorScript -ErrorAction SilentlyContinue)){return}
@@ -76,21 +132,47 @@ function Scroll-HcBrowserVirtualCursorDelta {
 
 function Update-HcSmoothBrowserPointer {
     $state=Get-HcGameInputPointerState
-    if($null -eq $state -or -not [bool]$state.Available){return $false}
+    if($null -eq $state -or -not [bool]$state.Available){
+        Stop-HcBrowserAnalogDrive
+        return $false
+    }
+
+    # One radial deadzone/curve preserves the real stick angle, so diagonals
+    # are simultaneous rather than decomposed into alternating X/Y steps.
+    $rawX=[double]$state.LeftX
+    $rawY=-[double]$state.LeftY
+    $magnitude=[math]::Sqrt(($rawX*$rawX)+($rawY*$rawY))
+    $x=0.0;$y=0.0
+    if($magnitude -gt 0.14){
+        $normalized=[math]::Min(1.0,($magnitude-0.14)/(1.0-0.14))
+        $curved=[math]::Pow($normalized,1.55)
+        if($magnitude -gt 0.000001){
+            $x=($rawX/$magnitude)*$curved
+            $y=($rawY/$magnitude)*$curved
+        }
+    }
+
+    $speed=[double](Get-HcControllerCursorSpeed)
+    $maxPixelsPerSecond=1500.0*($speed/100.0)
     $now=Get-Date
+    $changed=([math]::Abs($x-$script:HcBrowserDriveLastX) -ge 0.018 -or
+              [math]::Abs($y-$script:HcBrowserDriveLastY) -ge 0.018 -or
+              [math]::Abs($maxPixelsPerSecond-$script:HcBrowserDriveLastSpeed) -ge 1.0)
+    $heartbeat=($script:HcBrowserDriveLastSentAt -eq [datetime]::MinValue -or
+                ($now-$script:HcBrowserDriveLastSentAt).TotalMilliseconds -ge 250)
+    $neutralChanged=(([math]::Abs($x) -le 0.0001 -and [math]::Abs($y) -le 0.0001) -and $script:HcBrowserDriveActive)
+    if($changed -or $heartbeat -or $neutralChanged){
+        Set-HcBrowserAnalogDrive $x $y $maxPixelsPerSecond
+    }
+
+    # Pointer motion is integrated by requestAnimationFrame in-page. Keep only
+    # right-stick scrolling on the PowerShell poll loop.
     $dt=0.016
     if($script:HcSmoothBrowserCursorLastAt -ne [datetime]::MinValue){
         $dt=($now-$script:HcSmoothBrowserCursorLastAt).TotalSeconds
         if($dt -le 0 -or $dt -gt 0.1){$dt=0.016}
     }
     $script:HcSmoothBrowserCursorLastAt=$now
-    $speed=[double](Get-HcControllerCursorSpeed)
-    $maxPixelsPerSecond=1500.0*($speed/100.0)
-    $x=Convert-HcCursorAxis ([double]$state.LeftX)
-    $y=Convert-HcCursorAxis ([double]$state.LeftY)
-    if([math]::Abs($x) -gt 0.0001 -or [math]::Abs($y) -gt 0.0001){
-        Move-HcBrowserVirtualCursorDelta ($x*$maxPixelsPerSecond*$dt) (-$y*$maxPixelsPerSecond*$dt)
-    }
     $sx=Convert-HcCursorAxis ([double]$state.RightX)
     $sy=Convert-HcCursorAxis ([double]$state.RightY)
     if([math]::Abs($sx) -gt 0.0001 -or [math]::Abs($sy) -gt 0.0001){
@@ -101,12 +183,21 @@ function Update-HcSmoothBrowserPointer {
 
 function Handle-HcBrowserController {
     param([int]$Mask,[string]$Direction)
-    if(-not $script:HcBrowserActive){return $false}
-    if((Get-Command Test-HcMainMenuVisible -ErrorAction SilentlyContinue) -and (Test-HcMainMenuVisible)){return $false}
+    if(-not $script:HcBrowserActive){
+        Stop-HcBrowserAnalogDrive
+        return $false
+    }
+    if((Get-Command Test-HcMainMenuVisible -ErrorAction SilentlyContinue) -and (Test-HcMainMenuVisible)){
+        Stop-HcBrowserAnalogDrive
+        return $false
+    }
 
     if($script:HcBrowserFocusArea -eq 'Toolbar'){
+        Stop-HcBrowserAnalogDrive
         $script:HcSmoothBrowserCursorLastAt=[datetime]::MinValue
-        return (& $script:HcStreamingBaseBrowserController $Mask $Direction)
+        $handled=& $script:HcStreamingBaseBrowserController $Mask $Direction
+        if(-not $script:HcBrowserActive){Stop-HcBrowserAnalogDrive}
+        return $handled
     }
 
     $analog=Update-HcSmoothBrowserPointer
