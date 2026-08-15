@@ -113,6 +113,7 @@ HuymaierGameProviders.ps1
 HuymaierGameProviderWorker.ps1
 HuymaierLibraryWorker.ps1
 HuymaierLivePlatformModels.ps1
+HuymaierUser3DModels.ps1
 HuymaierNativeAudio.cs
 HuymaierNativeConsoleLibraryWorker.ps1
 HuymaierNativeDisplay.cs
@@ -141,7 +142,6 @@ Install-HuymaierConsole.ps1
 Launch-HuymaierConsole.cmd
 Launch-Windowed.cmd
 manifest.json
-Native/HuymaierBuiltInModelGenerator.cs
 Native/HuymaierConsole.ConsolePlatforms.cs
 Native/HuymaierConsole.GameInput.cs
 Native/HuymaierConsole.NativeApp.cs
