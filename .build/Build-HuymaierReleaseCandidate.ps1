@@ -24,6 +24,7 @@ $providerPreflightOptimizer=Join-Path $PSScriptRoot 'Optimize-ProviderConcurrenc
 $browserCursorOptimizer=Join-Path $PSScriptRoot 'Optimize-ControllerBrowserCursor.ps1'
 $runtimeHitchOptimizer=Join-Path $PSScriptRoot 'Optimize-RuntimeHitching.ps1'
 $concurrentDownloadRefreshOptimizer=Join-Path $PSScriptRoot 'Optimize-ConcurrentDownloadRefresh.ps1'
+$downloadLibraryRefreshOptimizer=Join-Path $PSScriptRoot 'Optimize-DownloadLibraryRefreshPolicy.ps1'
 $workspace=$env:GITHUB_WORKSPACE
 if([string]::IsNullOrWhiteSpace($workspace)){$workspace=(Split-Path -Parent $PSScriptRoot)}
 $coreSource=Join-Path $workspace 'HuymaierConsole.ps1'
@@ -53,7 +54,7 @@ $streamingCursorSource=Join-Path $workspace 'Native\HuymaierStreamingCursorHost.
 $unifiedCursorHostSource=Join-Path $workspace 'Native\HuymaierUnifiedCursorHost.cs'
 
 $requiredFiles=@(
-    $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$dolphinOptimizer,$wiiArtworkAliasOptimizer,$appLibraryOptimizer,$streamingControllerOptimizer,$unifiedCursorOptimizer,$sonyPointerOptimizer,$externalGameBarOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$providerPreflightOptimizer,$browserCursorOptimizer,$runtimeHitchOptimizer,$concurrentDownloadRefreshOptimizer,
+    $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$dolphinOptimizer,$wiiArtworkAliasOptimizer,$appLibraryOptimizer,$streamingControllerOptimizer,$unifiedCursorOptimizer,$sonyPointerOptimizer,$externalGameBarOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$providerPreflightOptimizer,$browserCursorOptimizer,$runtimeHitchOptimizer,$concurrentDownloadRefreshOptimizer,$downloadLibraryRefreshOptimizer,
     $coreSource,$bootstrapSource,$installerCoreSource,$installerScriptSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$nativeSystemOverlaySource,$nativeInputSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource,
     $providerConcurrencySource,$providerConcurrencyUiSource,$providerTransferCoordinatorSource,$appLibrarySource,$appInstallWorkerSource,$streamingControllerSource,$unifiedCursorSource,$streamingCursorSource,$unifiedCursorHostSource
 )
@@ -81,6 +82,7 @@ try{
     & $browserCursorOptimizer -BrowserPath $browserSource
     & $runtimeHitchOptimizer -ConsolePath $coreSource
     & $concurrentDownloadRefreshOptimizer -ConsolePath $coreSource
+    & $downloadLibraryRefreshOptimizer -ConsolePath $coreSource
     & $coreBuilder -TriggerPath $TriggerPath
 }finally{
     # Candidate bytes are built from deterministic optimized/stamped workspace sources,
