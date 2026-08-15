@@ -7,6 +7,11 @@ param(
 Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
 foreach($path in @($CorePath,$BootstrapPath,$InstallerScriptPath,$CoreBuilderPath)){if(-not(Test-Path -LiteralPath $path -PathType Leaf)){throw "Platform-model transform input missing: $path"}}
+$repoRoot=Split-Path -Parent $PSScriptRoot
+$atlasRuntimePath=Join-Path $repoRoot 'HuymaierPlatformAtlas.ps1'
+$atlasParts=@(1..4|ForEach-Object{Join-Path $repoRoot ('.development\v0.26.5\platform-model-atlas.part{0:D2}.b64' -f $_)})
+if(-not(Test-Path -LiteralPath $atlasRuntimePath -PathType Leaf)){throw "Platform-model atlas runtime missing: $atlasRuntimePath"}
+foreach($part in $atlasParts){if(-not(Test-Path -LiteralPath $part -PathType Leaf)){throw "Platform-model atlas source part missing: $part"}}
 
 $core=Get-Content -Raw -LiteralPath $CorePath -Encoding UTF8
 if($core -notmatch 'HUYMAIER_PLATFORM_3D_MODELS_RUNTIME_V1'){
@@ -33,8 +38,29 @@ if (Test-Path -LiteralPath $script:PlatformModelsModulePath) {
 }
 '@
     $core=$core.Replace($loadNeedle,$loadBlock)
-    Set-Content -LiteralPath $CorePath -Value $core -Encoding UTF8
 }
+if($core -notmatch 'HUYMAIER_PLATFORM_3D_ATLAS_RUNTIME_LOAD_V1'){
+    $pathNeedle="$script:PlatformModelsModulePath = Join-Path $script:BaseDir 'HuymaierPlatformModels.ps1'"
+    if(-not $core.Contains($pathNeedle)){throw 'Platform atlas requires platform model module path first.'}
+    $core=$core.Replace($pathNeedle,$pathNeedle+"`r`n`$script:PlatformAtlasModulePath = Join-Path `$script:BaseDir 'HuymaierPlatformAtlas.ps1'")
+    $loadNeedle=@'
+if (Test-Path -LiteralPath $script:PlatformModelsModulePath) {
+    try { . $script:PlatformModelsModulePath }
+    catch { Write-Log "Platform 3D model module load failed: $($_.Exception.Message)" 'ERROR' }
+}
+'@
+    if(-not $core.Contains($loadNeedle)){throw 'Platform atlas could not find platform model runtime load block.'}
+    $loadBlock=$loadNeedle+@'
+
+# HUYMAIER_PLATFORM_3D_ATLAS_RUNTIME_LOAD_V1
+if (Test-Path -LiteralPath $script:PlatformAtlasModulePath) {
+    try { . $script:PlatformAtlasModulePath }
+    catch { Write-Log "Platform 3D atlas module load failed: $($_.Exception.Message)" 'ERROR' }
+}
+'@
+    $core=$core.Replace($loadNeedle,$loadBlock)
+}
+Set-Content -LiteralPath $CorePath -Value $core -Encoding UTF8
 
 $bootstrap=Get-Content -Raw -LiteralPath $BootstrapPath -Encoding UTF8
 if($bootstrap -notmatch 'HUYMAIER_PLATFORM_3D_MODELS_PREFLIGHT_V1'){
@@ -44,18 +70,55 @@ if($bootstrap -notmatch 'HUYMAIER_PLATFORM_3D_MODELS_PREFLIGHT_V1'){
     $entryNeedle="        [pscustomobject]@{Path=`$unifiedCursorPath;Label='Unified cursor runtime'},"
     if(-not $bootstrap.Contains($entryNeedle)){throw 'Platform models could not find unified cursor preflight entry.'}
     $bootstrap=$bootstrap.Replace($entryNeedle,$entryNeedle+"`r`n        [pscustomobject]@{Path=`$platformModelsPath;Label='Platform 3D model runtime'},")
-    Set-Content -LiteralPath $BootstrapPath -Value $bootstrap -Encoding UTF8
 }
+if($bootstrap -notmatch 'HUYMAIER_PLATFORM_3D_ATLAS_PREFLIGHT_V1'){
+    $pathNeedle="$platformModelsPath=Join-Path $baseDir 'HuymaierPlatformModels.ps1'"
+    if(-not $bootstrap.Contains($pathNeedle)){throw 'Platform atlas requires platform model preflight path first.'}
+    $bootstrap=$bootstrap.Replace($pathNeedle,$pathNeedle+"`r`n# HUYMAIER_PLATFORM_3D_ATLAS_PREFLIGHT_V1`r`n`$platformAtlasPath=Join-Path `$baseDir 'HuymaierPlatformAtlas.ps1'")
+    $entryNeedle="        [pscustomobject]@{Path=`$platformModelsPath;Label='Platform 3D model runtime'},"
+    if(-not $bootstrap.Contains($entryNeedle)){throw 'Platform atlas could not find platform model preflight entry.'}
+    $bootstrap=$bootstrap.Replace($entryNeedle,$entryNeedle+"`r`n        [pscustomobject]@{Path=`$platformAtlasPath;Label='Platform 3D atlas runtime'},")
+}
+Set-Content -LiteralPath $BootstrapPath -Value $bootstrap -Encoding UTF8
 
 $installer=Get-Content -Raw -LiteralPath $InstallerScriptPath -Encoding UTF8
 if($installer -notmatch 'HUYMAIER_PLATFORM_3D_MODELS_INSTALLER_CACHE_V1'){
     $entryNeedle="            'HuymaierUnifiedCursor.ps1',"
     if(-not $installer.Contains($entryNeedle)){throw 'Platform models could not find unified cursor installer-cache entry.'}
     $installer=$installer.Replace($entryNeedle,$entryNeedle+"`r`n            # HUYMAIER_PLATFORM_3D_MODELS_INSTALLER_CACHE_V1`r`n            'HuymaierPlatformModels.ps1',")
-    Set-Content -LiteralPath $InstallerScriptPath -Value $installer -Encoding UTF8
 }
+if($installer -notmatch 'HUYMAIER_PLATFORM_3D_ATLAS_INSTALLER_CACHE_V1'){
+    $entryNeedle="            'HuymaierPlatformModels.ps1',"
+    if(-not $installer.Contains($entryNeedle)){throw 'Platform atlas could not find platform model installer-cache entry.'}
+    $installer=$installer.Replace($entryNeedle,$entryNeedle+"`r`n            # HUYMAIER_PLATFORM_3D_ATLAS_INSTALLER_CACHE_V1`r`n            'HuymaierPlatformAtlas.ps1',")
+}
+Set-Content -LiteralPath $InstallerScriptPath -Value $installer -Encoding UTF8
 
 $builder=Get-Content -Raw -LiteralPath $CoreBuilderPath -Encoding UTF8
+if($builder -notmatch 'HUYMAIER_PLATFORM_3D_ATLAS_PAYLOAD_V1'){
+    $anchor='# Files inherited from old packages but retired from the active architecture.'
+    if(-not $builder.Contains($anchor)){throw 'Platform atlas could not find post-overlay staging anchor.'}
+    $payload=@'
+# HUYMAIER_PLATFORM_3D_ATLAS_PAYLOAD_V1
+$modelAtlasParts=@(
+    (Join-Path $workspace '.development\v0.26.5\platform-model-atlas.part01.b64'),
+    (Join-Path $workspace '.development\v0.26.5\platform-model-atlas.part02.b64'),
+    (Join-Path $workspace '.development\v0.26.5\platform-model-atlas.part03.b64'),
+    (Join-Path $workspace '.development\v0.26.5\platform-model-atlas.part04.b64')
+)
+foreach($modelAtlasPart in $modelAtlasParts){if(-not(Test-Path -LiteralPath $modelAtlasPart -PathType Leaf)){throw "3D model atlas source part missing: $modelAtlasPart"}}
+$modelAtlasBase64=($modelAtlasParts|ForEach-Object{(Get-Content -Raw -LiteralPath $_ -Encoding ASCII).Trim()}) -join ''
+$modelAtlasBytes=[Convert]::FromBase64String($modelAtlasBase64)
+$modelAtlasSha=[BitConverter]::ToString(([Security.Cryptography.SHA256]::Create()).ComputeHash($modelAtlasBytes)).Replace('-','').ToLowerInvariant()
+if($modelAtlasSha -ne 'f9c4c973d1b269ffc79e51544caf63eb494df75eb04ff4924a7947fe0a9fe650'){throw "3D model atlas SHA mismatch: $modelAtlasSha"}
+if($modelAtlasBytes.Length -lt 1024 -or $modelAtlasBytes[0] -ne 0x89 -or $modelAtlasBytes[1] -ne 0x50 -or $modelAtlasBytes[2] -ne 0x4E -or $modelAtlasBytes[3] -ne 0x47){throw '3D model atlas payload is not a valid PNG.'}
+$modelAtlasPath=Join-Path $stage 'Assets\Models\platform-models.png'
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $modelAtlasPath)|Out-Null
+[IO.File]::WriteAllBytes($modelAtlasPath,$modelAtlasBytes)
+
+'@
+    $builder=$builder.Replace($anchor,$payload+$anchor)
+}
 if($builder -notmatch 'HUYMAIER_PLATFORM_3D_MODEL_WORKER_BUILD_V1'){
     $compileNeedle=@'
 & $csc @unifiedArgs
@@ -92,5 +155,5 @@ $unifiedHeaders=(& $dumpbin /nologo /headers $unifiedCursorExe) -join "`n";if($u
 $modelHeaders=(& $dumpbin /nologo /headers $modelPreviewExe) -join "`n";if($modelHeaders -notmatch '(?i)machine \(x64\)|8664 machine'){throw 'HuymaierModelPreviewWorker.exe is not x64.'}
 '@
     $builder=$builder.Replace($archNeedle,$archBlock)
-    Set-Content -LiteralPath $CoreBuilderPath -Value $builder -Encoding UTF8
 }
+Set-Content -LiteralPath $CoreBuilderPath -Value $builder -Encoding UTF8
