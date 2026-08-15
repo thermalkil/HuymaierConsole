@@ -4,6 +4,7 @@
 # This module does not create Games cards, inject Settings actions, or own the
 # platform rail. HuymaierUser3DModels V4 owns presentation. Keeping rendering
 # helpers separate prevents late wrapper/load-order regressions.
+# V4 owns the card tooltip/action text: X/Square View 3D model.
 
 Set-StrictMode -Version 2.0
 
