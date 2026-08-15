@@ -53,17 +53,19 @@ $appInstallWorkerSource=Join-Path $workspace 'HuymaierAppInstallWorker.ps1'
 $streamingControllerSource=Join-Path $workspace 'HuymaierStreamingController.ps1'
 $unifiedCursorSource=Join-Path $workspace 'HuymaierUnifiedCursor.ps1'
 $platformModelsSource=Join-Path $workspace 'HuymaierPlatformModels.ps1'
+$platformAtlasSource=Join-Path $workspace 'HuymaierPlatformAtlas.ps1'
 $modelPreviewSource=Join-Path $workspace 'Native\HuymaierModelPreviewWorker.cs'
 $modelPreviewAliasesSource=Join-Path $workspace 'Native\HuymaierModelPreviewWpfAliases.cs'
 $modelMapSource=Join-Path $workspace 'Assets\Models\model-map.json'
+$modelAtlasParts=@(1..4|ForEach-Object{Join-Path $workspace ('.development\v0.26.5\platform-model-atlas.part{0:D2}.b64' -f $_)})
 $streamingCursorSource=Join-Path $workspace 'Native\HuymaierStreamingCursorHost.cs'
 $unifiedCursorHostSource=Join-Path $workspace 'Native\HuymaierUnifiedCursorHost.cs'
 
 $requiredFiles=@(
     $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$dolphinOptimizer,$wiiArtworkAliasOptimizer,$gameCubeHubOptimizer,$appLibraryOptimizer,$streamingControllerOptimizer,$unifiedCursorOptimizer,$platformModelsOptimizer,$sonyPointerOptimizer,$externalGameBarOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$providerPreflightOptimizer,$browserCursorOptimizer,$runtimeHitchOptimizer,$concurrentDownloadRefreshOptimizer,$downloadLibraryRefreshOptimizer,
     $coreSource,$bootstrapSource,$installerCoreSource,$installerScriptSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$nativeSystemOverlaySource,$nativeInputSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource,
-    $providerConcurrencySource,$providerConcurrencyUiSource,$providerTransferCoordinatorSource,$appLibrarySource,$appInstallWorkerSource,$streamingControllerSource,$unifiedCursorSource,$platformModelsSource,$modelPreviewSource,$modelPreviewAliasesSource,$modelMapSource,$streamingCursorSource,$unifiedCursorHostSource
-)
+    $providerConcurrencySource,$providerConcurrencyUiSource,$providerTransferCoordinatorSource,$appLibrarySource,$appInstallWorkerSource,$streamingControllerSource,$unifiedCursorSource,$platformModelsSource,$platformAtlasSource,$modelPreviewSource,$modelPreviewAliasesSource,$modelMapSource,$streamingCursorSource,$unifiedCursorHostSource
+)+$modelAtlasParts
 foreach($required in $requiredFiles){if(-not(Test-Path -LiteralPath $required -PathType Leaf)){throw "Candidate optimization wrapper is missing required file: $required"}}
 
 $originals=@{}
