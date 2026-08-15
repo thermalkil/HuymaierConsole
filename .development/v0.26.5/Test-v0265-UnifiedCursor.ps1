@@ -22,14 +22,14 @@ try{
     $installerText=Get-Content -Raw $installer -Encoding UTF8
     $builderText=Get-Content -Raw $builder -Encoding UTF8
     $runtime=Get-Content -Raw (Join-Path $repo 'HuymaierUnifiedCursor.ps1') -Encoding UTF8
-    $host=Get-Content -Raw (Join-Path $repo 'Native\HuymaierUnifiedCursorHost.cs') -Encoding UTF8
+    $hostText=Get-Content -Raw (Join-Path $repo 'Native\HuymaierUnifiedCursorHost.cs') -Encoding UTF8
     foreach($required in @('HUYMAIER_UNIFIED_CURSOR_RUNTIME_V1','HuymaierUnifiedCursor.ps1')){Assert-Contains $coreText $required "Core unified cursor loader missing $required"}
     foreach($required in @('HUYMAIER_UNIFIED_CURSOR_PREFLIGHT_V1','HuymaierUnifiedCursor.ps1','Unified cursor runtime')){Assert-Contains $bootstrapText $required "Bootstrap unified cursor preflight missing $required"}
     foreach($required in @('HUYMAIER_UNIFIED_CURSOR_INSTALLER_CACHE_V1','HuymaierUnifiedCursor.ps1')){Assert-Contains $installerText $required "Installer unified cursor cache missing $required"}
     foreach($required in @('HUYMAIER_UNIFIED_CURSOR_HOST_BUILD_V1','HuymaierUnifiedCursorHost.cs','HuymaierUnifiedCursorHost.exe','HuymaierUnifiedCursorHost.exe is not x64')){Assert-Contains $builderText $required "Builder unified cursor contract missing $required"}
     foreach($required in @('Set-HcUnifiedCursorContext','browser-web','browser-toolbar','Start-HcUnifiedShellCursorHost','Start-HcUnifiedStreamingCursorHost','function Show-HcBrowserVirtualCursor','function Move-HcBrowserVirtualCursor','function Update-HcSmoothBrowserPointer','NATIVE CURSOR','Start-HcNativeStreamingApp','--mode streaming','--mode shell')){Assert-Contains $runtime $required "Unified cursor runtime missing $required"}
-    foreach($required in @('SetSystemCursor','SPI_SETCURSORS','OCR_NORMAL','OCR_HAND','OCR_IBEAM','CreateGoldCursor','SystemParametersInfo','HC_ReadGamepadPointerState','Math.Sqrt(rawX * rawX + rawY * rawY)','1500.0','mode == "shell"','mode == "streaming"','GetAncestor','GWL_EXSTYLE','WS_EX_WINDOWEDGE','DwmSetWindowAttribute','DWMWA_NCRENDERING_POLICY','VK_F11','VK_LWIN','VK_SHIFT','VK_RETURN','SWP_FRAMECHANGED','ApplyFullscreen','TryNativeFullscreenShortcut')){Assert-Contains $host $required "Unified native host missing $required"}
-    if($host.IndexOf('CursorOverlay',[StringComparison]::Ordinal) -ge 0){throw 'Unified cursor host must use the actual system cursor, not a second overlay cursor.'}
+    foreach($required in @('SetSystemCursor','SPI_SETCURSORS','OCR_NORMAL','OCR_HAND','OCR_IBEAM','CreateGoldCursor','SystemParametersInfo','HC_ReadGamepadPointerState','Math.Sqrt(rawX * rawX + rawY * rawY)','1500.0','mode == "shell"','mode == "streaming"','GetAncestor','GWL_EXSTYLE','WS_EX_WINDOWEDGE','DwmSetWindowAttribute','DWMWA_NCRENDERING_POLICY','VK_F11','VK_LWIN','VK_SHIFT','VK_RETURN','SWP_FRAMECHANGED','ApplyFullscreen','TryNativeFullscreenShortcut')){Assert-Contains $hostText $required "Unified native host missing $required"}
+    if($hostText.IndexOf('CursorOverlay',[StringComparison]::Ordinal) -ge 0){throw 'Unified cursor host must use the actual system cursor, not a second overlay cursor.'}
     if($runtime.IndexOf('Move-HcBrowserVirtualCursorDelta ($x*',[StringComparison]::Ordinal) -ge 0){throw 'Unified browser still contains a JS movement path.'}
     Add-Type -AssemblyName System.Windows.Forms,System.Drawing
     $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
