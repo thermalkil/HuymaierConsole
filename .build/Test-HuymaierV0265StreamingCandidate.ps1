@@ -56,7 +56,8 @@ $runtime=Require-Text 'HuymaierStreamingController.ps1' @(
 $unified=Require-Text 'HuymaierUnifiedCursor.ps1' @(
     'Set-HcUnifiedCursorContext','browser-web','browser-toolbar','Start-HcUnifiedShellCursorHost','Start-HcUnifiedStreamingCursorHost',
     'function Show-HcBrowserVirtualCursor','function Move-HcBrowserVirtualCursor','function Update-HcSmoothBrowserPointer','Hide-HcBrowserJsCursorNow',
-    'NATIVE CURSOR','HuymaierUnifiedCursorHost.exe','--mode shell','--mode streaming','function Start-HcNativeStreamingApp'
+    'NATIVE CURSOR','HuymaierUnifiedCursorHost.exe','--mode shell','--mode streaming','function Start-HcNativeStreamingApp',
+    '$script:HcUnifiedBaseHideConsoleCursor=${function:Hide-ConsoleCursor}','function Hide-ConsoleCursor','$script:HcBrowserActive -and $script:HcBrowserFocusArea -eq ''Web''','if($script:ControllerCursorHidden){Show-ConsoleCursor}'
 )
 $managed=Require-Text 'Native\HuymaierConsole.GameInput.cs' @(
     'public const string Version = "0.26.5";','public const string Architecture = "x64";','HuymaierPointerState','HuymaierPointerInput','HC_ReadGamepadPointerState','ReadPointerState'
@@ -86,7 +87,8 @@ $unifiedHost=Require-Text 'Native\HuymaierUnifiedCursorHost.cs' @(
     'SWP_FRAMECHANGED','ApplyFullscreen','TryNativeFullscreenShortcut'
 )
 $nintendo=Require-Text 'Native\HuymaierConsole.ConsolePlatforms.cs' @(
-    'HUYMAIER_WII_ARTWORK_ALIAS_V1','string legacyKey=CleanName(Path.GetFileNameWithoutExtension(game.Path))','string cover=FindDolphinArtwork(game.Path,artworkTitle)','FindEmulatorArtwork(game.Path,artworkTitle)'
+    'HUYMAIER_WII_ARTWORK_ALIAS_V1','string legacyKey=CleanName(Path.GetFileNameWithoutExtension(game.Path))','string cover=FindDolphinArtwork(game.Path,artworkTitle)','FindEmulatorArtwork(game.Path,artworkTitle)',
+    'HUYMAIER_GAMECUBE_MEMORY_FACE_V1','CreateGameCubeFace("MEMORY CARD", "Slot A / Slot B", "bottom")','else if (command == XmbInputCommand.Down) next = 2;  // Memory Card','else if (page == 2) RenderGameCubeMemoryCards(FindSaveRoots())','if(index==2) return new Quaternion(new Vector3D(1,0,0),-90);'
 )
 
 foreach($scriptFile in @('HuymaierConsole.ps1','HuymaierBootstrap.ps1','Install-HuymaierConsole.ps1','HuymaierStreamingController.ps1','HuymaierUnifiedCursor.ps1')){Assert-Ps51Parse $scriptFile}
@@ -101,6 +103,13 @@ if($hostText.IndexOf('double moveX = ApplyDeadzoneCurve(lx);',[StringComparison]
 if($unifiedHost.IndexOf('CursorOverlay',[StringComparison]::Ordinal) -ge 0){throw 'Staged unified cursor still draws a second overlay instead of replacing the Windows cursor.'}
 if($unified.IndexOf('Move-HcBrowserVirtualCursorDelta ($x*',[StringComparison]::Ordinal) -ge 0){throw 'Staged unified Web pointer still contains JavaScript delta movement.'}
 if($overlay.IndexOf('DisposeTaskPreviews(); telemetryTimer.Stop();`r`n            try { Hide();',[StringComparison]::Ordinal) -ge 0){throw 'Staged external Game Bar still hides without detaching the native app owner.'}
+if($nintendo.IndexOf('if(index==2) return new Quaternion(new Vector3D(1,0,0),90);',[StringComparison]::Ordinal) -ge 0){throw 'Staged GameCube page 2 still presents the decorative top face instead of bottom Memory Card.'}
+
+$webHideStart=$unified.IndexOf('function Hide-ConsoleCursor',[StringComparison]::Ordinal)
+$webHideEnd=$unified.IndexOf('# The old in-page cursor remains available',[math]::Max(0,$webHideStart),[StringComparison]::Ordinal)
+if($webHideStart -lt 0 -or $webHideEnd -le $webHideStart){throw 'Staged Web native-cursor ownership override could not be isolated.'}
+$webHideScope=$unified.Substring($webHideStart,$webHideEnd-$webHideStart)
+if($webHideScope.IndexOf("Set-HcUnifiedCursorContext 'browser-web'",[StringComparison]::Ordinal) -lt 0 -or $webHideScope.IndexOf('& $script:HcUnifiedBaseHideConsoleCursor',[StringComparison]::Ordinal) -lt 0){throw 'Staged Web cursor does not exclusively suppress pointer parking while preserving shell fallback.'}
 
 if($unified.IndexOf("Start-Process -FilePath `$script:HcUnifiedCursorHostPath",[StringComparison]::Ordinal) -lt 0){throw 'Staged native streaming/Web runtime does not start the unified native cursor host.'}
 if($unified.IndexOf("Set-HcUnifiedCursorContext 'browser-web'",[StringComparison]::Ordinal) -lt 0){throw 'Staged Web browser does not route into native browser-web cursor mode.'}
@@ -122,6 +131,7 @@ $validation|Add-Member -NotePropertyName smoothBrowserCursorGate -NotePropertyVa
 $validation|Add-Member -NotePropertyName browserRafCursorGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName unifiedSystemCursorGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName nativeWebPointerGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName webNativeCursorExclusiveOwnershipGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName cursorSpeedSettingGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName nativeStreamingControllerGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName nativeStreamingBackgroundInputGate -NotePropertyValue 'success' -Force
@@ -132,6 +142,7 @@ $validation|Add-Member -NotePropertyName nativeStreamingFullscreenGate -NoteProp
 $validation|Add-Member -NotePropertyName nativeStreamingChromeSuppressionGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName streamingAppArtworkGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName wiiArtworkAliasGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName gameCubeMemoryFaceGate -NotePropertyValue 'success' -Force
 $validation|ConvertTo-Json -Depth 20|Set-Content -LiteralPath $ValidationPath -Encoding UTF8
 
-Write-Host 'Staged v0.26.5 unified system cursor, native Web pointer, Sony HID pointer/Guide, external Game Bar, stronger native fullscreen and Wii artwork-alias gates passed.'
+Write-Host 'Staged v0.26.5 unified system cursor, exclusive native Web pointer, Sony HID pointer/Guide, external Game Bar, stronger native fullscreen, Wii artwork-alias and GameCube bottom Memory face gates passed.'
