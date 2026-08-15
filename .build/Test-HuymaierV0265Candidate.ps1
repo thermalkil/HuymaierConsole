@@ -51,8 +51,13 @@ $core=Require-Text 'HuymaierConsole.ps1' @(
     'Invoke-HcIncrementalConsoleCountRefresh',
     'Stop-HcRuntimeStateWatcher',
     'HUYMAIER_CONCURRENT_DOWNLOAD_REFRESH_V1',
-    "if(`$lower.EndsWith('provider-transfers.json')){Add-HcRuntimeDirtyPath `$script:ProviderStatePath}"
+    'HUYMAIER_DOWNLOAD_LIBRARY_REFRESH_POLICY_V1',
+    'Aggregate transfer telemetry does not invalidate the Games library.',
+    'Request-HcDeferredLibraryRefresh',
+    'Invoke-HcDeferredLibraryRefresh'
 )
+$obsoleteAggregateBridge="if(`$lower.EndsWith('provider-transfers.json')){Add-HcRuntimeDirtyPath `$script:ProviderStatePath}"
+if($core.IndexOf($obsoleteAggregateBridge,[StringComparison]::Ordinal) -ge 0){throw 'Staged shell still treats provider-transfers telemetry as a Games-library mutation.'}
 $countStart=$core.IndexOf('function Get-PlatformCountSummary {',[StringComparison]::Ordinal)
 $countEnd=$core.IndexOf('function New-PlatformCard {',[StringComparison]::Ordinal)
 if($countStart -lt 0 -or $countEnd -le $countStart){throw 'Staged shell platform-count renderer cannot be inspected.'}
