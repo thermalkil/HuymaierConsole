@@ -90,7 +90,7 @@ jobs:
           $out=Join-Path $env:RUNNER_TEMP 'HuymaierGameInputBridge.dll'
           $cmd='call "'+$vcvars+'" && cl /nologo /std:c++17 /O2 /EHsc /MT /LD /I"'+$header.Directory.FullName+'" "'+(Resolve-Path 'Native\HuymaierGameInputBridge.cpp').Path+'" /link /LIBPATH:"'+$lib.Directory.FullName+'" gameinput.lib /OUT:"'+$out+'"'
           cmd.exe /d /s /c $cmd
-          if($LASTEXITCODE -ne 0 -or -not(Test-Path -LiteralPath $out)){throw 'GameInput analog pointer bridge x64 compile failed.'}
+          if($LASTEXITCODE -ne 0 -or -not(Test-Path -LiteralPath $out)){throw 'GameInput analog pointer/Guide bridge x64 compile failed.'}
 
       - name: Compile transformed exact x64 native host source
         shell: powershell
@@ -100,20 +100,26 @@ jobs:
           $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
           if(-not(Test-Path -LiteralPath $csc)){throw 'Framework64 csc.exe missing.'}
           $tempNative=Join-Path $env:RUNNER_TEMP 'HuymaierConsole.ConsolePlatforms.v0265.cs'
+          $tempInput=Join-Path $env:RUNNER_TEMP 'HuymaierNativeInput.v0265.cs'
+          $tempOverlay=Join-Path $env:RUNNER_TEMP 'HuymaierConsole.SystemOverlay.v0265.cs'
           Copy-Item -LiteralPath 'Native\HuymaierConsole.ConsolePlatforms.cs' -Destination $tempNative -Force
+          Copy-Item -LiteralPath 'HuymaierNativeInput.cs' -Destination $tempInput -Force
+          Copy-Item -LiteralPath 'Native\HuymaierConsole.SystemOverlay.cs' -Destination $tempOverlay -Force
           & '.\.build\Optimize-NintendoLibraryOwnership.ps1' -NativePath $tempNative
           & '.\.build\Optimize-NintendoDisplayNames.ps1' -ConsolePlatformsPath $tempNative
           & '.\.build\Optimize-DolphinIntegration.ps1' -ConsolePlatformsPath $tempNative
           & '.\.build\Optimize-WiiArtworkAliases.ps1' -ConsolePlatformsPath $tempNative
+          & '.\.build\Optimize-SonyPointerSharedState.ps1' -NativeInputPath $tempInput
+          & '.\.build\Optimize-ExternalGameBarOverlay.ps1' -SystemOverlayPath $tempOverlay
           $automation=[Management.Automation.PSObject].Assembly.Location
           $refs=@([Uri].Assembly.Location,[Linq.Enumerable].Assembly.Location,[System.Xaml.XamlReader].Assembly.Location,[Xml.XmlDocument].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,[Windows.Window].Assembly.Location,[Windows.Forms.Form].Assembly.Location,[Drawing.Bitmap].Assembly.Location,[Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,$automation)|Select-Object -Unique
           $sources=@(
             'Native\HuymaierConsole.NativeApp.cs',
             'Native\HuymaierConsole.Ps1.cs',
             $tempNative,
-            'Native\HuymaierConsole.SystemOverlay.cs',
+            $tempOverlay,
             'Native\HuymaierConsole.GameInput.cs',
-            'HuymaierNativeInput.cs',
+            $tempInput,
             'HuymaierNativeDisplay.cs',
             'HuymaierNativeAudio.cs',
             'HuymaierPerformance.cs',
@@ -141,6 +147,8 @@ jobs:
             'HuymaierAppLibrary.ps1',
             'HuymaierAppInstallWorker.ps1',
             'HuymaierStreamingController.ps1',
+            'HuymaierNativeInput.cs',
+            'Native/HuymaierConsole.SystemOverlay.cs',
             'Native/HuymaierStreamingCursorHost.cs'
           )){
             if($sources -notcontains $required){throw "Release payload is missing $required"}
