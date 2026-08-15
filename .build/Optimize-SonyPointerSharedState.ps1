@@ -114,7 +114,7 @@ $tailBlock=@'
                     int odd = pointerSequence + 1;
                     if ((odd & 1) == 0) odd++;
                     pointerView.Write(8, odd);
-                    Thread.MemoryBarrier();
+                    System.Threading.Thread.MemoryBarrier();
                     pointerView.Write(0, POINTER_MAP_MAGIC);
                     pointerView.Write(4, 1);
                     pointerView.Write(12, productId);
@@ -124,7 +124,7 @@ $tailBlock=@'
                     pointerView.Write(32, NormalizePointerAxis(rx, false));
                     pointerView.Write(36, NormalizePointerAxis(ry, true));
                     pointerView.Write(40, BuildPointerButtons(buttons1, buttons2));
-                    Thread.MemoryBarrier();
+                    System.Threading.Thread.MemoryBarrier();
                     pointerSequence = odd + 1;
                     pointerView.Write(8, pointerSequence);
                     pointerView.Flush();
