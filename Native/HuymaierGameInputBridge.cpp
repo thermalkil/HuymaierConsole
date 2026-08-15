@@ -29,12 +29,15 @@ namespace
     bool g_callbackRegistered = false;
     std::atomic<long> g_guidePresses(0);
     std::atomic<long> g_sharePresses(0);
+    std::atomic<bool> g_sharedGuideDown(false);
+    std::atomic<uint64_t> g_lastGuideDeliveredAt(0);
 
     // Sony controllers already have a proven WM_INPUT path in HuymaierNativeInput.
     // The shell publishes its continuous axes/buttons here so Web and the isolated
     // streaming cursor helper use the exact same controller backend as navigation.
     static const wchar_t* kPointerMapName = L"Local\\HuymaierConsole.PointerStateV1";
     static const int32_t kPointerMagic = 0x31504348; // HCP1
+    static const uint32_t kSharedGuideBit = 0x0100;
     HANDLE g_pointerMapping = nullptr;
     const unsigned char* g_pointerBytes = nullptr;
 
@@ -121,6 +124,20 @@ namespace
         return true;
     }
 
+    bool ConsumeSharedGuideEdge()
+    {
+        float lx = 0.0f, ly = 0.0f, rx = 0.0f, ry = 0.0f, lt = 0.0f, rt = 0.0f;
+        uint32_t buttons = 0;
+        if (!TryReadSharedPointerState(&lx, &ly, &rx, &ry, &lt, &rt, &buttons))
+        {
+            g_sharedGuideDown.store(false, std::memory_order_release);
+            return false;
+        }
+        const bool down = (buttons & kSharedGuideBit) != 0;
+        const bool previous = g_sharedGuideDown.exchange(down, std::memory_order_acq_rel);
+        return down && !previous;
+    }
+
     void CALLBACK OnSystemButton(
         GameInputCallbackToken,
         void*,
@@ -176,8 +193,8 @@ extern "C" __declspec(dllexport) int __cdecl HC_GameInputInitialize()
     HRESULT result = GameInputCreate(&input);
     if (FAILED(result) || input == nullptr)
     {
-        // The Sony HID shared-state path can still service pointer reads even if
-        // GameInput itself is unavailable for the controller.
+        // The Sony HID shared-state path can still service pointer and Guide
+        // reads even if GameInput itself is unavailable for the controller.
         return EnsureSharedPointerState() ? 1 : 0;
     }
 
@@ -205,12 +222,26 @@ extern "C" __declspec(dllexport) int __cdecl HC_GameInputInitialize()
     g_callbackRegistered = true;
     g_guidePresses.store(0, std::memory_order_release);
     g_sharePresses.store(0, std::memory_order_release);
+    g_sharedGuideDown.store(false, std::memory_order_release);
+    g_lastGuideDeliveredAt.store(0, std::memory_order_release);
     return 1;
 }
 
 extern "C" __declspec(dllexport) int __cdecl HC_ConsumeGuidePress()
 {
-    return ConsumeEdge(g_guidePresses);
+    // Merge the proven Sony Raw-HID Guide state with the GameInput system-button
+    // callback. Consume both every pass, then debounce the merged edge so one PS
+    // press cannot open and immediately close the Game Bar if both APIs report it.
+    const bool sonyEdge = ConsumeSharedGuideEdge();
+    const bool gameInputEdge = ConsumeEdge(g_guidePresses) != 0;
+    if (!sonyEdge && !gameInputEdge) return 0;
+
+    const uint64_t now = GetTickCount64();
+    const uint64_t previous = g_lastGuideDeliveredAt.load(std::memory_order_acquire);
+    if (previous != 0 && now >= previous && now - previous < 300)
+        return 0;
+    g_lastGuideDeliveredAt.store(now, std::memory_order_release);
+    return 1;
 }
 
 extern "C" __declspec(dllexport) int __cdecl HC_ConsumeSharePress()
@@ -286,4 +317,6 @@ extern "C" __declspec(dllexport) void __cdecl HC_GameInputShutdown()
     CloseSharedPointerState();
     g_guidePresses.store(0, std::memory_order_release);
     g_sharePresses.store(0, std::memory_order_release);
+    g_sharedGuideDown.store(false, std::memory_order_release);
+    g_lastGuideDeliveredAt.store(0, std::memory_order_release);
 }
