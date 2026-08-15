@@ -7,6 +7,10 @@ $bootstrap=Join-Path $root 'HuymaierBootstrap.ps1'
 $installer=Join-Path $root 'Install-HuymaierConsole.ps1'
 $builder=Join-Path $root '.build\Build-HuymaierReleaseCandidate.Core.ps1'
 
+# Fail before any transform mutates the checkout if a shipped runtime reuses a
+# protected PowerShell automatic variable such as read-only $Host/$PID.
+& (Join-Path $PSScriptRoot 'Test-v0265-PowerShellSafety.ps1')
+
 # The platform-model transform intentionally layers on top of the same runtime
 # transforms used by the release builder. Prepare those prerequisites in the
 # checkout before Test-v0265-PlatformModels.ps1 makes its isolated temp copies.
