@@ -61,7 +61,8 @@ $unified=Require-Text 'HuymaierUnifiedCursor.ps1' @(
     'Set-HcUnifiedCursorContext','browser-web','browser-toolbar','Start-HcUnifiedShellCursorHost','Start-HcUnifiedStreamingCursorHost',
     'function Show-HcBrowserVirtualCursor','function Move-HcBrowserVirtualCursor','function Update-HcSmoothBrowserPointer','Hide-HcBrowserJsCursorNow',
     'HUYMAIER_WEB_NATIVE_CURSOR_DEDUP_V2','NATIVE CURSOR','HuymaierUnifiedCursorHost.exe','--mode shell','--mode streaming','function Start-HcNativeStreamingApp',
-    '$script:HcUnifiedBaseHideConsoleCursor=${function:Hide-ConsoleCursor}','function Hide-ConsoleCursor','$script:HcBrowserActive -and $script:HcBrowserFocusArea -eq ''Web''','if($script:ControllerCursorHidden){Show-ConsoleCursor}'
+    '$script:HcUnifiedBaseHideConsoleCursor=${function:Hide-ConsoleCursor}','function Hide-ConsoleCursor','$script:HcBrowserActive -and $script:HcBrowserFocusArea -eq ''Web''','if($script:ControllerCursorHidden){Show-ConsoleCursor}',
+    '$script:HcUnifiedCursorContextLock=New-Object object','[Threading.Monitor]::Enter','[guid]::NewGuid().ToString(''N'')','[IO.File]::Replace','[IO.File]::Move'
 )
 $browser=Require-Text 'HuymaierWebBrowser.ps1' @(
     "Set-HcBrowserFocusArea 'Toolbar'","Set-HcBrowserFocusArea 'Web'",'ConvertTo-HcBrowserDestination','Invoke-HcBrowserControllerType'
@@ -112,15 +113,27 @@ if($unified.IndexOf('Move-HcBrowserVirtualCursorDelta ($x*',[StringComparison]::
 if($overlay.IndexOf('DisposeTaskPreviews(); telemetryTimer.Stop();`r`n            try { Hide();',[StringComparison]::Ordinal) -ge 0){throw 'Staged external Game Bar still hides without detaching the native app owner.'}
 if($nintendo.IndexOf('if(index==2) return new Quaternion(new Vector3D(1,0,0),90);',[StringComparison]::Ordinal) -ge 0){throw 'Staged GameCube page 2 still presents the decorative top face instead of bottom Memory Card.'}
 
+# Isolate native Web pointer ownership by actual function boundaries. The former
+# '# The old in-page cursor remains available' comment belonged to the retired
+# DOM cursor path and is intentionally absent from the native-only runtime.
 $webHideStart=$unified.IndexOf('function Hide-ConsoleCursor',[StringComparison]::Ordinal)
-$webHideEnd=$unified.IndexOf('# The old in-page cursor remains available',[math]::Max(0,$webHideStart),[StringComparison]::Ordinal)
-if($webHideStart -lt 0 -or $webHideEnd -le $webHideStart){throw 'Staged Web native-cursor ownership override could not be isolated.'}
+$webHideEnd=$unified.IndexOf('function Show-HcBrowserVirtualCursor',[math]::Max(0,$webHideStart),[StringComparison]::Ordinal)
+if($webHideStart -lt 0 -or $webHideEnd -le $webHideStart){throw 'Staged Web native-cursor ownership override could not be isolated by function boundary.'}
 $webHideScope=$unified.Substring($webHideStart,$webHideEnd-$webHideStart)
 if($webHideScope.IndexOf("Set-HcUnifiedCursorContext 'browser-web'",[StringComparison]::Ordinal) -lt 0 -or $webHideScope.IndexOf('& $script:HcUnifiedBaseHideConsoleCursor',[StringComparison]::Ordinal) -lt 0){throw 'Staged Web cursor does not exclusively suppress pointer parking while preserving shell fallback.'}
 if($unified.IndexOf("document.getElementById('hc-virtual-cursor')",[StringComparison]::Ordinal) -lt 0 -or $unified.IndexOf('if(n)n.remove()',[StringComparison]::Ordinal) -lt 0){throw 'Staged unified cursor does not clean up stale DOM cursor nodes from prior WebView documents.'}
 if($unified.IndexOf("Start-Process -FilePath `$script:HcUnifiedCursorHostPath",[StringComparison]::Ordinal) -lt 0){throw 'Staged native streaming/Web runtime does not start the unified native cursor host.'}
 if($unified.IndexOf("Set-HcUnifiedCursorContext 'browser-web'",[StringComparison]::Ordinal) -lt 0){throw 'Staged Web browser does not route into native browser-web cursor mode.'}
 if($unifiedHost.IndexOf('style &= ~(NativeMethods.WS_CAPTION',[StringComparison]::Ordinal) -lt 0 -or $unifiedHost.IndexOf('exStyle &= ~(NativeMethods.WS_EX_DLGMODALFRAME',[StringComparison]::Ordinal) -lt 0){throw 'Staged native streaming fullscreen does not strip standard/non-client window chrome.'}
+
+# The packaged cursor state writer must use the same serialized, collision-proof
+# atomic path as the source validator. Reject the old shared statePath+'.tmp'.
+$contextStart=$unified.IndexOf('function Set-HcUnifiedCursorContext',[StringComparison]::Ordinal)
+$contextEnd=$unified.IndexOf('function Test-HcUnifiedCursorProcessAlive',[math]::Max(0,$contextStart),[StringComparison]::Ordinal)
+if($contextStart -lt 0 -or $contextEnd -le $contextStart){throw 'Staged unified cursor context writer could not be isolated.'}
+$contextScope=$unified.Substring($contextStart,$contextEnd-$contextStart)
+foreach($required in @('[Threading.Monitor]::Enter','[Threading.Monitor]::Exit','[guid]::NewGuid().ToString(''N'')','[IO.File]::Replace','[IO.File]::Move')){if($contextScope.IndexOf($required,[StringComparison]::Ordinal) -lt 0){throw "Staged atomic cursor context writer missing: $required"}}
+if($contextScope.Contains("`$script:HcUnifiedCursorStatePath+'.tmp'") -or $contextScope.Contains('Move-Item -LiteralPath $tmp -Destination $script:HcUnifiedCursorStatePath -Force')){throw 'Staged unified cursor context writer still uses collision-prone shared temp-file state.'}
 
 $refreshStart=$nintendo.IndexOf('private void QueueConsoleArtworkRefresh()',[StringComparison]::Ordinal)
 $refreshEnd=$nintendo.IndexOf('private void LaunchGame(',[math]::Max(0,$refreshStart),[StringComparison]::Ordinal)
@@ -140,6 +153,7 @@ $validation|Add-Member -NotePropertyName nativeWebPointerGate -NotePropertyValue
 $validation|Add-Member -NotePropertyName webNativeCursorFinalLoadOrderGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName webLegacyDomCursorRetiredGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName webNativeCursorExclusiveOwnershipGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName webCursorAtomicStateWriteGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName cursorSpeedSettingGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName nativeStreamingControllerGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName nativeStreamingBackgroundInputGate -NotePropertyValue 'success' -Force
@@ -153,4 +167,4 @@ $validation|Add-Member -NotePropertyName wiiArtworkAliasGate -NotePropertyValue 
 $validation|Add-Member -NotePropertyName gameCubeMemoryFaceGate -NotePropertyValue 'success' -Force
 $validation|ConvertTo-Json -Depth 20|Set-Content -LiteralPath $ValidationPath -Encoding UTF8
 
-Write-Host 'Staged v0.26.5 final native Web cursor ownership, Sony HID pointer/Guide, external Game Bar, stronger native fullscreen, Wii artwork-alias and GameCube bottom Memory face gates passed.'
+Write-Host 'Staged v0.26.5 final native Web cursor ownership, atomic state writes, Sony HID pointer/Guide, external Game Bar, stronger native fullscreen, Wii artwork-alias and GameCube bottom Memory face gates passed.'
