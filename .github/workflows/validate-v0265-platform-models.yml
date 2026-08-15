@@ -24,4 +24,12 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
-          & '.\.development\v0.26.5\Test-v0265-PlatformModels.ps1'
+          try {
+            & '.\.development\v0.26.5\Test-v0265-PlatformModels.ps1'
+          }
+          catch {
+            $message = [string]$_.Exception.Message
+            $message = $message.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Host "::error title=Platform model validation failed::$message"
+            throw
+          }
