@@ -13,6 +13,7 @@ $dolphinOptimizer=Join-Path $PSScriptRoot 'Optimize-DolphinIntegration.ps1'
 $wiiArtworkAliasOptimizer=Join-Path $PSScriptRoot 'Optimize-WiiArtworkAliases.ps1'
 $appLibraryOptimizer=Join-Path $PSScriptRoot 'Optimize-AppLibrary.ps1'
 $streamingControllerOptimizer=Join-Path $PSScriptRoot 'Optimize-StreamingController.ps1'
+$unifiedCursorOptimizer=Join-Path $PSScriptRoot 'Optimize-UnifiedCursor.ps1'
 $sonyPointerOptimizer=Join-Path $PSScriptRoot 'Optimize-SonyPointerSharedState.ps1'
 $externalGameBarOptimizer=Join-Path $PSScriptRoot 'Optimize-ExternalGameBarOverlay.ps1'
 $providerOptimizer=Join-Path $PSScriptRoot 'Optimize-ProviderDownloads.ps1'
@@ -47,12 +48,14 @@ $providerTransferCoordinatorSource=Join-Path $workspace 'HuymaierProviderTransfe
 $appLibrarySource=Join-Path $workspace 'HuymaierAppLibrary.ps1'
 $appInstallWorkerSource=Join-Path $workspace 'HuymaierAppInstallWorker.ps1'
 $streamingControllerSource=Join-Path $workspace 'HuymaierStreamingController.ps1'
+$unifiedCursorSource=Join-Path $workspace 'HuymaierUnifiedCursor.ps1'
 $streamingCursorSource=Join-Path $workspace 'Native\HuymaierStreamingCursorHost.cs'
+$unifiedCursorHostSource=Join-Path $workspace 'Native\HuymaierUnifiedCursorHost.cs'
 
 $requiredFiles=@(
-    $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$dolphinOptimizer,$wiiArtworkAliasOptimizer,$appLibraryOptimizer,$streamingControllerOptimizer,$sonyPointerOptimizer,$externalGameBarOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$providerPreflightOptimizer,$browserCursorOptimizer,$runtimeHitchOptimizer,$concurrentDownloadRefreshOptimizer,
+    $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$dolphinOptimizer,$wiiArtworkAliasOptimizer,$appLibraryOptimizer,$streamingControllerOptimizer,$unifiedCursorOptimizer,$sonyPointerOptimizer,$externalGameBarOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$providerPreflightOptimizer,$browserCursorOptimizer,$runtimeHitchOptimizer,$concurrentDownloadRefreshOptimizer,
     $coreSource,$bootstrapSource,$installerCoreSource,$installerScriptSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$nativeSystemOverlaySource,$nativeInputSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource,
-    $providerConcurrencySource,$providerConcurrencyUiSource,$providerTransferCoordinatorSource,$appLibrarySource,$appInstallWorkerSource,$streamingControllerSource,$streamingCursorSource
+    $providerConcurrencySource,$providerConcurrencyUiSource,$providerTransferCoordinatorSource,$appLibrarySource,$appInstallWorkerSource,$streamingControllerSource,$unifiedCursorSource,$streamingCursorSource,$unifiedCursorHostSource
 )
 foreach($required in $requiredFiles){if(-not(Test-Path -LiteralPath $required -PathType Leaf)){throw "Candidate optimization wrapper is missing required file: $required"}}
 
@@ -63,6 +66,7 @@ try{
     & $providerPreflightOptimizer -BootstrapPath $bootstrapSource -InstallerScriptPath $installerScriptSource
     & $appLibraryOptimizer -CorePath $coreSource -BootstrapPath $bootstrapSource -InstallerScriptPath $installerScriptSource
     & $streamingControllerOptimizer -CorePath $coreSource -BootstrapPath $bootstrapSource -InstallerScriptPath $installerScriptSource -CoreBuilderPath $coreBuilder
+    & $unifiedCursorOptimizer -CorePath $coreSource -BootstrapPath $bootstrapSource -InstallerScriptPath $installerScriptSource -CoreBuilderPath $coreBuilder
     & $sonyPointerOptimizer -NativeInputPath $nativeInputSource
     & $externalGameBarOptimizer -SystemOverlayPath $nativeSystemOverlaySource
     & $startupOptimizer -CorePath $coreSource
