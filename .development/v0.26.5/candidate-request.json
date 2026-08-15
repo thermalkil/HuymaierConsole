@@ -1,12 +1,12 @@
 {
-  "requestedAtUtc": "2026-08-15T07:47:00Z",
-  "attempt": 10,
+  "requestedAtUtc": "2026-08-15T08:02:00Z",
+  "attempt": 11,
   "candidate": "v0.26.5-rc1",
   "version": "0.26.5",
   "base_release": "v0.26.2",
   "base_asset": "HC262.zip",
   "package_root": "HC265",
   "asset_name": "HC265.zip",
-  "production_source": "b4085fffe04266dfd5ee578c52b4bd881eb092a1",
-  "scope": "v0.26.5 RC1 attempt 10 fixes the two cursor failures reported from attempt 9. Native streaming cursor: enable ordinary background GameInput in the isolated helper path with GameInputEnableBackgroundInput while preserving Guide/Share background handling; after the native streaming target is fullscreen, initialize the controller cursor at the center of that target monitor rather than inheriting Huymaier's parked physical mouse position; use a radial 2-D deadzone/response curve so native diagonals preserve stick angle and normalized speed. Web cursor: stop issuing per-controller-poll ExecuteScript delta moves; publish a radial 2-D analog velocity vector to an in-page requestAnimationFrame loop so motion is display-frame smooth and true diagonals move simultaneously, while right-stick scrolling and the shared 40-200% Cursor Speed remain intact. The staged candidate must reject the old parked-pointer, axis-by-axis native movement, and per-poll Web delta patterns and must record browserRafCursorGate and nativeStreamingBackgroundInputGate success. Preserve attempt 9's Wii/GameCube hidden artwork alias with pretty display names, native streaming/fullscreen/app artwork, curated Apps, Dolphin Wii saves/artwork, provider concurrency/ETA, hitch guards, compiled 0.26.5/x64 native stamp, installer rollback/tamper, Steam ownership, Game Bar/navigation, Nintendo ownership, and frozen PS1/PS2/PS3 presentation gates."
+  "production_source": "93a11caa06216fd21e6eefed47159643332b76d5",
+  "scope": "v0.26.5 RC1 attempt 11 replaces the failed continuous-pointer source used by attempts 9-10 for PlayStation controllers. Huymaier's proven WM_INPUT Sony HID parser now publishes fresh continuous LX/LY/RX/RY and pointer-button state through Local\\HuymaierConsole.PointerStateV1 while normal shell navigation remains unchanged and remains suppressed when Huymaier is unfocused. HuymaierGameInputBridge.dll prefers that fresh shared Sony state for HC_ReadGamepadPointerState before falling back to GameInput, so the Web RAF cursor and isolated native streaming cursor helper consume the same DualSense/DualShock backend that already drives successful Huymaier navigation. Preserve requestAnimationFrame Web movement with radial 2-D stick math, shared 40-200% Cursor Speed, centered native cursor launch, radial native cursor motion, native streaming fullscreen/controller-mouse mode, Wii/GameCube hidden artwork alias with pretty names, Dolphin saves/artwork, curated Apps, app artwork, concurrent downloads/ETA, hitch guards, compiled 0.26.5/x64 native stamp, installer rollback/tamper, Steam ownership, Game Bar/navigation, Nintendo ownership and frozen PS1/PS2/PS3 presentation. The staged candidate must contain and gate HUYMAIER_SONY_POINTER_SHARED_STATE_V1, shared-map bridge fallback, browserRafCursorGate, nativeStreamingBackgroundInputGate and sonyHidPointerBackendGate before upload."
 }
