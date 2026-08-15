@@ -53,6 +53,12 @@ $runtime=Require-Text 'HuymaierStreamingController.ps1' @(
     'Update-HcSmoothBrowserPointer',
     'Move-HcBrowserVirtualCursorDelta',
     'Scroll-HcBrowserVirtualCursorDelta',
+    'Set-HcBrowserAnalogDrive',
+    'Stop-HcBrowserAnalogDrive',
+    'requestAnimationFrame(tick)',
+    '__hcCursorDriveState',
+    '__hcCursorDrive=(x,y,speed)',
+    'magnitude=[math]::Sqrt',
     '1500.0',
     'Right Stick Scroll',
     'Start-HcNativeStreamingApp',
@@ -77,7 +83,10 @@ $bridge=Require-Text 'Native\HuymaierGameInputBridge.cpp' @(
     'leftThumbstickX',
     'rightThumbstickY',
     'GameInputGamepadA',
-    'GameInputGamepadX'
+    'GameInputGamepadX',
+    'GameInputEnableBackgroundInput',
+    'GameInputEnableBackgroundGuideButton',
+    'GameInputEnableBackgroundShareButton'
 )
 $hostText=Require-Text 'Native\HuymaierStreamingCursorHost.cs' @(
     'HC_ReadGamepadPointerState',
@@ -92,7 +101,11 @@ $hostText=Require-Text 'Native\HuymaierStreamingCursorHost.cs' @(
     'TextInputHost',
     'parentProcessId',
     'IsPointerForegroundAllowed',
-    'RestoreWindow'
+    'RestoreWindow',
+    'launchBounds',
+    'SetCursorPos((int)Math.Round(cursorX)',
+    'Math.Sqrt(rawX * rawX + rawY * rawY)',
+    'magnitude > 0.14'
 )
 $nintendo=Require-Text 'Native\HuymaierConsole.ConsolePlatforms.cs' @(
     'HUYMAIER_WII_ARTWORK_ALIAS_V1',
@@ -105,6 +118,11 @@ foreach($scriptFile in @('HuymaierConsole.ps1','HuymaierBootstrap.ps1','Install-
 Assert-X64Pe 'HuymaierStreamingCursorHost.exe'
 Assert-X64Pe 'HuymaierConsole.exe'
 Require-File 'HuymaierGameInputBridge.dll'|Out-Null
+
+# Explicitly reject the two runtime failures from the prior RC.
+if($hostText.IndexOf('if (NativeMethods.GetCursorPos(out point))',[StringComparison]::Ordinal) -ge 0){throw 'Staged native streaming cursor still inherits Huymaier''s parked physical pointer.'}
+if($hostText.IndexOf('double moveX = ApplyDeadzoneCurve(lx);',[StringComparison]::Ordinal) -ge 0){throw 'Staged native streaming movement still shapes X/Y independently.'}
+if($runtime.IndexOf('Move-HcBrowserVirtualCursorDelta ($x*$maxPixelsPerSecond*$dt)',[StringComparison]::Ordinal) -ge 0){throw 'Staged browser analog cursor still emits per-poll delta scripts instead of RAF drive state.'}
 
 # Confirm the helper is a standalone shipped executable and native streaming does
 # not silently route back through WebView when an installed AUMID is available.
@@ -132,11 +150,13 @@ if($refreshScope.IndexOf($oldRefresh,[StringComparison]::Ordinal) -ge 0){throw '
 
 $validation=Get-Content -Raw -LiteralPath $ValidationPath -Encoding UTF8|ConvertFrom-Json
 $validation|Add-Member -NotePropertyName smoothBrowserCursorGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName browserRafCursorGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName cursorSpeedSettingGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName nativeStreamingControllerGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName nativeStreamingBackgroundInputGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName nativeStreamingFullscreenGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName streamingAppArtworkGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName wiiArtworkAliasGate -NotePropertyValue 'success' -Force
 $validation|ConvertTo-Json -Depth 20|Set-Content -LiteralPath $ValidationPath -Encoding UTF8
 
-Write-Host 'Staged v0.26.5 smooth cursor, cursor speed, native streaming/fullscreen, app artwork and Wii artwork-alias gates passed.'
+Write-Host 'Staged v0.26.5 RAF browser cursor, cursor speed, native streaming background-input/fullscreen, app artwork and Wii artwork-alias gates passed.'
