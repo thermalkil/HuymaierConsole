@@ -47,6 +47,7 @@ jobs:
             '.\.build\Optimize-StreamingController.ps1',
             '.\.build\Optimize-UnifiedCursor.ps1',
             '.\.build\Optimize-Platform3DModels.ps1',
+            '.\.build\Optimize-BuiltInLiveModels.ps1',
             '.\.build\Optimize-DolphinIntegration.ps1',
             '.\.build\Optimize-WiiArtworkAliases.ps1',
             '.\.build\Optimize-GameCubeHubNavigation.ps1',
@@ -62,12 +63,16 @@ jobs:
             '.\HuymaierStreamingController.ps1',
             '.\HuymaierUnifiedCursor.ps1',
             '.\HuymaierPlatformModels.ps1',
+            '.\HuymaierPlatformAtlas.ps1',
+            '.\HuymaierLivePlatformModels.ps1',
+            '.\.development\v0.26.5\Prepare-v0265-PlatformModelValidation.ps1',
             '.\.development\v0.26.5\Test-v0265-Stabilization.ps1',
             '.\.development\v0.26.5\Test-v0265-StreamingController.ps1',
             '.\.development\v0.26.5\Test-v0265-UnifiedCursor.ps1',
             '.\.development\v0.26.5\Test-v0265-DownloadRefreshPolicy.ps1',
             '.\.development\v0.26.5\Test-v0265-GameCubeHubNavigation.ps1',
-            '.\.development\v0.26.5\Test-v0265-PlatformModels.ps1'
+            '.\.development\v0.26.5\Test-v0265-PlatformModels.ps1',
+            '.\.development\v0.26.5\Test-v0265-BuiltInLiveModels.ps1'
           )){
             $t=$null;$e=$null
             [void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p),[ref]$t,[ref]$e)
@@ -83,8 +88,21 @@ jobs:
           & '.\.development\v0.26.5\Test-v0265-UnifiedCursor.ps1'
           & '.\.development\v0.26.5\Test-v0265-DownloadRefreshPolicy.ps1'
           & '.\.development\v0.26.5\Test-v0265-GameCubeHubNavigation.ps1'
-          & '.\.development\v0.26.5\Test-v0265-PlatformModels.ps1'
           & '.\.development\v0.26.5\Test-NintendoLibraryOwnership.ps1'
+          $restore=@('HuymaierConsole.ps1','HuymaierBootstrap.ps1','Install-HuymaierConsole.ps1','.build/Build-HuymaierReleaseCandidate.Core.ps1')
+          try {
+            # The platform-model validators intentionally test the same transform
+            # ordering used by the release builder. Prepare those prerequisites,
+            # validate both the live runtime and all 50 built-in GLBs, then put
+            # the checkout back to the exact requested source before packaging.
+            & '.\.development\v0.26.5\Prepare-v0265-PlatformModelValidation.ps1'
+            & '.\.development\v0.26.5\Test-v0265-PlatformModels.ps1'
+            & '.\.development\v0.26.5\Test-v0265-BuiltInLiveModels.ps1'
+          }
+          finally {
+            & git checkout -- @restore
+            if($LASTEXITCODE-ne0){throw 'Could not restore exact source after platform-model validation.'}
+          }
       - name: Build exact x64 FSE Home host
         shell: powershell
         run: |
