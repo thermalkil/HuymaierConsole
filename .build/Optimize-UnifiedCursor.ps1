@@ -9,32 +9,33 @@ $ErrorActionPreference='Stop'
 foreach($path in @($CorePath,$BootstrapPath,$InstallerScriptPath,$CoreBuilderPath)){if(-not(Test-Path -LiteralPath $path -PathType Leaf)){throw "Unified-cursor transform input missing: $path"}}
 
 $core=Get-Content -Raw -LiteralPath $CorePath -Encoding UTF8
-if($core -notmatch 'HUYMAIER_UNIFIED_CURSOR_RUNTIME_V1'){
+if($core -notmatch 'HUYMAIER_UNIFIED_CURSOR_RUNTIME_V2'){
     $pathNeedle='$script:StreamingControllerModulePath = Join-Path $script:BaseDir ''HuymaierStreamingController.ps1'''
     if(-not $core.Contains($pathNeedle)){throw 'Unified cursor requires streaming-controller transform first.'}
-    $core=$core.Replace($pathNeedle,$pathNeedle+"`r`n`$script:UnifiedCursorModulePath = Join-Path `$script:BaseDir 'HuymaierUnifiedCursor.ps1'")
-    $loadNeedle=@'
-# HUYMAIER_STREAMING_CONTROLLER_RUNTIME_V1
-if (Test-Path -LiteralPath $script:StreamingControllerModulePath) {
-    try { . $script:StreamingControllerModulePath }
-    catch { Write-Log "Streaming controller module load failed: $($_.Exception.Message)" 'ERROR' }
+    if($core -notmatch '\$script:UnifiedCursorModulePath'){
+        $core=$core.Replace($pathNeedle,$pathNeedle+"`r`n`$script:UnifiedCursorModulePath = Join-Path `$script:BaseDir 'HuymaierUnifiedCursor.ps1'")
+    }
+
+    # Unified Cursor must load after WebBrowser and Customization. Those modules
+    # define/wrap the browser input functions; loading unified earlier lets them
+    # overwrite the native pointer ownership later during startup.
+    $customizationBlock=@'
+if (Test-Path -LiteralPath $script:CustomizationModulePath) {
+    try { . $script:CustomizationModulePath }
+    catch { Write-Log "Customization module load failed: $($_.Exception.Message)" 'ERROR' }
 }
 '@
-    if(-not $core.Contains($loadNeedle)){throw 'Unified cursor could not find streaming runtime load block.'}
-    $loadBlock=@'
-# HUYMAIER_STREAMING_CONTROLLER_RUNTIME_V1
-if (Test-Path -LiteralPath $script:StreamingControllerModulePath) {
-    try { . $script:StreamingControllerModulePath }
-    catch { Write-Log "Streaming controller module load failed: $($_.Exception.Message)" 'ERROR' }
-}
+    if(-not $core.Contains($customizationBlock)){throw 'Unified cursor could not find final customization load boundary.'}
+    $unifiedBlock=@'
 
-# HUYMAIER_UNIFIED_CURSOR_RUNTIME_V1
+# HUYMAIER_UNIFIED_CURSOR_RUNTIME_V2
+# Load after WebBrowser + Customization so native Web cursor ownership is final.
 if (Test-Path -LiteralPath $script:UnifiedCursorModulePath) {
     try { . $script:UnifiedCursorModulePath }
     catch { Write-Log "Unified cursor module load failed: $($_.Exception.Message)" 'ERROR' }
 }
 '@
-    $core=$core.Replace($loadNeedle,$loadBlock)
+    $core=$core.Replace($customizationBlock,$customizationBlock+$unifiedBlock)
     Set-Content -LiteralPath $CorePath -Value $core -Encoding UTF8
 }
 
