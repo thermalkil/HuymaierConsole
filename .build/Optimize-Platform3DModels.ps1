@@ -68,12 +68,14 @@ if($LASTEXITCODE -ne 0 -or -not(Test-Path $unifiedCursorExe)){throw 'x64 Huymaie
 
 # HUYMAIER_PLATFORM_3D_MODEL_WORKER_BUILD_V1
 $modelPreviewSource=Join-Path $stage 'Native\HuymaierModelPreviewWorker.cs'
+$modelPreviewAliases=Join-Path $stage 'Native\HuymaierModelPreviewWpfAliases.cs'
 $modelPreviewExe=Join-Path $stage 'HuymaierModelPreviewWorker.exe'
-if(-not(Test-Path -LiteralPath $modelPreviewSource -PathType Leaf)){throw "Platform model preview worker source missing: $modelPreviewSource"}
-$modelRefs=@([Uri].Assembly.Location,[Linq.Enumerable].Assembly.Location,[Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,[Windows.Window].Assembly.Location)|Select-Object -Unique
+foreach($modelSource in @($modelPreviewSource,$modelPreviewAliases)){if(-not(Test-Path -LiteralPath $modelSource -PathType Leaf)){throw "Platform model preview worker source missing: $modelSource"}}
+$modelFramework=[Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()
+$modelRefs=@([Uri].Assembly.Location,[Linq.Enumerable].Assembly.Location,[Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,[Windows.Window].Assembly.Location,(Join-Path $modelFramework 'System.Xaml.dll'))|Select-Object -Unique
 $modelArgs=@('/noconfig','/nologo','/target:winexe','/platform:x64','/optimize+',('/out:'+$modelPreviewExe),('/win32icon:'+(Join-Path $stage 'HuymaierConsole.ico')))
-foreach($r in $modelRefs){$modelArgs+=('/reference:'+$r)}
-$modelArgs+=$modelPreviewSource
+foreach($r in $modelRefs){if(-not(Test-Path -LiteralPath $r -PathType Leaf)){throw "Platform-model compiler reference missing: $r"};$modelArgs+=('/reference:'+$r)}
+$modelArgs+=@($modelPreviewSource,$modelPreviewAliases)
 & $csc @modelArgs
 if($LASTEXITCODE -ne 0 -or -not(Test-Path $modelPreviewExe)){throw 'x64 HuymaierModelPreviewWorker.exe compilation failed.'}
 '@
