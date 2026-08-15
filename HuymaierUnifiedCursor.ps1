@@ -65,7 +65,11 @@ function Start-HcUnifiedStreamingCursorHost {
 function Hide-HcBrowserJsCursorNow {
     try{
         if(Get-Command Invoke-HcBrowserScriptAsync -ErrorAction SilentlyContinue){
-            Invoke-HcBrowserScriptAsync "(()=>{const n=document.getElementById('hc-virtual-cursor');if(n)n.style.display='none';if(window.__hcCursorDrive)window.__hcCursorDrive(0,0,0);return true})()"
+            # HUYMAIER_WEB_NATIVE_CURSOR_DEDUP_V2
+            # Remove the legacy DOM pointer entirely. Merely setting display:none
+            # was insufficient because its retained resize callback could render
+            # the old node again underneath the native system pointer.
+            Invoke-HcBrowserScriptAsync "(()=>{const n=document.getElementById('hc-virtual-cursor');if(n)n.remove();const s=document.getElementById('hc-virtual-cursor-style');if(s)s.remove();const hide=()=>{const q=document.getElementById('hc-virtual-cursor');if(q)q.remove();return true};window.__hcCursorRender=hide;window.__hcCursorShow=hide;window.__hcCursorHide=hide;window.__hcCursorMove=(dx,dy)=>true;if(window.__hcCursorDrive)window.__hcCursorDrive(0,0,0);return true})()"
         }
     }catch{}
 }
