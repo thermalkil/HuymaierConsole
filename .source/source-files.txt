@@ -6,6 +6,7 @@ EmulatorPlatforms/3DS/settings.default.json
 EmulatorPlatforms/Arcade/platform.json
 EmulatorPlatforms/Arcade/settings.default.json
 EmulatorPlatforms/Atari2600/platform.json
+EmulatorPlatforms/Atari2600/settings.default.json
 EmulatorPlatforms/AtariLynx/platform.json
 EmulatorPlatforms/AtariLynx/settings.default.json
 EmulatorPlatforms/Dreamcast/platform.json
