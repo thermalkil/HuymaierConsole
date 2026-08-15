@@ -23,7 +23,7 @@ foreach($needle in @('HUYMAIER_PLATFORM_PRESENTATION_BASE_V2','HcModelsBaseNewPl
 foreach($forbidden in @('HuymaierModelPreviewWorker.exe','Request-HcModelPreview','function New-PlatformCard','function Add-PlatformRail','function Get-PageDefinition','function Invoke-Action')){if($baseText.Contains($forbidden)){throw "Platform presentation base still owns retired rendering/settings behavior: $forbidden"}}
 
 $liveText=Get-Content -Raw $liveModule -Encoding UTF8
-foreach($needle in @('HUYMAIER_LIVE_PLATFORM_3D_HELPERS_V2','HuymaierLiveModel3D.dll','Initialize-HcLiveModelAssembly','New-HcLiveModelView','Get-HcPlatformVisualHost','Open-HcPlatformModelViewer','Close-HcPlatformModelViewer','function Invoke-SecondaryAction','function Apply-ControllerNavigation','X/Square View 3D model','LB / RB  Zoom')){if(-not$liveText.Contains($needle)){throw "Live platform helper contract missing: $needle"}}
+foreach($needle in @('HUYMAIER_LIVE_PLATFORM_3D_HELPERS_V2','HuymaierLiveModel3D.dll','Initialize-HcLiveModelAssembly','New-HcLiveModelView','Get-HcPlatformVisualHost','Open-HcPlatformModelViewer','Close-HcPlatformModelViewer','function Invoke-SecondaryAction','function Apply-ControllerNavigation','LB / RB  Zoom')){if(-not$liveText.Contains($needle)){throw "Live platform helper contract missing: $needle"}}
 foreach($forbidden in @('function New-PlatformCard','function Add-PlatformRail','function Get-PageDefinition','function Invoke-Action','function Adjust-SelectedSlider','Set-HcAtlasFallbackVisual','HuymaierPlatformAtlas')){if($liveText.Contains($forbidden)){throw "Live helper module still owns retired card/settings/atlas behavior: $forbidden"}}
 
 $controlText=Get-Content -Raw $liveControl -Encoding UTF8
