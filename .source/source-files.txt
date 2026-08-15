@@ -117,6 +117,7 @@ HuymaierNativeConsoleLibraryWorker.ps1
 HuymaierNativeDisplay.cs
 HuymaierNativeInput.cs
 HuymaierPerformance.cs
+HuymaierPlatformModels.ps1
 HuymaierProviderConcurrency.ps1
 HuymaierProviderConcurrencyUi.ps1
 HuymaierProviderProgressWorker.ps1
@@ -145,8 +146,11 @@ Native/HuymaierConsole.NativeApp.cs
 Native/HuymaierConsole.Ps1.cs
 Native/HuymaierConsole.SystemOverlay.cs
 Native/HuymaierGameInputBridge.cpp
+Native/HuymaierModelPreviewWorker.cs
+Native/HuymaierModelPreviewWpfAliases.cs
 Native/HuymaierStreamingCursorHost.cs
 Native/HuymaierUnifiedCursorHost.cs
+Assets/Models/model-map.json
 Register-HuymaierFSEHome.ps1
 RELEASE_NOTES.txt
 THIRD_PARTY_NOTICES.txt
