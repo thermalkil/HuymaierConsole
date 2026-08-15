@@ -87,9 +87,12 @@ extern "C" __declspec(dllexport) int __cdecl HC_GameInputInitialize()
         return 0;
 
     // Huymaier Console intentionally owns the system Guide button while it is
-    // running, including when an external game/app has foreground focus. Share
-    // remains separately observable and is never treated as Guide.
+    // running, including when an external game/app has foreground focus. The
+    // native streaming cursor helper is itself backgrounded while the Windows
+    // streaming app owns focus, so ordinary gamepad readings must also remain
+    // available in the background for that isolated pointer surface.
     input->SetFocusPolicy(static_cast<GameInputFocusPolicy>(
+        GameInputEnableBackgroundInput |
         GameInputEnableBackgroundGuideButton |
         GameInputEnableBackgroundShareButton));
 
@@ -125,7 +128,7 @@ extern "C" __declspec(dllexport) int __cdecl HC_ConsumeSharePress()
     return ConsumeEdge(g_sharePresses);
 }
 
-// Continuous normalized state used only for controller-pointer surfaces.  The
+// Continuous normalized state used only for controller-pointer surfaces. The
 // shell keeps its existing edge/navigation stack; this API does not alter
 // controller assignment or emulator behavior.
 extern "C" __declspec(dllexport) int __cdecl HC_ReadGamepadPointerState(
