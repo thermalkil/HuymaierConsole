@@ -48,6 +48,7 @@ jobs:
             '.\.build\Optimize-UnifiedCursor.ps1',
             '.\.build\Optimize-Platform3DModels.ps1',
             '.\.build\Optimize-User3DModels.ps1',
+            '.\.build\Optimize-Retired3DPayloadPrune.ps1',
             '.\.build\Optimize-DolphinIntegration.ps1',
             '.\.build\Optimize-WiiArtworkAliases.ps1',
             '.\.build\Optimize-GameCubeHubNavigation.ps1',
@@ -62,10 +63,10 @@ jobs:
             '.\HuymaierStreamingController.ps1',
             '.\HuymaierUnifiedCursor.ps1',
             '.\HuymaierPlatformModels.ps1',
-            '.\HuymaierPlatformAtlas.ps1',
             '.\HuymaierLivePlatformModels.ps1',
             '.\HuymaierUser3DModels.ps1',
             '.\.development\v0.26.5\Prepare-v0265-PlatformModelValidation.ps1',
+            '.\.development\v0.26.5\Test-v0265-PowerShellSafety.ps1',
             '.\.development\v0.26.5\Test-v0265-Stabilization.ps1',
             '.\.development\v0.26.5\Test-v0265-StreamingController.ps1',
             '.\.development\v0.26.5\Test-v0265-UnifiedCursor.ps1',
@@ -83,6 +84,7 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
+          & '.\.development\v0.26.5\Test-v0265-PowerShellSafety.ps1'
           & '.\.development\v0.26.5\Test-v0265-PerformanceAndOwnership.ps1'
           & '.\.development\v0.26.5\Test-v0265-Stabilization.ps1'
           & '.\.development\v0.26.5\Test-v0265-StreamingController.ps1'
