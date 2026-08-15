@@ -48,13 +48,14 @@ try{
     foreach($required in @("document.getElementById('hc-virtual-cursor')",'if(n)n.remove()',"document.getElementById('hc-virtual-cursor-style')",'if(s)s.remove()','window.__hcCursorRender=hide','window.__hcCursorShow=hide')){Assert-Contains $dedupScope $required "Native cursor cleanup missing $required"}
 
     # Race hardening: each state write needs a unique temp file and a serialized
-    # critical section; the old shared '.tmp' + Move-Item pattern is forbidden.
+    # critical section. Reject only the historical shared statePath+'.tmp'
+    # pattern; unique PID/GUID temp files intentionally still end in .tmp.
     $contextStart=$runtime.IndexOf('function Set-HcUnifiedCursorContext',[StringComparison]::Ordinal)
     $contextEnd=$runtime.IndexOf('function Test-HcUnifiedCursorProcessAlive',[math]::Max(0,$contextStart),[StringComparison]::Ordinal)
     if($contextStart -lt 0 -or $contextEnd -le $contextStart){throw 'Could not isolate unified cursor context writer.'}
     $contextScope=$runtime.Substring($contextStart,$contextEnd-$contextStart)
     foreach($required in @('[Threading.Monitor]::Enter','[Threading.Monitor]::Exit','[guid]::NewGuid().ToString(''N'')','[IO.File]::Replace','[IO.File]::Move')){Assert-Contains $contextScope $required "Atomic cursor context writer missing $required"}
-    if($contextScope.Contains("+'.tmp'") -or $contextScope.Contains('Move-Item -LiteralPath $tmp -Destination $script:HcUnifiedCursorStatePath -Force')){throw 'Unified cursor context writer still uses the collision-prone shared temp-file pattern.'}
+    if($contextScope.Contains("`$script:HcUnifiedCursorStatePath+'.tmp'") -or $contextScope.Contains('Move-Item -LiteralPath $tmp -Destination $script:HcUnifiedCursorStatePath -Force')){throw 'Unified cursor context writer still uses the collision-prone shared temp-file pattern.'}
 
     Add-Type -AssemblyName System.Windows.Forms,System.Drawing
     $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
