@@ -50,7 +50,7 @@ foreach($source in @('Steam','Epic Games','PS1','PS2','PS3','GameCube','Wii','Sw
 $atlasBase64=($atlasParts|ForEach-Object{(Get-Content -Raw -LiteralPath $_ -Encoding ASCII).Trim()}) -join ''
 $atlasBytes=[Convert]::FromBase64String($atlasBase64)
 $hasher=[Security.Cryptography.SHA256]::Create();try{$atlasSha=[BitConverter]::ToString($hasher.ComputeHash($atlasBytes)).Replace('-','').ToLowerInvariant()}finally{$hasher.Dispose()}
-if($atlasSha -ne 'f9c4c973d1b269ffc79e51544caf63eb494df75eb04ff4924a7947fe0a9fe650'){throw "3D model atlas source hash mismatch: $atlasSha"}
+if($atlasSha -ne 'fb46ad288c506e2c628f4bf06025deb66af17d26b4fff02baa2950de13d7342f'){throw "3D model atlas source hash mismatch: $atlasSha"}
 if($atlasBytes.Length -gt 100000){throw "3D model atlas is unexpectedly large: $($atlasBytes.Length) bytes"}
 if($atlasBytes[0] -ne 0x89 -or $atlasBytes[1] -ne 0x50 -or $atlasBytes[2] -ne 0x4e -or $atlasBytes[3] -ne 0x47){throw '3D model atlas source is not PNG.'}
 Add-Type -AssemblyName PresentationCore,WindowsBase
