@@ -77,7 +77,6 @@ EmulatorPlatforms/Switch/Assets/README-STARTUP.txt
 EmulatorPlatforms/Switch/platform.json
 EmulatorPlatforms/Switch/settings.default.json
 EmulatorPlatforms/TurboGrafx16/platform.json
-EmulatorPlatforms/TurboGrafx16/settings.default.json
 EmulatorPlatforms/Vita/platform.json
 EmulatorPlatforms/Vita/settings.default.json
 EmulatorPlatforms/Wii/Assets/README-STARTUP.txt
@@ -107,6 +106,7 @@ HuymaierEmulatorPlatforms.ps1
 HuymaierEmulatorSettings.ps1
 HuymaierEmulatorSettingsWorker.ps1
 HuymaierFSEHost.cs
+HuymaierGameBar.ps1
 HuymaierGameExperience.ps1
 HuymaierGameProviders.ps1
 HuymaierGameProviderWorker.ps1
@@ -138,8 +138,11 @@ Launch-HuymaierConsole.cmd
 Launch-Windowed.cmd
 manifest.json
 Native/HuymaierConsole.ConsolePlatforms.cs
+Native/HuymaierConsole.GameInput.cs
 Native/HuymaierConsole.NativeApp.cs
 Native/HuymaierConsole.Ps1.cs
+Native/HuymaierConsole.SystemOverlay.cs
+Native/HuymaierGameInputBridge.cpp
 Native/HuymaierStreamingCursorHost.cs
 Register-HuymaierFSEHome.ps1
 RELEASE_NOTES.txt
