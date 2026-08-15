@@ -14,6 +14,7 @@ $wiiArtworkAliasOptimizer=Join-Path $PSScriptRoot 'Optimize-WiiArtworkAliases.ps
 $appLibraryOptimizer=Join-Path $PSScriptRoot 'Optimize-AppLibrary.ps1'
 $streamingControllerOptimizer=Join-Path $PSScriptRoot 'Optimize-StreamingController.ps1'
 $sonyPointerOptimizer=Join-Path $PSScriptRoot 'Optimize-SonyPointerSharedState.ps1'
+$externalGameBarOptimizer=Join-Path $PSScriptRoot 'Optimize-ExternalGameBarOverlay.ps1'
 $providerOptimizer=Join-Path $PSScriptRoot 'Optimize-ProviderDownloads.ps1'
 $epicWatchOptimizer=Join-Path $PSScriptRoot 'Optimize-EpicTelemetryWatch.ps1'
 $epicCoordinatorOptimizer=Join-Path $PSScriptRoot 'Optimize-ProviderCoordinatorEpicActivation.ps1'
@@ -32,6 +33,7 @@ $manifestSource=Join-Path $workspace 'manifest.json'
 $appxManifestSource=Join-Path $workspace 'FSEPackage\AppxManifest.xml'
 $nativeGameInputSource=Join-Path $workspace 'Native\HuymaierConsole.GameInput.cs'
 $nativeConsoleSource=Join-Path $workspace 'Native\HuymaierConsole.ConsolePlatforms.cs'
+$nativeSystemOverlaySource=Join-Path $workspace 'Native\HuymaierConsole.SystemOverlay.cs'
 $nativeInputSource=Join-Path $workspace 'HuymaierNativeInput.cs'
 $providerModuleSource=Join-Path $workspace 'HuymaierGameProviders.ps1'
 $providerWorkerSource=Join-Path $workspace 'HuymaierGameProviderWorker.ps1'
@@ -48,20 +50,21 @@ $streamingControllerSource=Join-Path $workspace 'HuymaierStreamingController.ps1
 $streamingCursorSource=Join-Path $workspace 'Native\HuymaierStreamingCursorHost.cs'
 
 $requiredFiles=@(
-    $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$dolphinOptimizer,$wiiArtworkAliasOptimizer,$appLibraryOptimizer,$streamingControllerOptimizer,$sonyPointerOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$providerPreflightOptimizer,$browserCursorOptimizer,$runtimeHitchOptimizer,$concurrentDownloadRefreshOptimizer,
-    $coreSource,$bootstrapSource,$installerCoreSource,$installerScriptSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$nativeInputSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource,
+    $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$dolphinOptimizer,$wiiArtworkAliasOptimizer,$appLibraryOptimizer,$streamingControllerOptimizer,$sonyPointerOptimizer,$externalGameBarOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$providerPreflightOptimizer,$browserCursorOptimizer,$runtimeHitchOptimizer,$concurrentDownloadRefreshOptimizer,
+    $coreSource,$bootstrapSource,$installerCoreSource,$installerScriptSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$nativeSystemOverlaySource,$nativeInputSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource,
     $providerConcurrencySource,$providerConcurrencyUiSource,$providerTransferCoordinatorSource,$appLibrarySource,$appInstallWorkerSource,$streamingControllerSource,$streamingCursorSource
 )
 foreach($required in $requiredFiles){if(-not(Test-Path -LiteralPath $required -PathType Leaf)){throw "Candidate optimization wrapper is missing required file: $required"}}
 
 $originals=@{}
-foreach($path in @($coreBuilder,$coreSource,$bootstrapSource,$installerCoreSource,$installerScriptSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$nativeInputSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource)){$originals[$path]=[IO.File]::ReadAllBytes($path)}
+foreach($path in @($coreBuilder,$coreSource,$bootstrapSource,$installerCoreSource,$installerScriptSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$nativeSystemOverlaySource,$nativeInputSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource)){$originals[$path]=[IO.File]::ReadAllBytes($path)}
 try{
     & $versionStamper -TriggerPath $TriggerPath -CorePath $coreSource -BootstrapPath $bootstrapSource -InstallerCorePath $installerCoreSource -InstallerScriptPath $installerScriptSource -ManifestPath $manifestSource -AppxManifestPath $appxManifestSource -NativeGameInputPath $nativeGameInputSource
     & $providerPreflightOptimizer -BootstrapPath $bootstrapSource -InstallerScriptPath $installerScriptSource
     & $appLibraryOptimizer -CorePath $coreSource -BootstrapPath $bootstrapSource -InstallerScriptPath $installerScriptSource
     & $streamingControllerOptimizer -CorePath $coreSource -BootstrapPath $bootstrapSource -InstallerScriptPath $installerScriptSource -CoreBuilderPath $coreBuilder
     & $sonyPointerOptimizer -NativeInputPath $nativeInputSource
+    & $externalGameBarOptimizer -SystemOverlayPath $nativeSystemOverlaySource
     & $startupOptimizer -CorePath $coreSource
     & $nintendoOptimizer -NativePath $nativeConsoleSource
     & $nintendoNameOptimizer -ConsolePlatformsPath $nativeConsoleSource
