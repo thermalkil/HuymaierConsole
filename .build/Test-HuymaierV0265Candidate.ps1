@@ -54,7 +54,11 @@ $core=Require-Text 'HuymaierConsole.ps1' @(
     'HUYMAIER_DOWNLOAD_LIBRARY_REFRESH_POLICY_V1',
     'Aggregate transfer telemetry does not invalidate the Games library.',
     'Request-HcDeferredLibraryRefresh',
-    'Invoke-HcDeferredLibraryRefresh'
+    'Invoke-HcDeferredLibraryRefresh',
+    'HUYMAIER_UNIFIED_CURSOR_RUNTIME_V2',
+    'HuymaierUnifiedCursor.ps1',
+    'HUYMAIER_USER_3D_MODELS_RUNTIME_LOAD_V1',
+    'HuymaierUser3DModels.ps1'
 )
 $obsoleteAggregateBridge="if(`$lower.EndsWith('provider-transfers.json')){Add-HcRuntimeDirtyPath `$script:ProviderStatePath}"
 if($core.IndexOf($obsoleteAggregateBridge,[StringComparison]::Ordinal) -ge 0){throw 'Staged shell still treats provider-transfers telemetry as a Games-library mutation.'}
@@ -64,6 +68,9 @@ if($countStart -lt 0 -or $countEnd -le $countStart){throw 'Staged shell platform
 $countSegment=$core.Substring($countStart,$countEnd-$countStart)
 foreach($forbidden in @('Start-Ps1LibrarySummaryScan','Start-Ps2LibrarySummaryScan','Start-Ps3LibrarySummaryScan','Start-NativeConsoleLibrarySummaryScan $id')){if($countSegment.IndexOf($forbidden,[StringComparison]::Ordinal) -ge 0){throw "Staged platform-card rendering still starts a summary worker: $forbidden"}}
 if($core.IndexOf('Start-Ps1LibrarySummaryScan;Start-Ps2LibrarySummaryScan;Start-Ps3LibrarySummaryScan',[StringComparison]::Ordinal) -ge 0){throw 'Staged shell still contains the simultaneous console-summary worker burst.'}
+$customIndex=$core.IndexOf('Customization module load failed',[StringComparison]::Ordinal)
+$unifiedIndex=$core.IndexOf('HUYMAIER_UNIFIED_CURSOR_RUNTIME_V2',[StringComparison]::Ordinal)
+if($customIndex -lt 0 -or $unifiedIndex -le $customIndex){throw 'Staged unified cursor does not load after WebBrowser and Customization.'}
 
 $bootstrap=Require-Text 'HuymaierBootstrap.ps1' @(
     "`$script:ExpectedConsoleVersion='0.26.5'",
@@ -74,7 +81,11 @@ $bootstrap=Require-Text 'HuymaierBootstrap.ps1' @(
     'HuymaierProviderTransferCoordinator.ps1',
     'HuymaierAppLibrary.ps1',
     'HuymaierAppInstallWorker.ps1',
-    'HUYMAIER_CONCURRENT_PROVIDER_COORDINATOR_V1'
+    'HUYMAIER_CONCURRENT_PROVIDER_COORDINATOR_V1',
+    'HUYMAIER_UNIFIED_CURSOR_PREFLIGHT_V1',
+    'HuymaierUnifiedCursor.ps1',
+    'HUYMAIER_USER_3D_MODELS_PREFLIGHT_V1',
+    'HuymaierUser3DModels.ps1'
 )
 if($bootstrap.IndexOf("    Start-ProviderTelemetryWatch`r`n",[StringComparison]::Ordinal) -ge 0 -or $bootstrap.IndexOf("    Start-ProviderTelemetryWatch`n",[StringComparison]::Ordinal) -ge 0){throw 'Staged bootstrap still starts the legacy single-state provider telemetry coordinator.'}
 
@@ -88,7 +99,11 @@ $installerEntry=Require-Text 'Install-HuymaierConsole.ps1' @(
     'HuymaierProviderConcurrencyUi.ps1',
     'HuymaierProviderTransferCoordinator.ps1',
     'HuymaierAppLibrary.ps1',
-    'HuymaierAppInstallWorker.ps1'
+    'HuymaierAppInstallWorker.ps1',
+    'HUYMAIER_UNIFIED_CURSOR_INSTALLER_CACHE_V1',
+    'HuymaierUnifiedCursor.ps1',
+    'HUYMAIER_USER_3D_MODELS_INSTALLER_CACHE_V1',
+    'HuymaierUser3DModels.ps1'
 )
 $appx=Require-Text 'FSEPackage\AppxManifest.xml' @('Version="0.26.5.0"')
 
@@ -101,17 +116,20 @@ $browser=Require-Text 'HuymaierWebBrowser.ps1' @(
     "-Mode 'BrowserAddress'",
     "'BrowserInputSecure'",
     'Invoke-HcBrowserControllerType',
-    'HUYMAIER_BROWSER_VIRTUAL_CURSOR_V1',
-    'hc-virtual-cursor',
-    'document.elementFromPoint',
-    'window.__hcCursorClick',
-    'window.__hcCursorInput',
-    'window.__hcCursorSetValue',
-    'Open-HcBrowserCursorKeyboard $true $false',
-    'Open-HcBrowserCursorKeyboard $false $true',
     "Set-HcBrowserFocusArea 'Toolbar'",
     "Set-HcBrowserFocusArea 'Web'",
     'ConvertTo-HcBrowserDestination'
+)
+if($browser.IndexOf('HUYMAIER_BROWSER_VIRTUAL_CURSOR_V1',[StringComparison]::Ordinal) -ge 0 -or $browser.IndexOf('hc-virtual-cursor',[StringComparison]::Ordinal) -ge 0){throw 'Staged browser still contains the retired DOM virtual cursor implementation.'}
+$unifiedCursor=Require-Text 'HuymaierUnifiedCursor.ps1' @(
+    'HUYMAIER_WEB_NATIVE_CURSOR_DEDUP_V2',
+    'Start-HcUnifiedShellCursorHost',
+    'Start-HcUnifiedStreamingCursorHost',
+    "Set-HcUnifiedCursorContext 'browser-web'",
+    "document.getElementById('hc-virtual-cursor')",
+    'if(n)n.remove()',
+    'window.__hcCursorRender=hide',
+    'NATIVE CURSOR'
 )
 $browserStateIndex=$browser.IndexOf("`$script:HcBrowserAuthRequestPath = Join-Path")
 $browserInitIndex=$browser.IndexOf('function Initialize-HuymaierWebBrowser')
@@ -166,11 +184,11 @@ $appWorker=Require-Text 'HuymaierAppInstallWorker.ps1' @('winget','install','--s
 
 foreach($required in @(
     'HuymaierProviderTelemetry.ps1','HuymaierProviderProgressWorker.ps1','HuymaierProviderTelemetryCoordinator.ps1','HuymaierProviderConcurrency.ps1','HuymaierProviderConcurrencyUi.ps1','HuymaierProviderTransferCoordinator.ps1',
-    'HuymaierAppLibrary.ps1','HuymaierAppInstallWorker.ps1'
+    'HuymaierAppLibrary.ps1','HuymaierAppInstallWorker.ps1','HuymaierUnifiedCursor.ps1','HuymaierUser3DModels.ps1'
 )){Require-File $required|Out-Null}
 foreach($scriptFile in @(
     'HuymaierConsole.ps1','HuymaierBootstrap.ps1','Install-HuymaierConsole.ps1','HuymaierGameProviders.ps1','HuymaierGameProviderWorker.ps1','HuymaierProviderProgressWorker.ps1','HuymaierProviderTelemetry.ps1','HuymaierProviderTelemetryCoordinator.ps1',
-    'HuymaierProviderConcurrency.ps1','HuymaierProviderConcurrencyUi.ps1','HuymaierProviderTransferCoordinator.ps1','HuymaierShellRedesign.ps1','HuymaierWebBrowser.ps1','HuymaierAppLibrary.ps1','HuymaierAppInstallWorker.ps1'
+    'HuymaierProviderConcurrency.ps1','HuymaierProviderConcurrencyUi.ps1','HuymaierProviderTransferCoordinator.ps1','HuymaierShellRedesign.ps1','HuymaierWebBrowser.ps1','HuymaierAppLibrary.ps1','HuymaierAppInstallWorker.ps1','HuymaierUnifiedCursor.ps1','HuymaierUser3DModels.ps1'
 )){Assert-Ps51Parse $scriptFile}
 
 $realGit=(Get-Command git.exe -ErrorAction Stop).Source
@@ -181,7 +199,10 @@ $validation=Get-Content -Raw -LiteralPath $ValidationPath -Encoding UTF8|Convert
 $validation|Add-Member -NotePropertyName version0265ConsistencyGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName nativeHostBuildStampGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName browserColdStartGate -NotePropertyValue 'success' -Force
-$validation|Add-Member -NotePropertyName browserVirtualCursorGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName browserVirtualCursorGate -NotePropertyValue 'retired' -Force
+$validation|Add-Member -NotePropertyName browserNativeCursorGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName webLegacyDomCursorRetiredGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName webNativeCursorFinalLoadOrderGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName startupPerformanceGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName runtimeHitchGuardGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName providerTelemetryGate -NotePropertyValue 'success' -Force
@@ -196,4 +217,4 @@ $validation|Add-Member -NotePropertyName nativeAppInstallGate -NotePropertyValue
 $validation|Add-Member -NotePropertyName controllerAppModeGate -NotePropertyValue 'success' -Force
 $validation|Add-Member -NotePropertyName playStationPresentationFreezeGate -NotePropertyValue 'success' -Force
 $validation|ConvertTo-Json -Depth 10|Set-Content -LiteralPath $ValidationPath -Encoding UTF8
-Write-Host 'v0.26.5 release-shaped native stamp, browser cursor, hitch guard, concurrent transfers/ETA, Dolphin artwork/Wii saves, curated Apps/controller mode and PlayStation freeze gates passed.'
+Write-Host 'v0.26.5 release-shaped native stamp, final native browser cursor, hitch guard, concurrent transfers/ETA, Dolphin artwork/Wii saves, curated Apps/controller mode and PlayStation freeze gates passed.'
