@@ -17,6 +17,7 @@ $streamingControllerOptimizer=Join-Path $PSScriptRoot 'Optimize-StreamingControl
 $unifiedCursorOptimizer=Join-Path $PSScriptRoot 'Optimize-UnifiedCursor.ps1'
 $platformModelsOptimizer=Join-Path $PSScriptRoot 'Optimize-Platform3DModels.ps1'
 $user3DModelsOptimizer=Join-Path $PSScriptRoot 'Optimize-User3DModels.ps1'
+$retired3DPruneOptimizer=Join-Path $PSScriptRoot 'Optimize-Retired3DPayloadPrune.ps1'
 $sonyPointerOptimizer=Join-Path $PSScriptRoot 'Optimize-SonyPointerSharedState.ps1'
 $externalGameBarOptimizer=Join-Path $PSScriptRoot 'Optimize-ExternalGameBarOverlay.ps1'
 $providerOptimizer=Join-Path $PSScriptRoot 'Optimize-ProviderDownloads.ps1'
@@ -27,6 +28,7 @@ $providerPreflightOptimizer=Join-Path $PSScriptRoot 'Optimize-ProviderConcurrenc
 $runtimeHitchOptimizer=Join-Path $PSScriptRoot 'Optimize-RuntimeHitching.ps1'
 $concurrentDownloadRefreshOptimizer=Join-Path $PSScriptRoot 'Optimize-ConcurrentDownloadRefresh.ps1'
 $downloadLibraryRefreshOptimizer=Join-Path $PSScriptRoot 'Optimize-DownloadLibraryRefreshPolicy.ps1'
+
 $workspace=$env:GITHUB_WORKSPACE
 if([string]::IsNullOrWhiteSpace($workspace)){$workspace=(Split-Path -Parent $PSScriptRoot)}
 $coreSource=Join-Path $workspace 'HuymaierConsole.ps1'
@@ -53,22 +55,20 @@ $appInstallWorkerSource=Join-Path $workspace 'HuymaierAppInstallWorker.ps1'
 $streamingControllerSource=Join-Path $workspace 'HuymaierStreamingController.ps1'
 $unifiedCursorSource=Join-Path $workspace 'HuymaierUnifiedCursor.ps1'
 $platformModelsSource=Join-Path $workspace 'HuymaierPlatformModels.ps1'
-$platformAtlasSource=Join-Path $workspace 'HuymaierPlatformAtlas.ps1'
 $livePlatformModelsSource=Join-Path $workspace 'HuymaierLivePlatformModels.ps1'
 $user3DModelsSource=Join-Path $workspace 'HuymaierUser3DModels.ps1'
-$modelPreviewSource=Join-Path $workspace 'Native\HuymaierModelPreviewWorker.cs'
-$modelPreviewAliasesSource=Join-Path $workspace 'Native\HuymaierModelPreviewWpfAliases.cs'
+$modelLoaderSource=Join-Path $workspace 'Native\HuymaierModelPreviewWorker.cs'
+$modelAliasesSource=Join-Path $workspace 'Native\HuymaierModelPreviewWpfAliases.cs'
 $liveModelControlSource=Join-Path $workspace 'Native\HuymaierLiveModelControl.cs'
 $modelMapSource=Join-Path $workspace 'Assets\Models\model-map.json'
-$modelAtlasParts=@(1..4|ForEach-Object{Join-Path $workspace ('.development\v0.26.5\platform-model-atlas.part{0:D2}.b64' -f $_)})
 $streamingCursorSource=Join-Path $workspace 'Native\HuymaierStreamingCursorHost.cs'
 $unifiedCursorHostSource=Join-Path $workspace 'Native\HuymaierUnifiedCursorHost.cs'
 
 $requiredFiles=@(
-    $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$dolphinOptimizer,$wiiArtworkAliasOptimizer,$gameCubeHubOptimizer,$appLibraryOptimizer,$streamingControllerOptimizer,$unifiedCursorOptimizer,$platformModelsOptimizer,$user3DModelsOptimizer,$sonyPointerOptimizer,$externalGameBarOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$providerPreflightOptimizer,$runtimeHitchOptimizer,$concurrentDownloadRefreshOptimizer,$downloadLibraryRefreshOptimizer,
+    $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$dolphinOptimizer,$wiiArtworkAliasOptimizer,$gameCubeHubOptimizer,$appLibraryOptimizer,$streamingControllerOptimizer,$unifiedCursorOptimizer,$platformModelsOptimizer,$user3DModelsOptimizer,$retired3DPruneOptimizer,$sonyPointerOptimizer,$externalGameBarOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$providerPreflightOptimizer,$runtimeHitchOptimizer,$concurrentDownloadRefreshOptimizer,$downloadLibraryRefreshOptimizer,
     $coreSource,$bootstrapSource,$installerCoreSource,$installerScriptSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$nativeSystemOverlaySource,$nativeInputSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource,
-    $providerConcurrencySource,$providerConcurrencyUiSource,$providerTransferCoordinatorSource,$appLibrarySource,$appInstallWorkerSource,$streamingControllerSource,$unifiedCursorSource,$platformModelsSource,$platformAtlasSource,$livePlatformModelsSource,$user3DModelsSource,$modelPreviewSource,$modelPreviewAliasesSource,$liveModelControlSource,$modelMapSource,$streamingCursorSource,$unifiedCursorHostSource
-)+$modelAtlasParts
+    $providerConcurrencySource,$providerConcurrencyUiSource,$providerTransferCoordinatorSource,$appLibrarySource,$appInstallWorkerSource,$streamingControllerSource,$unifiedCursorSource,$platformModelsSource,$livePlatformModelsSource,$user3DModelsSource,$modelLoaderSource,$modelAliasesSource,$liveModelControlSource,$modelMapSource,$streamingCursorSource,$unifiedCursorHostSource
+)
 foreach($required in $requiredFiles){if(-not(Test-Path -LiteralPath $required -PathType Leaf)){throw "Candidate optimization wrapper is missing required file: $required"}}
 
 $originals=@{}
@@ -81,6 +81,7 @@ try{
     & $unifiedCursorOptimizer -CorePath $coreSource -BootstrapPath $bootstrapSource -InstallerScriptPath $installerScriptSource -CoreBuilderPath $coreBuilder
     & $platformModelsOptimizer -CorePath $coreSource -BootstrapPath $bootstrapSource -InstallerScriptPath $installerScriptSource -CoreBuilderPath $coreBuilder
     & $user3DModelsOptimizer -CorePath $coreSource -BootstrapPath $bootstrapSource -InstallerScriptPath $installerScriptSource
+    & $retired3DPruneOptimizer -CoreBuilderPath $coreBuilder
     & $sonyPointerOptimizer -NativeInputPath $nativeInputSource
     & $externalGameBarOptimizer -SystemOverlayPath $nativeSystemOverlaySource
     & $startupOptimizer -CorePath $coreSource
