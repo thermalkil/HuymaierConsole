@@ -15,6 +15,7 @@ $gameCubeHubOptimizer=Join-Path $PSScriptRoot 'Optimize-GameCubeHubNavigation.ps
 $appLibraryOptimizer=Join-Path $PSScriptRoot 'Optimize-AppLibrary.ps1'
 $streamingControllerOptimizer=Join-Path $PSScriptRoot 'Optimize-StreamingController.ps1'
 $unifiedCursorOptimizer=Join-Path $PSScriptRoot 'Optimize-UnifiedCursor.ps1'
+$platformModelsOptimizer=Join-Path $PSScriptRoot 'Optimize-Platform3DModels.ps1'
 $sonyPointerOptimizer=Join-Path $PSScriptRoot 'Optimize-SonyPointerSharedState.ps1'
 $externalGameBarOptimizer=Join-Path $PSScriptRoot 'Optimize-ExternalGameBarOverlay.ps1'
 $providerOptimizer=Join-Path $PSScriptRoot 'Optimize-ProviderDownloads.ps1'
@@ -51,13 +52,17 @@ $appLibrarySource=Join-Path $workspace 'HuymaierAppLibrary.ps1'
 $appInstallWorkerSource=Join-Path $workspace 'HuymaierAppInstallWorker.ps1'
 $streamingControllerSource=Join-Path $workspace 'HuymaierStreamingController.ps1'
 $unifiedCursorSource=Join-Path $workspace 'HuymaierUnifiedCursor.ps1'
+$platformModelsSource=Join-Path $workspace 'HuymaierPlatformModels.ps1'
+$modelPreviewSource=Join-Path $workspace 'Native\HuymaierModelPreviewWorker.cs'
+$modelPreviewAliasesSource=Join-Path $workspace 'Native\HuymaierModelPreviewWpfAliases.cs'
+$modelMapSource=Join-Path $workspace 'Assets\Models\model-map.json'
 $streamingCursorSource=Join-Path $workspace 'Native\HuymaierStreamingCursorHost.cs'
 $unifiedCursorHostSource=Join-Path $workspace 'Native\HuymaierUnifiedCursorHost.cs'
 
 $requiredFiles=@(
-    $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$dolphinOptimizer,$wiiArtworkAliasOptimizer,$gameCubeHubOptimizer,$appLibraryOptimizer,$streamingControllerOptimizer,$unifiedCursorOptimizer,$sonyPointerOptimizer,$externalGameBarOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$providerPreflightOptimizer,$browserCursorOptimizer,$runtimeHitchOptimizer,$concurrentDownloadRefreshOptimizer,$downloadLibraryRefreshOptimizer,
+    $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$dolphinOptimizer,$wiiArtworkAliasOptimizer,$gameCubeHubOptimizer,$appLibraryOptimizer,$streamingControllerOptimizer,$unifiedCursorOptimizer,$platformModelsOptimizer,$sonyPointerOptimizer,$externalGameBarOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$providerPreflightOptimizer,$browserCursorOptimizer,$runtimeHitchOptimizer,$concurrentDownloadRefreshOptimizer,$downloadLibraryRefreshOptimizer,
     $coreSource,$bootstrapSource,$installerCoreSource,$installerScriptSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$nativeSystemOverlaySource,$nativeInputSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource,
-    $providerConcurrencySource,$providerConcurrencyUiSource,$providerTransferCoordinatorSource,$appLibrarySource,$appInstallWorkerSource,$streamingControllerSource,$unifiedCursorSource,$streamingCursorSource,$unifiedCursorHostSource
+    $providerConcurrencySource,$providerConcurrencyUiSource,$providerTransferCoordinatorSource,$appLibrarySource,$appInstallWorkerSource,$streamingControllerSource,$unifiedCursorSource,$platformModelsSource,$modelPreviewSource,$modelPreviewAliasesSource,$modelMapSource,$streamingCursorSource,$unifiedCursorHostSource
 )
 foreach($required in $requiredFiles){if(-not(Test-Path -LiteralPath $required -PathType Leaf)){throw "Candidate optimization wrapper is missing required file: $required"}}
 
@@ -69,6 +74,7 @@ try{
     & $appLibraryOptimizer -CorePath $coreSource -BootstrapPath $bootstrapSource -InstallerScriptPath $installerScriptSource
     & $streamingControllerOptimizer -CorePath $coreSource -BootstrapPath $bootstrapSource -InstallerScriptPath $installerScriptSource -CoreBuilderPath $coreBuilder
     & $unifiedCursorOptimizer -CorePath $coreSource -BootstrapPath $bootstrapSource -InstallerScriptPath $installerScriptSource -CoreBuilderPath $coreBuilder
+    & $platformModelsOptimizer -CorePath $coreSource -BootstrapPath $bootstrapSource -InstallerScriptPath $installerScriptSource -CoreBuilderPath $coreBuilder
     & $sonyPointerOptimizer -NativeInputPath $nativeInputSource
     & $externalGameBarOptimizer -SystemOverlayPath $nativeSystemOverlaySource
     & $startupOptimizer -CorePath $coreSource
