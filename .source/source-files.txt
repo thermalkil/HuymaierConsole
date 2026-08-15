@@ -112,6 +112,7 @@ HuymaierGameExperience.ps1
 HuymaierGameProviders.ps1
 HuymaierGameProviderWorker.ps1
 HuymaierLibraryWorker.ps1
+HuymaierLivePlatformModels.ps1
 HuymaierNativeAudio.cs
 HuymaierNativeConsoleLibraryWorker.ps1
 HuymaierNativeDisplay.cs
@@ -146,6 +147,7 @@ Native/HuymaierConsole.NativeApp.cs
 Native/HuymaierConsole.Ps1.cs
 Native/HuymaierConsole.SystemOverlay.cs
 Native/HuymaierGameInputBridge.cpp
+Native/HuymaierLiveModelControl.cs
 Native/HuymaierModelPreviewWorker.cs
 Native/HuymaierModelPreviewWpfAliases.cs
 Native/HuymaierStreamingCursorHost.cs
