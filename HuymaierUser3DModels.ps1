@@ -1,27 +1,38 @@
-# HUYMAIER_USER_3D_MODELS_RUNTIME_V3
+# HUYMAIER_USER_3D_MODELS_RUNTIME_V4
 # User-owned live platform model library. Large GLB assets are intentionally
 # not shipped with Huymaier Console; users place their own models in a 3D Models
 # folder using the original Huymaier model-pack filenames.
 #
-# V3 keeps the Games rail icon-first and upgrades matching cards to real live
-# Viewport3D geometry after the page is already visible. A bad or expensive GLB
-# can therefore never blank the platform rail.
+# V4 is the single owner of platform-card presentation. It bypasses the retired
+# static preview/atlas/live card wrappers, keeps the proven layout/editing card
+# as its baseline, and upgrades matching cards to real Viewport3D geometry only
+# after the Games page is visible. Missing or failed GLBs always keep the icon.
 
 Set-StrictMode -Version 2.0
 
 $script:HcUser3DModelsRoot = Join-Path $script:DataDir '3D Models'
 $script:HcPortable3DModelsRoot = Join-Path $script:BaseDir '3D Models'
 $script:HcUser3DModelsGuidePath = Join-Path $script:HcUser3DModelsRoot 'README - Model Names.txt'
-$script:HcUserModelsBaseGetPageDefinition = ${function:Get-PageDefinition}
-$script:HcUserModelsBaseInvokeAction = ${function:Invoke-Action}
+# Bind once to the pre-3D presentation contract captured by HuymaierPlatformModels.
+# This deliberately bypasses the retired static preview/atlas/live card wrappers.
+$baseCardVar=Get-Variable -Name HcModelsBaseNewPlatformCard -Scope Script -ErrorAction SilentlyContinue
+$baseRailVar=Get-Variable -Name HcModelsBaseAddPlatformRail -Scope Script -ErrorAction SilentlyContinue
+$basePageVar=Get-Variable -Name HcModelsBaseGetPageDefinition -Scope Script -ErrorAction SilentlyContinue
+$baseActionVar=Get-Variable -Name HcModelsBaseInvokeAction -Scope Script -ErrorAction SilentlyContinue
+$script:HcUserModelsBaseNewPlatformCard=$(if($null -ne $baseCardVar -and $null -ne $baseCardVar.Value){$baseCardVar.Value}else{${function:New-PlatformCard}})
+$script:HcUserModelsBaseAddPlatformRail=$(if($null -ne $baseRailVar -and $null -ne $baseRailVar.Value){$baseRailVar.Value}else{${function:Add-PlatformRail}})
+$script:HcUserModelsBaseGetPageDefinition=$(if($null -ne $basePageVar -and $null -ne $basePageVar.Value){$basePageVar.Value}else{${function:Get-PageDefinition}})
+$script:HcUserModelsBaseInvokeAction=$(if($null -ne $baseActionVar -and $null -ne $baseActionVar.Value){$baseActionVar.Value}else{${function:Invoke-Action}})
+
+$script:HcPlatformPresentationOwner='HuymaierUser3DModelsV4'
 $script:HcUser3DModelNameMap = $null
 $script:HcUser3DCardQueue = New-Object System.Collections.ArrayList
 $script:HcUser3DCardTimer = $null
 $script:HcUser3DCardGeneration = 0
-
-$baseRailVar=Get-Variable -Name HcModelsBaseAddPlatformRail -Scope Script -ErrorAction SilentlyContinue
-if($null -ne $baseRailVar -and $null -ne $baseRailVar.Value){$script:HcUserModelsBaseAddPlatformRail=$baseRailVar.Value}
-else{$script:HcUserModelsBaseAddPlatformRail=${function:Add-PlatformRail}}
+$script:HcUser3DQueuedCount = 0
+$script:HcUser3DReadyCount = 0
+$script:HcUser3DMissingCount = 0
+$script:HcUser3DFailedCount = 0
 
 function Get-HcUser3DModelNames {
     return @(
@@ -103,8 +114,6 @@ function Initialize-HcUser3DModelNameMap {
         }
     }catch{try{Write-Log ('3D Models alias map could not be prepared: '+$_.Exception.Message) 'WARN'}catch{}}
 
-    # Explicit names cover the common runtime labels even if a future model-map
-    # changes presentation aliases.
     $explicit=@{
         'ps1'='Sony PlayStation.glb';'playstation'='Sony PlayStation.glb';'playstation 1'='Sony PlayStation.glb'
         'ps2'='PlayStation 2.glb';'playstation 2'='PlayStation 2.glb'
@@ -151,6 +160,10 @@ function Resolve-HcLivePlatformModelPath {
 function Reset-HcUser3DCardQueue {
     $script:HcUser3DCardGeneration++
     $script:HcUser3DCardQueue=New-Object System.Collections.ArrayList
+    $script:HcUser3DQueuedCount=0
+    $script:HcUser3DReadyCount=0
+    $script:HcUser3DMissingCount=0
+    $script:HcUser3DFailedCount=0
     if($null -ne $script:HcUser3DCardTimer){try{$script:HcUser3DCardTimer.Stop()}catch{}}
 }
 
@@ -158,16 +171,23 @@ function Start-HcUser3DCardTimer {
     if($null -eq $script:HcUser3DCardTimer){
         $timer=New-Object System.Windows.Threading.DispatcherTimer
         $timer.Interval=[TimeSpan]::FromMilliseconds(90)
-        $timer.Add_Tick({Update-HcUser3DCardQueue})
+        $timer.Add_Tick({
+            try{Update-HcUser3DCardQueue}
+            catch{
+                $script:HcUser3DFailedCount++
+                try{Write-Log ('Live 3D card queue tick failed: '+$_.Exception.Message) 'ERROR'}catch{}
+            }
+        })
         $script:HcUser3DCardTimer=$timer
     }
     if(-not $script:HcUser3DCardTimer.IsEnabled){$script:HcUser3DCardTimer.Start()}
 }
 
 function Queue-HcUser3DCard {
-    param($Button,$Host,[string]$Platform,[string]$Path)
-    if($null -eq $Button -or $null -eq $Host -or [string]::IsNullOrWhiteSpace($Path)){return}
-    [void]$script:HcUser3DCardQueue.Add([pscustomobject]@{Generation=$script:HcUser3DCardGeneration;Button=$Button;Host=$Host;Platform=$Platform;Path=$Path})
+    param($Button,$VisualHost,[string]$Platform,[string]$Path)
+    if($null -eq $Button -or $null -eq $VisualHost -or [string]::IsNullOrWhiteSpace($Path)){return}
+    [void]$script:HcUser3DCardQueue.Add([pscustomobject]@{Generation=$script:HcUser3DCardGeneration;Button=$Button;VisualHost=$VisualHost;Platform=$Platform;Path=$Path})
+    $script:HcUser3DQueuedCount++
     Start-HcUser3DCardTimer
 }
 
@@ -195,31 +215,31 @@ function Update-HcUser3DCardQueue {
     $item=$script:HcUser3DCardQueue[0]
     $script:HcUser3DCardQueue.RemoveAt(0)
     if($null -eq $item -or [int]$item.Generation -ne $script:HcUser3DCardGeneration){return}
-    $button=$item.Button;$host=$item.Host;$platform=[string]$item.Platform;$path=[string]$item.Path
-    if($null -eq $button -or $null -eq $host -or -not(Test-Path -LiteralPath $path -PathType Leaf)){return}
+    $button=$item.Button;$visualHost=$item.VisualHost;$platform=[string]$item.Platform;$path=[string]$item.Path
+    if($null -eq $button -or $null -eq $visualHost -or -not(Test-Path -LiteralPath $path -PathType Leaf)){return}
 
     $oldChild=$null
-    try{$oldChild=$host.Child}catch{}
+    try{$oldChild=$visualHost.Child}catch{}
     try{
         $view=New-HcUserCardLiveModelView $path ([int]$script:Config.PlatformModelScale)
-        if($null -eq $view){return}
+        if($null -eq $view){throw 'Live model view could not be created.'}
         if([int]$view.GeometryCount -le 0 -or [int]$view.VertexCount -le 0){throw 'Live model view reported no renderable geometry.'}
-        $host.Background='Transparent';$host.BorderThickness='0';$host.CornerRadius=0;$host.Width=112;$host.Height=96
-        $host.Child=$view
+        $visualHost.Background='Transparent';$visualHost.BorderThickness='0';$visualHost.CornerRadius=0;$visualHost.Width=112;$visualHost.Height=96
+        $visualHost.Child=$view
         $button.DataContext=[pscustomobject]@{HcLiveModelCard=$true;Platform=$platform;ModelPath=$path;GeometryCount=[int]$view.GeometryCount;VertexCount=[int]$view.VertexCount}
         $button.ToolTip='A/Cross Open platform   X/Square View 3D model'
+        $script:HcUser3DReadyCount++
         try{Write-Log ('Live 3D card ready: '+$platform+' geometry='+[int]$view.GeometryCount+' vertices='+[int]$view.VertexCount)}catch{}
     }catch{
-        try{if($null -ne $oldChild){$host.Child=$oldChild}}catch{}
+        $script:HcUser3DFailedCount++
+        try{if($null -ne $oldChild){$visualHost.Child=$oldChild}}catch{}
         try{Write-Log ('Live 3D card kept icon for '+$platform+': '+$_.Exception.Message) 'WARN'}catch{}
     }
 }
 
 function New-PlatformCard {
     param([string]$Platform,[int]$Index)
-    # Always construct the proven original icon card first. Live 3D never blocks
-    # the Games page and never removes the fallback until a real viewport exists.
-    $button=& $script:HcModelsBaseNewPlatformCard $Platform $Index
+    $button=& $script:HcUserModelsBaseNewPlatformCard $Platform $Index
     if($null -eq $button){return $button}
     if((Get-HcPlatformVisualStyle) -eq 'Icons'){
         $scale=[math]::Max(.60,[math]::Min(1.80,([int]$script:Config.PlatformIconScale)/100.0))
@@ -227,20 +247,34 @@ function New-PlatformCard {
         return $button
     }
     $path=Resolve-HcLivePlatformModelPath $Platform
-    if([string]::IsNullOrWhiteSpace($path)){$button.ToolTip='A/Cross Open platform   Add a matching GLB in the 3D Models folder to enable live 3D';return $button}
-    $host=Get-HcPlatformVisualHost $button
-    if($null -eq $host){try{Write-Log ('Live 3D card host was not found for '+$Platform) 'WARN'}catch{};return $button}
+    if([string]::IsNullOrWhiteSpace($path)){
+        $script:HcUser3DMissingCount++
+        $button.ToolTip='A/Cross Open platform   Add a matching GLB in the 3D Models folder to enable live 3D'
+        return $button
+    }
+    $visualHost=Get-HcPlatformVisualHost $button
+    if($null -eq $visualHost){
+        $script:HcUser3DFailedCount++
+        try{Write-Log ('Live 3D card visual host was not found for '+$Platform) 'WARN'}catch{}
+        return $button
+    }
     $button.ToolTip='A/Cross Open platform   Loading live 3D model…   X/Square View model'
-    Queue-HcUser3DCard $button $host $Platform $path
+    Queue-HcUser3DCard $button $visualHost $Platform $path
     return $button
 }
 
 function Add-PlatformRail {
-    # Bypass the retired static-preview rail wrapper. The original rail creates
-    # the cards while the final V3 New-PlatformCard queues live replacements.
     Reset-HcUser3DCardQueue
     & $script:HcUserModelsBaseAddPlatformRail
     if($script:HcUser3DCardQueue.Count -gt 0){Start-HcUser3DCardTimer}
+    try{
+        Write-Log ('3D platform presentation pass: owner='+$script:HcPlatformPresentationOwner+
+            '; style='+(Get-HcPlatformVisualStyle)+
+            '; detected='+(Get-HcDetectedUser3DModelCount)+
+            '; queued='+$script:HcUser3DQueuedCount+
+            '; missing='+$script:HcUser3DMissingCount+
+            '; failed='+$script:HcUser3DFailedCount)
+    }catch{}
 }
 
 function Get-PageDefinition {
@@ -288,3 +322,4 @@ function Invoke-Action {
 }
 
 [void](Initialize-HcUser3DModelsFolder)
+try{Write-Log ('Platform presentation owner initialized: '+$script:HcPlatformPresentationOwner)}catch{}
