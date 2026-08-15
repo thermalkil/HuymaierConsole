@@ -27,7 +27,7 @@ jobs:
           try {
             & '.\.development\v0.26.5\Prepare-v0265-PlatformModelValidation.ps1'
             & '.\.development\v0.26.5\Test-v0265-PlatformModels.ps1'
-            & '.\.development\v0.26.5\Test-v0265-BuiltInLiveModels.ps1'
+            & '.\.development\v0.26.5\Test-v0265-User3DModels.ps1'
           }
           catch {
             $message = [string]$_.Exception.Message
