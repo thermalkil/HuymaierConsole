@@ -23,25 +23,32 @@ try{
     $builderText=Get-Content -Raw $builder -Encoding UTF8
     $runtime=Get-Content -Raw (Join-Path $repo 'HuymaierUnifiedCursor.ps1') -Encoding UTF8
     $hostText=Get-Content -Raw (Join-Path $repo 'Native\HuymaierUnifiedCursorHost.cs') -Encoding UTF8
-    foreach($required in @('HUYMAIER_UNIFIED_CURSOR_RUNTIME_V1','HuymaierUnifiedCursor.ps1')){Assert-Contains $coreText $required "Core unified cursor loader missing $required"}
+    $releaseWrapper=Get-Content -Raw (Join-Path $repo '.build\Build-HuymaierReleaseCandidate.ps1') -Encoding UTF8
+    $browserSource=Get-Content -Raw (Join-Path $repo 'HuymaierWebBrowser.ps1') -Encoding UTF8
+
+    foreach($required in @('HUYMAIER_UNIFIED_CURSOR_RUNTIME_V2','HuymaierUnifiedCursor.ps1','Load after WebBrowser + Customization')){Assert-Contains $coreText $required "Core unified cursor loader missing $required"}
+    $customIndex=$coreText.IndexOf('Customization module load failed',[StringComparison]::Ordinal)
+    $unifiedIndex=$coreText.IndexOf('HUYMAIER_UNIFIED_CURSOR_RUNTIME_V2',[StringComparison]::Ordinal)
+    if($customIndex -lt 0 -or $unifiedIndex -le $customIndex){throw 'Unified cursor must load after Customization/WebBrowser so native browser hooks win final ownership.'}
     foreach($required in @('HUYMAIER_UNIFIED_CURSOR_PREFLIGHT_V1','HuymaierUnifiedCursor.ps1','Unified cursor runtime')){Assert-Contains $bootstrapText $required "Bootstrap unified cursor preflight missing $required"}
     foreach($required in @('HUYMAIER_UNIFIED_CURSOR_INSTALLER_CACHE_V1','HuymaierUnifiedCursor.ps1')){Assert-Contains $installerText $required "Installer unified cursor cache missing $required"}
     foreach($required in @('HUYMAIER_UNIFIED_CURSOR_HOST_BUILD_V1','HuymaierUnifiedCursorHost.cs','HuymaierUnifiedCursorHost.exe','HuymaierUnifiedCursorHost.exe is not x64')){Assert-Contains $builderText $required "Builder unified cursor contract missing $required"}
     foreach($required in @('Set-HcUnifiedCursorContext','browser-web','browser-toolbar','Start-HcUnifiedShellCursorHost','Start-HcUnifiedStreamingCursorHost','function Show-HcBrowserVirtualCursor','function Move-HcBrowserVirtualCursor','function Update-HcSmoothBrowserPointer','NATIVE CURSOR','Start-HcNativeStreamingApp','--mode streaming','--mode shell','$script:HcUnifiedBaseHideConsoleCursor=${function:Hide-ConsoleCursor}','function Hide-ConsoleCursor','$script:HcBrowserActive -and $script:HcBrowserFocusArea -eq ''Web''','if($script:ControllerCursorHidden){Show-ConsoleCursor}','try{Show-ConsoleCursor}catch{}','HUYMAIER_WEB_NATIVE_CURSOR_DEDUP_V2',"document.getElementById('hc-virtual-cursor')",'if(n)n.remove()',"document.getElementById('hc-virtual-cursor-style')",'window.__hcCursorRender=hide')){Assert-Contains $runtime $required "Unified cursor runtime missing $required"}
     foreach($required in @('SetSystemCursor','SPI_SETCURSORS','OCR_NORMAL','OCR_HAND','OCR_IBEAM','CreateGoldCursor','SystemParametersInfo','HC_ReadGamepadPointerState','Math.Sqrt(rawX * rawX + rawY * rawY)','1500.0','mode == "shell"','mode == "streaming"','GetAncestor','GWL_EXSTYLE','WS_EX_WINDOWEDGE','DwmSetWindowAttribute','DWMWA_NCRENDERING_POLICY','VK_F11','VK_LWIN','VK_SHIFT','VK_RETURN','SWP_FRAMECHANGED','ApplyFullscreen','TryNativeFullscreenShortcut')){Assert-Contains $hostText $required "Unified native host missing $required"}
     if($hostText.IndexOf('CursorOverlay',[StringComparison]::Ordinal) -ge 0){throw 'Unified cursor host must use the actual system cursor, not a second overlay cursor.'}
-    if($runtime.IndexOf('Move-HcBrowserVirtualCursorDelta ($x*',[StringComparison]::Ordinal) -ge 0){throw 'Unified browser still contains a JS movement path.'}
+
+    # The legacy browser DOM cursor transform is retired. Source browser code
+    # and the production wrapper must not add it back after unified ownership.
+    if($browserSource.IndexOf('HUYMAIER_BROWSER_VIRTUAL_CURSOR_V1',[StringComparison]::Ordinal) -ge 0 -or $browserSource.IndexOf('hc-virtual-cursor',[StringComparison]::Ordinal) -ge 0){throw 'Base browser source unexpectedly contains the retired DOM cursor.'}
+    if($releaseWrapper.IndexOf('& $browserCursorOptimizer',[StringComparison]::Ordinal) -ge 0){throw 'Release wrapper still invokes the retired browser virtual-cursor transform.'}
+    foreach($required in @('HUYMAIER_BROWSER_NATIVE_CURSOR_ONLY_V1','Do not run Optimize-ControllerBrowserCursor.ps1')){Assert-Contains $releaseWrapper $required "Release wrapper native-cursor-only contract missing $required"}
+
     $dedupStart=$runtime.IndexOf('function Hide-HcBrowserJsCursorNow',[StringComparison]::Ordinal)
     $dedupEnd=$runtime.IndexOf('# Browser Web content owns the real OS pointer',[math]::Max(0,$dedupStart),[StringComparison]::Ordinal)
-    if($dedupStart -lt 0 -or $dedupEnd -le $dedupStart){throw 'Could not isolate native Web cursor de-duplication scope.'}
+    if($dedupStart -lt 0 -or $dedupEnd -le $dedupStart){throw 'Could not isolate native Web cursor cleanup scope.'}
     $dedupScope=$runtime.Substring($dedupStart,$dedupEnd-$dedupStart)
-    foreach($required in @("document.getElementById('hc-virtual-cursor')",'if(n)n.remove()',"document.getElementById('hc-virtual-cursor-style')",'if(s)s.remove()','window.__hcCursorRender=hide','window.__hcCursorShow=hide')){Assert-Contains $dedupScope $required "Web native cursor de-duplication missing $required"}
-    $webHideStart=$runtime.IndexOf('function Hide-ConsoleCursor',[StringComparison]::Ordinal)
-    $webHideEnd=$runtime.IndexOf('# The old in-page cursor remains available',[math]::Max(0,$webHideStart),[StringComparison]::Ordinal)
-    if($webHideStart -lt 0 -or $webHideEnd -le $webHideStart){throw 'Could not isolate unified Web cursor ownership override.'}
-    $webHideScope=$runtime.Substring($webHideStart,$webHideEnd-$webHideStart)
-    if($webHideScope.IndexOf('& $script:HcUnifiedBaseHideConsoleCursor',[StringComparison]::Ordinal) -lt 0){throw 'Shell cursor parking fallback was removed instead of being restricted to non-Web surfaces.'}
-    if($webHideScope.IndexOf("Set-HcUnifiedCursorContext 'browser-web'",[StringComparison]::Ordinal) -lt 0){throw 'Web cursor override does not preserve browser-web native-host ownership.'}
+    foreach($required in @("document.getElementById('hc-virtual-cursor')",'if(n)n.remove()',"document.getElementById('hc-virtual-cursor-style')",'if(s)s.remove()','window.__hcCursorRender=hide','window.__hcCursorShow=hide')){Assert-Contains $dedupScope $required "Native cursor cleanup missing $required"}
+
     Add-Type -AssemblyName System.Windows.Forms,System.Drawing
     $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
     if(-not(Test-Path $csc)){throw 'Framework64 csc missing'}
@@ -52,5 +59,8 @@ try{
     Assert-X64Pe $out
     $sources=@(Get-Content (Join-Path $repo '.source\source-files.txt') -Encoding UTF8)
     foreach($required in @('HuymaierUnifiedCursor.ps1','Native/HuymaierUnifiedCursorHost.cs')){if($sources -notcontains $required){throw "Release source list missing $required"}}
-    Write-Host 'v0.26.5 unified system cursor, exclusive native Web pointer ownership, DOM cursor de-duplication and strengthened streaming fullscreen gates passed.'
+    Write-Host 'webNativeCursorFinalLoadOrderGate: success'
+    Write-Host 'webLegacyDomCursorRetiredGate: success'
+    Write-Host 'webNativeCursorExclusiveOwnershipGate: success'
+    Write-Host 'v0.26.5 unified native cursor gates passed.'
 }finally{Remove-Item $temp -Recurse -Force -ErrorAction SilentlyContinue}
