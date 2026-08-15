@@ -207,20 +207,16 @@ namespace HuymaierConsole.StreamingCursor
             }
 
             NativeMethods.GetWindowThreadProcessId(targetWindow, out targetProcessId);
-            NativeMethods.POINT point;
-            if (NativeMethods.GetCursorPos(out point))
-            {
-                cursorX = point.X;
-                cursorY = point.Y;
-            }
-            else
-            {
-                Rectangle screen = Screen.FromHandle(targetWindow).Bounds;
-                cursorX = screen.Left + screen.Width / 2.0;
-                cursorY = screen.Top + screen.Height / 2.0;
-            }
 
+            // Huymaier parks/hides the physical mouse while a controller owns
+            // the shell. Do not inherit that parked edge position. Fullscreen
+            // the target first, then start the controller cursor at the center
+            // of the target monitor and synchronize the real Windows pointer.
             ApplyFullscreen();
+            Rectangle launchBounds = Screen.FromHandle(targetWindow).Bounds;
+            cursorX = launchBounds.Left + launchBounds.Width / 2.0;
+            cursorY = launchBounds.Top + launchBounds.Height / 2.0;
+            NativeMethods.SetCursorPos((int)Math.Round(cursorX), (int)Math.Round(cursorY));
             overlay.MoveCenter((int)Math.Round(cursorX), (int)Math.Round(cursorY));
             overlay.Show();
             pointerActive = true;
@@ -362,8 +358,20 @@ namespace HuymaierConsole.StreamingCursor
                 return;
             }
 
-            double moveX = ApplyDeadzoneCurve(lx);
-            double moveY = ApplyDeadzoneCurve(ly);
+            // Radial deadzone/curve preserves the controller's true 2-D
+            // direction. This normalizes diagonal speed and avoids axis snap.
+            double rawX = lx;
+            double rawY = ly;
+            double magnitude = Math.Sqrt(rawX * rawX + rawY * rawY);
+            double moveX = 0.0;
+            double moveY = 0.0;
+            if (magnitude > 0.14)
+            {
+                double normalized = Math.Min(1.0, (magnitude - 0.14) / (1.0 - 0.14));
+                double curved = Math.Pow(normalized, 1.55);
+                moveX = (rawX / magnitude) * curved;
+                moveY = (rawY / magnitude) * curved;
+            }
             double maxPixelsPerSecond = 1500.0 * speedPercent / 100.0;
             bool stickMoving = Math.Abs(moveX) > 0.0001 || Math.Abs(moveY) > 0.0001;
 
