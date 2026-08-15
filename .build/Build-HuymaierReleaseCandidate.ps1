@@ -24,7 +24,6 @@ $epicWatchOptimizer=Join-Path $PSScriptRoot 'Optimize-EpicTelemetryWatch.ps1'
 $epicCoordinatorOptimizer=Join-Path $PSScriptRoot 'Optimize-ProviderCoordinatorEpicActivation.ps1'
 $providerConcurrencyOptimizer=Join-Path $PSScriptRoot 'Optimize-ProviderConcurrency.ps1'
 $providerPreflightOptimizer=Join-Path $PSScriptRoot 'Optimize-ProviderConcurrencyPreflight.ps1'
-$browserCursorOptimizer=Join-Path $PSScriptRoot 'Optimize-ControllerBrowserCursor.ps1'
 $runtimeHitchOptimizer=Join-Path $PSScriptRoot 'Optimize-RuntimeHitching.ps1'
 $concurrentDownloadRefreshOptimizer=Join-Path $PSScriptRoot 'Optimize-ConcurrentDownloadRefresh.ps1'
 $downloadLibraryRefreshOptimizer=Join-Path $PSScriptRoot 'Optimize-DownloadLibraryRefreshPolicy.ps1'
@@ -66,7 +65,7 @@ $streamingCursorSource=Join-Path $workspace 'Native\HuymaierStreamingCursorHost.
 $unifiedCursorHostSource=Join-Path $workspace 'Native\HuymaierUnifiedCursorHost.cs'
 
 $requiredFiles=@(
-    $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$dolphinOptimizer,$wiiArtworkAliasOptimizer,$gameCubeHubOptimizer,$appLibraryOptimizer,$streamingControllerOptimizer,$unifiedCursorOptimizer,$platformModelsOptimizer,$user3DModelsOptimizer,$sonyPointerOptimizer,$externalGameBarOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$providerPreflightOptimizer,$browserCursorOptimizer,$runtimeHitchOptimizer,$concurrentDownloadRefreshOptimizer,$downloadLibraryRefreshOptimizer,
+    $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$dolphinOptimizer,$wiiArtworkAliasOptimizer,$gameCubeHubOptimizer,$appLibraryOptimizer,$streamingControllerOptimizer,$unifiedCursorOptimizer,$platformModelsOptimizer,$user3DModelsOptimizer,$sonyPointerOptimizer,$externalGameBarOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$providerPreflightOptimizer,$runtimeHitchOptimizer,$concurrentDownloadRefreshOptimizer,$downloadLibraryRefreshOptimizer,
     $coreSource,$bootstrapSource,$installerCoreSource,$installerScriptSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$nativeSystemOverlaySource,$nativeInputSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource,
     $providerConcurrencySource,$providerConcurrencyUiSource,$providerTransferCoordinatorSource,$appLibrarySource,$appInstallWorkerSource,$streamingControllerSource,$unifiedCursorSource,$platformModelsSource,$platformAtlasSource,$livePlatformModelsSource,$user3DModelsSource,$modelPreviewSource,$modelPreviewAliasesSource,$liveModelControlSource,$modelMapSource,$streamingCursorSource,$unifiedCursorHostSource
 )+$modelAtlasParts
@@ -94,7 +93,10 @@ try{
     & $epicWatchOptimizer -BootstrapPath $bootstrapSource
     & $epicCoordinatorOptimizer -CoordinatorPath $coordinatorSource
     & $providerConcurrencyOptimizer -ProviderModulePath $providerModuleSource -ProviderWorkerPath $providerWorkerSource -ProgressWorkerPath $progressWorkerSource -BootstrapPath $bootstrapSource -ShellRedesignPath $shellRedesignSource
-    & $browserCursorOptimizer -BrowserPath $browserSource
+    # HUYMAIER_BROWSER_NATIVE_CURSOR_ONLY_V1
+    # Do not run Optimize-ControllerBrowserCursor.ps1. That retired transform
+    # appends the legacy hc-virtual-cursor DOM pointer and conflicts with the
+    # unified native system cursor.
     & $runtimeHitchOptimizer -ConsolePath $coreSource
     & $concurrentDownloadRefreshOptimizer -ConsolePath $coreSource
     & $downloadLibraryRefreshOptimizer -ConsolePath $coreSource
