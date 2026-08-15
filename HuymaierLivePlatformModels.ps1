@@ -139,8 +139,8 @@ function Get-HcPlatformVisualHost {
 }
 
 function Set-HcAtlasFallbackVisual {
-    param($Host,[string]$Platform,[int]$ScalePercent)
-    if($null -eq $Host -or -not(Get-Command Get-HcAtlasImageSource -ErrorAction SilentlyContinue)){return $false}
+    param($VisualHost,[string]$Platform,[int]$ScalePercent)
+    if($null -eq $VisualHost -or -not(Get-Command Get-HcAtlasImageSource -ErrorAction SilentlyContinue)){return $false}
     try{
         $source=Get-HcAtlasImageSource $Platform
         if($null -eq $source){return $false}
@@ -153,7 +153,7 @@ function Set-HcAtlasFallbackVisual {
         $image.Width=84*$factor
         $image.Height=84*$factor
         $image.IsHitTestVisible=$false
-        $Host.Child=$image
+        $VisualHost.Child=$image
         return $true
     }catch{return $false}
 }
@@ -169,24 +169,24 @@ function New-PlatformCard {
         return $button
     }
 
-    $host=Get-HcPlatformVisualHost $button
-    if($null -eq $host){return $button}
+    $visualHost=Get-HcPlatformVisualHost $button
+    if($null -eq $visualHost){return $button}
     $modelScale=[int]$script:Config.PlatformModelScale
     $path=Resolve-HcLivePlatformModelPath $Platform
     if(-not [string]::IsNullOrWhiteSpace($path)){
         $view=New-HcLiveModelView $path $modelScale
         if($null -ne $view){
-            $host.Background='Transparent'
-            $host.BorderThickness='0'
-            $host.CornerRadius=0
-            $host.Width=112
-            $host.Height=96
-            $host.Child=$view
+            $visualHost.Background='Transparent'
+            $visualHost.BorderThickness='0'
+            $visualHost.CornerRadius=0
+            $visualHost.Width=112
+            $visualHost.Height=96
+            $visualHost.Child=$view
             $button.ToolTip='A/Cross Open platform   X/Square View 3D model'
             return $button
         }
     }
-    [void](Set-HcAtlasFallbackVisual $host $Platform $modelScale)
+    [void](Set-HcAtlasFallbackVisual $visualHost $Platform $modelScale)
     $button.ToolTip='A/Cross Open platform   X/Square View model when live GLB is available'
     return $button
 }
