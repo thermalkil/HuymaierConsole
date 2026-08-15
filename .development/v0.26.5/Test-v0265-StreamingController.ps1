@@ -32,12 +32,14 @@ try{
     $bootstrap=Copy-TestFile 'HuymaierBootstrap.ps1'
     $installer=Copy-TestFile 'Install-HuymaierConsole.ps1'
     $builder=Copy-TestFile '.build\Build-HuymaierReleaseCandidate.Core.ps1'
+    $nativeInput=Copy-TestFile 'HuymaierNativeInput.cs'
 
     & (Join-Path $repo '.build\Optimize-ProviderConcurrencyPreflight.ps1') -BootstrapPath $bootstrap -InstallerScriptPath $installer
     & (Join-Path $repo '.build\Optimize-AppLibrary.ps1') -CorePath $core -BootstrapPath $bootstrap -InstallerScriptPath $installer
     & (Join-Path $repo '.build\Optimize-StreamingController.ps1') -CorePath $core -BootstrapPath $bootstrap -InstallerScriptPath $installer -CoreBuilderPath $builder
+    & (Join-Path $repo '.build\Optimize-SonyPointerSharedState.ps1') -NativeInputPath $nativeInput
 
-    foreach($path in @($core,$bootstrap,$installer,$builder,(Join-Path $repo 'HuymaierStreamingController.ps1'),(Join-Path $repo '.build\Optimize-StreamingController.ps1'))){Assert-Ps51Parse $path}
+    foreach($path in @($core,$bootstrap,$installer,$builder,(Join-Path $repo 'HuymaierStreamingController.ps1'),(Join-Path $repo '.build\Optimize-StreamingController.ps1'),(Join-Path $repo '.build\Optimize-SonyPointerSharedState.ps1'))){Assert-Ps51Parse $path}
 
     $coreText=Get-Content -Raw -LiteralPath $core -Encoding UTF8
     $bootstrapText=Get-Content -Raw -LiteralPath $bootstrap -Encoding UTF8
@@ -47,6 +49,7 @@ try{
     $bridgeText=Get-Content -Raw -LiteralPath (Join-Path $repo 'Native\HuymaierGameInputBridge.cpp') -Encoding UTF8
     $managedText=Get-Content -Raw -LiteralPath (Join-Path $repo 'Native\HuymaierConsole.GameInput.cs') -Encoding UTF8
     $hostText=Get-Content -Raw -LiteralPath (Join-Path $repo 'Native\HuymaierStreamingCursorHost.cs') -Encoding UTF8
+    $nativeInputText=Get-Content -Raw -LiteralPath $nativeInput -Encoding UTF8
 
     foreach($required in @('HUYMAIER_STREAMING_CONTROLLER_RUNTIME_V1','HuymaierStreamingController.ps1')){Assert-Contains $coreText $required "Main shell is missing streaming-controller loader marker $required."}
     foreach($required in @('HuymaierStreamingController.ps1','Streaming controller runtime')){Assert-Contains $bootstrapText $required "Bootstrap streaming preflight is missing $required."}
@@ -62,13 +65,18 @@ try{
 
     foreach($required in @(
         'HC_ReadGamepadPointerState','GetCurrentReading(GameInputKindGamepad','leftThumbstickX','rightThumbstickY','GameInputGamepadA','GameInputGamepadX',
-        'GameInputEnableBackgroundInput','GameInputEnableBackgroundGuideButton','GameInputEnableBackgroundShareButton'
-    )){Assert-Contains $bridgeText $required "GameInput bridge pointer state/background policy is missing $required."}
+        'GameInputEnableBackgroundInput','GameInputEnableBackgroundGuideButton','GameInputEnableBackgroundShareButton',
+        'HuymaierConsole.PointerStateV1','TryReadSharedPointerState','OpenFileMappingW','GetTickCount64','if (TryReadSharedPointerState'
+    )){Assert-Contains $bridgeText $required "GameInput bridge pointer/shared Sony state is missing $required."}
     foreach($required in @('HuymaierPointerState','HuymaierPointerInput','HC_ReadGamepadPointerState','ReadPointerState')){Assert-Contains $managedText $required "Managed pointer bridge is missing $required."}
     foreach($required in @(
         'HC_ReadGamepadPointerState','WS_POPUP','SetWindowPos','MonitorFromWindow','ApplyDeadzoneCurve','1500.0','LeftClick','ShowOnScreenKeyboard','MOUSEEVENTF_WHEEL',
         'TextInputHost','parentProcessId','IsPointerForegroundAllowed','RestoreWindow','launchBounds','SetCursorPos((int)Math.Round(cursorX)','Math.Sqrt(rawX * rawX + rawY * rawY)','magnitude > 0.14'
     )){Assert-Contains $hostText $required "Native streaming cursor host is missing $required."}
+    foreach($required in @(
+        'HUYMAIER_SONY_POINTER_SHARED_STATE_V1','MemoryMappedFile.CreateOrOpen','Local\\HuymaierConsole.PointerStateV1','PublishPointerState(productId, lx, ly, rx, ry, buttons1, buttons2)',
+        'byte rx = report[stateBase + 2]','byte ry = report[stateBase + 3]','NormalizePointerAxis(ly, true)','BuildPointerButtons(buttons1, buttons2)','GetTickCount64()'
+    )){Assert-Contains $nativeInputText $required "Transformed Sony Raw HID pointer publisher is missing $required."}
 
     # Explicitly reject the two shipped RC failure patterns: inheriting the
     # shell's parked physical cursor and per-axis stick shaping for movement.
@@ -80,6 +88,7 @@ try{
     $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
     if(-not(Test-Path -LiteralPath $csc -PathType Leaf)){throw 'Framework64 csc.exe is missing.'}
     $systemRef=[Uri].Assembly.Location
+    $coreRef=[Linq.Enumerable].Assembly.Location
     $formsRef=[Windows.Forms.Form].Assembly.Location
     $drawingRef=[Drawing.Bitmap].Assembly.Location
     $hostOut=Join-Path $temp 'HuymaierStreamingCursorHost.exe'
@@ -94,10 +103,16 @@ try{
     if($LASTEXITCODE -ne 0 -or -not(Test-Path -LiteralPath $managedOut -PathType Leaf)){throw 'Managed GameInput pointer bridge x64 compilation failed.'}
     Assert-X64Pe $managedOut
 
-    $sources=@(Get-Content -LiteralPath (Join-Path $repo '.source\source-files.txt') -Encoding UTF8)
-    foreach($required in @('HuymaierStreamingController.ps1','Native/HuymaierStreamingCursorHost.cs')){if($sources -notcontains $required){throw "Release source payload is missing $required"}}
+    $nativeInputOut=Join-Path $temp 'HuymaierNativeInput.Pointer.dll'
+    $nativeInputArgs=@('/noconfig','/nologo','/target:library','/platform:x64','/optimize+',('/out:'+$nativeInputOut),('/reference:'+$systemRef),('/reference:'+$coreRef),$nativeInput)
+    & $csc @nativeInputArgs
+    if($LASTEXITCODE -ne 0 -or -not(Test-Path -LiteralPath $nativeInputOut -PathType Leaf)){throw 'Transformed Sony HID pointer publisher x64 compilation failed.'}
+    Assert-X64Pe $nativeInputOut
 
-    Write-Host 'v0.26.5 native streaming background input, centered/radial cursor, RAF browser cursor, cursor-speed, fullscreen and app-artwork gates passed.'
+    $sources=@(Get-Content -LiteralPath (Join-Path $repo '.source\source-files.txt') -Encoding UTF8)
+    foreach($required in @('HuymaierNativeInput.cs','HuymaierStreamingController.ps1','Native/HuymaierStreamingCursorHost.cs')){if($sources -notcontains $required){throw "Release source payload is missing $required"}}
+
+    Write-Host 'v0.26.5 Sony Raw HID shared pointer, native streaming cursor, RAF browser cursor, cursor-speed, fullscreen and app-artwork gates passed.'
 }finally{
     Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
 }
