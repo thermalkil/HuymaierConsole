@@ -15,6 +15,7 @@ $script:HcUnifiedBaseBrowserController=${function:Handle-HcBrowserController}
 $script:HcUnifiedBaseBrowserKey=${function:Handle-HcBrowserKey}
 $script:HcUnifiedBaseBrowserToolbarVisuals=${function:Update-HcBrowserToolbarVisuals}
 $script:HcUnifiedBaseAdjustSlider=${function:Adjust-SelectedSlider}
+$script:HcUnifiedBaseHideConsoleCursor=${function:Hide-ConsoleCursor}
 
 function Set-HcUnifiedCursorContext {
     param([ValidateSet('shell','browser-web','browser-toolbar')][string]$Mode)
@@ -69,6 +70,20 @@ function Hide-HcBrowserJsCursorNow {
     }catch{}
 }
 
+# Browser Web content owns the real OS pointer through HuymaierUnifiedCursorHost.
+# Do not let the shell's legacy controller path park that pointer in the corner
+# while the native host is simultaneously moving it.
+function Hide-ConsoleCursor {
+    try{
+        if($script:HcBrowserActive -and $script:HcBrowserFocusArea -eq 'Web'){
+            Set-HcUnifiedCursorContext 'browser-web'
+            if($script:ControllerCursorHidden){Show-ConsoleCursor}
+            return
+        }
+    }catch{}
+    & $script:HcUnifiedBaseHideConsoleCursor
+}
+
 # The old in-page cursor remains available only as dormant compatibility code.
 # It must never render or move while the unified native pointer is installed.
 function Show-HcBrowserVirtualCursor { Hide-HcBrowserJsCursorNow }
@@ -82,14 +97,21 @@ function Set-HcBrowserFocusArea {
     & $script:HcUnifiedBaseSetBrowserFocusArea $Area
     Hide-HcBrowserJsCursorNow
     if($script:HcBrowserActive){
-        if($Area -eq 'Web'){Set-HcUnifiedCursorContext 'browser-web'}else{Set-HcUnifiedCursorContext 'browser-toolbar'}
+        if($Area -eq 'Web'){
+            try{Show-ConsoleCursor}catch{}
+            Set-HcUnifiedCursorContext 'browser-web'
+        }else{Set-HcUnifiedCursorContext 'browser-toolbar'}
     }else{Set-HcUnifiedCursorContext 'shell'}
 }
 
 function Open-HuymaierBrowser {
     param([string]$Url='https://www.google.com',[string]$Title='Web')
     & $script:HcUnifiedBaseOpenBrowser $Url $Title
-    if($script:HcBrowserActive){Set-HcUnifiedCursorContext 'browser-web';Hide-HcBrowserJsCursorNow}
+    if($script:HcBrowserActive){
+        try{Show-ConsoleCursor}catch{}
+        Set-HcUnifiedCursorContext 'browser-web'
+        Hide-HcBrowserJsCursorNow
+    }
     Start-HcUnifiedShellCursorHost
 }
 
@@ -114,6 +136,7 @@ function Handle-HcBrowserController {
     # Web content uses the real OS cursor. HuymaierUnifiedCursorHost handles
     # left-stick movement, A/Cross click, X/Square OSK and right-stick scroll.
     # Keep only browser-level commands here to avoid a second pointer path.
+    try{Show-ConsoleCursor}catch{}
     Set-HcUnifiedCursorContext 'browser-web'
     Hide-HcBrowserJsCursorNow
     $script:LastDirection=''
