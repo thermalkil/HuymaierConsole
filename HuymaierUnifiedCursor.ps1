@@ -16,16 +16,30 @@ $script:HcUnifiedBaseBrowserKey=${function:Handle-HcBrowserKey}
 $script:HcUnifiedBaseBrowserToolbarVisuals=${function:Update-HcBrowserToolbarVisuals}
 $script:HcUnifiedBaseAdjustSlider=${function:Adjust-SelectedSlider}
 $script:HcUnifiedBaseHideConsoleCursor=${function:Hide-ConsoleCursor}
+$script:HcUnifiedCursorContextLock=New-Object object
+$script:HcUnifiedCursorLastContext=''
 
 function Set-HcUnifiedCursorContext {
     param([ValidateSet('shell','browser-web','browser-toolbar')][string]$Mode)
+    $entered=$false;$tmp=''
     try{
+        [Threading.Monitor]::Enter($script:HcUnifiedCursorContextLock);$entered=$true
+        if([string]::Equals($script:HcUnifiedCursorLastContext,$Mode,[StringComparison]::OrdinalIgnoreCase) -and (Test-Path -LiteralPath $script:HcUnifiedCursorStatePath -PathType Leaf)){return}
         $directory=Split-Path -Parent $script:HcUnifiedCursorStatePath
         if(-not(Test-Path -LiteralPath $directory -PathType Container)){New-Item -ItemType Directory -Force -Path $directory|Out-Null}
-        $tmp=$script:HcUnifiedCursorStatePath+'.tmp'
+        $tmp=$script:HcUnifiedCursorStatePath+'.'+$PID+'.'+[guid]::NewGuid().ToString('N')+'.tmp'
         [IO.File]::WriteAllText($tmp,$Mode,(New-Object Text.UTF8Encoding($false)))
-        Move-Item -LiteralPath $tmp -Destination $script:HcUnifiedCursorStatePath -Force
+        if(Test-Path -LiteralPath $script:HcUnifiedCursorStatePath -PathType Leaf){
+            [IO.File]::Replace($tmp,$script:HcUnifiedCursorStatePath,$null,$true)
+        }else{
+            [IO.File]::Move($tmp,$script:HcUnifiedCursorStatePath)
+        }
+        $tmp='';$script:HcUnifiedCursorLastContext=$Mode
     }catch{Write-Log ('Unified cursor context update failed: '+$_.Exception.Message) 'WARN'}
+    finally{
+        if($tmp){try{Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue}catch{}}
+        if($entered){[Threading.Monitor]::Exit($script:HcUnifiedCursorContextLock)}
+    }
 }
 
 function Test-HcUnifiedCursorProcessAlive {
@@ -66,17 +80,11 @@ function Hide-HcBrowserJsCursorNow {
     try{
         if(Get-Command Invoke-HcBrowserScriptAsync -ErrorAction SilentlyContinue){
             # HUYMAIER_WEB_NATIVE_CURSOR_DEDUP_V2
-            # Remove the legacy DOM pointer entirely. Merely setting display:none
-            # was insufficient because its retained resize callback could render
-            # the old node again underneath the native system pointer.
             Invoke-HcBrowserScriptAsync "(()=>{const n=document.getElementById('hc-virtual-cursor');if(n)n.remove();const s=document.getElementById('hc-virtual-cursor-style');if(s)s.remove();const hide=()=>{const q=document.getElementById('hc-virtual-cursor');if(q)q.remove();return true};window.__hcCursorRender=hide;window.__hcCursorShow=hide;window.__hcCursorHide=hide;window.__hcCursorMove=(dx,dy)=>true;if(window.__hcCursorDrive)window.__hcCursorDrive(0,0,0);return true})()"
         }
     }catch{}
 }
 
-# Browser Web content owns the real OS pointer through HuymaierUnifiedCursorHost.
-# Do not let the shell's legacy controller path park that pointer in the corner
-# while the native host is simultaneously moving it.
 function Hide-ConsoleCursor {
     try{
         if($script:HcBrowserActive -and $script:HcBrowserFocusArea -eq 'Web'){
@@ -88,8 +96,6 @@ function Hide-ConsoleCursor {
     & $script:HcUnifiedBaseHideConsoleCursor
 }
 
-# The old in-page cursor remains available only as dormant compatibility code.
-# It must never render or move while the unified native pointer is installed.
 function Show-HcBrowserVirtualCursor { Hide-HcBrowserJsCursorNow }
 function Move-HcBrowserVirtualCursor { param([string]$Direction); Hide-HcBrowserJsCursorNow }
 function Set-HcBrowserAnalogDrive { param([double]$X,[double]$Y,[double]$PixelsPerSecond); Hide-HcBrowserJsCursorNow }
@@ -137,9 +143,6 @@ function Handle-HcBrowserController {
         return $handled
     }
 
-    # Web content uses the real OS cursor. HuymaierUnifiedCursorHost handles
-    # left-stick movement, A/Cross click, X/Square OSK and right-stick scroll.
-    # Keep only browser-level commands here to avoid a second pointer path.
     try{Show-ConsoleCursor}catch{}
     Set-HcUnifiedCursorContext 'browser-web'
     Hide-HcBrowserJsCursorNow
