@@ -11,6 +11,7 @@ $nintendoOptimizer=Join-Path $PSScriptRoot 'Optimize-NintendoLibraryOwnership.ps
 $nintendoNameOptimizer=Join-Path $PSScriptRoot 'Optimize-NintendoDisplayNames.ps1'
 $dolphinOptimizer=Join-Path $PSScriptRoot 'Optimize-DolphinIntegration.ps1'
 $wiiArtworkAliasOptimizer=Join-Path $PSScriptRoot 'Optimize-WiiArtworkAliases.ps1'
+$gameCubeHubOptimizer=Join-Path $PSScriptRoot 'Optimize-GameCubeHubNavigation.ps1'
 $appLibraryOptimizer=Join-Path $PSScriptRoot 'Optimize-AppLibrary.ps1'
 $streamingControllerOptimizer=Join-Path $PSScriptRoot 'Optimize-StreamingController.ps1'
 $unifiedCursorOptimizer=Join-Path $PSScriptRoot 'Optimize-UnifiedCursor.ps1'
@@ -54,7 +55,7 @@ $streamingCursorSource=Join-Path $workspace 'Native\HuymaierStreamingCursorHost.
 $unifiedCursorHostSource=Join-Path $workspace 'Native\HuymaierUnifiedCursorHost.cs'
 
 $requiredFiles=@(
-    $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$dolphinOptimizer,$wiiArtworkAliasOptimizer,$appLibraryOptimizer,$streamingControllerOptimizer,$unifiedCursorOptimizer,$sonyPointerOptimizer,$externalGameBarOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$providerPreflightOptimizer,$browserCursorOptimizer,$runtimeHitchOptimizer,$concurrentDownloadRefreshOptimizer,$downloadLibraryRefreshOptimizer,
+    $coreBuilder,$versionStamper,$startupOptimizer,$nintendoOptimizer,$nintendoNameOptimizer,$dolphinOptimizer,$wiiArtworkAliasOptimizer,$gameCubeHubOptimizer,$appLibraryOptimizer,$streamingControllerOptimizer,$unifiedCursorOptimizer,$sonyPointerOptimizer,$externalGameBarOptimizer,$providerOptimizer,$epicWatchOptimizer,$epicCoordinatorOptimizer,$providerConcurrencyOptimizer,$providerPreflightOptimizer,$browserCursorOptimizer,$runtimeHitchOptimizer,$concurrentDownloadRefreshOptimizer,$downloadLibraryRefreshOptimizer,
     $coreSource,$bootstrapSource,$installerCoreSource,$installerScriptSource,$manifestSource,$appxManifestSource,$nativeGameInputSource,$nativeConsoleSource,$nativeSystemOverlaySource,$nativeInputSource,$providerModuleSource,$providerWorkerSource,$progressWorkerSource,$coordinatorSource,$shellRedesignSource,$browserSource,
     $providerConcurrencySource,$providerConcurrencyUiSource,$providerTransferCoordinatorSource,$appLibrarySource,$appInstallWorkerSource,$streamingControllerSource,$unifiedCursorSource,$streamingCursorSource,$unifiedCursorHostSource
 )
@@ -75,6 +76,7 @@ try{
     & $nintendoNameOptimizer -ConsolePlatformsPath $nativeConsoleSource
     & $dolphinOptimizer -ConsolePlatformsPath $nativeConsoleSource
     & $wiiArtworkAliasOptimizer -ConsolePlatformsPath $nativeConsoleSource
+    & $gameCubeHubOptimizer -ConsolePlatformsPath $nativeConsoleSource
     & $providerOptimizer -ProviderModulePath $providerModuleSource -ProviderWorkerPath $providerWorkerSource -ProgressWorkerPath $progressWorkerSource -CoordinatorPath $coordinatorSource
     & $epicWatchOptimizer -BootstrapPath $bootstrapSource
     & $epicCoordinatorOptimizer -CoordinatorPath $coordinatorSource
