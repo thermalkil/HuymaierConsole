@@ -12,19 +12,24 @@ if(-not(Test-Path -LiteralPath $userRuntime -PathType Leaf)){throw "User 3D-mode
 
 $core=Get-Content -Raw -LiteralPath $CorePath -Encoding UTF8
 if($core -notmatch 'HUYMAIER_USER_3D_MODELS_RUNTIME_LOAD_V1'){
-    $needle='$script:LivePlatformModelsModulePath = Join-Path $script:BaseDir ''HuymaierLivePlatformModels.ps1'''
-    if(-not $core.Contains($needle)){throw 'User 3D-model runtime requires live-model module path first.'}
-    $core=$core.Replace($needle,$needle+"`r`n`$script:User3DModelsModulePath = Join-Path `$script:BaseDir 'HuymaierUser3DModels.ps1'")
+    $pathNeedle='$script:LivePlatformModelsModulePath = Join-Path $script:BaseDir ''HuymaierLivePlatformModels.ps1'''
+    if(-not $core.Contains($pathNeedle)){throw 'User 3D-model runtime requires live-model helper path first.'}
+    $core=$core.Replace($pathNeedle,$pathNeedle+"`r`n`$script:User3DModelsModulePath = Join-Path `$script:BaseDir 'HuymaierUser3DModels.ps1'")
+
+    # V4 must load immediately after the helper-only live module so it becomes
+    # the sole final platform-card/settings owner. Match the cleaned V2 helper
+    # block rather than the retired pre-cleanup live-renderer wording.
     $load=@'
 if (Test-Path -LiteralPath $script:LivePlatformModelsModulePath) {
     try { . $script:LivePlatformModelsModulePath }
-    catch { Write-Log "Live platform 3D model module load failed: $($_.Exception.Message)" 'ERROR' }
+    catch { Write-Log "Live platform 3D helper module load failed: $($_.Exception.Message)" 'ERROR' }
 }
 '@
-    if(-not $core.Contains($load)){throw 'User 3D-model runtime could not find live-model load block.'}
+    if(-not $core.Contains($load)){throw 'User 3D-model runtime could not find cleaned live-helper load block.'}
     $replacement=$load+@'
 
 # HUYMAIER_USER_3D_MODELS_RUNTIME_LOAD_V1
+# Final presentation owner: cards, rail, Customization controls and actions.
 if (Test-Path -LiteralPath $script:User3DModelsModulePath) {
     try { . $script:User3DModelsModulePath }
     catch { Write-Log "User 3D Models module load failed: $($_.Exception.Message)" 'ERROR' }
@@ -37,10 +42,10 @@ Set-Content -LiteralPath $CorePath -Value $core -Encoding UTF8
 $bootstrap=Get-Content -Raw -LiteralPath $BootstrapPath -Encoding UTF8
 if($bootstrap -notmatch 'HUYMAIER_USER_3D_MODELS_PREFLIGHT_V1'){
     $needle='$livePlatformModelsPath=Join-Path $baseDir ''HuymaierLivePlatformModels.ps1'''
-    if(-not $bootstrap.Contains($needle)){throw 'User 3D-model preflight requires live-model path first.'}
+    if(-not $bootstrap.Contains($needle)){throw 'User 3D-model preflight requires live-model helper path first.'}
     $bootstrap=$bootstrap.Replace($needle,$needle+"`r`n# HUYMAIER_USER_3D_MODELS_PREFLIGHT_V1`r`n`$user3DModelsPath=Join-Path `$baseDir 'HuymaierUser3DModels.ps1'")
-    $entry="        [pscustomobject]@{Path=`$livePlatformModelsPath;Label='Live platform 3D runtime'},"
-    if(-not $bootstrap.Contains($entry)){throw 'User 3D-model preflight could not find live-model entry.'}
+    $entry="        [pscustomobject]@{Path=`$livePlatformModelsPath;Label='Live platform 3D helper runtime'},"
+    if(-not $bootstrap.Contains($entry)){throw 'User 3D-model preflight could not find cleaned live-helper entry.'}
     $bootstrap=$bootstrap.Replace($entry,$entry+"`r`n        [pscustomobject]@{Path=`$user3DModelsPath;Label='User 3D Models runtime'},")
 }
 Set-Content -LiteralPath $BootstrapPath -Value $bootstrap -Encoding UTF8
@@ -48,7 +53,7 @@ Set-Content -LiteralPath $BootstrapPath -Value $bootstrap -Encoding UTF8
 $installer=Get-Content -Raw -LiteralPath $InstallerScriptPath -Encoding UTF8
 if($installer -notmatch 'HUYMAIER_USER_3D_MODELS_INSTALLER_CACHE_V1'){
     $needle="            'HuymaierLivePlatformModels.ps1',"
-    if(-not $installer.Contains($needle)){throw 'User 3D-model installer cache requires live-model runtime entry.'}
+    if(-not $installer.Contains($needle)){throw 'User 3D-model installer cache requires live-model helper runtime entry.'}
     $installer=$installer.Replace($needle,$needle+"`r`n            # HUYMAIER_USER_3D_MODELS_INSTALLER_CACHE_V1`r`n            'HuymaierUser3DModels.ps1',")
 }
 Set-Content -LiteralPath $InstallerScriptPath -Value $installer -Encoding UTF8
