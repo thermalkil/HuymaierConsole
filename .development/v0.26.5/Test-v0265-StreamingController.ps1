@@ -33,13 +33,15 @@ try{
     $installer=Copy-TestFile 'Install-HuymaierConsole.ps1'
     $builder=Copy-TestFile '.build\Build-HuymaierReleaseCandidate.Core.ps1'
     $nativeInput=Copy-TestFile 'HuymaierNativeInput.cs'
+    $systemOverlay=Copy-TestFile 'Native\HuymaierConsole.SystemOverlay.cs'
 
     & (Join-Path $repo '.build\Optimize-ProviderConcurrencyPreflight.ps1') -BootstrapPath $bootstrap -InstallerScriptPath $installer
     & (Join-Path $repo '.build\Optimize-AppLibrary.ps1') -CorePath $core -BootstrapPath $bootstrap -InstallerScriptPath $installer
     & (Join-Path $repo '.build\Optimize-StreamingController.ps1') -CorePath $core -BootstrapPath $bootstrap -InstallerScriptPath $installer -CoreBuilderPath $builder
     & (Join-Path $repo '.build\Optimize-SonyPointerSharedState.ps1') -NativeInputPath $nativeInput
+    & (Join-Path $repo '.build\Optimize-ExternalGameBarOverlay.ps1') -SystemOverlayPath $systemOverlay
 
-    foreach($path in @($core,$bootstrap,$installer,$builder,(Join-Path $repo 'HuymaierStreamingController.ps1'),(Join-Path $repo '.build\Optimize-StreamingController.ps1'),(Join-Path $repo '.build\Optimize-SonyPointerSharedState.ps1'))){Assert-Ps51Parse $path}
+    foreach($path in @($core,$bootstrap,$installer,$builder,(Join-Path $repo 'HuymaierStreamingController.ps1'),(Join-Path $repo '.build\Optimize-StreamingController.ps1'),(Join-Path $repo '.build\Optimize-SonyPointerSharedState.ps1'),(Join-Path $repo '.build\Optimize-ExternalGameBarOverlay.ps1'))){Assert-Ps51Parse $path}
 
     $coreText=Get-Content -Raw -LiteralPath $core -Encoding UTF8
     $bootstrapText=Get-Content -Raw -LiteralPath $bootstrap -Encoding UTF8
@@ -50,6 +52,7 @@ try{
     $managedText=Get-Content -Raw -LiteralPath (Join-Path $repo 'Native\HuymaierConsole.GameInput.cs') -Encoding UTF8
     $hostText=Get-Content -Raw -LiteralPath (Join-Path $repo 'Native\HuymaierStreamingCursorHost.cs') -Encoding UTF8
     $nativeInputText=Get-Content -Raw -LiteralPath $nativeInput -Encoding UTF8
+    $overlayText=Get-Content -Raw -LiteralPath $systemOverlay -Encoding UTF8
 
     foreach($required in @('HUYMAIER_STREAMING_CONTROLLER_RUNTIME_V1','HuymaierStreamingController.ps1')){Assert-Contains $coreText $required "Main shell is missing streaming-controller loader marker $required."}
     foreach($required in @('HuymaierStreamingController.ps1','Streaming controller runtime')){Assert-Contains $bootstrapText $required "Bootstrap streaming preflight is missing $required."}
@@ -66,23 +69,27 @@ try{
     foreach($required in @(
         'HC_ReadGamepadPointerState','GetCurrentReading(GameInputKindGamepad','leftThumbstickX','rightThumbstickY','GameInputGamepadA','GameInputGamepadX',
         'GameInputEnableBackgroundInput','GameInputEnableBackgroundGuideButton','GameInputEnableBackgroundShareButton',
-        'HuymaierConsole.PointerStateV1','TryReadSharedPointerState','OpenFileMappingW','GetTickCount64','if (TryReadSharedPointerState'
-    )){Assert-Contains $bridgeText $required "GameInput bridge pointer/shared Sony state is missing $required."}
+        'HuymaierConsole.PointerStateV1','TryReadSharedPointerState','OpenFileMappingW','GetTickCount64','if (TryReadSharedPointerState',
+        'kSharedGuideBit','ConsumeSharedGuideEdge','g_sharedGuideDown','g_lastGuideDeliveredAt','HC_ConsumeGuidePress','now - previous < 300'
+    )){Assert-Contains $bridgeText $required "GameInput bridge pointer/shared Sony Guide state is missing $required."}
     foreach($required in @('HuymaierPointerState','HuymaierPointerInput','HC_ReadGamepadPointerState','ReadPointerState')){Assert-Contains $managedText $required "Managed pointer bridge is missing $required."}
     foreach($required in @(
         'HC_ReadGamepadPointerState','WS_POPUP','SetWindowPos','MonitorFromWindow','ApplyDeadzoneCurve','1500.0','LeftClick','ShowOnScreenKeyboard','MOUSEEVENTF_WHEEL',
         'TextInputHost','parentProcessId','IsPointerForegroundAllowed','RestoreWindow','launchBounds','SetCursorPos((int)Math.Round(cursorX)','Math.Sqrt(rawX * rawX + rawY * rawY)','magnitude > 0.14'
     )){Assert-Contains $hostText $required "Native streaming cursor host is missing $required."}
     foreach($required in @(
-        'HUYMAIER_SONY_POINTER_SHARED_STATE_V1','MemoryMappedFile.CreateOrOpen','Local\\HuymaierConsole.PointerStateV1','PublishPointerState(productId, lx, ly, rx, ry, buttons1, buttons2)',
-        'byte rx = report[stateBase + 2]','byte ry = report[stateBase + 3]','NormalizePointerAxis(ly, true)','BuildPointerButtons(buttons1, buttons2)','GetTickCount64()'
-    )){Assert-Contains $nativeInputText $required "Transformed Sony Raw HID pointer publisher is missing $required."}
+        'HUYMAIER_SONY_POINTER_SHARED_STATE_V1','MemoryMappedFile.CreateOrOpen','Local\\HuymaierConsole.PointerStateV1','PublishPointerState(productId, lx, ly, rx, ry, buttons1, buttons2, buttons3)',
+        'byte rx = report[stateBase + 2]','byte ry = report[stateBase + 3]','NormalizePointerAxis(ly, true)','BuildPointerButtons(buttons1, buttons2, buttons3)','pointerButtons |= 0x0100','GetTickCount64()'
+    )){Assert-Contains $nativeInputText $required "Transformed Sony Raw HID pointer/Guide publisher is missing $required."}
+    foreach($required in @(
+        'HUYMAIER_EXTERNAL_GAMEBAR_OWNER_V1','GWLP_HWNDPARENT','SetWindowLongPtr64','AttachExternalOwner(handle, targetWindow)','SetWindowOwner','DetachExternalOwner','externalOwnerWindow','HWND_TOPMOST'
+    )){Assert-Contains $overlayText $required "Transformed external Game Bar overlay is missing $required."}
 
-    # Explicitly reject the two shipped RC failure patterns: inheriting the
-    # shell's parked physical cursor and per-axis stick shaping for movement.
+    # Explicitly reject the shipped cursor failure patterns.
     if($hostText.IndexOf('if (NativeMethods.GetCursorPos(out point))',[StringComparison]::Ordinal) -ge 0){throw 'Native streaming cursor still inherits the parked shell pointer at launch.'}
     if($hostText.IndexOf('double moveX = ApplyDeadzoneCurve(lx);',[StringComparison]::Ordinal) -ge 0){throw 'Native streaming movement still uses axis-by-axis deadzone shaping.'}
     if($runtimeText.IndexOf('Move-HcBrowserVirtualCursorDelta ($x*$maxPixelsPerSecond*$dt)',[StringComparison]::Ordinal) -ge 0){throw 'Browser analog cursor still emits per-poll delta scripts instead of RAF drive state.'}
+    if($overlayText.IndexOf('DisposeTaskPreviews(); telemetryTimer.Stop();`r`n            try { Hide();',[StringComparison]::Ordinal) -ge 0){throw 'External Game Bar hides without detaching its foreground app owner.'}
 
     Add-Type -AssemblyName System.Windows.Forms,System.Drawing
     $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
@@ -106,13 +113,13 @@ try{
     $nativeInputOut=Join-Path $temp 'HuymaierNativeInput.Pointer.dll'
     $nativeInputArgs=@('/noconfig','/nologo','/target:library','/platform:x64','/optimize+',('/out:'+$nativeInputOut),('/reference:'+$systemRef),('/reference:'+$coreRef),$nativeInput)
     & $csc @nativeInputArgs
-    if($LASTEXITCODE -ne 0 -or -not(Test-Path -LiteralPath $nativeInputOut -PathType Leaf)){throw 'Transformed Sony HID pointer publisher x64 compilation failed.'}
+    if($LASTEXITCODE -ne 0 -or -not(Test-Path -LiteralPath $nativeInputOut -PathType Leaf)){throw 'Transformed Sony HID pointer/Guide publisher x64 compilation failed.'}
     Assert-X64Pe $nativeInputOut
 
     $sources=@(Get-Content -LiteralPath (Join-Path $repo '.source\source-files.txt') -Encoding UTF8)
-    foreach($required in @('HuymaierNativeInput.cs','HuymaierStreamingController.ps1','Native/HuymaierStreamingCursorHost.cs')){if($sources -notcontains $required){throw "Release source payload is missing $required"}}
+    foreach($required in @('HuymaierNativeInput.cs','HuymaierStreamingController.ps1','Native/HuymaierStreamingCursorHost.cs','Native/HuymaierConsole.SystemOverlay.cs')){if($sources -notcontains $required){throw "Release source payload is missing $required"}}
 
-    Write-Host 'v0.26.5 Sony Raw HID shared pointer, native streaming cursor, RAF browser cursor, cursor-speed, fullscreen and app-artwork gates passed.'
+    Write-Host 'v0.26.5 Sony Raw HID pointer/Guide, external native-app Game Bar, native streaming cursor and RAF browser cursor gates passed.'
 }finally{
     Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
 }
