@@ -55,16 +55,26 @@ try{
 
     foreach($required in @(
         'ControllerCursorSpeed','controller-cursor-speed-slider','Convert-HcCursorAxis','Update-HcSmoothBrowserPointer','Move-HcBrowserVirtualCursorDelta','Scroll-HcBrowserVirtualCursorDelta',
+        'Set-HcBrowserAnalogDrive','Stop-HcBrowserAnalogDrive','requestAnimationFrame(tick)','__hcCursorDriveState','__hcCursorDrive=(x,y,speed)','magnitude=[math]::Sqrt',
         '1500.0','Right Stick Scroll','Start-HcNativeStreamingApp','HuymaierStreamingCursorHost.exe','Get-HcAppxArtworkCandidate','favicon.ico','FullscreenPresentation','ControllerMouseEnabled',
         'Native app mode uses the installed Windows streaming app directly; WebView is not involved.'
     )){Assert-Contains $runtimeText $required "Streaming controller runtime is missing $required."}
 
-    foreach($required in @('HC_ReadGamepadPointerState','GetCurrentReading(GameInputKindGamepad','leftThumbstickX','rightThumbstickY','GameInputGamepadA','GameInputGamepadX')){Assert-Contains $bridgeText $required "GameInput bridge pointer state is missing $required."}
+    foreach($required in @(
+        'HC_ReadGamepadPointerState','GetCurrentReading(GameInputKindGamepad','leftThumbstickX','rightThumbstickY','GameInputGamepadA','GameInputGamepadX',
+        'GameInputEnableBackgroundInput','GameInputEnableBackgroundGuideButton','GameInputEnableBackgroundShareButton'
+    )){Assert-Contains $bridgeText $required "GameInput bridge pointer state/background policy is missing $required."}
     foreach($required in @('HuymaierPointerState','HuymaierPointerInput','HC_ReadGamepadPointerState','ReadPointerState')){Assert-Contains $managedText $required "Managed pointer bridge is missing $required."}
     foreach($required in @(
         'HC_ReadGamepadPointerState','WS_POPUP','SetWindowPos','MonitorFromWindow','ApplyDeadzoneCurve','1500.0','LeftClick','ShowOnScreenKeyboard','MOUSEEVENTF_WHEEL',
-        'TextInputHost','parentProcessId','IsPointerForegroundAllowed','RestoreWindow'
+        'TextInputHost','parentProcessId','IsPointerForegroundAllowed','RestoreWindow','launchBounds','SetCursorPos((int)Math.Round(cursorX)','Math.Sqrt(rawX * rawX + rawY * rawY)','magnitude > 0.14'
     )){Assert-Contains $hostText $required "Native streaming cursor host is missing $required."}
+
+    # Explicitly reject the two shipped RC failure patterns: inheriting the
+    # shell's parked physical cursor and per-axis stick shaping for movement.
+    if($hostText.IndexOf('if (NativeMethods.GetCursorPos(out point))',[StringComparison]::Ordinal) -ge 0){throw 'Native streaming cursor still inherits the parked shell pointer at launch.'}
+    if($hostText.IndexOf('double moveX = ApplyDeadzoneCurve(lx);',[StringComparison]::Ordinal) -ge 0){throw 'Native streaming movement still uses axis-by-axis deadzone shaping.'}
+    if($runtimeText.IndexOf('Move-HcBrowserVirtualCursorDelta ($x*$maxPixelsPerSecond*$dt)',[StringComparison]::Ordinal) -ge 0){throw 'Browser analog cursor still emits per-poll delta scripts instead of RAF drive state.'}
 
     Add-Type -AssemblyName System.Windows.Forms,System.Drawing
     $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
@@ -87,7 +97,7 @@ try{
     $sources=@(Get-Content -LiteralPath (Join-Path $repo '.source\source-files.txt') -Encoding UTF8)
     foreach($required in @('HuymaierStreamingController.ps1','Native/HuymaierStreamingCursorHost.cs')){if($sources -notcontains $required){throw "Release source payload is missing $required"}}
 
-    Write-Host 'v0.26.5 native streaming, smooth browser cursor, cursor-speed setting, fullscreen host and app-artwork gates passed.'
+    Write-Host 'v0.26.5 native streaming background input, centered/radial cursor, RAF browser cursor, cursor-speed, fullscreen and app-artwork gates passed.'
 }finally{
     Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
 }
