@@ -24,7 +24,7 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
-          & '.\.development\v0.26.5\Apply-v0265-NamingRecompsFixes.ps1'
+          & '.\.development\v0.26.5\Apply-v0265-NamingRecompsFixesV2.ps1'
           & '.\.development\v0.26.5\Apply-v0265-ModelRenderingFixes.ps1'
           & '.\.development\v0.26.5\Apply-v0265-ModelRenderingTestUpdates.ps1'
 
