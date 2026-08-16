@@ -337,12 +337,13 @@ namespace HuymaierConsole.Modeling
             // Fit against the full 3D bounding diagonal rather than only the
             // largest axis. The diagonal is invariant under turntable rotation,
             // so wide/deep console models cannot become clipped at oblique yaw.
+            // 2.60 keeps perspective headroom for the near side of the rotating bounds.
             double boundingDiameter = Math.Sqrt(
                 bounds.SizeX * bounds.SizeX +
                 bounds.SizeY * bounds.SizeY +
                 bounds.SizeZ * bounds.SizeZ);
             if (!Finite(boundingDiameter) || boundingDiameter <= 0.00001) throw new InvalidDataException("GLB scene bounds have no usable size.");
-            normalizedScale = 2.80 / boundingDiameter;
+            normalizedScale = 2.60 / boundingDiameter;
 
             Point3D center = new Point3D(
                 bounds.X + bounds.SizeX / 2.0,
