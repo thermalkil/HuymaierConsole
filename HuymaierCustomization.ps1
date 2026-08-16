@@ -62,7 +62,6 @@ function Convert-HcDisplayBrandText {
     return ([regex]::Replace($Value,'Huymaier Console',[System.Text.RegularExpressions.MatchEvaluator]{param($m)$name},[System.Text.RegularExpressions.RegexOptions]::IgnoreCase))
 }
 
-
 function Set-ConsoleNotice {
     param([string]$Message,[string]$Level='INFO')
     & $script:HcCustomizationBaseSetConsoleNotice (Convert-HcDisplayBrandText $Message) $Level
@@ -290,3 +289,8 @@ function Initialize-HcCustomization {
 }
 
 Initialize-HcCustomizationConfig
+
+# Manual Recomps owns the final provider/file-picker behavior so the user can
+# add multiple native recomp games explicitly, one executable at a time.
+$script:HcManualRecompsModulePath=Join-Path $script:BaseDir 'HuymaierRecompsManual.ps1'
+if(Test-Path -LiteralPath $script:HcManualRecompsModulePath -PathType Leaf){. $script:HcManualRecompsModulePath}
