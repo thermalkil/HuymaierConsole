@@ -156,6 +156,7 @@ Native/HuymaierD3D11ShelfAsset.cpp
 Native/HuymaierD3D11ShelfAsset.h
 Native/HuymaierD3D11ShelfRuntime.cpp
 Native/HuymaierD3D11ShelfRenderer.cpp
+Native/HuymaierD3D11UvAddressSmoke.cpp
 Native/HuymaierLiveModelControl.cs
 Native/HuymaierModelPreviewWorker.cs
 Native/HuymaierModelPreviewWpfAliases.cs
