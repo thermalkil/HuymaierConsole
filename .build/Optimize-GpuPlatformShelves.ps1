@@ -16,10 +16,11 @@ $gpuRendererSource=Join-Path $stage 'Native\HuymaierD3D11ShelfRenderer.cpp'
 $gpuRuntimeSource=Join-Path $stage 'Native\HuymaierD3D11ShelfRuntime.cpp'
 $gpuAssetSource=Join-Path $stage 'Native\HuymaierD3D11ShelfAsset.cpp'
 $gpuAssetHeader=Join-Path $stage 'Native\HuymaierD3D11ShelfAsset.h'
+$gpuUvAddressSmokeSource=Join-Path $stage 'Native\HuymaierD3D11UvAddressSmoke.cpp'
 $gpuHostSource=Join-Path $stage 'Native\HuymaierD3D11ShelfHost.cs'
 $gpuCompilerSource=Join-Path $stage 'Native\HuymaierGpuShelfAssetCompiler.cs'
 $gpuCompilerProgramSource=Join-Path $stage 'Native\HuymaierGpuShelfAssetCompilerProgram.cs'
-foreach($gpuSource in @($gpuRendererSource,$gpuRuntimeSource,$gpuAssetSource,$gpuAssetHeader,$gpuHostSource,$gpuCompilerSource,$gpuCompilerProgramSource)){if(-not(Test-Path -LiteralPath $gpuSource -PathType Leaf)){throw "GPU shelf source missing: $gpuSource"}}
+foreach($gpuSource in @($gpuRendererSource,$gpuRuntimeSource,$gpuAssetSource,$gpuAssetHeader,$gpuUvAddressSmokeSource,$gpuHostSource,$gpuCompilerSource,$gpuCompilerProgramSource)){if(-not(Test-Path -LiteralPath $gpuSource -PathType Leaf)){throw "GPU shelf source missing: $gpuSource"}}
 
 $gpuNativeDll=Join-Path $stage 'HuymaierD3D11ShelfRenderer.dll'
 $gpuHostDll=Join-Path $stage 'HuymaierGpuShelfHost.dll'
@@ -36,7 +37,7 @@ $gpuBuildText=@"
 call "$gpuVcvars" >nul
 if errorlevel 1 exit /b %errorlevel%
 pushd "$stage"
-cl.exe /nologo /LD /O2 /EHsc /std:c++17 /MT /DUNICODE /D_UNICODE /I"$stage\Native" "$gpuRendererSource" "$gpuAssetSource" "$gpuRuntimeSource" /link /OUT:"$gpuNativeDll" d3d11.lib d3d9.lib d3dcompiler.lib dxgi.lib user32.lib ole32.lib
+cl.exe /nologo /LD /O2 /EHsc /std:c++17 /MT /DUNICODE /D_UNICODE /I"$stage\Native" "$gpuRendererSource" "$gpuAssetSource" "$gpuRuntimeSource" "$gpuUvAddressSmokeSource" /link /OUT:"$gpuNativeDll" d3d11.lib d3d9.lib d3dcompiler.lib dxgi.lib user32.lib ole32.lib
 set HC_GPU_RC=%ERRORLEVEL%
 popd
 exit /b %HC_GPU_RC%
@@ -45,7 +46,7 @@ Set-Content -LiteralPath $gpuBuildCmd -Value $gpuBuildText -Encoding ASCII
 & cmd.exe /d /c ('"'+$gpuBuildCmd+'"')
 $gpuBuildResult=$LASTEXITCODE
 Remove-Item -LiteralPath $gpuBuildCmd -Force -ErrorAction SilentlyContinue
-foreach($junk in @('HuymaierD3D11ShelfRenderer.lib','HuymaierD3D11ShelfRenderer.exp','HuymaierD3D11ShelfRenderer.obj','HuymaierD3D11ShelfAsset.obj','HuymaierD3D11ShelfRuntime.obj')){Remove-Item -LiteralPath (Join-Path $stage $junk) -Force -ErrorAction SilentlyContinue}
+foreach($junk in @('HuymaierD3D11ShelfRenderer.lib','HuymaierD3D11ShelfRenderer.exp','HuymaierD3D11ShelfRenderer.obj','HuymaierD3D11ShelfAsset.obj','HuymaierD3D11ShelfRuntime.obj','HuymaierD3D11UvAddressSmoke.obj')){Remove-Item -LiteralPath (Join-Path $stage $junk) -Force -ErrorAction SilentlyContinue}
 if($gpuBuildResult -ne 0 -or -not(Test-Path -LiteralPath $gpuNativeDll -PathType Leaf)){throw 'x64 HuymaierD3D11ShelfRenderer.dll compilation failed.'}
 
 $gpuFramework=[Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()
@@ -73,7 +74,7 @@ $gpuNativeHeaders=(& $dumpbin /nologo /headers $gpuNativeDll) -join "`n";if($gpu
 $gpuHostHeaders=(& $dumpbin /nologo /headers $gpuHostDll) -join "`n";if($gpuHostHeaders -notmatch '(?i)machine \(x64\)|8664 machine'){throw 'HuymaierGpuShelfHost.dll is not x64.'}
 $gpuCompilerHeaders=(& $dumpbin /nologo /headers $gpuCompilerExe) -join "`n";if($gpuCompilerHeaders -notmatch '(?i)machine \(x64\)|8664 machine'){throw 'HuymaierGpuShelfAssetCompiler.exe is not x64.'}
 $gpuExports=(& $dumpbin /nologo /exports $gpuNativeDll) -join "`n"
-foreach($gpuExport in @('HC_GPU_CreateShelfSurface','HC_GPU_LoadShelfModel','HC_GPU_SetShelfItem','HC_GPU_RenderShelfSurface','HC_GPU_GetCachedAssetCount')){if($gpuExports -notmatch [regex]::Escape($gpuExport)){throw "HuymaierD3D11ShelfRenderer.dll missing production export: $gpuExport"}}
+foreach($gpuExport in @('HC_D3D11UvAddressSmokeTest','HC_GPU_CreateShelfSurface','HC_GPU_LoadShelfModel','HC_GPU_SetShelfItem','HC_GPU_RenderShelfSurface','HC_GPU_GetCachedAssetCount')){if($gpuExports -notmatch [regex]::Escape($gpuExport)){throw "HuymaierD3D11ShelfRenderer.dll missing production export: $gpuExport"}}
 '@
     $builder=$builder.Replace($archAnchor,$arch)
 }
