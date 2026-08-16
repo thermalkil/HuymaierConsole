@@ -69,7 +69,7 @@ function New-HcV7ProbeGlb([string]$Path){
  $ms=New-Object IO.MemoryStream;$bw=New-Object IO.BinaryWriter($ms)
  try{
   foreach($f in @([single](-1),[single](-.6),[single]0,[single]1,[single](-.6),[single]0,[single]1,[single](.6),[single]0,[single](-1),[single](.6),[single]0)){$bw.Write($f)}
-  foreach($i in 0..3){$bw.Write([single]0);$bw.Write([single]0);$bw.Write([single]-1)}
+  foreach($i in 0..3){$bw.Write([single]0);$bw.Write([single]0);$bw.Write([single](-1))}
   foreach($ix in @([uint16]0,[uint16]1,[uint16]2,[uint16]0,[uint16]2,[uint16]3)){$bw.Write($ix)};$bw.Flush();$bin=[byte[]]$ms.ToArray()
  }finally{$bw.Dispose();$ms.Dispose()}
  $json="{`"asset`":{`"version`":`"2.0`"},`"scene`":0,`"scenes`":[{`"nodes`":[0]}],`"nodes`":[{`"mesh`":0}],`"meshes`":[{`"primitives`":[{`"attributes`":{`"POSITION`":0,`"NORMAL`":1},`"indices`":2,`"material`":0,`"mode`":4}]}],`"materials`":[{`"doubleSided`":true,`"pbrMetallicRoughness`":{`"baseColorFactor`":[.15,.65,.95,1],`"metallicFactor`":.1,`"roughnessFactor`":.7}}],`"buffers`":[{`"byteLength`":$($bin.Length)}],`"bufferViews`":[{`"buffer`":0,`"byteOffset`":0,`"byteLength`":48},{`"buffer`":0,`"byteOffset`":48,`"byteLength`":48},{`"buffer`":0,`"byteOffset`":96,`"byteLength`":12}],`"accessors`":[{`"bufferView`":0,`"componentType`":5126,`"count`":4,`"type`":`"VEC3`"},{`"bufferView`":1,`"componentType`":5126,`"count`":4,`"type`":`"VEC3`"},{`"bufferView`":2,`"componentType`":5123,`"count`":6,`"type`":`"SCALAR`"}]}"
