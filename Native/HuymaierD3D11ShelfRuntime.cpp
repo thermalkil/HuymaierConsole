@@ -26,6 +26,9 @@ using HuymaierGpuShelf::Vertex;
 namespace
 {
     // HUYMAIER_D3D11_SHARED_SHELF_RUNTIME_V1
+    // HC3D v1 stores glTF V as 1-transformedV. Convert that cache-space
+    // convention back to glTF/D3D texture space exactly once in the shader so
+    // authored KHR_texture_transform and sampler wrap modes remain intact.
     struct Constants
     {
         XMFLOAT4X4 worldViewProjection;
@@ -110,7 +113,13 @@ VSOut VSMain(VSIn v)
 }
 float4 PSMain(VSOut i) : SV_TARGET
 {
-    float4 tex = Flags.x != 0 ? BaseTexture.Sample(BaseSampler, i.uv0) : float4(1,1,1,1);
+    // HC3D v1 cache UVs intentionally use an inverted V convention. WIC/D3D11
+    // textures and glTF both address the top row at V=0, so undo the cache
+    // convention immediately before sampling. This preserves transformed UVs
+    // and lets the authored REPEAT/CLAMP/MIRROR sampler operate on glTF space.
+    float2 baseUv = float2(i.uv0.x, 1.0 - i.uv0.y);
+    float2 emissiveUv = float2(i.uv1.x, 1.0 - i.uv1.y);
+    float4 tex = Flags.x != 0 ? BaseTexture.Sample(BaseSampler, baseUv) : float4(1,1,1,1);
     float4 base = tex * BaseColor;
     if (Flags.z == 1 && base.a < Extra.x) discard;
     float3 n = normalize(i.n);
@@ -121,7 +130,7 @@ float4 PSMain(VSOut i) : SV_TARGET
     float diffuse = Flags.w != 0 ? 1.0 : (0.24 + d0 * .60 + d1 * .20);
     float3 lit = base.rgb * diffuse;
     float3 em = Emissive.rgb * Emissive.a;
-    if (Flags.y != 0) em *= EmissiveTexture.Sample(EmissiveSampler, i.uv1).rgb;
+    if (Flags.y != 0) em *= EmissiveTexture.Sample(EmissiveSampler, emissiveUv).rgb;
     float specPower = lerp(8.0, 62.0, 1.0 - saturate(Surface.y));
     float3 halfDir = normalize(-l0 + float3(0,0,-1));
     float spec = Flags.w != 0 ? 0.0 : pow(saturate(dot(n,halfDir)),specPower) * saturate(Surface.z + Surface.x*.30 + Surface.w*.18);
@@ -215,7 +224,7 @@ float4 PSMain(VSOut i) : SV_TARGET
         D3DPRESENT_PARAMETERS pp{};pp.Windowed=TRUE;pp.SwapEffect=D3DSWAPEFFECT_DISCARD;pp.hDeviceWindow=GetDesktopWindow();pp.BackBufferWidth=1;pp.BackBufferHeight=1;pp.BackBufferFormat=D3DFMT_A8R8G8B8;pp.PresentationInterval=D3DPRESENT_INTERVAL_IMMEDIATE;
         hr=s.d3d9->CreateDeviceEx(D3DADAPTER_DEFAULT,D3DDEVTYPE_HAL,GetDesktopWindow(),D3DCREATE_HARDWARE_VERTEXPROCESSING|D3DCREATE_MULTITHREADED|D3DCREATE_FPU_PRESERVE,&pp,nullptr,s.device9.GetAddressOf());if(FAILED(hr))return hr;
         s.sharedHandle=nullptr;
-        hr=s.device9->CreateTexture(width,height,1,D3DUSAGE_RENDERTARGET,D3DFMT_A8R8G8B8,D3DPOOL_DEFAULT,s.texture9.GetAddressOf(),&s.sharedHandle);if(FAILED(hr)||!s.sharedHandle)return FAILED(hr)?hr:E_FAIL;
+        hr=s.d3d9->CreateTexture(width,height,1,D3DUSAGE_RENDERTARGET,D3DFMT_A8R8G8B8,D3DPOOL_DEFAULT,s.texture9.GetAddressOf(),&s.sharedHandle);if(FAILED(hr)||!s.sharedHandle)return FAILED(hr)?hr:E_FAIL;
         if(FAILED(hr=s.texture9->GetSurfaceLevel(0,s.surface9.GetAddressOf())))return hr;
         if(FAILED(hr=g_core.device->OpenSharedResource(s.sharedHandle,__uuidof(ID3D11Texture2D),reinterpret_cast<void**>(s.texture11.GetAddressOf()))))return hr;
         if(FAILED(hr=g_core.device->CreateRenderTargetView(s.texture11.Get(),nullptr,s.rtv.GetAddressOf())))return hr;
