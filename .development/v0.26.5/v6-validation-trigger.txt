@@ -1,0 +1,2 @@
+V6 dual-shelf/material compatibility freeze validation.
+Runtime source parent: 8e17a1a50775a1fabb5e1c165dc246a900c992b9
