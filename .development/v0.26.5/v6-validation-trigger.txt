@@ -1,3 +1,3 @@
 V6 dual-shelf/material compatibility freeze validation.
-Runtime source parent: 15984181372c92346ef71f8d7d838c5ade744986
-Validation retry: strict-mode material probe literals corrected.
+Runtime source parent: 008f70df70be59052392980fbe92532300c2bd1a
+Validation retry: 70-percent shelf scale retained with tighter perspective-safe rotation envelope.
