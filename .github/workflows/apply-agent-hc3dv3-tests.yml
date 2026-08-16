@@ -1,0 +1,39 @@
+name: Apply HC3D v3 Test Migrations
+on:
+  push:
+    branches: [agent/v0265-recomps-wpf-render-fix]
+    paths:
+      - '.development/v0.26.5/Apply-v0265-Hc3dV3TestPatch.py'
+      - '.github/workflows/apply-agent-hc3dv3-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/v0265-recomps-wpf-render-fix
+          fetch-depth: 0
+      - name: Apply v3 test migrations
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          python '.\.development\v0.26.5\Apply-v0265-Hc3dV3TestPatch.py'
+          $targets=@(
+            '.development\v0.26.5\Test-v0265-GpuShelfAssetCompiler.ps1',
+            '.development\v0.26.5\Test-v0265-MirroredModelWinding.ps1',
+            '.development\v0.26.5\Test-v0265-D3D11FaceCulling.ps1',
+            '.development\v0.26.5\Test-v0265-GpuPlatformShelvesV7.ps1'
+          )
+          foreach($p in $targets){$t=$null;$e=$null;[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p),[ref]$t,[ref]$e);if($e.Count){throw "$p failed PowerShell 5.1 parse: $(@($e|ForEach-Object{$_.Message}) -join '; ')"}}
+      - name: Commit migrated tests
+        shell: powershell
+        run: |
+          git config user.name 'thermalkil'
+          git config user.email '98826286+thermalkil@users.noreply.github.com'
+          git add .development/v0.26.5/Test-v0265-GpuShelfAssetCompiler.ps1 .development/v0.26.5/Test-v0265-MirroredModelWinding.ps1 .development/v0.26.5/Test-v0265-D3D11FaceCulling.ps1 .development/v0.26.5/Test-v0265-GpuPlatformShelvesV7.ps1
+          if(git diff --cached --quiet){exit 0}
+          git commit -m 'Migrate platform model regressions to HC3D v3'
+          git push origin HEAD:agent/v0265-recomps-wpf-render-fix
