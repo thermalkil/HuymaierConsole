@@ -1,0 +1,36 @@
+name: Apply HC3D v3 Direct UV
+on:
+  push:
+    branches: [agent/v0265-recomps-wpf-render-fix]
+    paths:
+      - '.development/v0.26.5/Apply-v0265-UvV3Patch.py'
+      - '.github/workflows/apply-agent-uv-v3.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/v0265-recomps-wpf-render-fix
+          fetch-depth: 0
+      - name: Apply and parse UV migration
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          python '.\.development\v0.26.5\Apply-v0265-UvV3Patch.py'
+          $t=$null;$e=$null
+          [void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path '.\.development\v0.26.5\Test-v0265-D3D11UvAddressing.ps1'),[ref]$t,[ref]$e)
+          if($e.Count){throw "UV v3 test failed PowerShell 5.1 parse: $(@($e|ForEach-Object{$_.Message}) -join '; ')"}
+          & '.\.development\v0.26.5\Test-v0265-D3D11UvAddressing.ps1'
+      - name: Commit direct UV convention
+        shell: powershell
+        run: |
+          git config user.name 'thermalkil'
+          git config user.email '98826286+thermalkil@users.noreply.github.com'
+          git add Native/HuymaierD3D11UvAddressSmoke.cpp .development/v0.26.5/Test-v0265-D3D11UvAddressing.ps1
+          if(git diff --cached --quiet){exit 0}
+          git commit -m 'Move HC3D UV regression to direct glTF v3 convention'
+          git push origin HEAD:agent/v0265-recomps-wpf-render-fix
