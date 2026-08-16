@@ -45,11 +45,10 @@ float4 PSMain(float4 position : SV_POSITION) : SV_TARGET
         return ProbeTexture.SampleLevel(MirrorSampler, float2(1.75, 0.25), 0.0);
     }
 
-    // HC3D v1 stores V as 1-transformedV. Production sampling must undo that
-    // cache-space convention exactly once. Cached (0.25,0.25) therefore becomes
-    // authored/transformed glTF (0.25,0.75) -> bottom-left blue texel.
-    float2 cachedUv = float2(0.25, 0.25);
-    float2 gltfUv = float2(cachedUv.x, 1.0 - cachedUv.y);
+    // HC3D v3 stores authored/transformed glTF UVs directly. No hidden V flip
+    // exists in either cache or production shader. (0.25,0.75) therefore samples
+    // the bottom-left blue texel exactly as authored.
+    float2 gltfUv = float2(0.25, 0.75);
     return ProbeTexture.SampleLevel(RepeatSampler, gltfUv, 0.0);
 }
 )HLSL";
