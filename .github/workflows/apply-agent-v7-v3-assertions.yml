@@ -1,0 +1,34 @@
+name: Apply V7 HC3D v3 Assertions
+on:
+  push:
+    branches: [agent/v0265-recomps-wpf-render-fix]
+    paths:
+      - '.development/v0.26.5/Fix-v0265-V7V3Assertions.py'
+      - '.github/workflows/apply-agent-v7-v3-assertions.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/v0265-recomps-wpf-render-fix
+          fetch-depth: 0
+      - name: Apply V7 assertions
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          python '.\.development\v0.26.5\Fix-v0265-V7V3Assertions.py'
+          $t=$null;$e=$null
+          [void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path '.\.development\v0.26.5\Test-v0265-GpuPlatformShelvesV7.ps1'),[ref]$t,[ref]$e)
+          if($e.Count){throw "V7 v3 assertion test failed parse: $(@($e|ForEach-Object{$_.Message}) -join '; ')"}
+      - name: Commit V7 assertions
+        shell: powershell
+        run: |
+          git config user.name 'thermalkil'
+          git config user.email '98826286+thermalkil@users.noreply.github.com'
+          git add .development/v0.26.5/Test-v0265-GpuPlatformShelvesV7.ps1
+          if(git diff --cached --quiet){exit 0}
+          git commit -m 'Harden V7 release assertions for HC3D v3'
+          git push origin HEAD:agent/v0265-recomps-wpf-render-fix
