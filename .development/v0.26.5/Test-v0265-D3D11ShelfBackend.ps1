@@ -2,12 +2,17 @@ Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
 $root=(Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $cpp=Join-Path $root 'Native\HuymaierD3D11ShelfRenderer.cpp'
+$assetCpp=Join-Path $root 'Native\HuymaierD3D11ShelfAsset.cpp'
+$assetH=Join-Path $root 'Native\HuymaierD3D11ShelfAsset.h'
+$runtimeCpp=Join-Path $root 'Native\HuymaierD3D11ShelfRuntime.cpp'
 $hostSource=Join-Path $root 'Native\HuymaierD3D11ShelfHost.cs'
-foreach($p in @($cpp,$hostSource)){if(-not(Test-Path -LiteralPath $p -PathType Leaf)){throw "D3D11 shelf source missing: $p"}}
+foreach($p in @($cpp,$assetCpp,$assetH,$runtimeCpp,$hostSource)){if(-not(Test-Path -LiteralPath $p -PathType Leaf)){throw "D3D11 shelf source missing: $p"}}
 $cppText=Get-Content -Raw -LiteralPath $cpp -Encoding UTF8
+$runtimeText=Get-Content -Raw -LiteralPath $runtimeCpp -Encoding UTF8
 $hostText=Get-Content -Raw -LiteralPath $hostSource -Encoding UTF8
-foreach($n in @('HC_D3D11SmokeTest','HC_D3D11CreateWpfSurface','D3D11CreateDevice','Direct3DCreate9Ex','OpenSharedResource','D3D11_CREATE_DEVICE_BGRA_SUPPORT','D3DCompile')){if($cppText.IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Native D3D11 contract missing: $n"}}
-foreach($n in @('HUYMAIER_D3D11_SHELF_HOST_V1','D3DImage','D3DResourceType.IDirect3DSurface9','CompositionTarget.Rendering','HC_D3D11RenderWpfSurface')){if($hostText.IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Managed D3D11 bridge contract missing: $n"}}
+foreach($n in @('HC_D3D11SmokeTest','D3D11CreateDevice','Direct3DCreate9Ex','OpenSharedResource','D3D11_CREATE_DEVICE_BGRA_SUPPORT','D3DCompile')){if($cppText.IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Native D3D11 proof contract missing: $n"}}
+foreach($n in @('HUYMAIER_D3D11_SHARED_SHELF_RUNTIME_V1','HC_GPU_CreateShelfSurface','HC_GPU_LoadShelfModel','HC_GPU_SetShelfItem','HC_GPU_RenderShelfSurface','HC_GPU_GetCachedAssetCount','AcquireAssetLocked','GenerateMips')){if(($runtimeText+(Get-Content -Raw $assetCpp)).IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Production D3D11 shelf contract missing: $n"}}
+foreach($n in @('HUYMAIER_D3D11_SHELF_HOST_V2','D3DImage','D3DResourceType.IDirect3DSurface9','CompositionTarget.Rendering','HC_GPU_LoadShelfModel','HC_GPU_SetShelfItem','ReplayState','LoadedModelCount')){if($hostText.IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Managed D3D11 bridge V2 contract missing: $n"}}
 
 $tokens=$null;$errors=$null
 [void][Management.Automation.Language.Parser]::ParseFile($PSCommandPath,[ref]$tokens,[ref]$errors)
@@ -25,21 +30,24 @@ New-Item -ItemType Directory -Force -Path $temp|Out-Null
 try{
     $nativeDll=Join-Path $temp 'HuymaierD3D11ShelfRenderer.dll'
     $cmdFile=Join-Path $temp 'build-native.cmd'
+    $nativeDir=Join-Path $root 'Native'
     $cmd=@"
 @echo off
 call "$vcvars" >nul
 if errorlevel 1 exit /b %errorlevel%
-cl.exe /nologo /LD /O2 /EHsc /std:c++17 /MD /DUNICODE /D_UNICODE "$cpp" /link /OUT:"$nativeDll" d3d11.lib d3d9.lib d3dcompiler.lib dxgi.lib user32.lib ole32.lib
+cl.exe /nologo /LD /O2 /EHsc /std:c++17 /MD /DUNICODE /D_UNICODE /I"$nativeDir" "$cpp" "$assetCpp" "$runtimeCpp" /link /OUT:"$nativeDll" d3d11.lib d3d9.lib d3dcompiler.lib dxgi.lib user32.lib ole32.lib
 exit /b %errorlevel%
 "@
     Set-Content -LiteralPath $cmdFile -Value $cmd -Encoding ASCII
     & cmd.exe /d /c ('"'+$cmdFile+'"')
-    if($LASTEXITCODE-ne0-or-not(Test-Path -LiteralPath $nativeDll -PathType Leaf)){throw 'Native x64 D3D11 shelf DLL compilation failed.'}
+    if($LASTEXITCODE-ne0-or-not(Test-Path -LiteralPath $nativeDll -PathType Leaf)){throw 'Native x64 production D3D11 shelf DLL compilation failed.'}
 
     $dumpbin=Get-ChildItem -LiteralPath (Join-Path $vsInstall 'VC\Tools\MSVC') -Filter dumpbin.exe -File -Recurse -ErrorAction SilentlyContinue|Where-Object{$_.FullName-match '\\Hostx64\\x64\\dumpbin\.exe$'}|Sort-Object FullName -Descending|Select-Object -First 1
     if(-not$dumpbin){throw 'x64 dumpbin.exe was not found.'}
     $headers=(& $dumpbin.FullName /nologo /headers $nativeDll)-join"`n"
     if($headers-notmatch'(?i)machine \(x64\)|8664 machine'){throw 'HuymaierD3D11ShelfRenderer.dll is not x64.'}
+    $exports=(& $dumpbin.FullName /nologo /exports $nativeDll)-join"`n"
+    foreach($name in @('HC_D3D11SmokeTest','HC_GPU_CreateShelfSurface','HC_GPU_LoadShelfModel','HC_GPU_SetShelfItem','HC_GPU_ClearShelfItems','HC_GPU_RenderShelfSurface','HC_GPU_ReleaseShelfSurfacePointer','HC_GPU_DestroyShelfSurface','HC_GPU_GetCachedAssetCount')){if($exports-notmatch[regex]::Escape($name)){throw "Production native shelf DLL export missing: $name"}}
 
     Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml
     $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
@@ -51,7 +59,7 @@ exit /b %errorlevel%
     foreach($r in $refs){$args+=('/reference:'+$r)}
     $args+=$hostSource
     & $csc @args
-    if($LASTEXITCODE-ne0-or-not(Test-Path -LiteralPath $managedDll -PathType Leaf)){throw 'Managed D3D11 WPF bridge compilation failed.'}
+    if($LASTEXITCODE-ne0-or-not(Test-Path -LiteralPath $managedDll -PathType Leaf)){throw 'Managed D3D11 WPF bridge V2 compilation failed.'}
 
     Add-Type -TypeDefinition @'
 using System;
@@ -70,7 +78,9 @@ public static class HcNativeSearchPath {
     Write-Host 'platformModelD3D11X64Gate: success'
     Write-Host 'platformModelD3D11ShaderGate: success'
     Write-Host 'platformModelD3D11WarpSmokeGate: success'
-    Write-Host 'platformModelD3DImageBridgeCompileGate: success'
+    Write-Host 'platformModelD3DImageBridgeV2CompileGate: success'
+    Write-Host 'platformModelD3D11ProductionExportsGate: success'
+    Write-Host 'platformModelD3D11SharedAssetCacheGate: success'
 }finally{
     Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
 }
