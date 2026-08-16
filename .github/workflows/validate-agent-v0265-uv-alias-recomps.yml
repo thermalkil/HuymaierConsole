@@ -25,7 +25,7 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
-          & '.\.development\v0.26.5\Apply-v0265-UvAliasesRecompsV2.ps1'
+          & '.\.development\v0.26.5\Apply-v0265-UvAliasesRecompsV3.ps1'
 
       - name: Parse and safety audit
         shell: powershell
@@ -54,5 +54,5 @@ jobs:
           if(-not (git status --porcelain)){Write-Host 'Validated source already committed.';exit 0}
           git config user.name 'huymaier-validation-bot'
           git config user.email 'actions@users.noreply.github.com'
-          git add -- EmulatorPlatforms/platform-registry.json Assets/Models/model-map.json Native/HuymaierD3D11ShelfAssetSmoke.cpp HuymaierGpuPlatformShelves.ps1
+          git add -- EmulatorPlatforms/platform-registry.json Assets/Models/model-map.json Native/HuymaierD3D11ShelfAssetSmoke.cpp Native/HuymaierD3D11ShelfRuntime.cpp HuymaierGpuPlatformShelves.ps1
           if(-not (git diff --cached --quiet)){git commit -m 'Apply canonical platform and Recomps integration';git push origin HEAD:agent/v0265-uv-alias-recomps}
