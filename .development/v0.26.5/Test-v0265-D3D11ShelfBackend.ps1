@@ -70,8 +70,12 @@ public static class HcNativeSearchPath {
 }
 '@
     if(-not[HcNativeSearchPath]::SetDllDirectory($temp)){throw 'Could not set native DLL search path for D3D11 smoke test.'}
-    Add-Type -Path $managedDll
-    $result=[HuymaierConsole.Modeling.D3D11ShelfSurface]::RunNativeSmokeTest()
+    $gpuAssembly=[Reflection.Assembly]::LoadFrom($managedDll)
+    $gpuType=$gpuAssembly.GetType('HuymaierConsole.Modeling.D3D11ShelfSurface',$false)
+    if($null-eq$gpuType){throw 'LoadFrom GPU host assembly did not expose D3D11ShelfSurface.'}
+    $smokeMethod=$gpuType.GetMethod('RunNativeSmokeTest',[Reflection.BindingFlags]'Public,Static')
+    if($null-eq$smokeMethod){throw 'D3D11ShelfSurface.RunNativeSmokeTest was not found through loaded assembly.'}
+    $result=[int]$smokeMethod.Invoke($null,@())
     if([int]$result-ne1){throw "D3D11 shader/render/readback smoke test failed with code $result"}
 
     Write-Host 'platformModelD3D11NativeCompileGate: success'
@@ -81,6 +85,7 @@ public static class HcNativeSearchPath {
     Write-Host 'platformModelD3DImageBridgeV2CompileGate: success'
     Write-Host 'platformModelD3D11ProductionExportsGate: success'
     Write-Host 'platformModelD3D11SharedAssetCacheGate: success'
+    Write-Host 'platformModelGpuHostLoadFromResolutionGate: success'
 }finally{
     Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
 }
