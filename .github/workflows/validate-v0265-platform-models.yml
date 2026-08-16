@@ -30,6 +30,7 @@ jobs:
             & '.\.development\v0.26.5\Test-v0265-User3DModels.ps1'
             & '.\.development\v0.26.5\Test-v0265-Live3DCardRender.ps1'
             & '.\.development\v0.26.5\Test-v0265-D3D11ShelfBackend.ps1'
+            & '.\.development\v0.26.5\Test-v0265-GpuShelfAssetCompiler.ps1'
           }
           catch {
             $message = [string]$_.Exception.Message
