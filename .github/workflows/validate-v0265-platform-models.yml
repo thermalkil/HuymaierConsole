@@ -4,13 +4,14 @@ on:
   push:
     branches:
       - feature/v0.26.5-performance-and-downloads
+      - agent/v0265-recomps-wpf-render-fix
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: huymaier-v0265-platform-model-validation
+  group: huymaier-v0265-platform-model-validation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -31,6 +32,8 @@ jobs:
             & '.\.development\v0.26.5\Test-v0265-PlatformNamingAudit.ps1'
             & '.\.development\v0.26.5\Test-v0265-Live3DCardRender.ps1'
             & '.\.development\v0.26.5\Test-v0265-FullModelViewerUvBrightnessV3.ps1'
+            & '.\.development\v0.26.5\Test-v0265-ModelMaterialCoverage.ps1'
+            & '.\.development\v0.26.5\Test-v0265-GeneratedProviderMaterials.ps1'
             & '.\.development\v0.26.5\Test-v0265-D3D11ShelfBackend.ps1'
             & '.\.development\v0.26.5\Test-v0265-D3D11FaceCulling.ps1'
             & '.\.development\v0.26.5\Test-v0265-GpuShelfAssetCompiler.ps1'
@@ -43,6 +46,7 @@ jobs:
             & '.\.development\v0.26.5\Test-v0265-ManualRecomps.ps1'
             & '.\.development\v0.26.5\Test-v0265-ManualRecompsFinalOwnership.ps1'
             & '.\.development\v0.26.5\Test-v0265-RecompsDirectLibrary.ps1'
+            & '.\.development\v0.26.5\Test-v0265-RecompsWpfRender.ps1'
           }
           catch {
             $message = [string]$_.Exception.Message

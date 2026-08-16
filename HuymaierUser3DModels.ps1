@@ -60,6 +60,60 @@ function Initialize-HcPlatformPresentationConfig {
 }
 function Get-HcPlatformVisualStyle {Initialize-HcPlatformPresentationConfig;return [string]$script:Config.PlatformVisualStyle}
 
+
+$script:HcPlatformDisplayLabelMap=$null
+function Initialize-HcPlatformDisplayLabelMap {
+    if($null-ne$script:HcPlatformDisplayLabelMap){return}
+    $map=@{}
+    try{
+        $registryPath=Join-Path $script:BaseDir 'EmulatorPlatforms\platform-registry.json'
+        if(Test-Path -LiteralPath $registryPath -PathType Leaf){
+            $registry=Get-Content -Raw -LiteralPath $registryPath -Encoding UTF8|ConvertFrom-Json
+            foreach($platform in @($registry.platforms)){
+                if($null-eq$platform){continue}
+                $display=[string](Get-EntryProperty $platform 'displayName' '')
+                if([string]::IsNullOrWhiteSpace($display)){$display=[string](Get-EntryProperty $platform 'name' '')}
+                if([string]::IsNullOrWhiteSpace($display)){continue}
+                $keys=New-Object System.Collections.ArrayList
+                foreach($field in @('name','menuName','displayName')){$value=[string](Get-EntryProperty $platform $field '');if(-not[string]::IsNullOrWhiteSpace($value)){[void]$keys.Add($value)}}
+                foreach($alias in @((Get-EntryProperty $platform 'aliases' @()))){if(-not[string]::IsNullOrWhiteSpace([string]$alias)){[void]$keys.Add([string]$alias)}}
+                foreach($key in @($keys)){$normalized=([string]$key).Trim().ToLowerInvariant();if($normalized-and-not$map.ContainsKey($normalized)){$map[$normalized]=$display}}
+            }
+        }
+    }catch{try{Write-Log ('Platform display-name map failed: '+$_.Exception.Message) 'WARN'}catch{}}
+    $script:HcPlatformDisplayLabelMap=$map
+}
+function Get-HcPlatformDisplayLabel {
+    param([string]$Platform,[string]$Group='')
+    if([string]::IsNullOrWhiteSpace($Platform)){return $Platform}
+    if([string]::Equals($Group,'Providers',[StringComparison]::OrdinalIgnoreCase)){
+        switch($Platform.Trim().ToLowerInvariant()){
+            'steam' {return 'Steam'}
+            'epic' {return 'Epic Games'}
+            'epic games' {return 'Epic Games'}
+            'gog' {return 'GOG'}
+            'ea' {return 'EA'}
+            'ea app' {return 'EA'}
+            'ubisoft' {return 'Ubisoft Connect'}
+            'ubisoft connect' {return 'Ubisoft Connect'}
+            'xbox' {return 'Xbox PC'}
+            'xbox app' {return 'Xbox PC'}
+            'microsoft gaming app' {return 'Xbox PC'}
+            'battle.net' {return 'Battle.net'}
+            'battlenet' {return 'Battle.net'}
+            'rockstar' {return 'Rockstar Games'}
+            'rockstar games' {return 'Rockstar Games'}
+            'amazon' {return 'Amazon Games'}
+            'amazon games' {return 'Amazon Games'}
+            'recomps' {return 'Recomps'}
+        }
+    }
+    Initialize-HcPlatformDisplayLabelMap
+    $key=$Platform.Trim().ToLowerInvariant()
+    if($script:HcPlatformDisplayLabelMap.ContainsKey($key)){return [string]$script:HcPlatformDisplayLabelMap[$key]}
+    return $Platform
+}
+
 function Get-HcUser3DModelNames {
     @(
         'Arcade.glb','Atari 2600.glb','Atari Lynx.glb','Epic Games.glb','Neo Geo Pocket Color.glb','Neo Geo.glb',
@@ -352,7 +406,7 @@ function Update-Hc3DShelfSelection {
         }
         $selectedCard=Get-Hc3DShelfSelectedCardForGroup $groupKey
         if($null-ne$group.Header){
-            $group.Header.Text=$(if($null-ne$selectedCard){$group.Title+'   •   '+$selectedCard.Platform}else{$group.Title})
+            $group.Header.Text=$(if($null-ne$selectedCard){$group.Title+'   •   '+$selectedCard.DisplayName}else{$group.Title})
             $group.Header.Foreground=$(if($groupFocused){'#E7C45E'}else{'#D8E0EA'})
         }
     }
@@ -381,7 +435,8 @@ function New-Hc3DShelfCard([string]$Platform,[int]$PlatformIndex,[string]$Group,
     $icon.HorizontalAlignment='Center';$icon.VerticalAlignment='Center';$visualHost.Child=$icon
     [System.Windows.Controls.Grid]::SetRow($visualHost,0);$grid.Children.Add($visualHost)|Out-Null
     $label=New-Object System.Windows.Controls.TextBlock
-    $label.Text=$Platform;$label.FontSize=11;$label.FontWeight='SemiBold';$label.Foreground='White'
+    $displayName=Get-HcPlatformDisplayLabel $Platform $Group
+    $label.Text=$displayName;$label.FontSize=11;$label.FontWeight='SemiBold';$label.Foreground='White'
     $label.HorizontalAlignment='Center';$label.TextAlignment='Center';$label.TextTrimming='CharacterEllipsis';$label.Margin='3,3,3,0'
     [System.Windows.Controls.Grid]::SetRow($label,1);$grid.Children.Add($label)|Out-Null
     $summary=Get-PlatformCountSummary $Platform
@@ -397,7 +452,7 @@ function New-Hc3DShelfCard([string]$Platform,[int]$PlatformIndex,[string]$Group,
     else{$button.ToolTip='A/Cross Open platform   •   X/Square View 3D model'}
     [pscustomobject]@{
         ActionIndex=$ActionIndex;PlatformIndex=$PlatformIndex;ShelfIndex=$ShelfIndex;Group=$Group
-        Platform=$Platform;Button=$button;VisualHost=$visualHost;Icon=$icon;Label=$label;Count=$count
+        Platform=$Platform;DisplayName=$displayName;Button=$button;VisualHost=$visualHost;Icon=$icon;Label=$label;Count=$count
         Path=$path;View=$null;Loading=$false;Failed=$false
     }
 }
@@ -420,7 +475,7 @@ function Add-Hc3DShelfGroup([string]$Key,[string]$Title,[object[]]$Entries){
         [void]$cards.Add($card);[void]$script:Hc3DShelfCards.Add($card)
         $row.Children.Add($card.Button)|Out-Null
         $script:ActionButtons+=$card.Button
-        $script:CurrentActions+=(New-Action ('platform-select:'+$platformIndex) $platform)
+        $script:CurrentActions+=(New-Action ('platform-select:'+$platformIndex) ([string]$card.DisplayName))
     }
 
     $scroll=New-Object System.Windows.Controls.ScrollViewer

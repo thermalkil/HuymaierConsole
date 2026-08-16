@@ -228,7 +228,7 @@ function Test-HcGpuShelfCacheCurrent([string]$ModelPath,[string]$CachePath){
         $reader=New-Object IO.BinaryReader($stream)
         $magic=-join$reader.ReadChars(4)
         if($magic-ne'HC3D'){return $false}
-        if($reader.ReadInt32()-ne2){return $false}
+        if($reader.ReadInt32()-ne3){return $false}
         if($reader.ReadInt64()-ne[int64]$source.Length){return $false}
         if($reader.ReadInt64()-ne[int64]$source.LastWriteTimeUtc.Ticks){return $false}
         return ($reader.ReadInt32()-eq[int]$script:HcGpuShelfCacheQuality)
@@ -383,7 +383,7 @@ function Update-HcGpuShelfLayoutForGroup($Group,[bool]$Focused){
         }catch{}
     }
     $selectedCard=Get-HcGpuShelfSelectedCardForGroup ([string]$Group.Key)
-    if($Group.Header){$Group.Header.Text=$(if($selectedCard){$Group.Title+'   •   '+$selectedCard.Platform}else{$Group.Title});$Group.Header.Foreground=$(if($Focused){'#E7C45E'}else{'#D8E0EA'})}
+    if($Group.Header){$Group.Header.Text=$(if($selectedCard){$Group.Title+'   •   '+$selectedCard.DisplayName}else{$Group.Title});$Group.Header.Foreground=$(if($Focused){'#E7C45E'}else{'#D8E0EA'})}
 }
 
 function Center-HcGpuShelfSelection($Card){
@@ -417,14 +417,15 @@ function New-HcGpuShelfCard([string]$Platform,[int]$PlatformIndex,[string]$Group
     $grid=New-Object System.Windows.Controls.Grid;$grid.RowDefinitions.Add((New-Object System.Windows.Controls.RowDefinition -Property @{Height='*'}));$grid.RowDefinitions.Add((New-Object System.Windows.Controls.RowDefinition -Property @{Height='Auto'}));$grid.RowDefinitions.Add((New-Object System.Windows.Controls.RowDefinition -Property @{Height='Auto'}))
     $visualHost=New-Object System.Windows.Controls.Border;$visualHost.Background='Transparent';$visualHost.BorderThickness='0';$visualHost.Height=140;$visualHost.HorizontalAlignment='Stretch';$visualHost.VerticalAlignment='Stretch';$visualHost.ClipToBounds=$false
     $icon=New-PlatformIconImage $Platform 108;$icon.HorizontalAlignment='Center';$icon.VerticalAlignment='Center';$visualHost.Child=$icon;[System.Windows.Controls.Grid]::SetRow($visualHost,0);$grid.Children.Add($visualHost)|Out-Null
-    $label=New-Object System.Windows.Controls.TextBlock;$label.Text=$Platform;$label.FontSize=13;$label.FontWeight='SemiBold';$label.Foreground='White';$label.HorizontalAlignment='Center';$label.TextAlignment='Center';$label.TextTrimming='CharacterEllipsis';$label.Margin='3,3,3,0';[System.Windows.Controls.Grid]::SetRow($label,1);$grid.Children.Add($label)|Out-Null
+    $displayName=Get-HcPlatformDisplayLabel $Platform $Group
+    $label=New-Object System.Windows.Controls.TextBlock;$label.Text=$displayName;$label.FontSize=13;$label.FontWeight='SemiBold';$label.Foreground='White';$label.HorizontalAlignment='Center';$label.TextAlignment='Center';$label.TextTrimming='CharacterEllipsis';$label.Margin='3,3,3,0';[System.Windows.Controls.Grid]::SetRow($label,1);$grid.Children.Add($label)|Out-Null
     $summary=Get-PlatformCountSummary $Platform;$count=New-Object System.Windows.Controls.TextBlock;$count.Text=$(if([bool]$summary.Pending){'SCANNING…'}elseif([int]$summary.Owned-gt[int]$summary.Installed){([int]$summary.Installed).ToString()+' INSTALLED • '+([int]$summary.Owned).ToString()+' OWNED'}else{([int]$summary.Installed).ToString()+' GAMES'});$count.FontSize=9;$count.FontWeight='SemiBold';$count.Foreground='#94A6BE';$count.HorizontalAlignment='Center';$count.Margin='2,2,2,1';[System.Windows.Controls.Grid]::SetRow($count,2);$grid.Children.Add($count)|Out-Null
     $button.Content=$grid
     $button.Add_Click({param($sender,$eventArgs)try{Set-KeyboardActive;Invoke-UiFeedback 'Confirm';Invoke-Action ([string]$sender.Tag)}catch{try{Write-Log ('GPU shelf platform action failed: '+$_.Exception.Message) 'ERROR'}catch{}}})
     $button.Add_MouseEnter({param($sender,$eventArgs)if(-not(Test-HcMouseHoverAllowed)){return};Set-KeyboardActive;$idx=[array]::IndexOf($script:ActionButtons,$sender);if($idx-ge0){$script:SelectedAction=$idx;Update-ActionVisuals}})
     $path=Resolve-HcShelfModelPath $Platform $Group;$cache=$(if($path){Get-HcGpuShelfCachePath $path}else{$null})
     if(-not$path){$button.ToolTip='A/Cross Open platform   •   Add a matching GLB to enable the 3D shelf model'}else{$button.ToolTip='A/Cross Open platform   •   X/Square View 3D model'}
-    [pscustomobject]@{ActionIndex=$ActionIndex;PlatformIndex=$PlatformIndex;ShelfIndex=$ShelfIndex;Group=$Group;Platform=$Platform;Button=$button;VisualHost=$visualHost;Icon=$icon;Label=$label;Count=$count;Path=$path;CachePath=$cache;GpuReady=$false;Failed=$false;View=$null;Loading=$false}
+    [pscustomobject]@{ActionIndex=$ActionIndex;PlatformIndex=$PlatformIndex;ShelfIndex=$ShelfIndex;Group=$Group;Platform=$Platform;DisplayName=$displayName;Button=$button;VisualHost=$visualHost;Icon=$icon;Label=$label;Count=$count;Path=$path;CachePath=$cache;GpuReady=$false;Failed=$false;View=$null;Loading=$false}
 }
 
 function Add-HcGpuShelfGroup([string]$Key,[string]$Title,[object[]]$Entries,[double]$Height){
@@ -434,7 +435,7 @@ function Add-HcGpuShelfGroup([string]$Key,[string]$Title,[object[]]$Entries,[dou
     $surface=$null;if(Initialize-HcGpuShelfRuntime){try{$surface=New-Object HuymaierConsole.Modeling.D3D11ShelfSurface;$surface.HorizontalAlignment='Stretch';$surface.VerticalAlignment='Stretch';if($surface.PSObject.Methods['SetBrightnessPercent']){$surface.SetBrightnessPercent([double]$script:Config.PlatformModelBrightness)};$container.Children.Add($surface)|Out-Null}catch{try{Write-Log ('GPU shelf surface creation failed: '+$_.Exception.Message) 'WARN'}catch{}}}
     $row=New-Object System.Windows.Controls.StackPanel;$row.Orientation='Horizontal';$row.VerticalAlignment='Center';$row.Margin='14,0,14,0'
     $cards=New-Object System.Collections.ArrayList;$start=$script:ActionButtons.Count
-    for($local=0;$local-lt$Entries.Count;$local++){$entry=$Entries[$local];$platform=[string]$entry.Platform;$platformIndex=[int]$entry.PlatformIndex;$actionIndex=$script:ActionButtons.Count;$card=New-HcGpuShelfCard $platform $platformIndex $Key $local $actionIndex;[void]$cards.Add($card);[void]$script:Hc3DShelfCards.Add($card);$row.Children.Add($card.Button)|Out-Null;$script:ActionButtons+=$card.Button;$script:CurrentActions+=(New-Action ('platform-select:'+$platformIndex) $platform)}
+    for($local=0;$local-lt$Entries.Count;$local++){$entry=$Entries[$local];$platform=[string]$entry.Platform;$platformIndex=[int]$entry.PlatformIndex;$actionIndex=$script:ActionButtons.Count;$card=New-HcGpuShelfCard $platform $platformIndex $Key $local $actionIndex;[void]$cards.Add($card);[void]$script:Hc3DShelfCards.Add($card);$row.Children.Add($card.Button)|Out-Null;$script:ActionButtons+=$card.Button;$script:CurrentActions+=(New-Action ('platform-select:'+$platformIndex) ([string]$card.DisplayName))}
     $scroll=New-Object System.Windows.Controls.ScrollViewer;$scroll.Tag=$Key;$scroll.Height=$Height;$scroll.Background='Transparent';$scroll.HorizontalScrollBarVisibility='Hidden';$scroll.VerticalScrollBarVisibility='Disabled';$scroll.PanningMode='HorizontalOnly';$scroll.Content=$row;$scroll.HorizontalContentAlignment='Left';$scroll.VerticalContentAlignment='Center';$scroll.Add_ScrollChanged({param($sender,$eventArgs)try{Update-HcGpuShelfLayout}catch{}});$container.Children.Add($scroll)|Out-Null;$script:ActionPanel.Children.Add($container)|Out-Null
     $group=[pscustomobject]@{Key=$Key;Title=$Title;Start=$start;Cards=$cards;Row=$row;Scroll=$scroll;Header=$header;Container=$container;Surface=$surface;Height=$Height;SelectedLocalIndex=0};$script:HcGpuShelfGroups[$Key]=$group;$script:Hc3DShelfGroups[$Key]=$group;$script:HomeRows+=,[pscustomobject]@{Start=$start;Count=$cards.Count;Platform=$true}
     foreach($card in @($cards)){if($card.Path){Queue-HcGpuShelfCache $card}}

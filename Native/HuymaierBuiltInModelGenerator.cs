@@ -291,7 +291,7 @@ namespace HuymaierConsole.Modeling
                 primitives.Add("{\"attributes\":{\"POSITION\":"+posAcc+",\"NORMAL\":"+normAcc+"},\"indices\":"+idxAcc+",\"material\":"+mat+",\"mode\":4}");
             }
             bw.Flush();byte[] binBytes=bin.ToArray();bw.Dispose();bin.Dispose();
-            string json="{\"asset\":{\"version\":\"2.0\",\"generator\":\"Huymaier Console BuiltInModelGenerator v1\"},\"scene\":0,\"scenes\":[{\"nodes\":[0]}],\"nodes\":[{\"mesh\":0,\"name\":\""+name+"\"}],\"meshes\":[{\"name\":\""+name+"\",\"primitives\":["+String.Join(",",primitives.ToArray())+"]}],\"materials\":["+String.Join(",",materials.ToArray())+"],\"buffers\":[{\"byteLength\":"+binBytes.Length+"}],\"bufferViews\":["+String.Join(",",views.ToArray())+"],\"accessors\":["+String.Join(",",accessors.ToArray())+"]}";
+            string json="{\"asset\":{\"version\":\"2.0\",\"generator\":\"Huymaier Console BuiltInModelGenerator v1\"},\"scene\":0,\"scenes\":[{\"nodes\":[0]}],\"nodes\":[{\"mesh\":0,\"name\":\""+name+"\",\"rotation\":[0,1,0,0]}],\"meshes\":[{\"name\":\""+name+"\",\"primitives\":["+String.Join(",",primitives.ToArray())+"]}],\"materials\":["+String.Join(",",materials.ToArray())+"],\"buffers\":[{\"byteLength\":"+binBytes.Length+"}],\"bufferViews\":["+String.Join(",",views.ToArray())+"],\"accessors\":["+String.Join(",",accessors.ToArray())+"]}";
             byte[] jsonBytes=Encoding.UTF8.GetBytes(json);int jsonPad=(4-(jsonBytes.Length%4))%4;int binPad=(4-(binBytes.Length%4))%4;uint total=(uint)(12+8+jsonBytes.Length+jsonPad+8+binBytes.Length+binPad);
             using(FileStream fs=File.Create(path))using(BinaryWriter o=new BinaryWriter(fs))
             {

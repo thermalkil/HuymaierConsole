@@ -7,12 +7,19 @@ foreach($p in @($probe,$runtime)){if(-not(Test-Path -LiteralPath $p -PathType Le
 
 $runtimeText=Get-Content -Raw -LiteralPath $runtime -Encoding UTF8
 foreach($contract in @(
-    'float2 baseUv = float2(i.uv0.x, 1.0 - i.uv0.y)',
-    'float2 emissiveUv = float2(i.uv1.x, 1.0 - i.uv1.y)',
+    'BaseTexture.Sample(BaseSampler, i.uv0)',
+    'EmissiveTexture.Sample(EmissiveSampler,i.uv1)',
+    'MetallicRoughnessTexture.Sample(MetallicRoughnessSampler,i.uv2)',
+    'NormalTexture.Sample(NormalSampler,i.uv3)',
+    'OcclusionTexture.Sample(OcclusionSampler,i.uv4)',
     'D3D11_TEXTURE_ADDRESS_CLAMP',
     'D3D11_TEXTURE_ADDRESS_MIRROR',
     'D3D11_TEXTURE_ADDRESS_WRAP')){
     if($runtimeText.IndexOf($contract,[StringComparison]::Ordinal)-lt0){throw "Production D3D11 UV/sampler contract missing: $contract"}
+}
+
+foreach($forbidden in @('1.0 - i.uv0.y','1.0 - i.uv1.y','float2 cachedUv')){
+    if($runtimeText.IndexOf($forbidden,[StringComparison]::Ordinal)-ge0){throw "HC3D v3 reintroduced hidden UV inversion: $forbidden"}
 }
 
 $vswhere=Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
@@ -53,7 +60,7 @@ public static class HcUvAddressProbe {
     Write-Host 'platformModelUvClampPixelGate: success'
     Write-Host 'platformModelUvMirroredRepeatPixelGate: success'
     Write-Host 'platformModelUvTransformPixelGate: success'
-    Write-Host 'platformModelUvHc3dConventionGate: success'
+    Write-Host 'platformModelUvHc3dV3DirectGltfGate: success'
 }finally{
     Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
 }

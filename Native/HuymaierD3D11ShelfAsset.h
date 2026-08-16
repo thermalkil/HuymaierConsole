@@ -9,13 +9,17 @@
 
 namespace HuymaierGpuShelf
 {
-    // HUYMAIER_D3D11_GPU_ASSET_V1
+    // HUYMAIER_D3D11_GPU_ASSET_V3
     struct Vertex
     {
         float px, py, pz;
         float nx, ny, nz;
+        float tx, ty, tz, tw;
         float u0, v0;
         float u1, v1;
+        float u2, v2;
+        float u3, v3;
+        float u4, v4;
     };
 
     struct DrawBatch
@@ -24,17 +28,28 @@ namespace HuymaierGpuShelf
         uint32_t indexCount = 0;
         int32_t baseImage = -1;
         int32_t emissiveImage = -1;
+        int32_t metallicRoughnessImage = -1;
+        int32_t normalImage = -1;
+        int32_t occlusionImage = -1;
         float baseColor[4] = { 1, 1, 1, 1 };
         float emissiveColor[3] = { 0, 0, 0 };
         float emissiveStrength = 1.0f;
-        float metallic = 0.0f;
-        float roughness = 0.7f;
+        float metallic = 1.0f;
+        float roughness = 1.0f;
         float specular = 1.0f;
         float clearcoat = 0.0f;
+        float normalScale = 1.0f;
+        float occlusionStrength = 1.0f;
         int32_t baseWrapS = 10497;
         int32_t baseWrapT = 10497;
         int32_t emissiveWrapS = 10497;
         int32_t emissiveWrapT = 10497;
+        int32_t metallicRoughnessWrapS = 10497;
+        int32_t metallicRoughnessWrapT = 10497;
+        int32_t normalWrapS = 10497;
+        int32_t normalWrapT = 10497;
+        int32_t occlusionWrapS = 10497;
+        int32_t occlusionWrapT = 10497;
         int32_t alphaMode = 0;
         float alphaCutoff = 0.5f;
         int32_t flags = 0;
