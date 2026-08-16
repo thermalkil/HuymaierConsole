@@ -6,7 +6,7 @@ $aliases=Join-Path $root 'Native\HuymaierModelPreviewWpfAliases.cs'
 $compiler=Join-Path $root 'Native\HuymaierGpuShelfAssetCompiler.cs'
 foreach($p in @($loader,$aliases,$compiler)){if(-not(Test-Path -LiteralPath $p -PathType Leaf)){throw "Mirrored-winding source missing: $p"}}
 $text=Get-Content -Raw -LiteralPath $compiler -Encoding UTF8
-foreach($n in @('CacheVersion = 2','Determinant3x3','bool mirrored','ix[i + 2]','ix[i + 1]')){if($text.IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Mirrored-winding compiler contract missing: $n"}}
+foreach($n in @('CacheVersion = 3','Determinant3x3','bool mirrored','ix[i + 2]','ix[i + 1]')){if($text.IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Mirrored-winding compiler contract missing: $n"}}
 
 Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Web.Extensions
 $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
@@ -36,14 +36,14 @@ try{
 
     [HuymaierConsole.Modeling.GpuShelfAssetCompiler]::Compile($glb,$cache,128)
     $br=New-Object IO.BinaryReader([IO.File]::OpenRead($cache));try{
-        if((-join$br.ReadChars(4))-ne'HC3D'){throw 'Mirrored cache magic is invalid.'};if($br.ReadInt32()-ne2){throw 'Mirrored cache is not HC3D v2.'}
+        if((-join$br.ReadChars(4))-ne'HC3D'){throw 'Mirrored cache magic is invalid.'};if($br.ReadInt32()-ne3){throw 'Mirrored cache is not HC3D v3.'}
         [void]$br.ReadInt64();[void]$br.ReadInt64();[void]$br.ReadInt32();$vc=$br.ReadInt32();$ic=$br.ReadInt32();[void]$br.ReadInt32();[void]$br.ReadInt32();for($i=0;$i-lt6;$i++){[void]$br.ReadSingle()}
         if($vc-ne3-or$ic-ne3){throw "Unexpected mirrored probe counts v=$vc i=$ic"}
-        $br.BaseStream.Position+=($vc*40)
+        $br.BaseStream.Position+=($vc*80)
         $i0=$br.ReadUInt32();$i1=$br.ReadUInt32();$i2=$br.ReadUInt32()
         if($i0-ne0-or$i1-ne2-or$i2-ne1){throw "Negative-determinant triangle winding was not repaired: $i0,$i1,$i2"}
     }finally{$br.Dispose()}
     Write-Host 'platformModelMirroredNodeDetectionGate: success'
     Write-Host 'platformModelMirroredTriangleWindingGate: success'
-    Write-Host 'platformModelHc3dV2CacheGate: success'
+    Write-Host 'platformModelHc3dV3CacheGate: success'
 }finally{Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue}

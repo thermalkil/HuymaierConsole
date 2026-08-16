@@ -55,16 +55,16 @@ foreach($screen in @(1080.0,2160.0)){
 
 $nativeText=Get-Content -Raw $native -Encoding UTF8
 foreach($n in @(
-    'HUYMAIER_D3D11_SHARED_SHELF_RUNTIME_V1','std::unordered_map<std::wstring, std::weak_ptr<Asset>> assets','std::shared_ptr<Asset> asset',
+    'HUYMAIER_D3D11_SHARED_SHELF_RUNTIME_V3','std::unordered_map<std::wstring, std::weak_ptr<Asset>> assets','std::shared_ptr<Asset> asset',
     'HC_GPU_LoadShelfModel','HC_GPU_SetShelfItem','HC_GPU_SetShelfBrightness','HC_GPU_RenderShelfSurface','phase*16.0f',
     'D3D11_CULL_BACK','FrontCounterClockwise=TRUE','rasterizerSingleSided','rasterizerDoubleSided','D3D11_CULL_NONE',
-    'float2 baseUv = float2(i.uv0.x, 1.0 - i.uv0.y)','float2 emissiveUv = float2(i.uv1.x, 1.0 - i.uv1.y)','s.brightness'
+    'MetallicRoughnessTexture : register(t2)','NormalTexture : register(t3)','OcclusionTexture : register(t4)','SV_IsFrontFace','s.brightness'
 )){if(-not$nativeText.Contains($n)){throw "Native persistent GPU shelf contract missing: $n"}}
 foreach($bad in @('HC_GPU_UnloadShelfModel','erase(id)')){if($nativeText.Contains($bad)){throw "Native shelf exposes distance-style model eviction: $bad"}}
-$assetText=Get-Content -Raw $asset -Encoding UTF8;foreach($n in @('version != 2','D3D11_USAGE_IMMUTABLE','D3D11_RESOURCE_MISC_GENERATE_MIPS','GenerateMips')){if(-not$assetText.Contains($n)){throw "GPU asset upload contract missing: $n"}}
+$assetText=Get-Content -Raw $asset -Encoding UTF8;foreach($n in @('version!=3','D3D11_USAGE_IMMUTABLE','D3D11_RESOURCE_MISC_GENERATE_MIPS','GenerateMips')){if(-not$assetText.Contains($n)){throw "GPU asset upload contract missing: $n"}}
 $uvSmokeText=Get-Content -Raw $uvSmoke -Encoding UTF8;foreach($n in @('HC_D3D11UvAddressSmokeTest','D3D11_TEXTURE_ADDRESS_WRAP','D3D11_TEXTURE_ADDRESS_CLAMP','D3D11_TEXTURE_ADDRESS_MIRROR','PixelEquals')){if(-not$uvSmokeText.Contains($n)){throw "GPU UV-addressing smoke contract missing: $n"}}
 $hostText=Get-Content -Raw $hostSource -Encoding UTF8;foreach($n in @('HUYMAIER_D3D11_SHELF_HOST_V2','HUYMAIER_D3D11_DPI_AWARE_SHELF_V1','D3DImage','ReplayState','CompositionTarget.Rendering','VisualTreeHelper.GetDpi','dpiScaleX','dpiScaleY','PixelWidthFor','PixelHeightFor','ApplyItemToNative','modelPaths','itemStates','HC_GPU_SetShelfBrightness','SetBrightnessPercent')){if(-not$hostText.Contains($n)){throw "Managed GPU shelf host contract missing: $n"}}
-$compilerText=Get-Content -Raw $compiler -Encoding UTF8;foreach($n in @('HUYMAIER_GPU_SHELF_ASSET_CACHE_V1','CacheVersion = 2','Determinant3x3','bool mirrored','ix[i + 2]','ix[i + 1]','DefaultShelfTextureSize = 512','DecodePixelWidth','DecodePixelHeight','IsCacheCurrent','EnsureCompiled')){if(-not$compilerText.Contains($n)){throw "Persistent HC3D v2 compiler contract missing: $n"}}
+$compilerText=Get-Content -Raw $compiler -Encoding UTF8;foreach($n in @('HUYMAIER_GPU_SHELF_ASSET_CACHE_V3','CacheVersion = 3','Determinant3x3','bool mirrored','ix[i + 2]','ix[i + 1]','DefaultShelfTextureSize = 512','DecodePixelWidth','DecodePixelHeight','IsCacheCurrent','EnsureCompiled')){if(-not$compilerText.Contains($n)){throw "Persistent HC3D v2 compiler contract missing: $n"}}
 $userText=Get-Content -Raw $userRuntime -Encoding UTF8;foreach($n in @('PlatformModelBrightness','3D model brightness','platform-model-brightness-slider')){if(-not$userText.Contains($n)){throw "Shared model-brightness setting contract missing: $n"}}
 $programText=Get-Content -Raw $program -Encoding UTF8;if(-not$programText.Contains('HUYMAIER_GPU_SHELF_COMPILER_PROGRAM_V1')-or-not$programText.Contains('GpuShelfAssetCompiler.EnsureCompiled')){throw 'Background cache compiler program contract is incomplete.'}
 
@@ -97,5 +97,5 @@ try{
 
 foreach($gate in @(
     'platformModelV7FinalOwnerGate','platformModelAllInstalledModelsStay3DGate','platformModelNoDistanceIconReversionGate','platformModelGpuShelfFullHeightGate','platformModelBackgroundCacheCompilerGate','platformModelGpuViewportOnlyCullingGate','platformModelNativeTurntableGate','platformModelSharedGpuAssetCacheGate','platformModelGpuMipTextureGate','platformModelV7ReleaseSourceGate','platformModelV7LoadOrderGate','platformModelV7InstallerPayloadGate','platformModelD3D11DpiAwareShelfGate','platformModelCanonicalRecompsReleaseGate',
-    'platformModelHc3dV2ReleaseGate','platformModelMaterialFaceCullingReleaseGate','platformModelBrightnessReleaseGate','platformModelFullViewerUvReleaseGate','platformNamingReleaseGate','recompsProviderActionsReleaseGate'
+    'platformModelHc3dV3ReleaseGate','platformModelMaterialFaceCullingReleaseGate','platformModelBrightnessReleaseGate','platformModelFullViewerUvReleaseGate','platformNamingReleaseGate','recompsProviderActionsReleaseGate'
 )){Write-Host ($gate+': success')}
