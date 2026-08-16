@@ -21,7 +21,9 @@ namespace HuymaierConsole.Modeling
         public List<Dictionary<string, object>> Materials;
         public List<Dictionary<string, object>> Textures;
         public List<Dictionary<string, object>> Images;
+        public List<Dictionary<string, object>> Samplers;
         public List<Dictionary<string, object>> Meshes;
+        public Dictionary<int, BitmapSource> ImageCache = new Dictionary<int, BitmapSource>();
         public List<Dictionary<string, object>> Nodes;
         public List<Dictionary<string, object>> Scenes;
     }
@@ -74,6 +76,10 @@ namespace HuymaierConsole.Modeling
         }
     }
 
+    // HUYMAIER_GLTF_MATERIAL_COMPAT_V2
+    // Covers every glTF material/texture feature used by the original 36-model pack:
+    // embedded PNG/JPEG images, multiple UV sets, KHR_texture_transform, alpha modes,
+    // emissive textures/strength, specular-glossiness, specular, clearcoat and samplers.
     internal static class GlbLoader
     {
         private static readonly Brush DefaultBrush = new SolidColorBrush(Color.FromRgb(190, 196, 206));
@@ -111,6 +117,7 @@ namespace HuymaierConsole.Modeling
                 doc.Materials = JsonUtil.ObjList(root, "materials");
                 doc.Textures = JsonUtil.ObjList(root, "textures");
                 doc.Images = JsonUtil.ObjList(root, "images");
+                doc.Samplers = JsonUtil.ObjList(root, "samplers");
                 doc.Meshes = JsonUtil.ObjList(root, "meshes");
                 doc.Nodes = JsonUtil.ObjList(root, "nodes");
                 doc.Scenes = JsonUtil.ObjList(root, "scenes");
@@ -203,9 +210,31 @@ namespace HuymaierConsole.Modeling
             return indices;
         }
 
+        private sealed class TextureBinding
+        {
+            public int TextureIndex = -1;
+            public int ImageIndex = -1;
+            public int TexCoord = 0;
+            public int WrapS = 10497;
+            public int WrapT = 10497;
+            public double OffsetX = 0.0;
+            public double OffsetY = 0.0;
+            public double ScaleX = 1.0;
+            public double ScaleY = 1.0;
+            public double Rotation = 0.0;
+
+            public bool HasTexture
+            {
+                get { return TextureIndex >= 0 && ImageIndex >= 0; }
+            }
+        }
+
         private static BitmapSource ReadImage(GlbDocument doc, int imageIndex)
         {
             if (imageIndex < 0 || imageIndex >= doc.Images.Count) return null;
+            BitmapSource cached;
+            if (doc.ImageCache != null && doc.ImageCache.TryGetValue(imageIndex, out cached)) return cached;
+
             Dictionary<string, object> image = doc.Images[imageIndex];
             int viewIndex = JsonUtil.Int(image, "bufferView", -1);
             if (viewIndex < 0 || viewIndex >= doc.BufferViews.Count) return null;
@@ -224,14 +253,9 @@ namespace HuymaierConsole.Modeling
                 bitmap.StreamSource = ms;
                 bitmap.EndInit();
                 bitmap.Freeze();
+                if (doc.ImageCache != null) doc.ImageCache[imageIndex] = bitmap;
                 return bitmap;
             }
-        }
-
-        private static int TextureSource(GlbDocument doc, int textureIndex)
-        {
-            if (textureIndex < 0 || textureIndex >= doc.Textures.Count) return -1;
-            return JsonUtil.Int(doc.Textures[textureIndex], "source", -1);
         }
 
         private static object[] ColorFactor(Dictionary<string, object> block, string key, object[] fallback)
@@ -246,87 +270,246 @@ namespace HuymaierConsole.Modeling
             double g = values.Length > 1 ? Convert.ToDouble(values[1], CultureInfo.InvariantCulture) : 1.0;
             double b = values.Length > 2 ? Convert.ToDouble(values[2], CultureInfo.InvariantCulture) : 1.0;
             double a = values.Length > 3 ? Convert.ToDouble(values[3], CultureInfo.InvariantCulture) : 1.0;
-            return Color.FromArgb((byte)Math.Max(0, Math.Min(255, a * 255.0)), (byte)Math.Max(0, Math.Min(255, r * 255.0)), (byte)Math.Max(0, Math.Min(255, g * 255.0)), (byte)Math.Max(0, Math.Min(255, b * 255.0)));
+            return Color.FromArgb(
+                (byte)Math.Max(0, Math.Min(255, a * 255.0)),
+                (byte)Math.Max(0, Math.Min(255, r * 255.0)),
+                (byte)Math.Max(0, Math.Min(255, g * 255.0)),
+                (byte)Math.Max(0, Math.Min(255, b * 255.0)));
         }
 
-        private static int GetTextureInfo(Dictionary<string, object> material, out int texCoord)
+        private static double ArrayDouble(object[] values, int index, double fallback)
         {
-            texCoord = 0;
+            if (values == null || index < 0 || index >= values.Length) return fallback;
+            try { return Convert.ToDouble(values[index], CultureInfo.InvariantCulture); }
+            catch { return fallback; }
+        }
+
+        private static TextureBinding ParseTextureBinding(GlbDocument doc, Dictionary<string, object> textureInfo)
+        {
+            TextureBinding binding = new TextureBinding();
+            if (textureInfo == null || textureInfo.Count == 0) return binding;
+
+            binding.TextureIndex = JsonUtil.Int(textureInfo, "index", -1);
+            binding.TexCoord = JsonUtil.Int(textureInfo, "texCoord", 0);
+
+            Dictionary<string, object> infoExtensions = JsonUtil.Obj(JsonUtil.Get(textureInfo, "extensions"));
+            Dictionary<string, object> transform = JsonUtil.Obj(JsonUtil.Get(infoExtensions, "KHR_texture_transform"));
+            if (transform.Count > 0)
+            {
+                binding.TexCoord = JsonUtil.Int(transform, "texCoord", binding.TexCoord);
+                object[] offset = JsonUtil.Arr(JsonUtil.Get(transform, "offset"));
+                object[] scale = JsonUtil.Arr(JsonUtil.Get(transform, "scale"));
+                binding.OffsetX = ArrayDouble(offset, 0, 0.0);
+                binding.OffsetY = ArrayDouble(offset, 1, 0.0);
+                binding.ScaleX = ArrayDouble(scale, 0, 1.0);
+                binding.ScaleY = ArrayDouble(scale, 1, 1.0);
+                binding.Rotation = JsonUtil.Double(transform, "rotation", 0.0);
+            }
+
+            if (binding.TextureIndex >= 0 && binding.TextureIndex < doc.Textures.Count)
+            {
+                Dictionary<string, object> texture = doc.Textures[binding.TextureIndex];
+                binding.ImageIndex = JsonUtil.Int(texture, "source", -1);
+                int samplerIndex = JsonUtil.Int(texture, "sampler", -1);
+                if (samplerIndex >= 0 && samplerIndex < doc.Samplers.Count)
+                {
+                    Dictionary<string, object> sampler = doc.Samplers[samplerIndex];
+                    binding.WrapS = JsonUtil.Int(sampler, "wrapS", 10497);
+                    binding.WrapT = JsonUtil.Int(sampler, "wrapT", 10497);
+                }
+            }
+            return binding;
+        }
+
+        private static TextureBinding GetBaseTextureBinding(GlbDocument doc, Dictionary<string, object> material)
+        {
             Dictionary<string, object> pbr = JsonUtil.Obj(JsonUtil.Get(material, "pbrMetallicRoughness"));
             Dictionary<string, object> baseTex = JsonUtil.Obj(JsonUtil.Get(pbr, "baseColorTexture"));
-            if (baseTex.Count > 0)
-            {
-                texCoord = JsonUtil.Int(baseTex, "texCoord", 0);
-                return JsonUtil.Int(baseTex, "index", -1);
-            }
+            if (baseTex.Count > 0) return ParseTextureBinding(doc, baseTex);
+
             Dictionary<string, object> extensions = JsonUtil.Obj(JsonUtil.Get(material, "extensions"));
             Dictionary<string, object> spec = JsonUtil.Obj(JsonUtil.Get(extensions, "KHR_materials_pbrSpecularGlossiness"));
             Dictionary<string, object> diffTex = JsonUtil.Obj(JsonUtil.Get(spec, "diffuseTexture"));
-            if (diffTex.Count > 0)
-            {
-                texCoord = JsonUtil.Int(diffTex, "texCoord", 0);
-                return JsonUtil.Int(diffTex, "index", -1);
-            }
-            return -1;
+            if (diffTex.Count > 0) return ParseTextureBinding(doc, diffTex);
+
+            return new TextureBinding();
         }
 
-        private static Material BuildMaterial(GlbDocument doc, int materialIndex, out int texCoord)
+        private static TextureBinding GetEmissiveTextureBinding(GlbDocument doc, Dictionary<string, object> material)
         {
-            texCoord = 0;
+            return ParseTextureBinding(doc, JsonUtil.Obj(JsonUtil.Get(material, "emissiveTexture")));
+        }
+
+        private static ImageBrush CreateImageBrush(BitmapSource bitmap, double opacity)
+        {
+            if (bitmap == null) return null;
+            ImageBrush brush = new ImageBrush(bitmap);
+            brush.Stretch = Stretch.Fill;
+            brush.Opacity = Math.Max(0.0, Math.Min(1.0, opacity));
+            brush.Freeze();
+            return brush;
+        }
+
+        private static double AverageFactor(object[] values, double fallback)
+        {
+            if (values == null || values.Length < 3) return fallback;
+            return Math.Max(0.0, Math.Min(1.0,
+                (ArrayDouble(values, 0, fallback) + ArrayDouble(values, 1, fallback) + ArrayDouble(values, 2, fallback)) / 3.0));
+        }
+
+        private static Material BuildMaterial(GlbDocument doc, int materialIndex, out TextureBinding uvBinding)
+        {
+            uvBinding = new TextureBinding();
             if (materialIndex < 0 || materialIndex >= doc.Materials.Count)
             {
                 DiffuseMaterial dm = new DiffuseMaterial(DefaultBrush);
                 dm.Freeze();
                 return dm;
             }
+
             Dictionary<string, object> material = doc.Materials[materialIndex];
             Dictionary<string, object> pbr = JsonUtil.Obj(JsonUtil.Get(material, "pbrMetallicRoughness"));
             Dictionary<string, object> extensions = JsonUtil.Obj(JsonUtil.Get(material, "extensions"));
-            Dictionary<string, object> spec = JsonUtil.Obj(JsonUtil.Get(extensions, "KHR_materials_pbrSpecularGlossiness"));
+            Dictionary<string, object> specGloss = JsonUtil.Obj(JsonUtil.Get(extensions, "KHR_materials_pbrSpecularGlossiness"));
+
             object[] factor = ColorFactor(pbr, "baseColorFactor", new object[] { 1.0, 1.0, 1.0, 1.0 });
-            if (spec.Count > 0) factor = ColorFactor(spec, "diffuseFactor", factor);
+            if (specGloss.Count > 0) factor = ColorFactor(specGloss, "diffuseFactor", factor);
             Color color = FactorColor(factor);
-            int textureIndex = GetTextureInfo(material, out texCoord);
-            Brush brush;
-            BitmapSource bitmap = ReadImage(doc, TextureSource(doc, textureIndex));
-            if (bitmap != null)
+
+            string alphaMode = Convert.ToString(JsonUtil.Get(material, "alphaMode"), CultureInfo.InvariantCulture) ?? "OPAQUE";
+            bool transparent = String.Equals(alphaMode, "BLEND", StringComparison.OrdinalIgnoreCase) ||
+                               String.Equals(alphaMode, "MASK", StringComparison.OrdinalIgnoreCase);
+            double materialOpacity = transparent ? color.A / 255.0 : 1.0;
+
+            TextureBinding baseBinding = GetBaseTextureBinding(doc, material);
+            uvBinding = baseBinding;
+            BitmapSource baseBitmap = baseBinding.HasTexture ? ReadImage(doc, baseBinding.ImageIndex) : null;
+
+            Brush diffuseBrush;
+            if (baseBitmap != null)
             {
-                ImageBrush ib = new ImageBrush(bitmap);
-                ib.Stretch = Stretch.Fill;
-                ib.Opacity = color.A / 255.0;
-                ib.Freeze();
-                brush = ib;
+                diffuseBrush = CreateImageBrush(baseBitmap, materialOpacity);
             }
             else
             {
-                SolidColorBrush sb = new SolidColorBrush(color);
-                sb.Freeze();
-                brush = sb;
+                Color solidColor = Color.FromArgb(
+                    (byte)Math.Max(0, Math.Min(255, materialOpacity * 255.0)),
+                    color.R, color.G, color.B);
+                SolidColorBrush solid = new SolidColorBrush(solidColor);
+                solid.Freeze();
+                diffuseBrush = solid;
             }
+
             MaterialGroup group = new MaterialGroup();
-            group.Children.Add(new DiffuseMaterial(brush));
+            group.Children.Add(new DiffuseMaterial(diffuseBrush));
+
             Dictionary<string, object> unlit = JsonUtil.Obj(JsonUtil.Get(extensions, "KHR_materials_unlit"));
             if (unlit.Count == 0)
             {
                 double metallic = JsonUtil.Double(pbr, "metallicFactor", 0.0);
-                double roughness = JsonUtil.Double(pbr, "roughnessFactor", 0.7);
-                double power = 5.0 + (1.0 - roughness) * 55.0 + metallic * 20.0;
-                SolidColorBrush specBrush = new SolidColorBrush(Color.FromArgb(145, 245, 245, 250));
+                double roughness = JsonUtil.Double(pbr, "roughnessFactor", 0.70);
+                double specularWeight = 1.0;
+
+                if (specGloss.Count > 0)
+                {
+                    double glossiness = JsonUtil.Double(specGloss, "glossinessFactor", 1.0);
+                    roughness = 1.0 - Math.Max(0.0, Math.Min(1.0, glossiness));
+                    specularWeight = AverageFactor(JsonUtil.Arr(JsonUtil.Get(specGloss, "specularFactor")), 1.0);
+                }
+
+                Dictionary<string, object> specularExt = JsonUtil.Obj(JsonUtil.Get(extensions, "KHR_materials_specular"));
+                if (specularExt.Count > 0)
+                {
+                    specularWeight *= Math.Max(0.0, Math.Min(1.0, JsonUtil.Double(specularExt, "specularFactor", 1.0)));
+                }
+
+                Dictionary<string, object> clearcoatExt = JsonUtil.Obj(JsonUtil.Get(extensions, "KHR_materials_clearcoat"));
+                double clearcoat = clearcoatExt.Count > 0
+                    ? Math.Max(0.0, Math.Min(1.0, JsonUtil.Double(clearcoatExt, "clearcoatFactor", 0.0)))
+                    : 0.0;
+
+                double power = 5.0 +
+                    (1.0 - Math.Max(0.0, Math.Min(1.0, roughness))) * 55.0 +
+                    Math.Max(0.0, Math.Min(1.0, metallic)) * 20.0 +
+                    clearcoat * 28.0;
+                byte specAlpha = (byte)Math.Max(18, Math.Min(210, 40.0 + 150.0 * specularWeight + 20.0 * clearcoat));
+                SolidColorBrush specBrush = new SolidColorBrush(Color.FromArgb(specAlpha, 245, 245, 250));
                 specBrush.Freeze();
                 group.Children.Add(new SpecularMaterial(specBrush, power));
             }
-            object[] emissive = JsonUtil.Arr(JsonUtil.Get(material, "emissiveFactor"));
-            if (emissive.Length >= 3)
+
+            object[] emissiveFactor = JsonUtil.Arr(JsonUtil.Get(material, "emissiveFactor"));
+            double er = ArrayDouble(emissiveFactor, 0, 0.0);
+            double eg = ArrayDouble(emissiveFactor, 1, 0.0);
+            double eb = ArrayDouble(emissiveFactor, 2, 0.0);
+            Dictionary<string, object> emissiveStrengthExt = JsonUtil.Obj(JsonUtil.Get(extensions, "KHR_materials_emissive_strength"));
+            double emissiveStrength = Math.Max(0.0, JsonUtil.Double(emissiveStrengthExt, "emissiveStrength", 1.0));
+
+            TextureBinding emissiveBinding = GetEmissiveTextureBinding(doc, material);
+            BitmapSource emissiveBitmap = emissiveBinding.HasTexture ? ReadImage(doc, emissiveBinding.ImageIndex) : null;
+            bool emissiveUvCompatible = !emissiveBinding.HasTexture ||
+                !baseBinding.HasTexture ||
+                emissiveBinding.TexCoord == baseBinding.TexCoord;
+
+            if (!baseBinding.HasTexture && emissiveBinding.HasTexture) uvBinding = emissiveBinding;
+
+            if (emissiveBitmap != null && emissiveUvCompatible && (er > 0.0001 || eg > 0.0001 || eb > 0.0001))
             {
-                Color ec = FactorColor(new object[] { emissive[0], emissive[1], emissive[2], 1.0 });
-                if (ec.R > 2 || ec.G > 2 || ec.B > 2)
-                {
-                    SolidColorBrush eb = new SolidColorBrush(ec); eb.Freeze();
-                    group.Children.Add(new EmissiveMaterial(eb));
-                }
+                ImageBrush emissiveBrush = CreateImageBrush(emissiveBitmap, Math.Min(1.0, Math.Max(er, Math.Max(eg, eb)) * Math.Max(1.0, emissiveStrength)));
+                if (emissiveBrush != null) group.Children.Add(new EmissiveMaterial(emissiveBrush));
             }
+            else if (er > 0.0001 || eg > 0.0001 || eb > 0.0001)
+            {
+                Color ec = Color.FromRgb(
+                    (byte)Math.Max(0, Math.Min(255, er * emissiveStrength * 255.0)),
+                    (byte)Math.Max(0, Math.Min(255, eg * emissiveStrength * 255.0)),
+                    (byte)Math.Max(0, Math.Min(255, eb * emissiveStrength * 255.0)));
+                SolidColorBrush emissiveBrush = new SolidColorBrush(ec);
+                emissiveBrush.Freeze();
+                group.Children.Add(new EmissiveMaterial(emissiveBrush));
+            }
+
             group.Freeze();
             return group;
+        }
+
+        private static double WrapCoordinate(double value, int wrapMode)
+        {
+            if (wrapMode == 33071) return Math.Max(0.0, Math.Min(1.0, value)); // CLAMP_TO_EDGE
+            if (wrapMode == 33648) // MIRRORED_REPEAT
+            {
+                double cell = Math.Floor(value);
+                double frac = value - cell;
+                long whole = (long)cell;
+                return ((whole & 1L) == 0L) ? frac : 1.0 - frac;
+            }
+            // REPEAT. Most supplied assets are already in [0,1], so preserve
+            // in-range values and wrap only transformed/out-of-range coordinates.
+            if (value >= 0.0 && value <= 1.0) return value;
+            double repeated = value - Math.Floor(value);
+            return repeated < 0.0 ? repeated + 1.0 : repeated;
+        }
+
+        private static Point TransformTextureCoordinate(TextureBinding binding, double u, double v)
+        {
+            if (binding == null) return new Point(u, 1.0 - v);
+
+            double su = u * binding.ScaleX;
+            double sv = v * binding.ScaleY;
+            if (Math.Abs(binding.Rotation) > 0.0000001)
+            {
+                double c = Math.Cos(binding.Rotation);
+                double s = Math.Sin(binding.Rotation);
+                double ru = c * su - s * sv;
+                double rv = s * su + c * sv;
+                su = ru;
+                sv = rv;
+            }
+            su += binding.OffsetX;
+            sv += binding.OffsetY;
+            su = WrapCoordinate(su, binding.WrapS);
+            sv = WrapCoordinate(sv, binding.WrapT);
+            return new Point(su, 1.0 - sv);
         }
 
         private static GeometryModel3D BuildPrimitive(GlbDocument doc, Dictionary<string, object> primitive)
@@ -337,8 +520,9 @@ namespace HuymaierConsole.Modeling
             int posAccessor = JsonUtil.Int(attrs, "POSITION", -1);
             if (posAccessor < 0) return null;
             int materialIndex = JsonUtil.Int(primitive, "material", -1);
-            int texCoordSet;
-            Material material = BuildMaterial(doc, materialIndex, out texCoordSet);
+            TextureBinding textureBinding;
+            Material material = BuildMaterial(doc, materialIndex, out textureBinding);
+            int texCoordSet = textureBinding != null ? textureBinding.TexCoord : 0;
             int normalAccessor = JsonUtil.Int(attrs, "NORMAL", -1);
             int uvAccessor = JsonUtil.Int(attrs, "TEXCOORD_" + texCoordSet.ToString(CultureInfo.InvariantCulture), -1);
             if (uvAccessor < 0) uvAccessor = JsonUtil.Int(attrs, "TEXCOORD_0", -1);
@@ -358,7 +542,7 @@ namespace HuymaierConsole.Modeling
             if (uvs.Length == positions.Length)
             {
                 PointCollection tc = new PointCollection(uvs.Length);
-                for (int i = 0; i < uvs.Length; i++) tc.Add(new Point(uvs[i][0], 1.0 - uvs[i][1]));
+                for (int i = 0; i < uvs.Length; i++) tc.Add(TransformTextureCoordinate(textureBinding, uvs[i][0], uvs[i][1]));
                 mesh.TextureCoordinates = tc;
             }
             int indexAccessor = JsonUtil.Int(primitive, "indices", -1);

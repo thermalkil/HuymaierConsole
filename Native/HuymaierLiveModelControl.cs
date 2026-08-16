@@ -301,6 +301,9 @@ namespace HuymaierConsole.Modeling
         public bool CardMode { get; private set; }
         public int GeometryCount { get; private set; }
         public int VertexCount { get; private set; }
+        public int MaterialCount { get; private set; }
+        public int TextureCount { get; private set; }
+        public int ImageCount { get; private set; }
         public double Yaw { get { return yawRotation.Angle; } }
         public double Pitch { get { return pitchRotation.Angle; } }
         public double ZoomDistance { get { return zoomDistance; } }
@@ -319,6 +322,9 @@ namespace HuymaierConsole.Modeling
             IsHitTestVisible = false;
 
             GlbDocument doc = GlbLoader.Read(ModelPath);
+            MaterialCount = doc.Materials == null ? 0 : doc.Materials.Count;
+            TextureCount = doc.Textures == null ? 0 : doc.Textures.Count;
+            ImageCount = doc.Images == null ? 0 : doc.Images.Count;
             Model3DGroup model = cardMode ? CardSceneBuilder.BuildScene(doc) : GlbLoader.BuildScene(doc);
             GeometryCount = CountGeometry(model);
             VertexCount = CountVertices(model);
@@ -327,9 +333,16 @@ namespace HuymaierConsole.Modeling
             Rect3D bounds = model.Bounds;
             if (bounds.IsEmpty || !Finite(bounds.X) || !Finite(bounds.Y) || !Finite(bounds.Z) || !Finite(bounds.SizeX) || !Finite(bounds.SizeY) || !Finite(bounds.SizeZ))
                 throw new InvalidDataException("GLB scene bounds are empty or non-finite.");
-            double maxDimension = Math.Max(bounds.SizeX, Math.Max(bounds.SizeY, bounds.SizeZ));
-            if (!Finite(maxDimension) || maxDimension <= 0.00001) throw new InvalidDataException("GLB scene bounds have no usable size.");
-            normalizedScale = 2.15 / maxDimension;
+            // HUYMAIER_ROTATION_SAFE_MODEL_FRAMING_V2
+            // Fit against the full 3D bounding diagonal rather than only the
+            // largest axis. The diagonal is invariant under turntable rotation,
+            // so wide/deep console models cannot become clipped at oblique yaw.
+            double boundingDiameter = Math.Sqrt(
+                bounds.SizeX * bounds.SizeX +
+                bounds.SizeY * bounds.SizeY +
+                bounds.SizeZ * bounds.SizeZ);
+            if (!Finite(boundingDiameter) || boundingDiameter <= 0.00001) throw new InvalidDataException("GLB scene bounds have no usable size.");
+            normalizedScale = 2.80 / boundingDiameter;
 
             Point3D center = new Point3D(
                 bounds.X + bounds.SizeX / 2.0,

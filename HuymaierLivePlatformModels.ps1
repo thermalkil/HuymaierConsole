@@ -1,4 +1,5 @@
-# HUYMAIER_LIVE_PLATFORM_3D_HELPERS_V2
+# HUYMAIER_LIVE_PLATFORM_3D_HELPERS_V3
+# HUYMAIER_CONTEXT_AWARE_MODEL_VIEWER_V1
 # GLB/ViewPort3D helper and full-screen model viewer only.
 #
 # This module does not create Games cards, inject Settings actions, or own the
@@ -80,10 +81,10 @@ function Close-HcPlatformModelViewer {
 }
 
 function Open-HcPlatformModelViewer {
-    param([string]$Platform)
+    param([string]$Platform,[string]$ModelPath='')
     if([string]::IsNullOrWhiteSpace($Platform)){return $false}
-    $path=''
-    try{$path=Resolve-HcLivePlatformModelPath $Platform}catch{}
+    $path=[string]$ModelPath
+    if([string]::IsNullOrWhiteSpace($path)){try{$path=Resolve-HcLivePlatformModelPath $Platform}catch{}}
     if([string]::IsNullOrWhiteSpace($path)){
         try{Set-ConsoleNotice ('Live 3D model asset is not installed for '+$Platform+'.') 'WARN'}catch{}
         return $false
