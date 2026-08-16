@@ -30,6 +30,9 @@ namespace HuymaierConsole.Modeling
         internal static extern int HC_GPU_SetShelfItem(IntPtr handle, int id, float x, float y, float width, float height, float scale, int selected, int visible);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int HC_GPU_SetShelfItemView(IntPtr handle, int id, float yawOffset, float pitch, int spin);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int HC_GPU_SetShelfBrightness(IntPtr handle, float brightness);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
@@ -53,6 +56,9 @@ namespace HuymaierConsole.Modeling
         private sealed class ItemState
         {
             public float X, Y, Width, Height, Scale;
+            public float YawOffset = 0.0f;
+            public float Pitch = -10.0f;
+            public bool Spin = true;
             public bool Selected, Visible;
         }
 
@@ -108,11 +114,13 @@ namespace HuymaierConsole.Modeling
             if (!NativeReady || state == null) return true;
             try
             {
-                return D3D11ShelfNative.HC_GPU_SetShelfItem(
+                bool layoutOk = D3D11ShelfNative.HC_GPU_SetShelfItem(
                     nativeHandle, id,
                     state.X * (float)dpiScaleX, state.Y * (float)dpiScaleY,
                     state.Width * (float)dpiScaleX, state.Height * (float)dpiScaleY,
                     state.Scale, state.Selected ? 1 : 0, state.Visible ? 1 : 0) != 0;
+                bool viewOk = D3D11ShelfNative.HC_GPU_SetShelfItemView(nativeHandle, id, state.YawOffset, state.Pitch, state.Spin ? 1 : 0) != 0;
+                return layoutOk && viewOk;
             }
             catch { return false; }
         }
@@ -149,18 +157,34 @@ namespace HuymaierConsole.Modeling
         public bool SetItem(int id, double x, double y, double width, double height, double scale, bool selected, bool visible)
         {
             if (disposed || id < 0) return false;
-            ItemState state = new ItemState
-            {
-                X = (float)x,
-                Y = (float)y,
-                Width = Math.Max(0, (float)width),
-                Height = Math.Max(0, (float)height),
-                Scale = Math.Max(.40f, Math.Min(.90f, (float)scale)),
-                Selected = selected,
-                Visible = visible
-            };
+            ItemState state;
+            if (!itemStates.TryGetValue(id, out state) || state == null) state = new ItemState();
+            state.X = (float)x;
+            state.Y = (float)y;
+            state.Width = Math.Max(0, (float)width);
+            state.Height = Math.Max(0, (float)height);
+            state.Scale = Math.Max(.40f, Math.Min(.90f, (float)scale));
+            state.Selected = selected;
+            state.Visible = visible;
             itemStates[id] = state;
             return ApplyItemToNative(id, state);
+        }
+
+        public bool SetItemView(int id, double yawOffset, double pitch, bool spin)
+        {
+            if (disposed || id < 0) return false;
+            ItemState state;
+            if (!itemStates.TryGetValue(id, out state) || state == null)
+            {
+                state = new ItemState { Width = 1.0f, Height = 1.0f, Scale = .82f, Visible = true };
+            }
+            state.YawOffset = (float)yawOffset;
+            state.Pitch = Math.Max(-80.0f, Math.Min(80.0f, (float)pitch));
+            state.Spin = spin;
+            itemStates[id] = state;
+            if (!NativeReady) return true;
+            try { return D3D11ShelfNative.HC_GPU_SetShelfItemView(nativeHandle, id, state.YawOffset, state.Pitch, state.Spin ? 1 : 0) != 0; }
+            catch { return false; }
         }
 
         public void ClearModels()

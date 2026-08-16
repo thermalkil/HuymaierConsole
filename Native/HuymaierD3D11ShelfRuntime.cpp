@@ -45,6 +45,9 @@ namespace
         std::shared_ptr<Asset> asset;
         float x = 0, y = 0, width = 1, height = 1;
         float modelScale = 0.70f;
+        float yawOffset = 0.0f;
+        float pitch = -10.0f;
+        bool spin = true;
         bool selected = false;
         bool visible = false;
     };
@@ -268,8 +271,10 @@ float4 PSMain(VSOut i, bool isFrontFace : SV_IsFrontFace) : SV_TARGET
         D3D11_VIEWPORT vp{};vp.TopLeftX=x;vp.TopLeftY=y;vp.Width=right-x;vp.Height=bottom-y;vp.MinDepth=0;vp.MaxDepth=1;g_core.context->RSSetViewports(1,&vp);g_core.context->ClearDepthStencilView(s.dsv.Get(),D3D11_CLEAR_DEPTH,1,0);
         UINT stride=sizeof(Vertex),offset=0;ID3D11Buffer* vb=a.vertexBuffer.Get();g_core.context->IASetVertexBuffers(0,1,&vb,&stride,&offset);g_core.context->IASetIndexBuffer(a.indexBuffer.Get(),DXGI_FORMAT_R32_UINT,0);
         const float cx=(a.minBounds[0]+a.maxBounds[0])*.5f,cy=(a.minBounds[1]+a.maxBounds[1])*.5f,cz=(a.minBounds[2]+a.maxBounds[2])*.5f;const float sx=a.maxBounds[0]-a.minBounds[0],sy=a.maxBounds[1]-a.minBounds[1],sz=a.maxBounds[2]-a.minBounds[2];float diameter=std::sqrt(sx*sx+sy*sy+sz*sz);if(diameter<.00001f)diameter=1;
-        const float scale=(2.60f/diameter)*std::max(.45f,std::min(.82f,item.modelScale))*(item.selected?1.04f:1.0f);const float yaw=24.0f+phase*16.0f+static_cast<float>((item.id*11)%360);
-        XMMATRIX world=XMMatrixTranslation(-cx,-cy,-cz)*XMMatrixScaling(scale,scale,scale)*XMMatrixRotationX(XMConvertToRadians(-10.0f))*XMMatrixRotationY(XMConvertToRadians(yaw));XMMATRIX view=XMMatrixLookAtLH(XMVectorSet(0,.08f,-4.2f,1),XMVectorZero(),XMVectorSet(0,1,0,0));XMMATRIX proj=XMMatrixPerspectiveFovLH(XMConvertToRadians(34.0f),vp.Width/vp.Height,.01f,100.0f);XMMATRIX wvp=world*view*proj;
+        const float scale=(2.60f/diameter)*std::max(.45f,std::min(.90f,item.modelScale))*(item.selected?1.04f:1.0f);
+        const float yaw=24.0f+(item.spin?phase*16.0f:0.0f)+static_cast<float>((item.id*11)%360)+item.yawOffset;
+        const float pitch=std::max(-80.0f,std::min(80.0f,item.pitch));
+        XMMATRIX world=XMMatrixTranslation(-cx,-cy,-cz)*XMMatrixScaling(scale,scale,scale)*XMMatrixRotationX(XMConvertToRadians(pitch))*XMMatrixRotationY(XMConvertToRadians(yaw));XMMATRIX view=XMMatrixLookAtLH(XMVectorSet(0,.08f,-4.2f,1),XMVectorZero(),XMVectorSet(0,1,0,0));XMMATRIX proj=XMMatrixPerspectiveFovLH(XMConvertToRadians(34.0f),vp.Width/vp.Height,.01f,100.0f);XMMATRIX wvp=world*view*proj;
         for(const DrawBatch& d:a.draws)
         {
             Constants c{};XMStoreFloat4x4(&c.worldViewProjection,wvp);XMStoreFloat4x4(&c.world,world);c.baseColor=XMFLOAT4(d.baseColor[0],d.baseColor[1],d.baseColor[2],d.baseColor[3]);c.emissive=XMFLOAT4(d.emissiveColor[0],d.emissiveColor[1],d.emissiveColor[2],d.emissiveStrength);c.surface=XMFLOAT4(d.metallic,d.roughness,d.specular,d.clearcoat);c.extra=XMFLOAT4(d.alphaCutoff,item.selected?1.0f:0.0f,s.brightness,0);c.materialParams=XMFLOAT4(d.normalScale,d.occlusionStrength,0,0);c.flags=XMINT4(d.baseImage>=0?1:0,d.emissiveImage>=0?1:0,d.alphaMode,(d.flags&2)?1:0);c.maps=XMINT4(d.metallicRoughnessImage>=0?1:0,d.normalImage>=0?1:0,d.occlusionImage>=0?1:0,(d.flags&1)?1:0);
@@ -292,6 +297,7 @@ extern "C" __declspec(dllexport) void* __cdecl HC_GPU_CreateShelfSurface(int wid
 }
 extern "C" __declspec(dllexport) int __cdecl HC_GPU_LoadShelfModel(void* handle,int id,const wchar_t* cachePath){if(!handle||!cachePath)return 0;std::lock_guard<std::mutex>guard(g_core.lock);ShelfSurface*s=static_cast<ShelfSurface*>(handle);auto asset=AcquireAssetLocked(cachePath);if(!asset)return 0;Item&item=s->items[id];item.id=id;item.asset=asset;return 1;}
 extern "C" __declspec(dllexport) int __cdecl HC_GPU_SetShelfItem(void* handle,int id,float x,float y,float width,float height,float scale,int selected,int visible){if(!handle||width<0||height<0)return 0;std::lock_guard<std::mutex>guard(g_core.lock);ShelfSurface*s=static_cast<ShelfSurface*>(handle);auto it=s->items.find(id);if(it==s->items.end())return 0;Item&i=it->second;i.x=x;i.y=y;i.width=width;i.height=height;i.modelScale=scale;i.selected=selected!=0;i.visible=visible!=0;return 1;}
+extern "C" __declspec(dllexport) int __cdecl HC_GPU_SetShelfItemView(void* handle,int id,float yawOffset,float pitch,int spin){if(!handle)return 0;std::lock_guard<std::mutex>guard(g_core.lock);ShelfSurface*s=static_cast<ShelfSurface*>(handle);auto it=s->items.find(id);if(it==s->items.end())return 0;Item&i=it->second;i.yawOffset=yawOffset;i.pitch=std::max(-80.0f,std::min(80.0f,pitch));i.spin=spin!=0;return 1;}
 extern "C" __declspec(dllexport) int __cdecl HC_GPU_SetShelfBrightness(void* handle,float brightness){if(!handle)return 0;std::lock_guard<std::mutex>guard(g_core.lock);ShelfSurface*s=static_cast<ShelfSurface*>(handle);s->brightness=std::max(0.50f,std::min(2.50f,brightness));return 1;}
 extern "C" __declspec(dllexport) void __cdecl HC_GPU_ClearShelfItems(void* handle){if(!handle)return;std::lock_guard<std::mutex>guard(g_core.lock);static_cast<ShelfSurface*>(handle)->items.clear();}
 extern "C" __declspec(dllexport) int __cdecl HC_GPU_RenderShelfSurface(void* handle,float phase){if(!handle)return 0;std::lock_guard<std::mutex>guard(g_core.lock);return RenderSurfaceLocked(*static_cast<ShelfSurface*>(handle),phase);}
