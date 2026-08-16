@@ -74,7 +74,7 @@ $gpuNativeHeaders=(& $dumpbin /nologo /headers $gpuNativeDll) -join "`n";if($gpu
 $gpuHostHeaders=(& $dumpbin /nologo /headers $gpuHostDll) -join "`n";if($gpuHostHeaders -notmatch '(?i)machine \(x64\)|8664 machine'){throw 'HuymaierGpuShelfHost.dll is not x64.'}
 $gpuCompilerHeaders=(& $dumpbin /nologo /headers $gpuCompilerExe) -join "`n";if($gpuCompilerHeaders -notmatch '(?i)machine \(x64\)|8664 machine'){throw 'HuymaierGpuShelfAssetCompiler.exe is not x64.'}
 $gpuExports=(& $dumpbin /nologo /exports $gpuNativeDll) -join "`n"
-foreach($gpuExport in @('HC_D3D11UvAddressSmokeTest','HC_GPU_CreateShelfSurface','HC_GPU_LoadShelfModel','HC_GPU_SetShelfItem','HC_GPU_SetShelfBrightness','HC_GPU_RenderShelfSurface','HC_GPU_GetCachedAssetCount')){if($gpuExports -notmatch [regex]::Escape($gpuExport)){throw "HuymaierD3D11ShelfRenderer.dll missing production export: $gpuExport"}}
+foreach($gpuExport in @('HC_D3D11UvAddressSmokeTest','HC_GPU_CreateShelfSurface','HC_GPU_LoadShelfModel','HC_GPU_SetShelfItem','HC_GPU_SetShelfItemView','HC_GPU_SetShelfBrightness','HC_GPU_RenderShelfSurface','HC_GPU_GetCachedAssetCount')){if($gpuExports -notmatch [regex]::Escape($gpuExport)){throw "HuymaierD3D11ShelfRenderer.dll missing production export: $gpuExport"}}
 '@
     $builder=$builder.Replace($archAnchor,$arch)
 }
