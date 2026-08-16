@@ -15,6 +15,7 @@ namespace HuymaierGpuShelf
     // The WPF/D3DImage target is an ordinary UNORM desktop surface, so the final linear
     // lighting result is encoded back to sRGB before premultiplied-alpha output.
         static const char* HcShelfShaderSource = R"HLSL(
+    // HUYMAIER_D3D11_SHELF_SHADER_V4_COLOR_MANAGED_UI_PBR
     cbuffer ModelConstants : register(b0)
     {
         row_major float4x4 WorldViewProjection;
