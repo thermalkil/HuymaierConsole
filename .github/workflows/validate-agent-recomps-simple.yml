@@ -19,10 +19,25 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Validate manual Recomps routing
+      - name: Validate full platform and Recomps suite
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
-          & '.\.development\v0.26.5\Test-v0265-PowerShellSafety.ps1'
+          & '.\.development\v0.26.5\Prepare-v0265-PlatformModelValidation.ps1'
+          & '.\.development\v0.26.5\Test-v0265-PlatformModels.ps1'
+          & '.\.development\v0.26.5\Test-v0265-User3DModels.ps1'
+          & '.\.development\v0.26.5\Test-v0265-PlatformNamingAudit.ps1'
+          & '.\.development\v0.26.5\Test-v0265-Live3DCardRender.ps1'
+          & '.\.development\v0.26.5\Test-v0265-FullModelViewerUvBrightnessV3.ps1'
+          & '.\.development\v0.26.5\Test-v0265-D3D11ShelfBackend.ps1'
+          & '.\.development\v0.26.5\Test-v0265-D3D11FaceCulling.ps1'
+          & '.\.development\v0.26.5\Test-v0265-GpuShelfAssetCompiler.ps1'
+          & '.\.development\v0.26.5\Test-v0265-MirroredModelWinding.ps1'
+          & '.\.development\v0.26.5\Test-v0265-D3D11CachedModelRender.ps1'
+          & '.\.development\v0.26.5\Test-v0265-D3D11UvAddressing.ps1'
+          & '.\.development\v0.26.5\Test-v0265-GpuPlatformShelvesV7.ps1'
+          & '.\.development\v0.26.5\Test-v0265-CanonicalRecomps.ps1'
+          & '.\.development\v0.26.5\Test-v0265-RecompsProviderActions.ps1'
           & '.\.development\v0.26.5\Test-v0265-ManualRecomps.ps1'
+          & '.\.development\v0.26.5\Test-v0265-ManualRecompsFinalOwnership.ps1'
           & '.\.development\v0.26.5\Test-v0265-RecompsDirectLibrary.ps1'
