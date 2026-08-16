@@ -246,8 +246,14 @@ function Get-FileBrowserItems {
     $seen=@{}
     foreach($entry in @($base)){
         if($null-eq$entry){continue}
-        [void]$items.Add($entry)
+        $type=[string](Get-EntryProperty $entry 'Type' '')
         $full=[string](Get-EntryProperty $entry 'FullName' '')
+        if([string]::Equals($type,'File',[StringComparison]::OrdinalIgnoreCase)){
+            $extension=[string](Get-EntryProperty $entry 'Extension' '')
+            if([string]::IsNullOrWhiteSpace($extension) -and $full){try{$extension=[IO.Path]::GetExtension($full)}catch{}}
+            if(-not [string]::Equals($extension,'.exe',[StringComparison]::OrdinalIgnoreCase)){continue}
+        }
+        [void]$items.Add($entry)
         if($full){$seen[$full.ToLowerInvariant()]=$true}
     }
     try{
