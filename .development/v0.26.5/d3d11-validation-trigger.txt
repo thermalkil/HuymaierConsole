@@ -1,2 +1,3 @@
-D3D11 shelf backend phase-2 validation.
-Native backend + managed D3DImage bridge + persistent .hc3d cache compiler.
+D3D11 shelf backend phase-2 validation retry.
+Native backend + D3DImage bridge + persistent .hc3d cache compiler.
+Framework C# local-shadowing issue corrected.
