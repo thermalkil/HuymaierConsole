@@ -6,7 +6,9 @@ $aliases=Join-Path $root 'Native\HuymaierModelPreviewWpfAliases.cs'
 $compiler=Join-Path $root 'Native\HuymaierGpuShelfAssetCompiler.cs'
 foreach($p in @($loader,$aliases,$compiler)){if(-not(Test-Path -LiteralPath $p -PathType Leaf)){throw "Mirrored-winding source missing: $p"}}
 $text=Get-Content -Raw -LiteralPath $compiler -Encoding UTF8
-foreach($n in @('CacheVersion = 3','Determinant3x3','bool mirrored','ix[i + 2]','ix[i + 1]')){if($text.IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Mirrored-winding compiler contract missing: $n"}}
+foreach($n in @('CacheVersion = 3','Determinant3x3','bool mirrored')){if($text.IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Mirrored-winding compiler contract missing: $n"}}
+$compact=[regex]::Replace($text,'\s+','')
+foreach($n in @('indices.Add((uint)(baseVertex+ix[i]));indices.Add((uint)(baseVertex+ix[i+2]));indices.Add((uint)(baseVertex+ix[i+1]));','if(mirrored)tw=-tw;')){if($compact.IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Mirrored-winding/tangent compiler contract missing: $n"}}
 
 Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Web.Extensions
 $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
@@ -45,5 +47,6 @@ try{
     }finally{$br.Dispose()}
     Write-Host 'platformModelMirroredNodeDetectionGate: success'
     Write-Host 'platformModelMirroredTriangleWindingGate: success'
+    Write-Host 'platformModelMirroredTangentHandednessGate: success'
     Write-Host 'platformModelHc3dV3CacheGate: success'
 }finally{Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue}
