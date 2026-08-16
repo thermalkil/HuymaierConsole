@@ -1,2 +1,2 @@
-D3D11 shelf backend phase-1 validation.
-Native backend + managed D3DImage bridge smoke test.
+D3D11 shelf backend phase-2 validation.
+Native backend + managed D3DImage bridge + persistent .hc3d cache compiler.
