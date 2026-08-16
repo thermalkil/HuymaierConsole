@@ -1,0 +1,39 @@
+name: Fix GPU cache compiler WPF reference
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-gpu-cache-ref.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v0.26.5-performance-and-downloads
+          fetch-depth: 0
+      - name: Add PresentationFramework reference and self-clean
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('.development/v0.26.5/Test-v0265-GpuShelfAssetCompiler.ps1')
+          text=p.read_text(encoding='utf-8-sig')
+          text=text.replace("Add-Type -AssemblyName PresentationCore,WindowsBase,System.Web.Extensions", "Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Web.Extensions", 1)
+          old="$refs=@([Uri].Assembly.Location,[Linq.Enumerable].Assembly.Location,[Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,(Join-Path $framework 'System.Xaml.dll'))|Select-Object -Unique"
+          new="$refs=@([Uri].Assembly.Location,[Linq.Enumerable].Assembly.Location,[Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,[ComponentModel.ISupportInitialize].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,[Windows.Window].Assembly.Location,(Join-Path $framework 'System.Xaml.dll'))|Select-Object -Unique"
+          if old not in text: raise SystemExit('GPU cache compiler reference anchor not found')
+          p.write_text(text.replace(old,new,1),encoding='utf-8')
+          Path('.github/workflows/fix-gpu-cache-ref.yml').unlink()
+      - name: Commit reference correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'thermalkil'
+          git config user.email '98826286+thermalkil@users.noreply.github.com'
+          git add -A
+          git commit -m 'Reference WPF framework in GPU cache compiler validation'
+          git push origin HEAD:feature/v0.26.5-performance-and-downloads
