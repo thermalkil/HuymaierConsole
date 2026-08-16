@@ -1,9 +1,9 @@
 ﻿{
     "candidate":  "v0.26.5-rc1",
-    "result":  "success",
-    "runId":  "31949628092",
+    "result":  "failure",
+    "runId":  "31954592630",
     "runAttempt":  "1",
-    "commit":  "adb9941e9e3a67d93ce5e2c11a43156d9e2c5128",
-    "productionSource":  "40962b0e576eb4dc81799a4451c492b05823cf65",
-    "recordedAtUtc":  "2026-08-16T13:25:04.7843159Z"
+    "commit":  "9169113d00c67b9fb3d68376674c539691f98714",
+    "productionSource":  "61404b14e81e9fd24e4189485f8e2eb4d7c804ce",
+    "recordedAtUtc":  "2026-08-16T15:07:33.4490905Z"
 }
