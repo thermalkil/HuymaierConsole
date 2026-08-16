@@ -5,14 +5,14 @@ $runtime=Join-Path $root 'HuymaierGpuPlatformShelves.ps1'
 $userRuntime=Join-Path $root 'HuymaierUser3DModels.ps1'
 $native=Join-Path $root 'Native\HuymaierD3D11ShelfRuntime.cpp'
 $asset=Join-Path $root 'Native\HuymaierD3D11ShelfAsset.cpp'
-$host=Join-Path $root 'Native\HuymaierD3D11ShelfHost.cs'
+$hostSource=Join-Path $root 'Native\HuymaierD3D11ShelfHost.cs'
 $compiler=Join-Path $root 'Native\HuymaierGpuShelfAssetCompiler.cs'
 $program=Join-Path $root 'Native\HuymaierGpuShelfAssetCompilerProgram.cs'
 $platformOptimizer=Join-Path $root '.build\Optimize-Platform3DModels.ps1'
 $gpuOptimizer=Join-Path $root '.build\Optimize-GpuPlatformShelves.ps1'
 $userOptimizer=Join-Path $root '.build\Optimize-User3DModels.ps1'
 $sourceList=Join-Path $root '.source\source-files.txt'
-foreach($p in @($runtime,$userRuntime,$native,$asset,$host,$compiler,$program,$platformOptimizer,$gpuOptimizer,$userOptimizer,$sourceList)){if(-not(Test-Path -LiteralPath $p -PathType Leaf)){throw "V7 GPU shelf source missing: $p"}}
+foreach($p in @($runtime,$userRuntime,$native,$asset,$hostSource,$compiler,$program,$platformOptimizer,$gpuOptimizer,$userOptimizer,$sourceList)){if(-not(Test-Path -LiteralPath $p -PathType Leaf)){throw "V7 GPU shelf source missing: $p"}}
 
 foreach($ps in @($runtime,$platformOptimizer,$gpuOptimizer,$userOptimizer)){
     $t=$null;$e=$null;$ast=[Management.Automation.Language.Parser]::ParseFile($ps,[ref]$t,[ref]$e)
@@ -48,7 +48,7 @@ $nativeText=Get-Content -Raw $native -Encoding UTF8
 foreach($n in @('HUYMAIER_D3D11_SHARED_SHELF_RUNTIME_V1','std::unordered_map<std::wstring, std::weak_ptr<Asset>> assets','std::shared_ptr<Asset> asset','HC_GPU_LoadShelfModel','HC_GPU_SetShelfItem','HC_GPU_RenderShelfSurface','phase*16.0f')){if(-not$nativeText.Contains($n)){throw "Native persistent GPU shelf contract missing: $n"}}
 foreach($bad in @('HC_GPU_UnloadShelfModel','erase(id)')){if($nativeText.Contains($bad)){throw "Native shelf exposes distance-style model eviction: $bad"}}
 $assetText=Get-Content -Raw $asset -Encoding UTF8;foreach($n in @('D3D11_USAGE_IMMUTABLE','D3D11_RESOURCE_MISC_GENERATE_MIPS','GenerateMips')){if(-not$assetText.Contains($n)){throw "GPU asset upload contract missing: $n"}}
-$hostText=Get-Content -Raw $host -Encoding UTF8;foreach($n in @('HUYMAIER_D3D11_SHELF_HOST_V2','D3DImage','ReplayState','CompositionTarget.Rendering','modelPaths','itemStates')){if(-not$hostText.Contains($n)){throw "Managed GPU shelf host contract missing: $n"}}
+$hostText=Get-Content -Raw $hostSource -Encoding UTF8;foreach($n in @('HUYMAIER_D3D11_SHELF_HOST_V2','D3DImage','ReplayState','CompositionTarget.Rendering','modelPaths','itemStates')){if(-not$hostText.Contains($n)){throw "Managed GPU shelf host contract missing: $n"}}
 $compilerText=Get-Content -Raw $compiler -Encoding UTF8;foreach($n in @('HUYMAIER_GPU_SHELF_ASSET_CACHE_V1','DefaultShelfTextureSize = 512','DecodePixelWidth','DecodePixelHeight','IsCacheCurrent','EnsureCompiled')){if(-not$compilerText.Contains($n)){throw "Persistent HC3D compiler contract missing: $n"}}
 $programText=Get-Content -Raw $program -Encoding UTF8;if(-not$programText.Contains('HUYMAIER_GPU_SHELF_COMPILER_PROGRAM_V1')-or-not$programText.Contains('GpuShelfAssetCompiler.EnsureCompiled')){throw 'Background cache compiler program contract is incomplete.'}
 
