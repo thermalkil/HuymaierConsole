@@ -16,7 +16,7 @@ jobs:
         with:
           ref: feature/v0.26.5-performance-and-downloads
           fetch-depth: 0
-      - name: Wire V7 runtime, source list and build transform
+      - name: Wire current V7 source and self-clean
         shell: python
         run: |
           from pathlib import Path
@@ -25,33 +25,23 @@ jobs:
           text=p.read_text(encoding='utf-8-sig')
           anchor="$script:HcGpuShelfNativeDll=Join-Path $script:BaseDir 'HuymaierD3D11ShelfRenderer.dll'"
           if "$script:HcGpuShelfHostDll" not in text:
-              if anchor not in text: raise SystemExit('V7 native DLL path anchor missing')
+              if anchor not in text: raise SystemExit('V7 native path anchor missing')
               text=text.replace(anchor,anchor+"\n$script:HcGpuShelfHostDll=Join-Path $script:BaseDir 'HuymaierGpuShelfHost.dll'",1)
           old="""        if(-not(Test-Path -LiteralPath $script:HcGpuShelfCompilerExe -PathType Leaf)){throw 'HuymaierGpuShelfAssetCompiler.exe is missing.'}\n        New-Item -ItemType Directory -Force -Path $script:HcGpuShelfCacheDir|Out-Null\n        if(($env:PATH -split ';') -notcontains $script:BaseDir){$env:PATH=$script:BaseDir+';'+$env:PATH}\n        if(-not(Initialize-HcLiveModelAssembly)){throw 'HuymaierLiveModel3D.dll could not be loaded.'}\n        $type=[type]::GetType('HuymaierConsole.Modeling.D3D11ShelfSurface, HuymaierLiveModel3D',$false)\n        if($null-eq$type){\n            try{$type=[HuymaierConsole.Modeling.D3D11ShelfSurface]}catch{}\n        }\n        if($null-eq$type){throw 'D3D11ShelfSurface type is unavailable.'}"""
           new="""        if(-not(Test-Path -LiteralPath $script:HcGpuShelfCompilerExe -PathType Leaf)){throw 'HuymaierGpuShelfAssetCompiler.exe is missing.'}\n        if(-not(Test-Path -LiteralPath $script:HcGpuShelfHostDll -PathType Leaf)){throw 'HuymaierGpuShelfHost.dll is missing.'}\n        New-Item -ItemType Directory -Force -Path $script:HcGpuShelfCacheDir|Out-Null\n        if(($env:PATH -split ';') -notcontains $script:BaseDir){$env:PATH=$script:BaseDir+';'+$env:PATH}\n        $gpuType=[type]::GetType('HuymaierConsole.Modeling.D3D11ShelfSurface, HuymaierGpuShelfHost',$false)\n        if($null-eq$gpuType){\n            Add-Type -Path $script:HcGpuShelfHostDll -ErrorAction Stop\n            $gpuType=[type]::GetType('HuymaierConsole.Modeling.D3D11ShelfSurface, HuymaierGpuShelfHost',$false)\n        }\n        if($null-eq$gpuType){throw 'D3D11ShelfSurface type is unavailable.'}"""
-          if old not in text: raise SystemExit('V7 host-load block anchor missing')
+          if old not in text: raise SystemExit('V7 host-load anchor missing')
           p.write_text(text.replace(old,new,1),encoding='utf-8')
 
           p=Path('.source/source-files.txt')
           lines=p.read_text(encoding='utf-8-sig').splitlines()
-          additions=[
-            'HuymaierGpuPlatformShelves.ps1',
-            'Native/HuymaierD3D11ShelfRenderer.cpp',
-            'Native/HuymaierD3D11ShelfRuntime.cpp',
-            'Native/HuymaierD3D11ShelfAsset.h',
-            'Native/HuymaierD3D11ShelfAsset.cpp',
-            'Native/HuymaierD3D11ShelfHost.cs',
-            'Native/HuymaierGpuShelfAssetCompiler.cs',
-            'Native/HuymaierGpuShelfAssetCompilerProgram.cs',
-          ]
+          additions=['HuymaierGpuPlatformShelves.ps1','Native/HuymaierD3D11ShelfRenderer.cpp','Native/HuymaierD3D11ShelfRuntime.cpp','Native/HuymaierD3D11ShelfAsset.h','Native/HuymaierD3D11ShelfAsset.cpp','Native/HuymaierD3D11ShelfHost.cs','Native/HuymaierGpuShelfAssetCompiler.cs','Native/HuymaierGpuShelfAssetCompilerProgram.cs']
           for item in additions:
-              if item not in lines:
-                  if item.startswith('HuymaierGpu'):
-                      idx=lines.index('HuymaierUser3DModels.ps1')+1
-                  else:
-                      idx=lines.index('Native/HuymaierGameInputBridge.cpp')+1
-                      while idx < len(lines) and lines[idx].startswith('Native/HuymaierD3D11'): idx+=1
-                  lines.insert(idx,item)
+              if item in lines: continue
+              if item.startswith('HuymaierGpu'):
+                  idx=lines.index('HuymaierUser3DModels.ps1')+1
+              else:
+                  idx=lines.index('Native/HuymaierGameInputBridge.cpp')+1
+              lines.insert(idx,item)
           p.write_text('\n'.join(lines)+'\n',encoding='utf-8')
 
           p=Path('.build/Optimize-Platform3DModels.ps1')
@@ -63,10 +53,11 @@ jobs:
 
           p=Path('.build/Optimize-User3DModels.ps1')
           text=p.read_text(encoding='utf-8-sig')
-          needle="            'HuymaierD3D11ShelfRenderer.dll',\n            'HuymaierGpuShelfAssetCompiler.exe',"
-          replacement="            'HuymaierD3D11ShelfRenderer.dll',\n            'HuymaierGpuShelfHost.dll',\n            'HuymaierGpuShelfAssetCompiler.exe',"
-          if needle not in text: raise SystemExit('GPU installer binary list anchor missing')
-          p.write_text(text.replace(needle,replacement,1),encoding='utf-8')
+          if "'HuymaierGpuShelfHost.dll'" not in text:
+              needle="            'HuymaierD3D11ShelfRenderer.dll',"
+              if needle not in text: raise SystemExit('GPU installer native DLL anchor missing')
+              text=text.replace(needle,needle+"\n            'HuymaierGpuShelfHost.dll',",1)
+          p.write_text(text,encoding='utf-8')
 
           Path('.github/workflows/wire-v7-gpu-shelves.yml').unlink()
       - name: Commit V7 wiring
