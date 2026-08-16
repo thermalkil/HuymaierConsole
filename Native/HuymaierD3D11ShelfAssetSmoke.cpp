@@ -1,4 +1,5 @@
 #define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <Windows.h>
 #include <d3d11.h>
 #include <d3dcompiler.h>
@@ -7,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <memory>
 
 #include "HuymaierD3D11ShelfAsset.h"
 
