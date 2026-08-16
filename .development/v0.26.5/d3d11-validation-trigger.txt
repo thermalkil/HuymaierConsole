@@ -1,3 +1,4 @@
 D3D11 shelf backend phase-4 V7 DPI-aware freeze validation.
 V7 final owner + full-height shelves + persistent GPU assets + no distance icon reversion.
 Per-monitor DPI scales D3D surface pixels and native item rectangles.
+Staged requested-candidate probe strict-mode literal corrected after Attempt 30.
