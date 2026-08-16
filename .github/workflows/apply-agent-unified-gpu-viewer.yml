@@ -45,8 +45,9 @@ jobs:
           if($LASTEXITCODE-ne0-or-not(Test-Path $nativeDll)){throw 'Unified viewer native renderer compilation failed.'}
           Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml
           $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          $framework=[Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()
           $out=Join-Path $env:RUNNER_TEMP 'HuymaierGpuShelfHost.dll'
-          $refs=@([ComponentModel.ISupportInitialize].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,[Windows.Window].Assembly.Location)|Select-Object -Unique
+          $refs=@([ComponentModel.ISupportInitialize].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,[Windows.Window].Assembly.Location,(Join-Path $framework 'System.Xaml.dll'))|Select-Object -Unique
           $args=@('/noconfig','/nologo','/target:library','/platform:x64','/optimize+',('/out:'+$out));foreach($r in $refs){$args+=('/reference:'+$r)};$args+='.\Native\HuymaierD3D11ShelfHost.cs'
           & $csc @args
           if($LASTEXITCODE-ne0-or-not(Test-Path $out)){throw 'Unified viewer D3D11 WPF host compilation failed.'}
