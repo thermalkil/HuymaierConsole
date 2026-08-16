@@ -46,7 +46,7 @@ exit /b %errorlevel%
     if(-not(Test-Path -LiteralPath $csc -PathType Leaf)){throw 'Framework64 csc.exe was not found.'}
     $managedDll=Join-Path $temp 'HuymaierD3D11ShelfHost.dll'
     $framework=[Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()
-    $refs=@([Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,[Windows.Window].Assembly.Location,(Join-Path $framework 'System.Xaml.dll'))|Select-Object -Unique
+    $refs=@([ComponentModel.ISupportInitialize].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,[Windows.Window].Assembly.Location,(Join-Path $framework 'System.Xaml.dll'))|Select-Object -Unique
     $args=@('/noconfig','/nologo','/target:library','/platform:x64','/optimize+',('/out:'+$managedDll))
     foreach($r in $refs){$args+=('/reference:'+$r)}
     $args+=$hostSource
