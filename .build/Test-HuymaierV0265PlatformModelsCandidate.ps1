@@ -29,7 +29,7 @@ if($v6-lt0-or$v7-le$v6){throw 'Staged V7 GPU presentation owner does not load af
 [void](NeedText 'Install-HuymaierConsole.ps1' @('HUYMAIER_GPU_3D_SHELVES_INSTALLER_CACHE_V1','HuymaierGpuPlatformShelves.ps1','HuymaierD3D11ShelfRenderer.dll','HuymaierGpuShelfHost.dll','HuymaierGpuShelfAssetCompiler.exe'))
 
 $v7Text=NeedText 'HuymaierGpuPlatformShelves.ps1' @(
- 'HUYMAIER_USER_3D_MODELS_RUNTIME_V7','HUYMAIER_D3D11_GPU_SHELVES_V1','HuymaierGpuPlatformShelvesV7',
+ 'HUYMAIER_USER_3D_MODELS_RUNTIME_V7','HUYMAIER_D3D11_GPU_SHELVES_V1','HUYMAIER_D3D11_LOADFROM_TYPE_RESOLUTION_V1','HuymaierGpuPlatformShelvesV7',
  "Join-Path `$script:DataDir '3D Model Cache'",'HuymaierGpuShelfAssetCompiler.exe','HuymaierD3D11ShelfRenderer.dll','HuymaierGpuShelfHost.dll',
  'Test-HcGpuShelfCacheCurrent','Start-Process -FilePath $script:HcGpuShelfCompilerExe','-WindowStyle Hidden -PassThru',
  'LoadModel([int]$Card.ActionIndex','$Card.GpuReady=$true','$Card.Icon.Opacity=0.0','Get-HcGpuShelfDimensions','PrimaryScreenHeight',
@@ -58,13 +58,12 @@ try{foreach($name in @('HC_D3D11SmokeTest','HC_GPU_CreateShelfSurface','HC_GPU_L
 $smoke=[HcV7NativeProbe]::HC_D3D11SmokeTest();if($smoke-ne1){throw "Staged D3D11 WARP shader/readback smoke failed with code $smoke"}
 
 Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml
-Add-Type -Path (NeedFile 'HuymaierGpuShelfHost.dll')
-$gpuType=[type]::GetType('HuymaierConsole.Modeling.D3D11ShelfSurface, HuymaierGpuShelfHost',$false)
-if($null-eq$gpuType){throw 'Staged HuymaierGpuShelfHost.dll does not expose D3D11ShelfSurface.'}
+$gpuAssembly=[Reflection.Assembly]::LoadFrom((NeedFile 'HuymaierGpuShelfHost.dll'))
+$gpuType=$gpuAssembly.GetType('HuymaierConsole.Modeling.D3D11ShelfSurface',$false)
+if($null-eq$gpuType){throw 'Staged HuymaierGpuShelfHost.dll does not expose D3D11ShelfSurface through its loaded assembly.'}
 foreach($member in @('LoadModel','SetItem','ClearModels','Dispose')){if($null-eq$gpuType.GetMethod($member)){throw "Staged GPU shelf host method missing: $member"}}
 if($null-eq$gpuType.GetProperty('LoadedModelCount')){throw 'Staged GPU shelf host is missing LoadedModelCount.'}
 
-# Execute the staged background compiler against a tiny material-colored GLB.
 function New-HcV7ProbeGlb([string]$Path){
  $ms=New-Object IO.MemoryStream;$bw=New-Object IO.BinaryWriter($ms)
  try{
@@ -82,7 +81,7 @@ try{$glb=Join-Path $temp 'probe.glb';$cache=Join-Path $temp 'probe.hc3d';New-HcV
 $validation=Get-Content -Raw -LiteralPath $ValidationPath -Encoding UTF8|ConvertFrom-Json
 $gates=@(
  'platformModelSettingGate','platformModelPersistenceGate','platformModelScaleGate','platformModelMapCoverageGate','platformModelPresentationBaseGate','platformModelHelperOnlyGate','platformModelViewerControlGate','platformModelLiveDllX64Gate','platformModelUserFolderGate','platformModelOriginalNamingGate','platformModelCustomizationOnlyGate','platformModelNoBundledGlbGate','platformModelNoBundledGeneratorGate','platformModelRetiredAtlasGate','platformModelRetiredPreviewWorkerGate','platformModelRetiredPayloadPruneGate',
- 'platformModelV7FinalOwnerGate','platformModelAllInstalledModelsStay3DGate','platformModelNoDistanceIconReversionGate','platformModelGpuShelfFullHeightGate','platformModelBackgroundCacheCompilerGate','platformModelGpuViewportOnlyCullingGate','platformModelNativeTurntableGate','platformModelSharedGpuAssetCacheGate','platformModelGpuMipTextureGate','platformModelD3D11DpiAwareShelfGate','platformModelV7LoadOrderGate','platformModelV7InstallerPayloadGate','platformModelD3D11NativeCompileGate','platformModelD3D11X64Gate','platformModelD3D11ProductionExportsGate','platformModelD3D11WarpSmokeGate','platformModelGpuAssetCompilerGate','platformModelGpuCacheFreshnessGate'
+ 'platformModelV7FinalOwnerGate','platformModelAllInstalledModelsStay3DGate','platformModelNoDistanceIconReversionGate','platformModelGpuShelfFullHeightGate','platformModelBackgroundCacheCompilerGate','platformModelGpuViewportOnlyCullingGate','platformModelNativeTurntableGate','platformModelSharedGpuAssetCacheGate','platformModelGpuMipTextureGate','platformModelD3D11DpiAwareShelfGate','platformModelV7LoadOrderGate','platformModelV7InstallerPayloadGate','platformModelD3D11NativeCompileGate','platformModelD3D11X64Gate','platformModelD3D11ProductionExportsGate','platformModelD3D11WarpSmokeGate','platformModelGpuAssetCompilerGate','platformModelGpuCacheFreshnessGate','platformModelGpuHostLoadFromResolutionGate'
 )
 foreach($gate in $gates){$validation|Add-Member -NotePropertyName $gate -NotePropertyValue 'success' -Force;Write-Host ($gate+': success')}
 $validation|ConvertTo-Json -Depth 12|Set-Content -LiteralPath $ValidationPath -Encoding UTF8
