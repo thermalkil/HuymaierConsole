@@ -1,3 +1,3 @@
-D3D11 shelf backend phase-4 V7 contract validation retry.
+D3D11 shelf backend phase-4 V7 contract validation retry 2.
 V7 final owner + full-height shelves + persistent GPU assets + no distance icon reversion.
-Validator protected Host variable corrected.
+Isolated load-order proof now applies Platform3D before User/V7 transforms.
