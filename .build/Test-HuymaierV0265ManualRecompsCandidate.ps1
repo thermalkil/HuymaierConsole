@@ -23,7 +23,8 @@ $core=Get-Content -Raw -LiteralPath (NeedFile 'HuymaierConsole.ps1') -Encoding U
 $v7=$core.IndexOf('HUYMAIER_GPU_3D_SHELVES_RUNTIME_LOAD_V1',[StringComparison]::Ordinal)
 $manualFinal=$core.IndexOf('HUYMAIER_MANUAL_RECOMPS_FINAL_LOAD_V1',[StringComparison]::Ordinal)
 if($v7-lt0-or$manualFinal-le$v7){throw 'Staged manual Recomps final ownership does not load after V7.'}
-foreach($needle in @("ManualRecompsFinalModulePath = Join-Path `$script:BaseDir 'HuymaierRecompsFinal.ps1'",'. $script:ManualRecompsFinalModulePath')){if($core.IndexOf($needle,[StringComparison]::Ordinal)-lt0){throw "Staged core omits final manual Recomps runtime load: $needle"}}
+foreach($needle in @("ManualRecompsFinalModulePath = Join-Path `$script:BaseDir 'HuymaierRecompsFinal.ps1'",'. $script:ManualRecompsFinalModulePath','HUYMAIER_MANUAL_RECOMPS_CONFIG_V1','RecompGames = @()',"'FavoriteGames','RecompGames')) {","'ProviderInstallRoots','FavoriteGames','RecompGames')) {","EntryType,'RecompGame'", "{@('.exe')}else{@('.exe','.lnk','.url')}")){if($core.IndexOf($needle,[StringComparison]::Ordinal)-lt0){throw "Staged core omits manual Recomps persistence/picker contract: $needle"}}
+if($core.IndexOf("if (`$script:FileBrowserMode -eq 'PickExecutable') { `$allowed=@('.exe','.lnk','.url') }",[StringComparison]::Ordinal)-ge0){throw 'Staged RecompGame picker still exposes shortcut/URL choices.'}
 
 $bootstrap=Get-Content -Raw -LiteralPath (NeedFile 'HuymaierBootstrap.ps1') -Encoding UTF8
 foreach($needle in @('HUYMAIER_MANUAL_RECOMPS_PREFLIGHT_V1','HuymaierRecompsManual.ps1','HuymaierRecompsFinal.ps1','Manual Recomps library runtime','Manual Recomps final ownership runtime')){if($bootstrap.IndexOf($needle,[StringComparison]::Ordinal)-lt0){throw "Staged bootstrap omits manual Recomps preflight: $needle"}}
@@ -33,7 +34,9 @@ foreach($needle in @('HUYMAIER_MANUAL_RECOMPS_INSTALLER_CACHE_V1',"'HuymaierReco
 $validation=Get-Content -Raw -LiteralPath $ValidationPath -Encoding UTF8|ConvertFrom-Json
 if($null-eq$validation){throw 'Candidate validation record is unreadable.'}
 Write-Host 'stagedManualRecompsMultiGameLibraryGate: success'
+Write-Host 'stagedManualRecompsNativeConfigPersistenceGate: success'
 Write-Host 'stagedManualRecompsExactExeGate: success'
+Write-Host 'stagedManualRecompsExeOnlyPickerGate: success'
 Write-Host 'stagedManualRecompsRemoveWithoutDeleteGate: success'
 Write-Host 'stagedManualRecompsNoFolderScanGate: success'
 Write-Host 'stagedManualRecompsFinalAfterV7Gate: success'
