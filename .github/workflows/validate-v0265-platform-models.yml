@@ -40,6 +40,8 @@ jobs:
             & '.\.development\v0.26.5\Test-v0265-GpuPlatformShelvesV7.ps1'
             & '.\.development\v0.26.5\Test-v0265-CanonicalRecomps.ps1'
             & '.\.development\v0.26.5\Test-v0265-RecompsProviderActions.ps1'
+            & '.\.development\v0.26.5\Test-v0265-ManualRecomps.ps1'
+            & '.\.development\v0.26.5\Test-v0265-ManualRecompsFinalOwnership.ps1'
           }
           catch {
             $message = [string]$_.Exception.Message
