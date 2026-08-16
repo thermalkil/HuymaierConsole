@@ -19,7 +19,16 @@ $script:HcManualRecompsBaseInvokeAction=${function:Invoke-Action}
 
 function Initialize-HcManualRecompConfig {
     if($null -eq $script:Config.PSObject.Properties['RecompGames']){
-        $script:Config|Add-Member -NotePropertyName RecompGames -NotePropertyValue @() -Force
+        # The legacy core config loader does not know this new property yet. Read
+        # it directly from config.json so the manual list survives every restart.
+        $persisted=@()
+        try{
+            if($script:ConfigPath -and (Test-Path -LiteralPath $script:ConfigPath -PathType Leaf)){
+                $disk=Get-Content -Raw -LiteralPath $script:ConfigPath -Encoding UTF8|ConvertFrom-Json
+                if($null-ne$disk -and $null-ne$disk.PSObject.Properties['RecompGames']){$persisted=Convert-ToStableArray $disk.RecompGames}
+            }
+        }catch{Write-Log "Manual Recomps config recovery skipped: $($_.Exception.Message)" 'WARN'}
+        $script:Config|Add-Member -NotePropertyName RecompGames -NotePropertyValue $persisted -Force
     }
     $script:Config.RecompGames=Convert-ToStableArray $script:Config.RecompGames
 }
@@ -120,8 +129,8 @@ function Remove-HcManualRecompGame {
         $entryId=[string](Get-EntryProperty $entry 'Id' '')
         $entryTarget=[string](Get-EntryProperty $entry 'LaunchTarget' '')
         $isSame=[string]::Equals($entryId,$Id,[StringComparison]::OrdinalIgnoreCase)
-        if(-not$isSame -and $target){$isSame=[string]::Equals($entryTarget,$target,[StringComparison]::OrdinalIgnoreCase)}
-        if(-not$isSame){[void]$recent.Add($entry)}
+        if((-not $isSame) -and $target){$isSame=[string]::Equals($entryTarget,$target,[StringComparison]::OrdinalIgnoreCase)}
+        if(-not $isSame){[void]$recent.Add($entry)}
     }
     if($null-ne$script:Config.PSObject.Properties['RecentGames']){$script:Config.RecentGames=[object[]]$recent.ToArray()}
 
