@@ -1,4 +1,6 @@
-param()
+param(
+    [string]$FinalPath=''
+)
 
 Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
@@ -9,8 +11,9 @@ Add-Type -AssemblyName WindowsBase
 Add-Type -AssemblyName System.Xaml
 
 $repoRoot=(Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-$finalPath=Join-Path $repoRoot 'HuymaierRecompsFinal.ps1'
-if(-not(Test-Path -LiteralPath $finalPath -PathType Leaf)){throw 'HuymaierRecompsFinal.ps1 is missing.'}
+if([string]::IsNullOrWhiteSpace($FinalPath)){$FinalPath=Join-Path $repoRoot 'HuymaierRecompsFinal.ps1'}
+$finalPath=(Resolve-Path -LiteralPath $FinalPath).Path
+if(-not(Test-Path -LiteralPath $finalPath -PathType Leaf)){throw "HuymaierRecompsFinal.ps1 is missing: $FinalPath"}
 
 # Minimal post-V7 shell contract. This test deliberately executes the actual
 # WPF renderer instead of merely checking route/state strings.
