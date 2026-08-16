@@ -1,0 +1,34 @@
+name: Align GPU host test with LoadFrom resolution
+on:
+  push:
+    paths: ['.github/workflows/fix-gpu-host-loadfrom-test.yml']
+permissions: {contents: write}
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: feature/v0.26.5-performance-and-downloads, fetch-depth: 0}
+      - name: Replace Add-Type type lookup and self-clean
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('.development/v0.26.5/Test-v0265-D3D11ShelfBackend.ps1')
+          text=p.read_text(encoding='utf-8-sig')
+          old="""    Add-Type -Path $managedDll\n    $result=[HuymaierConsole.Modeling.D3D11ShelfSurface]::RunNativeSmokeTest()\n    if([int]$result-ne1){throw \"D3D11 shader/render/readback smoke test failed with code $result\"}\n"""
+          new="""    $gpuAssembly=[Reflection.Assembly]::LoadFrom($managedDll)\n    $gpuType=$gpuAssembly.GetType('HuymaierConsole.Modeling.D3D11ShelfSurface',$false)\n    if($null-eq$gpuType){throw 'LoadFrom GPU host assembly did not expose D3D11ShelfSurface.'}\n    $smokeMethod=$gpuType.GetMethod('RunNativeSmokeTest',[Reflection.BindingFlags]'Public,Static')\n    if($null-eq$smokeMethod){throw 'D3D11ShelfSurface.RunNativeSmokeTest was not found through loaded assembly.'}\n    $result=[int]$smokeMethod.Invoke($null,@())\n    if([int]$result-ne1){throw \"D3D11 shader/render/readback smoke test failed with code $result\"}\n"""
+          if old not in text: raise SystemExit('GPU host Add-Type smoke block not found')
+          text=text.replace(old,new,1)
+          gate="    Write-Host 'platformModelD3D11SharedAssetCacheGate: success'"
+          if gate not in text: raise SystemExit('D3D11 gate output anchor not found')
+          text=text.replace(gate,gate+"\n    Write-Host 'platformModelGpuHostLoadFromResolutionGate: success'",1)
+          p.write_text(text,encoding='utf-8')
+          Path('.github/workflows/fix-gpu-host-loadfrom-test.yml').unlink()
+      - name: Commit LoadFrom source proof
+        shell: bash
+        run: |
+          git config user.name thermalkil
+          git config user.email 98826286+thermalkil@users.noreply.github.com
+          git add -A
+          git commit -m 'Validate GPU host type through loaded assembly object'
+          git push origin HEAD:feature/v0.26.5-performance-and-downloads
