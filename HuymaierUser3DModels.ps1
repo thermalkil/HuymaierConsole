@@ -1,11 +1,13 @@
 # HUYMAIER_USER_3D_MODELS_RUNTIME_V5
+# HUYMAIER_3D_SHELF_BOUNDED_RESIDENCY_V1
 # Authoritative platform/provider presentation owner for v0.26.5.
 #
 # User-owned GLBs persist outside update payloads in
 # %LOCALAPPDATA%\Huymaier Console\3D Models (or a portable 3D Models folder).
 # V5 presents 3D mode as a centered textured shelf rather than forcing live
-# models into icon-sized card viewports. Only the selected platform and nearby
-# neighbors are materialized, and rotation changes only Viewport3D transforms.
+# models into icon-sized card viewports. Only the selected platform and its
+# immediate neighbors remain materialized; rotation changes Viewport3D transforms
+# only and background data polling cannot rebuild the active shelf.
 
 Set-StrictMode -Version 2.0
 
@@ -14,7 +16,6 @@ $script:HcUser3DModelsRoot=Join-Path $script:DataDir '3D Models'
 $script:HcPortable3DModelsRoot=Join-Path $script:BaseDir '3D Models'
 $script:HcUser3DModelsGuidePath=Join-Path $script:HcUser3DModelsRoot 'README - Model Names.txt'
 
-# Bind to the clean pre-3D presentation contract captured by HuymaierPlatformModels.
 $baseCardVar=Get-Variable HcModelsBaseNewPlatformCard -Scope Script -ErrorAction SilentlyContinue
 $baseRailVar=Get-Variable HcModelsBaseAddPlatformRail -Scope Script -ErrorAction SilentlyContinue
 $basePageVar=Get-Variable HcModelsBaseGetPageDefinition -Scope Script -ErrorAction SilentlyContinue
@@ -77,7 +78,7 @@ function Initialize-HcUser3DModelsFolder {
         if(-not(Test-Path $script:HcUser3DModelsRoot -PathType Container)){New-Item -ItemType Directory -Path $script:HcUser3DModelsRoot -Force|Out-Null}
         if(-not(Test-Path $script:HcUser3DModelsGuidePath -PathType Leaf)){
             $lines=New-Object System.Collections.Generic.List[string]
-            foreach($line in @('HUYMAIER CONSOLE - 3D MODELS','','Place your .glb files in this folder. Huymaier Console does not bundle large model packs.','The names below match the original Huymaier model pack exactly. Windows filename matching is case-insensitive.','Missing or failed models keep the normal platform icon.','Games 3D mode uses a centered textured shelf. The selected model is enlarged and nearby models load lazily.','The selected shelf model rotates continuously without rebuilding the Games page. X/Square opens the dedicated full-screen viewer.','','Supported original filenames:')){[void]$lines.Add($line)}
+            foreach($line in @('HUYMAIER CONSOLE - 3D MODELS','','Place your .glb files in this folder. Huymaier Console does not bundle large model packs.','The names below match the original Huymaier model pack exactly. Windows filename matching is case-insensitive.','Missing or failed models keep the normal platform icon.','Games 3D mode uses a centered textured shelf. The selected model is enlarged and its immediate neighbors load lazily.','Only three textured shelf models stay resident at a time so large embedded textures cannot accumulate while browsing.','The selected shelf model rotates continuously without rebuilding the Games page. X/Square opens the dedicated full-screen viewer.','','Supported original filenames:')){[void]$lines.Add($line)}
             foreach($name in @(Get-HcUser3DModelNames)){[void]$lines.Add('  '+$name)}
             foreach($line in @('','You may replace any file with your own GLB while keeping the same filename.','A portable 3D Models folder beside HuymaierConsole.ps1 is also recognized when present.')){[void]$lines.Add($line)}
             [IO.File]::WriteAllLines($script:HcUser3DModelsGuidePath,[string[]]$lines.ToArray(),(New-Object Text.UTF8Encoding($false)))
@@ -120,182 +121,80 @@ function Reset-Hc3DShelfRuntime {
 }
 function Get-Hc3DShelfSelectedLocalIndex {
     if(-not$script:Hc3DShelfMounted-or$script:Hc3DShelfCards.Count-le0){return -1}
-    [math]::Max(0,[math]::Min($script:Hc3DShelfCards.Count-1,$script:SelectedAction-$script:Hc3DShelfStart))
+    $index=$script:SelectedAction-$script:Hc3DShelfStart
+    if($index-lt0-or$index-ge$script:Hc3DShelfCards.Count){return -1}
+    [int]$index
 }
 function Set-Hc3DShelfViewFraming($View,[int]$ScalePercent){
     if($null-eq$View){return}
-    # The setting controls occupancy inside the shelf viewport, not an unsafe
-    # literal 200% geometry scale. Mapping 50..200 to 55..84 keeps rotating
-    # model bounds inside the camera frustum and prevents fixed-host clipping.
-    $safeScale=55.0+(([math]::Max(50,[math]::Min(200,$ScalePercent))-50.0)/150.0)*29.0
+    $safeScale=55.0+(([math]::Max(50,[math]::Min(200,$ScalePercent))-50.0)/150.0)*23.0
     try{$View.SetScalePercent($safeScale)}catch{}
 }
 function New-Hc3DShelfLiveModelView([string]$Path,[int]$ScalePercent){
     if(-not(Initialize-HcLiveModelAssembly)){return $null}
-    try{
-        # One-argument constructor uses the original GLB material/UV/embedded
-        # texture loader. Shelf mode only materializes the selected item and
-        # nearby neighbors, avoiding the old all-model texture storm.
-        $view=New-Object HuymaierConsole.Modeling.LiveModelView -ArgumentList @($Path)
-        Set-Hc3DShelfViewFraming $view $ScalePercent
-        $view
-    }catch{try{Write-Log ('Textured 3D shelf scene failed for '+$Path+': '+$_.Exception.Message) 'WARN'}catch{};$null}
+    try{$view=New-Object HuymaierConsole.Modeling.LiveModelView -ArgumentList @($Path);Set-Hc3DShelfViewFraming $view $ScalePercent;$view}catch{try{Write-Log ('Textured 3D shelf scene failed for '+$Path+': '+$_.Exception.Message) 'WARN'}catch{};$null}
 }
 function Start-Hc3DShelfLoadTimer {
-    if(-not$script:Hc3DShelfLoadTimer){
-        $timer=New-Object System.Windows.Threading.DispatcherTimer;$timer.Interval=[TimeSpan]::FromMilliseconds(120)
-        $timer.Add_Tick({try{Update-Hc3DShelfLoadQueue}catch{$script:HcUser3DFailedCount++;try{Write-Log ('3D shelf load tick failed: '+$_.Exception.Message) 'ERROR'}catch{}}});$script:Hc3DShelfLoadTimer=$timer
-    }
+    if(-not$script:Hc3DShelfLoadTimer){$timer=New-Object System.Windows.Threading.DispatcherTimer;$timer.Interval=[TimeSpan]::FromMilliseconds(120);$timer.Add_Tick({try{Update-Hc3DShelfLoadQueue}catch{$script:HcUser3DFailedCount++;try{Write-Log ('3D shelf load tick failed: '+$_.Exception.Message) 'ERROR'}catch{}}});$script:Hc3DShelfLoadTimer=$timer}
     if(-not$script:Hc3DShelfLoadTimer.IsEnabled){$script:Hc3DShelfLoadTimer.Start()}
 }
 function Queue-Hc3DShelfCard($Card,[bool]$Front){
-    if($null-eq$Card-or$Card.Loading-or$null-ne$Card.View-or$Card.Failed-or[string]::IsNullOrWhiteSpace([string]$Card.Path)){return}
-    $Card.Loading=$true;$request=[pscustomobject]@{Generation=$script:Hc3DShelfGeneration;Card=$Card}
-    if($Front){$script:Hc3DShelfLoadQueue.Insert(0,$request)}else{[void]$script:Hc3DShelfLoadQueue.Add($request)}
-    $script:HcUser3DQueuedCount++;Start-Hc3DShelfLoadTimer
+    if($null-eq$Card-or$Card.Loading-or$null-ne$Card.View-or$Card.Failed-or[string]::IsNullOrWhiteSpace([string]$Card.Path)){return};$Card.Loading=$true;$request=[pscustomobject]@{Generation=$script:Hc3DShelfGeneration;Card=$Card};if($Front){$script:Hc3DShelfLoadQueue.Insert(0,$request)}else{[void]$script:Hc3DShelfLoadQueue.Add($request)};$script:HcUser3DQueuedCount++;Start-Hc3DShelfLoadTimer
+}
+function Trim-Hc3DShelfResidency([int]$Selected){
+    if($Selected-lt0){return};$kept=New-Object System.Collections.ArrayList
+    foreach($request in @($script:Hc3DShelfLoadQueue)){try{if($request-and$request.Card-and[math]::Abs([int]$request.Card.Index-$Selected)-le1){[void]$kept.Add($request)}elseif($request-and$request.Card){$request.Card.Loading=$false}}catch{}}
+    $script:Hc3DShelfLoadQueue=$kept
+    foreach($card in @($script:Hc3DShelfCards)){if($null-eq$card-or[math]::Abs([int]$card.Index-$Selected)-le1){continue};if($null-ne$card.View){try{$card.VisualHost.Child=$card.Icon}catch{};$card.View=$null;$card.Loading=$false}}
 }
 function Update-Hc3DShelfLoadQueue {
-    if(-not$script:Hc3DShelfMounted-or(Get-HcPlatformVisualStyle)-ne'3D Models'){try{$script:Hc3DShelfLoadTimer.Stop()}catch{};return}
-    if($script:Hc3DShelfLoadQueue.Count-le0){try{$script:Hc3DShelfLoadTimer.Stop()}catch{};return}
-    $request=$script:Hc3DShelfLoadQueue[0];$script:Hc3DShelfLoadQueue.RemoveAt(0)
-    if($null-eq$request-or[int]$request.Generation-ne$script:Hc3DShelfGeneration){return}
-    $card=$request.Card;if($null-eq$card){return};$card.Loading=$false
-    if(-not(Test-Path -LiteralPath ([string]$card.Path) -PathType Leaf)){$card.Failed=$true;$script:HcUser3DFailedCount++;return}
-    try{
-        $view=New-Hc3DShelfLiveModelView ([string]$card.Path) ([int]$script:Config.PlatformModelScale)
-        if($null-eq$view){throw 'Textured live model view could not be created.'}
-        if([int]$view.GeometryCount-le0-or[int]$view.VertexCount-le0){throw 'Textured live model view reported no renderable geometry.'}
-        $card.VisualHost.Child=$view;$card.View=$view;$script:HcUser3DReadyCount++
-        try{Write-Log ('Textured 3D shelf ready: '+$card.Platform+' geometry='+[int]$view.GeometryCount+' vertices='+[int]$view.VertexCount)}catch{}
-    }catch{
-        $card.Failed=$true;$script:HcUser3DFailedCount++;try{$card.VisualHost.Child=$card.Icon}catch{};try{Write-Log ('3D shelf kept icon for '+$card.Platform+': '+$_.Exception.Message) 'WARN'}catch{}
-    }
+    if(-not$script:Hc3DShelfMounted-or(Get-HcPlatformVisualStyle)-ne'3D Models'){try{$script:Hc3DShelfLoadTimer.Stop()}catch{};return};if($script:Hc3DShelfLoadQueue.Count-le0){try{$script:Hc3DShelfLoadTimer.Stop()}catch{};return}
+    $request=$script:Hc3DShelfLoadQueue[0];$script:Hc3DShelfLoadQueue.RemoveAt(0);if($null-eq$request-or[int]$request.Generation-ne$script:Hc3DShelfGeneration){return};$card=$request.Card;if($null-eq$card){return};$card.Loading=$false
+    $selected=Get-Hc3DShelfSelectedLocalIndex;if($selected-lt0-or[math]::Abs([int]$card.Index-$selected)-gt1){return};if(-not(Test-Path -LiteralPath ([string]$card.Path) -PathType Leaf)){$card.Failed=$true;$script:HcUser3DFailedCount++;return}
+    try{$view=New-Hc3DShelfLiveModelView ([string]$card.Path) ([int]$script:Config.PlatformModelScale);if($null-eq$view){throw 'Textured live model view could not be created.'};if([int]$view.GeometryCount-le0-or[int]$view.VertexCount-le0){throw 'Textured live model view reported no renderable geometry.'};$card.VisualHost.Child=$view;$card.View=$view;$script:HcUser3DReadyCount++;try{Write-Log ('Textured 3D shelf ready: '+$card.Platform+' geometry='+[int]$view.GeometryCount+' vertices='+[int]$view.VertexCount)}catch{}}
+    catch{$card.Failed=$true;$script:HcUser3DFailedCount++;try{$card.VisualHost.Child=$card.Icon}catch{};try{Write-Log ('3D shelf kept icon for '+$card.Platform+': '+$_.Exception.Message) 'WARN'}catch{}}
 }
 function Start-Hc3DShelfSpinTimer {
-    if(-not$script:Hc3DShelfSpinTimer){
-        $timer=New-Object System.Windows.Threading.DispatcherTimer;$timer.Interval=[TimeSpan]::FromMilliseconds(50)
-        $timer.Add_Tick({
-            try{
-                if(-not$script:Hc3DShelfMounted-or(Get-HcPlatformVisualStyle)-ne'3D Models'){return}
-                $selected=Get-Hc3DShelfSelectedLocalIndex
-                for($i=0;$i-lt$script:Hc3DShelfCards.Count;$i++){
-                    $card=$script:Hc3DShelfCards[$i];if($null-eq$card.View){continue};$distance=[math]::Abs($i-$selected)
-                    if($distance-eq0){$card.View.Rotate(.60,0)}elseif($distance-le2){$card.View.Rotate(.22,0)}
-                }
-            }catch{}
-        });$script:Hc3DShelfSpinTimer=$timer
-    }
-    if(-not$script:Hc3DShelfSpinTimer.IsEnabled){$script:Hc3DShelfSpinTimer.Start()}
+    if(-not$script:Hc3DShelfSpinTimer){$timer=New-Object System.Windows.Threading.DispatcherTimer;$timer.Interval=[TimeSpan]::FromMilliseconds(50);$timer.Add_Tick({try{if(-not$script:Hc3DShelfMounted-or(Get-HcPlatformVisualStyle)-ne'3D Models'){return};$selected=Get-Hc3DShelfSelectedLocalIndex;if($selected-lt0){return};for($i=0;$i-lt$script:Hc3DShelfCards.Count;$i++){$card=$script:Hc3DShelfCards[$i];if($null-eq$card.View){continue};$distance=[math]::Abs($i-$selected);if($distance-eq0){$card.View.Rotate(.60,0)}elseif($distance-eq1){$card.View.Rotate(.22,0)}}}catch{}});$script:Hc3DShelfSpinTimer=$timer};if(-not$script:Hc3DShelfSpinTimer.IsEnabled){$script:Hc3DShelfSpinTimer.Start()}
 }
-function Queue-Hc3DShelfNeighborhood([int]$Selected){
-    foreach($delta in @(0,1,-1,2,-2)){$index=$Selected+$delta;if($index-lt0-or$index-ge$script:Hc3DShelfCards.Count){continue};$card=$script:Hc3DShelfCards[$index];if([string]::IsNullOrWhiteSpace([string]$card.Path)){continue};Queue-Hc3DShelfCard $card ($delta-eq0)}
-}
+function Queue-Hc3DShelfNeighborhood([int]$Selected){foreach($delta in @(0,1,-1)){$index=$Selected+$delta;if($index-lt0-or$index-ge$script:Hc3DShelfCards.Count){continue};$card=$script:Hc3DShelfCards[$index];if([string]::IsNullOrWhiteSpace([string]$card.Path)){continue};Queue-Hc3DShelfCard $card ($delta-eq0)}}
 function Center-Hc3DShelfSelection {
-    if($null-eq$script:Hc3DShelfScroll-or$null-eq$script:Hc3DShelfRow){return}
-    $selected=Get-Hc3DShelfSelectedLocalIndex;if($selected-lt0-or$selected-ge$script:Hc3DShelfCards.Count){return}
-    try{
-        $script:Hc3DShelfRow.UpdateLayout();$script:Hc3DShelfScroll.UpdateLayout();$button=$script:Hc3DShelfCards[$selected].Button
-        $origin=New-Object System.Windows.Point -ArgumentList 0,0;$point=$button.TranslatePoint($origin,$script:Hc3DShelfRow)
-        $target=[double]$point.X+([double]$button.ActualWidth/2.0)-([double]$script:Hc3DShelfScroll.ViewportWidth/2.0)
-        $script:Hc3DShelfScroll.ScrollToHorizontalOffset([math]::Max(0,$target))
-    }catch{}
+    if($null-eq$script:Hc3DShelfScroll-or$null-eq$script:Hc3DShelfRow){return};$selected=Get-Hc3DShelfSelectedLocalIndex;if($selected-lt0-or$selected-ge$script:Hc3DShelfCards.Count){return}
+    try{$script:Hc3DShelfRow.UpdateLayout();$script:Hc3DShelfScroll.UpdateLayout();$button=$script:Hc3DShelfCards[$selected].Button;$origin=New-Object System.Windows.Point -ArgumentList 0,0;$point=$button.TranslatePoint($origin,$script:Hc3DShelfRow);$target=[double]$point.X+([double]$button.ActualWidth/2.0)-([double]$script:Hc3DShelfScroll.ViewportWidth/2.0);$script:Hc3DShelfScroll.ScrollToHorizontalOffset([math]::Max(0,$target))}catch{}
 }
 function Update-Hc3DShelfSelection {
-    if(-not$script:Hc3DShelfMounted-or$script:Hc3DShelfCards.Count-le0){return}
-    $selected=Get-Hc3DShelfSelectedLocalIndex;if($selected-lt0){return}
-    for($i=0;$i-lt$script:Hc3DShelfCards.Count;$i++){
-        $card=$script:Hc3DShelfCards[$i];$distance=[math]::Abs($i-$selected)
-        if($distance-eq0){$card.Button.Width=470;$card.Button.Height=390;$card.VisualHost.Height=302;$card.Button.Opacity=1.0;$card.Button.BorderBrush='#F2D36B';$card.Button.BorderThickness='3';$card.Label.FontSize=22;$card.Count.FontSize=11}
-        elseif($distance-eq1){$card.Button.Width=280;$card.Button.Height=300;$card.VisualHost.Height=218;$card.Button.Opacity=.76;$card.Button.BorderBrush='#52637A';$card.Button.BorderThickness='1';$card.Label.FontSize=16;$card.Count.FontSize=9}
-        elseif($distance-eq2){$card.Button.Width=220;$card.Button.Height=260;$card.VisualHost.Height=184;$card.Button.Opacity=.48;$card.Button.BorderBrush='#38485D';$card.Button.BorderThickness='1';$card.Label.FontSize=14;$card.Count.FontSize=9}
-        else{$card.Button.Width=170;$card.Button.Height=230;$card.VisualHost.Height=156;$card.Button.Opacity=.20;$card.Button.BorderBrush='#263344';$card.Button.BorderThickness='1';$card.Label.FontSize=12;$card.Count.FontSize=8}
-        if($null-ne$card.View){Set-Hc3DShelfViewFraming $card.View ([int]$script:Config.PlatformModelScale)}
-    }
-    $active=$script:Hc3DShelfCards[$selected];$script:SelectedGamePlatform=[string]$active.Platform
-    if($null-ne$script:Hc3DShelfTitle){$script:Hc3DShelfTitle.Text=[string]$active.Platform}
-    if($null-ne$script:Hc3DShelfDetail){$script:Hc3DShelfDetail.Text='A/Cross open platform   •   X/Square full-screen 3D viewer   •   Left/Right browse'}
-    Queue-Hc3DShelfNeighborhood $selected;Start-Hc3DShelfSpinTimer;Center-Hc3DShelfSelection
+    if(-not$script:Hc3DShelfMounted-or$script:Hc3DShelfCards.Count-le0){return};$selected=Get-Hc3DShelfSelectedLocalIndex;if($selected-lt0){return};Trim-Hc3DShelfResidency $selected
+    for($i=0;$i-lt$script:Hc3DShelfCards.Count;$i++){$card=$script:Hc3DShelfCards[$i];$distance=[math]::Abs($i-$selected);if($distance-eq0){$card.Button.Width=470;$card.Button.Height=390;$card.VisualHost.Height=302;$card.Button.Opacity=1.0;$card.Button.BorderBrush='#F2D36B';$card.Button.BorderThickness='3';$card.Label.FontSize=22;$card.Count.FontSize=11}elseif($distance-eq1){$card.Button.Width=280;$card.Button.Height=300;$card.VisualHost.Height=218;$card.Button.Opacity=.76;$card.Button.BorderBrush='#52637A';$card.Button.BorderThickness='1';$card.Label.FontSize=16;$card.Count.FontSize=9}elseif($distance-eq2){$card.Button.Width=220;$card.Button.Height=260;$card.VisualHost.Height=184;$card.Button.Opacity=.48;$card.Button.BorderBrush='#38485D';$card.Button.BorderThickness='1';$card.Label.FontSize=14;$card.Count.FontSize=9}else{$card.Button.Width=170;$card.Button.Height=230;$card.VisualHost.Height=156;$card.Button.Opacity=.20;$card.Button.BorderBrush='#263344';$card.Button.BorderThickness='1';$card.Label.FontSize=12;$card.Count.FontSize=8};if($null-ne$card.View){Set-Hc3DShelfViewFraming $card.View ([int]$script:Config.PlatformModelScale)}}
+    $active=$script:Hc3DShelfCards[$selected];$script:SelectedGamePlatform=[string]$active.Platform;if($null-ne$script:Hc3DShelfTitle){$script:Hc3DShelfTitle.Text=[string]$active.Platform};if($null-ne$script:Hc3DShelfDetail){$script:Hc3DShelfDetail.Text='A/Cross open platform   •   X/Square full-screen 3D viewer   •   Left/Right browse'};Queue-Hc3DShelfNeighborhood $selected;Start-Hc3DShelfSpinTimer;Center-Hc3DShelfSelection
 }
 function New-Hc3DShelfCard([string]$Platform,[int]$Index){
-    $button=New-Object System.Windows.Controls.Button;$button.Tag=('platform-select:'+$Index);$button.Width=220;$button.Height=260;$button.Margin='12,8';$button.Padding='8';$button.Background='#8C0B111C';$button.BorderBrush='#38485D';$button.BorderThickness='1';$button.Cursor='Hand';$button.RenderTransformOrigin='0.5,0.5'
-    $button.Template=[Windows.Markup.XamlReader]::Parse('<ControlTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" TargetType="Button"><Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="18" Padding="{TemplateBinding Padding}" ClipToBounds="False"><ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/></Border></ControlTemplate>')
-    $grid=New-Object System.Windows.Controls.Grid;$grid.RowDefinitions.Add((New-Object System.Windows.Controls.RowDefinition -Property @{Height='*'}));$grid.RowDefinitions.Add((New-Object System.Windows.Controls.RowDefinition -Property @{Height='Auto'}));$grid.RowDefinitions.Add((New-Object System.Windows.Controls.RowDefinition -Property @{Height='Auto'}))
-    $visualHost=New-Object System.Windows.Controls.Border;$visualHost.Background='Transparent';$visualHost.BorderThickness='0';$visualHost.Height=184;$visualHost.HorizontalAlignment='Stretch';$visualHost.VerticalAlignment='Stretch';$visualHost.ClipToBounds=$false
-    $icon=New-PlatformIconImage $Platform 112;$icon.HorizontalAlignment='Center';$icon.VerticalAlignment='Center';$visualHost.Child=$icon;[System.Windows.Controls.Grid]::SetRow($visualHost,0);$grid.Children.Add($visualHost)|Out-Null
-    $label=New-Object System.Windows.Controls.TextBlock;$label.Text=$Platform;$label.FontSize=14;$label.FontWeight='SemiBold';$label.Foreground='White';$label.HorizontalAlignment='Center';$label.TextAlignment='Center';$label.TextTrimming='CharacterEllipsis';$label.Margin='4,7,4,0';[System.Windows.Controls.Grid]::SetRow($label,1);$grid.Children.Add($label)|Out-Null
-    $summary=Get-PlatformCountSummary $Platform;$count=New-Object System.Windows.Controls.TextBlock;$count.Text=$(if([bool]$summary.Pending){'SCANNING…'}elseif([int]$summary.Owned-gt[int]$summary.Installed){([int]$summary.Installed).ToString()+' INSTALLED • '+([int]$summary.Owned).ToString()+' OWNED'}else{([int]$summary.Installed).ToString()+' GAMES'});$count.FontSize=9;$count.FontWeight='SemiBold';$count.Foreground='#94A6BE';$count.HorizontalAlignment='Center';$count.Margin='2,3,2,2';[System.Windows.Controls.Grid]::SetRow($count,2);$grid.Children.Add($count)|Out-Null
-    $button.Content=$grid;$button.Add_Click({param($sender,$eventArgs)try{Set-KeyboardActive;Invoke-UiFeedback 'Confirm';Invoke-Action ([string]$sender.Tag)}catch{try{Write-Log ('3D shelf platform action failed: '+$_.Exception.Message) 'ERROR'}catch{}}});$button.Add_MouseEnter({param($sender,$eventArgs)if(-not(Test-HcMouseHoverAllowed)){return};Set-KeyboardActive;$idx=[array]::IndexOf($script:ActionButtons,$sender);if($idx-ge0){$script:SelectedAction=$idx;Update-ActionVisuals}})
-    $path=Resolve-HcLivePlatformModelPath $Platform;if(-not$path){$script:HcUser3DMissingCount++;$button.ToolTip='A/Cross Open platform   •   Add a matching GLB to enable the 3D shelf model'}else{$button.ToolTip='A/Cross Open platform   •   X/Square View 3D model'}
-    [pscustomobject]@{Index=$Index;Platform=$Platform;Button=$button;VisualHost=$visualHost;Icon=$icon;Label=$label;Count=$count;Path=$path;View=$null;Loading=$false;Failed=$false}
+    $button=New-Object System.Windows.Controls.Button;$button.Tag=('platform-select:'+$Index);$button.Width=220;$button.Height=260;$button.Margin='12,8';$button.Padding='8';$button.Background='#8C0B111C';$button.BorderBrush='#38485D';$button.BorderThickness='1';$button.Cursor='Hand';$button.RenderTransformOrigin='0.5,0.5';$button.Template=[Windows.Markup.XamlReader]::Parse('<ControlTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" TargetType="Button"><Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="18" Padding="{TemplateBinding Padding}" ClipToBounds="False"><ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/></Border></ControlTemplate>')
+    $grid=New-Object System.Windows.Controls.Grid;$grid.RowDefinitions.Add((New-Object System.Windows.Controls.RowDefinition -Property @{Height='*'}));$grid.RowDefinitions.Add((New-Object System.Windows.Controls.RowDefinition -Property @{Height='Auto'}));$grid.RowDefinitions.Add((New-Object System.Windows.Controls.RowDefinition -Property @{Height='Auto'}));$visualHost=New-Object System.Windows.Controls.Border;$visualHost.Background='Transparent';$visualHost.BorderThickness='0';$visualHost.Height=184;$visualHost.HorizontalAlignment='Stretch';$visualHost.VerticalAlignment='Stretch';$visualHost.ClipToBounds=$false
+    $icon=New-PlatformIconImage $Platform 112;$icon.HorizontalAlignment='Center';$icon.VerticalAlignment='Center';$visualHost.Child=$icon;[System.Windows.Controls.Grid]::SetRow($visualHost,0);$grid.Children.Add($visualHost)|Out-Null;$label=New-Object System.Windows.Controls.TextBlock;$label.Text=$Platform;$label.FontSize=14;$label.FontWeight='SemiBold';$label.Foreground='White';$label.HorizontalAlignment='Center';$label.TextAlignment='Center';$label.TextTrimming='CharacterEllipsis';$label.Margin='4,7,4,0';[System.Windows.Controls.Grid]::SetRow($label,1);$grid.Children.Add($label)|Out-Null
+    $summary=Get-PlatformCountSummary $Platform;$count=New-Object System.Windows.Controls.TextBlock;$count.Text=$(if([bool]$summary.Pending){'SCANNING…'}elseif([int]$summary.Owned-gt[int]$summary.Installed){([int]$summary.Installed).ToString()+' INSTALLED • '+([int]$summary.Owned).ToString()+' OWNED'}else{([int]$summary.Installed).ToString()+' GAMES'});$count.FontSize=9;$count.FontWeight='SemiBold';$count.Foreground='#94A6BE';$count.HorizontalAlignment='Center';$count.Margin='2,3,2,2';[System.Windows.Controls.Grid]::SetRow($count,2);$grid.Children.Add($count)|Out-Null;$button.Content=$grid
+    $button.Add_Click({param($sender,$eventArgs)try{Set-KeyboardActive;Invoke-UiFeedback 'Confirm';Invoke-Action ([string]$sender.Tag)}catch{try{Write-Log ('3D shelf platform action failed: '+$_.Exception.Message) 'ERROR'}catch{}}});$button.Add_MouseEnter({param($sender,$eventArgs)if(-not(Test-HcMouseHoverAllowed)){return};Set-KeyboardActive;$idx=[array]::IndexOf($script:ActionButtons,$sender);if($idx-ge0){$script:SelectedAction=$idx;Update-ActionVisuals}})
+    $path=Resolve-HcLivePlatformModelPath $Platform;if(-not$path){$script:HcUser3DMissingCount++;$button.ToolTip='A/Cross Open platform   •   Add a matching GLB to enable the 3D shelf model'}else{$button.ToolTip='A/Cross Open platform   •   X/Square View 3D model'};[pscustomobject]@{Index=$Index;Platform=$Platform;Button=$button;VisualHost=$visualHost;Icon=$icon;Label=$label;Count=$count;Path=$path;View=$null;Loading=$false;Failed=$false}
 }
 function Add-Hc3DPlatformShelf {
-    $script:Hc3DShelfMounted=$true;$script:Hc3DShelfStart=$script:ActionButtons.Count
-    $heading=New-Object System.Windows.Controls.TextBlock;$heading.Text='Games';$heading.FontSize=28;$heading.FontWeight='Bold';$heading.Foreground='White';$heading.Margin='0,0,0,2';$script:ActionPanel.Children.Add($heading)|Out-Null
-    $script:Hc3DShelfTitle=New-Object System.Windows.Controls.TextBlock;$script:Hc3DShelfTitle.FontSize=18;$script:Hc3DShelfTitle.FontWeight='SemiBold';$script:Hc3DShelfTitle.Foreground='#E7C45E';$script:Hc3DShelfTitle.Margin='0,0,0,2';$script:Hc3DShelfTitle.HorizontalAlignment='Center';$script:ActionPanel.Children.Add($script:Hc3DShelfTitle)|Out-Null
-    $script:Hc3DShelfDetail=New-Object System.Windows.Controls.TextBlock;$script:Hc3DShelfDetail.FontSize=11;$script:Hc3DShelfDetail.Foreground='#93A5BC';$script:Hc3DShelfDetail.Margin='0,0,0,8';$script:Hc3DShelfDetail.HorizontalAlignment='Center';$script:ActionPanel.Children.Add($script:Hc3DShelfDetail)|Out-Null
-    $row=New-Object System.Windows.Controls.StackPanel;$row.Orientation='Horizontal';$row.VerticalAlignment='Center';$row.Margin='60,0,60,8';$script:Hc3DShelfRow=$row
-    for($i=0;$i-lt$script:GameHubPlatforms.Count;$i++){
-        $platform=[string]$script:GameHubPlatforms[$i];$card=New-Hc3DShelfCard $platform $i;[void]$script:Hc3DShelfCards.Add($card);$row.Children.Add($card.Button)|Out-Null;$script:ActionButtons+=$card.Button;$script:CurrentActions+=(New-Action ('platform-select:'+$i) $platform)
-    }
-    $scroll=New-Object System.Windows.Controls.ScrollViewer;$scroll.Height=430;$scroll.HorizontalScrollBarVisibility='Hidden';$scroll.VerticalScrollBarVisibility='Disabled';$scroll.PanningMode='HorizontalOnly';$scroll.Content=$row;$scroll.HorizontalContentAlignment='Left';$scroll.VerticalContentAlignment='Center';$script:Hc3DShelfScroll=$scroll;$script:ActionPanel.Children.Add($scroll)|Out-Null
-    $script:HomeRows+=,[pscustomobject]@{Start=$script:Hc3DShelfStart;Count=$script:Hc3DShelfCards.Count;Platform=$true}
-    try{Write-Log ('3D platform shelf mounted: owner='+$script:HcPlatformPresentationOwner+'; detected='+(Get-HcDetectedUser3DModelCount)+'; platforms='+$script:Hc3DShelfCards.Count)}catch{}
-    Update-Hc3DShelfSelection
+    $script:Hc3DShelfMounted=$true;$script:Hc3DShelfStart=$script:ActionButtons.Count;$heading=New-Object System.Windows.Controls.TextBlock;$heading.Text='Games';$heading.FontSize=28;$heading.FontWeight='Bold';$heading.Foreground='White';$heading.Margin='0,0,0,2';$script:ActionPanel.Children.Add($heading)|Out-Null;$script:Hc3DShelfTitle=New-Object System.Windows.Controls.TextBlock;$script:Hc3DShelfTitle.FontSize=18;$script:Hc3DShelfTitle.FontWeight='SemiBold';$script:Hc3DShelfTitle.Foreground='#E7C45E';$script:Hc3DShelfTitle.Margin='0,0,0,2';$script:Hc3DShelfTitle.HorizontalAlignment='Center';$script:ActionPanel.Children.Add($script:Hc3DShelfTitle)|Out-Null;$script:Hc3DShelfDetail=New-Object System.Windows.Controls.TextBlock;$script:Hc3DShelfDetail.FontSize=11;$script:Hc3DShelfDetail.Foreground='#93A5BC';$script:Hc3DShelfDetail.Margin='0,0,0,8';$script:Hc3DShelfDetail.HorizontalAlignment='Center';$script:ActionPanel.Children.Add($script:Hc3DShelfDetail)|Out-Null
+    $row=New-Object System.Windows.Controls.StackPanel;$row.Orientation='Horizontal';$row.VerticalAlignment='Center';$row.Margin='60,0,60,8';$script:Hc3DShelfRow=$row;for($i=0;$i-lt$script:GameHubPlatforms.Count;$i++){$platform=[string]$script:GameHubPlatforms[$i];$card=New-Hc3DShelfCard $platform $i;[void]$script:Hc3DShelfCards.Add($card);$row.Children.Add($card.Button)|Out-Null;$script:ActionButtons+=$card.Button;$script:CurrentActions+=(New-Action ('platform-select:'+$i) $platform)}
+    $scroll=New-Object System.Windows.Controls.ScrollViewer;$scroll.Height=430;$scroll.HorizontalScrollBarVisibility='Hidden';$scroll.VerticalScrollBarVisibility='Disabled';$scroll.PanningMode='HorizontalOnly';$scroll.Content=$row;$scroll.HorizontalContentAlignment='Left';$scroll.VerticalContentAlignment='Center';$script:Hc3DShelfScroll=$scroll;$script:ActionPanel.Children.Add($scroll)|Out-Null;$script:HomeRows+=,[pscustomobject]@{Start=$script:Hc3DShelfStart;Count=$script:Hc3DShelfCards.Count;Platform=$true};try{Write-Log ('3D platform shelf mounted: owner='+$script:HcPlatformPresentationOwner+'; detected='+(Get-HcDetectedUser3DModelCount)+'; platforms='+$script:Hc3DShelfCards.Count+'; textureResidency=3')}catch{};Update-Hc3DShelfSelection
 }
 
-function New-PlatformCard([string]$Platform,[int]$Index){
-    $button=& $script:HcUserModelsBaseNewPlatformCard $Platform $Index;if(-not$button){return $button}
-    if((Get-HcPlatformVisualStyle)-eq'Icons'){$scale=[math]::Max(.60,[math]::Min(1.80,([int]$script:Config.PlatformIconScale)/100.0));$button.LayoutTransform=New-Object System.Windows.Media.ScaleTransform($scale,$scale)}
-    $button
-}
+function New-PlatformCard([string]$Platform,[int]$Index){$button=& $script:HcUserModelsBaseNewPlatformCard $Platform $Index;if(-not$button){return $button};if((Get-HcPlatformVisualStyle)-eq'Icons'){$scale=[math]::Max(.60,[math]::Min(1.80,([int]$script:Config.PlatformIconScale)/100.0));$button.LayoutTransform=New-Object System.Windows.Media.ScaleTransform($scale,$scale)};$button}
 function Add-PlatformRail {if((Get-HcPlatformVisualStyle)-eq'3D Models'){Add-Hc3DPlatformShelf;return};& $script:HcUserModelsBaseAddPlatformRail}
 function Update-ActionVisuals {& $script:HcUserModelsBaseUpdateActionVisuals;if($script:Hc3DShelfMounted-and$script:SelectedTab-eq1-and-not$script:SubPage){Update-Hc3DShelfSelection}}
-
-# The 3D shelf is a persistent visual surface. Background library/artwork/count
-# polling may update data in memory, but a redundant root Render-Page call would
-# destroy every Viewport3D and reload textures. Suppress only those same-page
-# rebuilds while the shelf is already mounted. Deliberate navigation changes the
-# tab/subpage first and therefore still performs a normal render.
-function Render-Page {
-    if($script:Hc3DShelfMounted-and$script:SelectedTab-eq1-and-not$script:SubPage-and(Get-HcPlatformVisualStyle)-eq'3D Models'){
-        $script:Hc3DDeferredRefreshCount++;if($script:Hc3DDeferredRefreshCount-eq1-or($script:Hc3DDeferredRefreshCount%20)-eq0){try{Write-Log ('Deferred redundant Games 3D shelf rebuild; count='+$script:Hc3DDeferredRefreshCount)}catch{}};return
-    }
-    Reset-Hc3DShelfRuntime;& $script:HcUserModelsBaseRenderPage
-}
+function Render-Page {if($script:Hc3DShelfMounted-and$script:SelectedTab-eq1-and-not$script:SubPage-and(Get-HcPlatformVisualStyle)-eq'3D Models'){$script:Hc3DDeferredRefreshCount++;if($script:Hc3DDeferredRefreshCount-eq1-or($script:Hc3DDeferredRefreshCount%20)-eq0){try{Write-Log ('Deferred redundant Games 3D shelf rebuild; count='+$script:Hc3DDeferredRefreshCount)}catch{}};return};Reset-Hc3DShelfRuntime;& $script:HcUserModelsBaseRenderPage}
 
 function Add-HcPlatformPresentationSettings($Page){
     $style=Get-HcPlatformVisualStyle;$detected=Get-HcDetectedUser3DModelCount;$result=New-Object System.Collections.Generic.List[object];$inserted=$false
-    foreach($item in @($Page.Actions)){$id=[string](Get-EntryProperty $item 'Id' '');if($id-in@('platform-visual-style','platform-icon-scale-slider','platform-model-scale-slider','open-3d-models-folder','3d-models-detected')){continue};[void]$result.Add($item);if(-not$inserted-and$id-eq'customization-preset'){[void]$result.Add((New-Action 'platform-visual-style' ('Platform visuals: '+$style) 'Choose Icons or the centered textured 3D shelf for Games platforms.'));[void]$result.Add((New-SliderAction 'platform-icon-scale-slider' 'Icon card size' ([int]$script:Config.PlatformIconScale) 'Scale platform cards while Icons mode is selected.' 60 180));[void]$result.Add((New-SliderAction 'platform-model-scale-slider' '3D shelf model size' ([int]$script:Config.PlatformModelScale) 'Adjust safe camera framing for shelf models. The model remains inside its viewport instead of being clipped.' 50 200));[void]$result.Add((New-Action 'open-3d-models-folder' ('3D Models Folder - '+$detected+' detected') 'Open the persistent model folder. Use the original Huymaier .glb filenames listed in the README.'));$inserted=$true}}
-    if(-not$inserted){[void]$result.Add((New-Action 'platform-visual-style' ('Platform visuals: '+$style) 'Choose Icons or the centered textured 3D shelf for Games platforms.'));[void]$result.Add((New-SliderAction 'platform-icon-scale-slider' 'Icon card size' ([int]$script:Config.PlatformIconScale) 'Scale platform cards while Icons mode is selected.' 60 180));[void]$result.Add((New-SliderAction 'platform-model-scale-slider' '3D shelf model size' ([int]$script:Config.PlatformModelScale) 'Adjust safe camera framing for shelf models. The model remains inside its viewport instead of being clipped.' 50 200));[void]$result.Add((New-Action 'open-3d-models-folder' ('3D Models Folder - '+$detected+' detected') 'Open the persistent model folder. Use the original Huymaier .glb filenames listed in the README.'))}
-    $Page.Actions=[object[]]$result.ToArray();$Page
+    foreach($item in @($Page.Actions)){$id=[string](Get-EntryProperty $item 'Id' '');if($id-in@('platform-visual-style','platform-icon-scale-slider','platform-model-scale-slider','open-3d-models-folder','3d-models-detected')){continue};[void]$result.Add($item);if(-not$inserted-and$id-eq'customization-preset'){[void]$result.Add((New-Action 'platform-visual-style' ('Platform visuals: '+$style) 'Choose Icons or the centered textured 3D shelf for Games platforms.'));[void]$result.Add((New-SliderAction 'platform-icon-scale-slider' 'Icon card size' ([int]$script:Config.PlatformIconScale) 'Scale platform cards while Icons mode is selected.' 60 180));[void]$result.Add((New-SliderAction 'platform-model-scale-slider' '3D shelf model size' ([int]$script:Config.PlatformModelScale) 'Adjust rotation-safe camera framing for shelf models. The model remains inside its viewport instead of being clipped.' 50 200));[void]$result.Add((New-Action 'open-3d-models-folder' ('3D Models Folder - '+$detected+' detected') 'Open the persistent model folder. Use the original Huymaier .glb filenames listed in the README.'));$inserted=$true}}
+    if(-not$inserted){[void]$result.Add((New-Action 'platform-visual-style' ('Platform visuals: '+$style) 'Choose Icons or the centered textured 3D shelf for Games platforms.'));[void]$result.Add((New-SliderAction 'platform-icon-scale-slider' 'Icon card size' ([int]$script:Config.PlatformIconScale) 'Scale platform cards while Icons mode is selected.' 60 180));[void]$result.Add((New-SliderAction 'platform-model-scale-slider' '3D shelf model size' ([int]$script:Config.PlatformModelScale) 'Adjust rotation-safe camera framing for shelf models. The model remains inside its viewport instead of being clipped.' 50 200));[void]$result.Add((New-Action 'open-3d-models-folder' ('3D Models Folder - '+$detected+' detected') 'Open the persistent model folder. Use the original Huymaier .glb filenames listed in the README.'))};$Page.Actions=[object[]]$result.ToArray();$Page
 }
 function Get-PageDefinition([int]$Index){$page=& $script:HcUserModelsBaseGetPageDefinition $Index;if(-not$page-or$Index-ne7){return $page};if($script:SubPage-ne'Customization'){return $page};Add-HcPlatformPresentationSettings $page}
-function Invoke-Action([string]$Id){
-    switch($Id){
-        'platform-visual-style' {Initialize-HcPlatformPresentationConfig;$script:Config.PlatformVisualStyle=$(if((Get-HcPlatformVisualStyle)-eq'Icons'){'3D Models'}else{'Icons'});Save-Config;try{Write-Log ('Platform visuals changed to '+$script:Config.PlatformVisualStyle+'.')}catch{};Render-Page;return}
-        'platform-icon-scale-slider' {[void](Adjust-SelectedSlider 5);return}
-        'platform-model-scale-slider' {[void](Adjust-SelectedSlider 5);return}
-        'open-3d-models-folder' {$path=Initialize-HcUser3DModelsFolder;try{Start-Process explorer.exe -ArgumentList ('"'+$path+'"')|Out-Null;Set-ConsoleNotice ('3D Models folder opened. '+(Get-HcDetectedUser3DModelCount)+' GLB file(s) detected.') 'INFO'}catch{try{Set-ConsoleNotice ('Could not open 3D Models folder: '+$_.Exception.Message) 'ERROR'}catch{}};return}
-        default {& $script:HcUserModelsBaseInvokeAction $Id}
-    }
-}
-function Adjust-SelectedSlider([int]$Delta){
-    $action=Get-SelectedActionObject;if(-not$action){return $false};$id=[string](Get-EntryProperty $action 'Id' '')
-    switch($id){
-        'platform-icon-scale-slider' {$value=[math]::Max(60,[math]::Min(180,([int]$script:Config.PlatformIconScale)+$Delta));$script:Config.PlatformIconScale=$value}
-        'platform-model-scale-slider' {$value=[math]::Max(50,[math]::Min(200,([int]$script:Config.PlatformModelScale)+$Delta));$script:Config.PlatformModelScale=$value}
-        default {return (& $script:HcUserModelsBaseAdjustSelectedSlider $Delta)}
-    }
-    Save-Config;try{$action.Value=$value;$control=$script:SliderControls[$id];if($control){$control.Slider.Value=$value;$control.Text.Text=($value.ToString()+'%')}}catch{};try{Invoke-UiFeedback 'Navigate'}catch{};$true
-}
-
-# Final UI dispatch boundary: native polling failures remain native-poll failures;
-# page/action/render failures are logged accurately and cannot masquerade as a
-# controller-backend failure in Process-Gamepads.
-function Apply-ControllerNavigation([int]$Mask,[string]$Direction){
-    try{& $script:HcUserModelsBaseApplyControllerNavigation $Mask $Direction}
-    catch{try{Write-Log ('Controller UI dispatch failed: '+$_.Exception.Message) 'ERROR'}catch{};$script:LastGamepadMask=$Mask;$script:LastDirection='';$script:NextDirectionAt=[datetime]::MinValue}
-}
+function Invoke-Action([string]$Id){switch($Id){'platform-visual-style'{Initialize-HcPlatformPresentationConfig;$script:Config.PlatformVisualStyle=$(if((Get-HcPlatformVisualStyle)-eq'Icons'){'3D Models'}else{'Icons'});Save-Config;try{Write-Log ('Platform visuals changed to '+$script:Config.PlatformVisualStyle+'.')}catch{};Render-Page;return}'platform-icon-scale-slider'{[void](Adjust-SelectedSlider 5);return}'platform-model-scale-slider'{[void](Adjust-SelectedSlider 5);return}'open-3d-models-folder'{$path=Initialize-HcUser3DModelsFolder;try{Start-Process explorer.exe -ArgumentList ('"'+$path+'"')|Out-Null;Set-ConsoleNotice ('3D Models folder opened. '+(Get-HcDetectedUser3DModelCount)+' GLB file(s) detected.') 'INFO'}catch{try{Set-ConsoleNotice ('Could not open 3D Models folder: '+$_.Exception.Message) 'ERROR'}catch{}};return}default{& $script:HcUserModelsBaseInvokeAction $Id}}}
+function Adjust-SelectedSlider([int]$Delta){$action=Get-SelectedActionObject;if(-not$action){return $false};$id=[string](Get-EntryProperty $action 'Id' '');switch($id){'platform-icon-scale-slider'{$value=[math]::Max(60,[math]::Min(180,([int]$script:Config.PlatformIconScale)+$Delta));$script:Config.PlatformIconScale=$value}'platform-model-scale-slider'{$value=[math]::Max(50,[math]::Min(200,([int]$script:Config.PlatformModelScale)+$Delta));$script:Config.PlatformModelScale=$value}default{return (& $script:HcUserModelsBaseAdjustSelectedSlider $Delta)}};Save-Config;try{$action.Value=$value;$control=$script:SliderControls[$id];if($control){$control.Slider.Value=$value;$control.Text.Text=($value.ToString()+'%')}}catch{};try{Invoke-UiFeedback 'Navigate'}catch{};$true}
+function Apply-ControllerNavigation([int]$Mask,[string]$Direction){try{& $script:HcUserModelsBaseApplyControllerNavigation $Mask $Direction}catch{try{Write-Log ('Controller UI dispatch failed: '+$_.Exception.Message) 'ERROR'}catch{};$script:LastGamepadMask=$Mask;$script:LastDirection='';$script:NextDirectionAt=[datetime]::MinValue}}
 
 Initialize-HcPlatformPresentationConfig
 [void](Initialize-HcUser3DModelsFolder)
