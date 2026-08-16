@@ -9,13 +9,15 @@
 
 namespace HuymaierGpuShelf
 {
-// HUYMAIER_D3D11_SHELF_SHADER_V4_COLOR_MANAGED_UI_PBR
+    // HUYMAIER_D3D11_SHELF_SHADER_V5_BALANCED_COLOR_PRESERVING_UI_PBR
     // Shared production shader for the shelf runtime and WARP pixel regressions.
     // glTF base-color/emissive textures are authored in sRGB; MR/normal/AO remain linear.
     // The WPF/D3DImage target is an ordinary UNORM desktop surface, so the final linear
-    // lighting result is encoded back to sRGB before premultiplied-alpha output.
-        static const char* HcShelfShaderSource = R"HLSL(
-    // HUYMAIER_D3D11_SHELF_SHADER_V4_COLOR_MANAGED_UI_PBR
+    // result is encoded to sRGB. Lighting is deliberately UI-oriented: authored hue is
+    // preserved for metallic surfaces and over-range energy is normalized by peak rather
+    // than clipping individual channels to white.
+    static const char* HcShelfShaderSource = R"HLSL(
+    // HUYMAIER_D3D11_SHELF_SHADER_V5_BALANCED_COLOR_PRESERVING_UI_PBR
     cbuffer ModelConstants : register(b0)
     {
         row_major float4x4 WorldViewProjection;
@@ -134,8 +136,8 @@ namespace HuymaierGpuShelf
         }
         else
         {
-            // UI-oriented image-based approximation: readable from every shelf angle,
-            // with camera-facing key/fill directions and colored metallic response.
+            // Balanced showroom lighting. Metallic materials retain a substantial
+            // base-color body term so provider/logo assets never collapse to gray.
             float3 v=normalize(float3(0.0,0.08,-4.2)-i.wp);
             float3 l0=normalize(float3(-0.45,0.72,-0.62));
             float3 l1=normalize(float3(0.75,0.25,-0.55));
@@ -144,32 +146,36 @@ namespace HuymaierGpuShelf
             float3 h0=normalize(l0+v);
             float3 h1=normalize(l1+v);
 
-            float3 diffuseColor=baseRgb*(1.0-metallic);
-            float diffuseLight=0.40+d0*0.62+d1*0.28;
-            float3 diffuse=diffuseColor*diffuseLight;
+            float diffuseLight=0.42+d0*0.30+d1*0.12;
+            float bodyRetention=lerp(1.0,0.78,metallic);
+            float3 body=baseRgb*diffuseLight*bodyRetention;
 
             float specularFactor=saturate(Surface.z);
             float3 dielectricF0=float3(0.04,0.04,0.04)*specularFactor;
-            float3 f0=lerp(dielectricF0,baseRgb,metallic);
-            float specPower=lerp(12.0,96.0,1.0-roughness);
+            float3 f0=lerp(dielectricF0,baseRgb*specularFactor,metallic);
+            float specPower=lerp(10.0,72.0,1.0-roughness);
             float directSpec0=pow(saturate(dot(n,h0)),specPower)*d0;
             float directSpec1=pow(saturate(dot(n,h1)),specPower)*d1;
-            float specEnvelope=lerp(0.42,1.0,1.0-roughness);
-            float3 directSpec=f0*(directSpec0*0.92+directSpec1*0.36)*specEnvelope;
+            float3 directSpec=f0*(directSpec0*0.18+directSpec1*0.07);
 
-            // Fake environment reflection keeps metallic authored colors visible even
-            // when their direct highlight is off-angle; clearcoat adds a small lift.
-            float environmentStrength=0.30+(1.0-roughness)*0.34+saturate(Surface.w)*0.10;
+            float environmentStrength=0.055+(1.0-roughness)*0.085+saturate(Surface.w)*0.025;
             float3 environmentSpec=f0*environmentStrength;
-            float3 metallicBody=baseRgb*metallic*0.18;
-            lit=(diffuse+directSpec+environmentSpec+metallicBody)*occlusion;
+            float3 metallicFill=baseRgb*metallic*(0.12+d0*0.08);
+            lit=(body+directSpec+environmentSpec+metallicFill)*occlusion;
         }
 
-        float selectedLift=Extra.y>.5?0.035:0.0;
+        float selectedLift=Extra.y>.5?0.025:0.0;
         float alpha=Flags.z==2?baseAlpha:1.0;
         float brightness=max(0.25,Extra.z);
         float3 linearRgb=max((lit+em+selectedLift.xxx)*brightness,0.0);
-        float3 displayRgb=LinearToSrgb(saturate(linearRgb));
+
+        // Never clip RGB channels independently: that is what turned purple GOG
+        // and other saturated provider materials into white silhouettes. If energy
+        // exceeds display range, scale the whole color by the same amount so hue
+        // and saturation survive intact.
+        float peak=max(linearRgb.r,max(linearRgb.g,linearRgb.b));
+        linearRgb*=1.0/max(1.0,peak);
+        float3 displayRgb=LinearToSrgb(linearRgb);
         return float4(displayRgb*alpha,alpha);
     }
     )HLSL";
