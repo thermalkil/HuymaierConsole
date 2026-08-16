@@ -50,7 +50,9 @@ try{
     if(Test-Path -LiteralPath $script:ProviderStatePath){throw 'Recomps native launch incorrectly entered the direct-provider worker/state pipeline.'}
 
     $script:SelectedProviderGame=$game
+    $script:SubPage='ProviderGame'
     $page=Get-GameProviderPageDefinition
+    if($null-eq$page-or$null-eq$page.PSObject.Properties['Actions']){throw 'Recomps game page was not produced in ProviderGame state.'}
     $ids=@($page.Actions|ForEach-Object{[string]$_.Id})
     foreach($required in @('provider-game-launch','provider-recomps-open-folder','provider-game-back')){if($ids-notcontains$required){throw "Recomps game page action missing: $required"}}
     foreach($forbidden in @('provider-game-update','provider-game-verify','provider-game-uninstall','provider-game-install','provider-game-location')){if($ids-contains$forbidden){throw "Recomps game page exposed backend-only action: $forbidden"}}
