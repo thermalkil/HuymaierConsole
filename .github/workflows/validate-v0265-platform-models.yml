@@ -32,6 +32,8 @@ jobs:
             & '.\.development\v0.26.5\Test-v0265-PlatformNamingAudit.ps1'
             & '.\.development\v0.26.5\Test-v0265-Live3DCardRender.ps1'
             & '.\.development\v0.26.5\Test-v0265-FullModelViewerUvBrightnessV3.ps1'
+            & '.\.development\v0.26.5\Test-v0265-ModelMaterialCoverage.ps1'
+            & '.\.development\v0.26.5\Test-v0265-GeneratedProviderMaterials.ps1'
             & '.\.development\v0.26.5\Test-v0265-D3D11ShelfBackend.ps1'
             & '.\.development\v0.26.5\Test-v0265-D3D11FaceCulling.ps1'
             & '.\.development\v0.26.5\Test-v0265-GpuShelfAssetCompiler.ps1'
