@@ -7,13 +7,15 @@ using System.Windows.Media.Imaging;
 
 namespace HuymaierConsole.Modeling
 {
-    // HUYMAIER_GPU_SHELF_ASSET_CACHE_V1
-    // Converts an original GLB once into a compact GPU-oriented cache:
-    // transformed vertices, indexed draw batches and downsampled BGRA textures.
-    // The cache freshness key is source length + last-write UTC ticks + quality.
+    // HUYMAIER_GPU_SHELF_ASSET_CACHE_V3
+    // Converts authored glTF 2.0 GLBs into a compact GPU cache while retaining
+    // every material feature used by the Huymaier model packs: base color,
+    // emissive, metallic/roughness, normal and occlusion maps, multiple UV sets,
+    // KHR_texture_transform, alpha modes, double-sided/unlit, specular,
+    // clearcoat and emissive-strength metadata.
     public static class GpuShelfAssetCompiler
     {
-        public const int CacheVersion = 2;
+        public const int CacheVersion = 3;
         public const int DefaultShelfTextureSize = 512;
 
         private sealed class TextureBinding
@@ -29,12 +31,18 @@ namespace HuymaierConsole.Modeling
             public double Rotation = 0.0;
         }
 
+        // 20 floats / 80 bytes. UVs are already transformed per material map:
+        // uv0=base, uv1=emissive, uv2=metallic-roughness, uv3=normal, uv4=occlusion.
         private struct Vertex
         {
             public float Px, Py, Pz;
             public float Nx, Ny, Nz;
+            public float Tx, Ty, Tz, Tw;
             public float U0, V0;
             public float U1, V1;
+            public float U2, V2;
+            public float U3, V3;
+            public float U4, V4;
         }
 
         private sealed class DrawBatch
@@ -43,11 +51,18 @@ namespace HuymaierConsole.Modeling
             public int IndexCount;
             public int BaseImage = -1;
             public int EmissiveImage = -1;
+            public int MetallicRoughnessImage = -1;
+            public int NormalImage = -1;
+            public int OcclusionImage = -1;
             public float Br = 1, Bg = 1, Bb = 1, Ba = 1;
             public float Er, Eg, Eb, EmissiveStrength = 1;
-            public float Metallic, Roughness = 0.7f, Specular = 1, Clearcoat;
+            public float Metallic = 1, Roughness = 1, Specular = 1, Clearcoat;
+            public float NormalScale = 1, OcclusionStrength = 1;
             public int BaseWrapS = 10497, BaseWrapT = 10497;
             public int EmissiveWrapS = 10497, EmissiveWrapT = 10497;
+            public int MetallicRoughnessWrapS = 10497, MetallicRoughnessWrapT = 10497;
+            public int NormalWrapS = 10497, NormalWrapT = 10497;
+            public int OcclusionWrapS = 10497, OcclusionWrapT = 10497;
             public int AlphaMode;
             public float AlphaCutoff = 0.5f;
             public int Flags;
@@ -164,11 +179,10 @@ namespace HuymaierConsole.Modeling
             object[] matrix = JsonUtil.Arr(JsonUtil.Get(node, "matrix"));
             if (matrix.Length == 16)
             {
-                double[] matrixValues = new double[16];
-                for (int i = 0; i < 16; i++) matrixValues[i] = Convert.ToDouble(matrix[i], CultureInfo.InvariantCulture);
-                return matrixValues;
+                double[] values = new double[16];
+                for (int i = 0; i < 16; i++) values[i] = Convert.ToDouble(matrix[i], CultureInfo.InvariantCulture);
+                return values;
             }
-
             double sx = 1, sy = 1, sz = 1;
             object[] s = JsonUtil.Arr(JsonUtil.Get(node, "scale"));
             if (s.Length >= 3) { sx = Convert.ToDouble(s[0], CultureInfo.InvariantCulture); sy = Convert.ToDouble(s[1], CultureInfo.InvariantCulture); sz = Convert.ToDouble(s[2], CultureInfo.InvariantCulture); }
@@ -178,7 +192,6 @@ namespace HuymaierConsole.Modeling
             double tx = 0, ty = 0, tz = 0;
             object[] t = JsonUtil.Arr(JsonUtil.Get(node, "translation"));
             if (t.Length >= 3) { tx = Convert.ToDouble(t[0], CultureInfo.InvariantCulture); ty = Convert.ToDouble(t[1], CultureInfo.InvariantCulture); tz = Convert.ToDouble(t[2], CultureInfo.InvariantCulture); }
-
             double xx = qx * qx, yy = qy * qy, zz = qz * qz;
             double xy = qx * qy, xz = qx * qz, yz = qy * qz;
             double wx = qw * qx, wy = qw * qy, wz = qw * qz;
@@ -197,14 +210,10 @@ namespace HuymaierConsole.Modeling
             oz = m[2] * x + m[6] * y + m[10] * z + m[14];
         }
 
-        private static void TransformNormal(double[] m, double x, double y, double z, out double ox, out double oy, out double oz)
+        private static void Normalize(ref double x, ref double y, ref double z)
         {
-            ox = m[0] * x + m[4] * y + m[8] * z;
-            oy = m[1] * x + m[5] * y + m[9] * z;
-            oz = m[2] * x + m[6] * y + m[10] * z;
-            double len = Math.Sqrt(ox * ox + oy * oy + oz * oz);
-            if (len > 0.0000001) { ox /= len; oy /= len; oz /= len; }
-            else { ox = 0; oy = 1; oz = 0; }
+            double len = Math.Sqrt(x * x + y * y + z * z);
+            if (len > 0.0000001) { x /= len; y /= len; z /= len; }
         }
 
         private static double Determinant3x3(double[] m)
@@ -212,6 +221,36 @@ namespace HuymaierConsole.Modeling
             return m[0] * (m[5] * m[10] - m[9] * m[6])
                  - m[4] * (m[1] * m[10] - m[9] * m[2])
                  + m[8] * (m[1] * m[6] - m[5] * m[2]);
+        }
+
+        private static void TransformNormal(double[] m, double x, double y, double z, out double ox, out double oy, out double oz)
+        {
+            double a00=m[0],a01=m[4],a02=m[8],a10=m[1],a11=m[5],a12=m[9],a20=m[2],a21=m[6],a22=m[10];
+            double det=a00*(a11*a22-a12*a21)-a01*(a10*a22-a12*a20)+a02*(a10*a21-a11*a20);
+            if (Math.Abs(det) < 0.0000000001)
+            {
+                ox=a00*x+a01*y+a02*z; oy=a10*x+a11*y+a12*z; oz=a20*x+a21*y+a22*z;
+                Normalize(ref ox, ref oy, ref oz); return;
+            }
+            double inv00=(a11*a22-a12*a21)/det, inv01=(a02*a21-a01*a22)/det, inv02=(a01*a12-a02*a11)/det;
+            double inv10=(a12*a20-a10*a22)/det, inv11=(a00*a22-a02*a20)/det, inv12=(a02*a10-a00*a12)/det;
+            double inv20=(a10*a21-a11*a20)/det, inv21=(a01*a20-a00*a21)/det, inv22=(a00*a11-a01*a10)/det;
+            ox=inv00*x+inv10*y+inv20*z; oy=inv01*x+inv11*y+inv21*z; oz=inv02*x+inv12*y+inv22*z;
+            Normalize(ref ox, ref oy, ref oz);
+        }
+
+        private static void TransformDirection(double[] m, double x, double y, double z, out double ox, out double oy, out double oz)
+        {
+            ox=m[0]*x+m[4]*y+m[8]*z; oy=m[1]*x+m[5]*y+m[9]*z; oz=m[2]*x+m[6]*y+m[10]*z;
+            Normalize(ref ox, ref oy, ref oz);
+        }
+
+        private static void FallbackTangent(double nx, double ny, double nz, out double tx, out double ty, out double tz)
+        {
+            if (Math.Abs(ny) < 0.90) { tx=nz; ty=0; tz=-nx; }
+            else { tx=0; ty=-nz; tz=ny; }
+            Normalize(ref tx, ref ty, ref tz);
+            if (Math.Abs(tx)+Math.Abs(ty)+Math.Abs(tz) < 0.00001) { tx=1;ty=0;tz=0; }
         }
 
         private static double ArrDouble(object[] a, int i, double fallback)
@@ -261,14 +300,20 @@ namespace HuymaierConsole.Modeling
             return ParseTexture(doc, JsonUtil.Obj(JsonUtil.Get(sg, "diffuseTexture")));
         }
 
-        private static TextureBinding EmissiveTexture(GlbDocument doc, Dictionary<string, object> material)
+        private static TextureBinding EmissiveTexture(GlbDocument doc, Dictionary<string, object> material) { return ParseTexture(doc, JsonUtil.Obj(JsonUtil.Get(material, "emissiveTexture"))); }
+        private static TextureBinding MetallicRoughnessTexture(GlbDocument doc, Dictionary<string, object> material)
         {
-            return ParseTexture(doc, JsonUtil.Obj(JsonUtil.Get(material, "emissiveTexture")));
+            Dictionary<string, object> pbr=JsonUtil.Obj(JsonUtil.Get(material,"pbrMetallicRoughness"));
+            return ParseTexture(doc,JsonUtil.Obj(JsonUtil.Get(pbr,"metallicRoughnessTexture")));
         }
+        private static TextureBinding NormalTexture(GlbDocument doc, Dictionary<string, object> material) { return ParseTexture(doc, JsonUtil.Obj(JsonUtil.Get(material, "normalTexture"))); }
+        private static TextureBinding OcclusionTexture(GlbDocument doc, Dictionary<string, object> material) { return ParseTexture(doc, JsonUtil.Obj(JsonUtil.Get(material, "occlusionTexture"))); }
 
+        // HC3D v3 stores authored/transformed glTF UVs directly. No hidden V
+        // inversion is carried in the cache or shader anymore.
         private static void TransformUv(TextureBinding b, double u, double v, out float ou, out float ov)
         {
-            if (b == null) { ou = (float)u; ov = (float)(1.0 - v); return; }
+            if (b == null) { ou = (float)u; ov = (float)v; return; }
             double su = u * b.ScaleX, sv = v * b.ScaleY;
             if (Math.Abs(b.Rotation) > 0.0000001)
             {
@@ -277,7 +322,7 @@ namespace HuymaierConsole.Modeling
                 su = ru; sv = rv;
             }
             su += b.OffsetX; sv += b.OffsetY;
-            ou = (float)su; ov = (float)(1.0 - sv);
+            ou = (float)su; ov = (float)sv;
         }
 
         private static DrawBatch MaterialBatch(GlbDocument doc, int materialIndex)
@@ -295,21 +340,32 @@ namespace HuymaierConsole.Modeling
             b.Er = (float)ArrDouble(ef, 0, 0); b.Eg = (float)ArrDouble(ef, 1, 0); b.Eb = (float)ArrDouble(ef, 2, 0);
             Dictionary<string, object> es = JsonUtil.Obj(JsonUtil.Get(ext, "KHR_materials_emissive_strength"));
             b.EmissiveStrength = (float)Math.Max(0, JsonUtil.Double(es, "emissiveStrength", 1));
-            b.Metallic = (float)Math.Max(0, Math.Min(1, JsonUtil.Double(pbr, "metallicFactor", 0)));
-            b.Roughness = (float)Math.Max(0, Math.Min(1, JsonUtil.Double(pbr, "roughnessFactor", 0.7)));
-            if (sg.Count > 0) b.Roughness = 1.0f - (float)Math.Max(0, Math.Min(1, JsonUtil.Double(sg, "glossinessFactor", 1)));
+            b.Metallic = (float)Math.Max(0, Math.Min(1, JsonUtil.Double(pbr, "metallicFactor", 1)));
+            b.Roughness = (float)Math.Max(0, Math.Min(1, JsonUtil.Double(pbr, "roughnessFactor", 1)));
+            if (sg.Count > 0)
+            {
+                b.Metallic=0.0f;
+                b.Roughness = 1.0f - (float)Math.Max(0, Math.Min(1, JsonUtil.Double(sg, "glossinessFactor", 1)));
+            }
             Dictionary<string, object> sp = JsonUtil.Obj(JsonUtil.Get(ext, "KHR_materials_specular"));
             b.Specular = (float)Math.Max(0, Math.Min(1, JsonUtil.Double(sp, "specularFactor", 1)));
             Dictionary<string, object> cc = JsonUtil.Obj(JsonUtil.Get(ext, "KHR_materials_clearcoat"));
             b.Clearcoat = (float)Math.Max(0, Math.Min(1, JsonUtil.Double(cc, "clearcoatFactor", 0)));
+            Dictionary<string, object> ntInfo=JsonUtil.Obj(JsonUtil.Get(m,"normalTexture"));
+            Dictionary<string, object> ocInfo=JsonUtil.Obj(JsonUtil.Get(m,"occlusionTexture"));
+            b.NormalScale=(float)Math.Max(0,JsonUtil.Double(ntInfo,"scale",1));
+            b.OcclusionStrength=(float)Math.Max(0,Math.Min(1,JsonUtil.Double(ocInfo,"strength",1)));
             string alpha = Convert.ToString(JsonUtil.Get(m, "alphaMode"), CultureInfo.InvariantCulture) ?? "OPAQUE";
             b.AlphaMode = String.Equals(alpha, "BLEND", StringComparison.OrdinalIgnoreCase) ? 2 : (String.Equals(alpha, "MASK", StringComparison.OrdinalIgnoreCase) ? 1 : 0);
             b.AlphaCutoff = (float)JsonUtil.Double(m, "alphaCutoff", 0.5);
             if (JsonUtil.Bool(m, "doubleSided", false)) b.Flags |= 1;
             if (JsonUtil.Obj(JsonUtil.Get(ext, "KHR_materials_unlit")).Count > 0) b.Flags |= 2;
-            TextureBinding bt = BaseTexture(doc, m), et = EmissiveTexture(doc, m);
-            b.BaseImage = bt.ImageIndex; b.BaseWrapS = bt.WrapS; b.BaseWrapT = bt.WrapT;
-            b.EmissiveImage = et.ImageIndex; b.EmissiveWrapS = et.WrapS; b.EmissiveWrapT = et.WrapT;
+            TextureBinding bt=BaseTexture(doc,m), et=EmissiveTexture(doc,m), mt=MetallicRoughnessTexture(doc,m), nt=NormalTexture(doc,m), ot=OcclusionTexture(doc,m);
+            b.BaseImage=bt.ImageIndex;b.BaseWrapS=bt.WrapS;b.BaseWrapT=bt.WrapT;
+            b.EmissiveImage=et.ImageIndex;b.EmissiveWrapS=et.WrapS;b.EmissiveWrapT=et.WrapT;
+            b.MetallicRoughnessImage=mt.ImageIndex;b.MetallicRoughnessWrapS=mt.WrapS;b.MetallicRoughnessWrapT=mt.WrapT;
+            b.NormalImage=nt.ImageIndex;b.NormalWrapS=nt.WrapS;b.NormalWrapT=nt.WrapT;
+            b.OcclusionImage=ot.ImageIndex;b.OcclusionWrapS=ot.WrapS;b.OcclusionWrapT=ot.WrapT;
             return b;
         }
 
@@ -322,174 +378,98 @@ namespace HuymaierConsole.Modeling
             Dictionary<string, object> view = doc.BufferViews[viewIndex];
             int offset = JsonUtil.Int(view, "byteOffset", 0), length = JsonUtil.Int(view, "byteLength", 0);
             if (offset < 0 || length <= 0 || offset + length > doc.Binary.Length) return null;
-            byte[] encoded = new byte[length];
-            Buffer.BlockCopy(doc.Binary, offset, encoded, 0, length);
+            byte[] encoded = new byte[length]; Buffer.BlockCopy(doc.Binary, offset, encoded, 0, length);
             using (MemoryStream probe = new MemoryStream(encoded, false))
             {
                 BitmapDecoder decoder = BitmapDecoder.Create(probe, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnDemand);
                 BitmapFrame frame = decoder.Frames[0];
-                int ow = frame.PixelWidth, oh = frame.PixelHeight;
-                int max = Math.Max(ow, oh);
+                int ow = frame.PixelWidth, oh = frame.PixelHeight, max = Math.Max(ow, oh);
                 double scale = max > maxTextureDimension ? maxTextureDimension / (double)max : 1.0;
-                int tw = Math.Max(1, (int)Math.Round(ow * scale));
-                int th = Math.Max(1, (int)Math.Round(oh * scale));
+                int tw = Math.Max(1, (int)Math.Round(ow * scale)); int th = Math.Max(1, (int)Math.Round(oh * scale));
                 using (MemoryStream ms = new MemoryStream(encoded, false))
                 {
-                    BitmapImage bitmap = new BitmapImage();
-                    bitmap.BeginInit();
-                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                    bitmap.CreateOptions = BitmapCreateOptions.PreservePixelFormat;
+                    BitmapImage bitmap = new BitmapImage(); bitmap.BeginInit(); bitmap.CacheOption = BitmapCacheOption.OnLoad; bitmap.CreateOptions = BitmapCreateOptions.PreservePixelFormat;
                     if (ow >= oh) bitmap.DecodePixelWidth = tw; else bitmap.DecodePixelHeight = th;
-                    bitmap.StreamSource = ms;
-                    bitmap.EndInit();
+                    bitmap.StreamSource = ms; bitmap.EndInit();
                     BitmapSource source = bitmap.Format == PixelFormats.Bgra32 ? (BitmapSource)bitmap : new FormatConvertedBitmap(bitmap, PixelFormats.Bgra32, null, 0);
-                    if (source.CanFreeze) source.Freeze();
-                    int stride = source.PixelWidth * 4;
-                    byte[] pixels = new byte[stride * source.PixelHeight];
-                    source.CopyPixels(pixels, stride, 0);
+                    if (source.CanFreeze) source.Freeze(); int stride = source.PixelWidth * 4; byte[] pixels = new byte[stride * source.PixelHeight]; source.CopyPixels(pixels, stride, 0);
                     return new ImageData { Width = source.PixelWidth, Height = source.PixelHeight, Bgra = pixels };
                 }
             }
         }
 
+        private static double[][] UvsFor(GlbDocument doc, Dictionary<string, object> attrs, TextureBinding binding)
+        {
+            int set=binding==null?0:binding.TexCoord;
+            int accessor=JsonUtil.Int(attrs,"TEXCOORD_"+set.ToString(CultureInfo.InvariantCulture),-1);
+            if(accessor<0&&set!=0)accessor=JsonUtil.Int(attrs,"TEXCOORD_0",-1);
+            return ReadAccessor(doc,accessor);
+        }
+
         private static void EmitNode(GlbDocument doc, int nodeIndex, double[] parent, HashSet<int> stack, List<Vertex> vertices, List<uint> indices, List<DrawBatch> draws, ref double minX, ref double minY, ref double minZ, ref double maxX, ref double maxY, ref double maxZ)
         {
             if (nodeIndex < 0 || nodeIndex >= doc.Nodes.Count || stack.Contains(nodeIndex)) return;
-            stack.Add(nodeIndex);
-            Dictionary<string, object> node = doc.Nodes[nodeIndex];
-            double[] world = Multiply(parent, NodeMatrix(node));
+            stack.Add(nodeIndex); Dictionary<string, object> node = doc.Nodes[nodeIndex]; double[] world = Multiply(parent, NodeMatrix(node));
             int meshIndex = JsonUtil.Int(node, "mesh", -1);
             if (meshIndex >= 0 && meshIndex < doc.Meshes.Count)
             {
                 object[] primitives = JsonUtil.Arr(JsonUtil.Get(doc.Meshes[meshIndex], "primitives"));
                 for (int p = 0; p < primitives.Length; p++)
                 {
-                    Dictionary<string, object> primitive = JsonUtil.Obj(primitives[p]);
-                    if (JsonUtil.Int(primitive, "mode", 4) != 4) continue;
-                    Dictionary<string, object> attrs = JsonUtil.Obj(JsonUtil.Get(primitive, "attributes"));
-                    int pa = JsonUtil.Int(attrs, "POSITION", -1);
-                    if (pa < 0) continue;
-                    double[][] pos = ReadAccessor(doc, pa);
-                    double[][] normals = ReadAccessor(doc, JsonUtil.Int(attrs, "NORMAL", -1));
+                    Dictionary<string, object> primitive = JsonUtil.Obj(primitives[p]); if (JsonUtil.Int(primitive, "mode", 4) != 4) continue;
+                    Dictionary<string, object> attrs = JsonUtil.Obj(JsonUtil.Get(primitive, "attributes")); int pa = JsonUtil.Int(attrs, "POSITION", -1); if (pa < 0) continue;
+                    double[][] pos = ReadAccessor(doc, pa); double[][] normals = ReadAccessor(doc, JsonUtil.Int(attrs, "NORMAL", -1)); double[][] tangents=ReadAccessor(doc,JsonUtil.Int(attrs,"TANGENT",-1));
                     int materialIndex = JsonUtil.Int(primitive, "material", -1);
                     Dictionary<string, object> material = materialIndex >= 0 && materialIndex < doc.Materials.Count ? doc.Materials[materialIndex] : new Dictionary<string, object>();
-                    TextureBinding bt = BaseTexture(doc, material), et = EmissiveTexture(doc, material);
-                    double[][] uvBase = ReadAccessor(doc, JsonUtil.Int(attrs, "TEXCOORD_" + bt.TexCoord.ToString(CultureInfo.InvariantCulture), JsonUtil.Int(attrs, "TEXCOORD_0", -1)));
-                    double[][] uvEm = ReadAccessor(doc, JsonUtil.Int(attrs, "TEXCOORD_" + et.TexCoord.ToString(CultureInfo.InvariantCulture), JsonUtil.Int(attrs, "TEXCOORD_0", -1)));
-                    int baseVertex = vertices.Count;
-                    for (int i = 0; i < pos.Length; i++)
+                    TextureBinding bt=BaseTexture(doc,material),et=EmissiveTexture(doc,material),mt=MetallicRoughnessTexture(doc,material),nt=NormalTexture(doc,material),ot=OcclusionTexture(doc,material);
+                    double[][] uv0=UvsFor(doc,attrs,bt),uv1=UvsFor(doc,attrs,et),uv2=UvsFor(doc,attrs,mt),uv3=UvsFor(doc,attrs,nt),uv4=UvsFor(doc,attrs,ot);
+                    int baseVertex=vertices.Count; bool mirrored=Determinant3x3(world)<-0.0000000001;
+                    for(int i=0;i<pos.Length;i++)
                     {
-                        double x, y, z; TransformPoint(world, pos[i][0], pos[i][1], pos[i][2], out x, out y, out z);
-                        double nx = 0, ny = 1, nz = 0;
-                        if (normals.Length == pos.Length) TransformNormal(world, normals[i][0], normals[i][1], normals[i][2], out nx, out ny, out nz);
-                        float bu = 0, bv = 0, eu = 0, ev = 0;
-                        if (uvBase.Length == pos.Length) TransformUv(bt, uvBase[i][0], uvBase[i][1], out bu, out bv);
-                        if (uvEm.Length == pos.Length) TransformUv(et, uvEm[i][0], uvEm[i][1], out eu, out ev); else { eu = bu; ev = bv; }
-                        vertices.Add(new Vertex { Px=(float)x, Py=(float)y, Pz=(float)z, Nx=(float)nx, Ny=(float)ny, Nz=(float)nz, U0=bu, V0=bv, U1=eu, V1=ev });
+                        double x,y,z;TransformPoint(world,pos[i][0],pos[i][1],pos[i][2],out x,out y,out z);
+                        double nx=0,ny=1,nz=0;if(normals.Length==pos.Length)TransformNormal(world,normals[i][0],normals[i][1],normals[i][2],out nx,out ny,out nz);
+                        double tx,ty,tz,tw=1;
+                        if(tangents.Length==pos.Length&&tangents[i].Length>=3){TransformDirection(world,tangents[i][0],tangents[i][1],tangents[i][2],out tx,out ty,out tz);tw=tangents[i].Length>3?tangents[i][3]:1;double dot=tx*nx+ty*ny+tz*nz;tx-=dot*nx;ty-=dot*ny;tz-=dot*nz;Normalize(ref tx,ref ty,ref tz);}else{FallbackTangent(nx,ny,nz,out tx,out ty,out tz);}
+                        if(mirrored)tw=-tw;
+                        float u0=0,v0=0,u1=0,v1=0,u2=0,v2=0,u3=0,v3=0,u4=0,v4=0;
+                        if(uv0.Length==pos.Length)TransformUv(bt,uv0[i][0],uv0[i][1],out u0,out v0);
+                        if(uv1.Length==pos.Length)TransformUv(et,uv1[i][0],uv1[i][1],out u1,out v1);else{u1=u0;v1=v0;}
+                        if(uv2.Length==pos.Length)TransformUv(mt,uv2[i][0],uv2[i][1],out u2,out v2);else{u2=u0;v2=v0;}
+                        if(uv3.Length==pos.Length)TransformUv(nt,uv3[i][0],uv3[i][1],out u3,out v3);else{u3=u0;v3=v0;}
+                        if(uv4.Length==pos.Length)TransformUv(ot,uv4[i][0],uv4[i][1],out u4,out v4);else{u4=u0;v4=v0;}
+                        vertices.Add(new Vertex{Px=(float)x,Py=(float)y,Pz=(float)z,Nx=(float)nx,Ny=(float)ny,Nz=(float)nz,Tx=(float)tx,Ty=(float)ty,Tz=(float)tz,Tw=(float)tw,U0=u0,V0=v0,U1=u1,V1=v1,U2=u2,V2=v2,U3=u3,V3=v3,U4=u4,V4=v4});
                         minX=Math.Min(minX,x);minY=Math.Min(minY,y);minZ=Math.Min(minZ,z);maxX=Math.Max(maxX,x);maxY=Math.Max(maxY,y);maxZ=Math.Max(maxZ,z);
                     }
-                    int[] ix = ReadIndices(doc, JsonUtil.Int(primitive, "indices", -1), pos.Length);
-                    DrawBatch batch = MaterialBatch(doc, materialIndex);
-                    batch.FirstIndex = indices.Count; batch.IndexCount = ix.Length;
-                    bool mirrored = Determinant3x3(world) < -0.0000000001;
-                    if (mirrored)
-                    {
-                        // Negative-determinant node transforms reverse glTF's
-                        // authored CCW winding when baked into positions.
-                        for (int i = 0; i + 2 < ix.Length; i += 3)
-                        {
-                            indices.Add((uint)(baseVertex + ix[i]));
-                            indices.Add((uint)(baseVertex + ix[i + 2]));
-                            indices.Add((uint)(baseVertex + ix[i + 1]));
-                        }
-                    }
-                    else
-                    {
-                        for (int i = 0; i < ix.Length; i++) indices.Add((uint)(baseVertex + ix[i]));
-                    }
+                    int[] ix=ReadIndices(doc,JsonUtil.Int(primitive,"indices",-1),pos.Length);DrawBatch batch=MaterialBatch(doc,materialIndex);batch.FirstIndex=indices.Count;batch.IndexCount=ix.Length;
+                    if(mirrored){for(int i=0;i+2<ix.Length;i+=3){indices.Add((uint)(baseVertex+ix[i]));indices.Add((uint)(baseVertex+ix[i+2]));indices.Add((uint)(baseVertex+ix[i+1]));}}
+                    else{for(int i=0;i<ix.Length;i++)indices.Add((uint)(baseVertex+ix[i]));}
                     draws.Add(batch);
                 }
             }
-            object[] children = JsonUtil.Arr(JsonUtil.Get(node, "children"));
-            for (int i = 0; i < children.Length; i++) EmitNode(doc, Convert.ToInt32(children[i], CultureInfo.InvariantCulture), world, stack, vertices, indices, draws, ref minX, ref minY, ref minZ, ref maxX, ref maxY, ref maxZ);
-            stack.Remove(nodeIndex);
+            object[] children=JsonUtil.Arr(JsonUtil.Get(node,"children"));for(int i=0;i<children.Length;i++)EmitNode(doc,Convert.ToInt32(children[i],CultureInfo.InvariantCulture),world,stack,vertices,indices,draws,ref minX,ref minY,ref minZ,ref maxX,ref maxY,ref maxZ);stack.Remove(nodeIndex);
         }
 
         public static bool IsCacheCurrent(string glbPath, string cachePath, int maxTextureDimension)
         {
-            try
-            {
-                FileInfo source = new FileInfo(glbPath);
-                using (BinaryReader br = new BinaryReader(File.OpenRead(cachePath)))
-                {
-                    if (new string(br.ReadChars(4)) != "HC3D") return false;
-                    if (br.ReadInt32() != CacheVersion) return false;
-                    return br.ReadInt64() == source.Length && br.ReadInt64() == source.LastWriteTimeUtc.Ticks && br.ReadInt32() == maxTextureDimension;
-                }
-            }
-            catch { return false; }
+            try{FileInfo source=new FileInfo(glbPath);using(BinaryReader br=new BinaryReader(File.OpenRead(cachePath))){if(new string(br.ReadChars(4))!="HC3D")return false;if(br.ReadInt32()!=CacheVersion)return false;return br.ReadInt64()==source.Length&&br.ReadInt64()==source.LastWriteTimeUtc.Ticks&&br.ReadInt32()==maxTextureDimension;}}catch{return false;}
         }
 
         public static void Compile(string glbPath, string cachePath, int maxTextureDimension)
         {
-            if (String.IsNullOrWhiteSpace(glbPath) || !File.Exists(glbPath)) throw new FileNotFoundException("GPU shelf GLB was not found.", glbPath);
-            maxTextureDimension = Math.Max(128, Math.Min(2048, maxTextureDimension));
-            FileInfo sourceInfo = new FileInfo(glbPath);
-            GlbDocument doc = GlbLoader.Read(glbPath);
-            List<Vertex> vertices = new List<Vertex>();
-            List<uint> indices = new List<uint>();
-            List<DrawBatch> draws = new List<DrawBatch>();
-            double minX=Double.PositiveInfinity,minY=Double.PositiveInfinity,minZ=Double.PositiveInfinity,maxX=Double.NegativeInfinity,maxY=Double.NegativeInfinity,maxZ=Double.NegativeInfinity;
-            int sceneIndex = JsonUtil.Int(doc.Root, "scene", 0);
-            object[] roots = doc.Scenes.Count > 0 && sceneIndex >= 0 && sceneIndex < doc.Scenes.Count ? JsonUtil.Arr(JsonUtil.Get(doc.Scenes[sceneIndex], "nodes")) : new object[0];
-            if (roots.Length == 0)
-            {
-                HashSet<int> children = new HashSet<int>();
-                for (int i=0;i<doc.Nodes.Count;i++) foreach(object c in JsonUtil.Arr(JsonUtil.Get(doc.Nodes[i],"children"))) children.Add(Convert.ToInt32(c,CultureInfo.InvariantCulture));
-                List<object> rootList = new List<object>();
-                for (int i=0;i<doc.Nodes.Count;i++) if(!children.Contains(i)) rootList.Add(i);
-                roots = rootList.ToArray();
-            }
-            for (int i = 0; i < roots.Length; i++) EmitNode(doc, Convert.ToInt32(roots[i], CultureInfo.InvariantCulture), Identity(), new HashSet<int>(), vertices, indices, draws, ref minX, ref minY, ref minZ, ref maxX, ref maxY, ref maxZ);
-            if (vertices.Count == 0 || indices.Count == 0 || draws.Count == 0) throw new InvalidDataException("GLB produced no GPU shelf triangle batches.");
-
-            List<ImageData> images = new List<ImageData>();
-            for (int i = 0; i < doc.Images.Count; i++) images.Add(DecodeImage(doc, i, maxTextureDimension));
-
-            string dir = Path.GetDirectoryName(cachePath); if (!String.IsNullOrWhiteSpace(dir)) Directory.CreateDirectory(dir);
-            string temp = cachePath + ".tmp-" + Guid.NewGuid().ToString("N");
-            try
-            {
-                using (BinaryWriter bw = new BinaryWriter(File.Create(temp)))
-                {
-                    bw.Write(new char[] { 'H','C','3','D' }); bw.Write(CacheVersion); bw.Write(sourceInfo.Length); bw.Write(sourceInfo.LastWriteTimeUtc.Ticks); bw.Write(maxTextureDimension);
-                    bw.Write(vertices.Count); bw.Write(indices.Count); bw.Write(draws.Count); bw.Write(images.Count);
-                    bw.Write((float)minX);bw.Write((float)minY);bw.Write((float)minZ);bw.Write((float)maxX);bw.Write((float)maxY);bw.Write((float)maxZ);
-                    foreach (Vertex v in vertices) { bw.Write(v.Px);bw.Write(v.Py);bw.Write(v.Pz);bw.Write(v.Nx);bw.Write(v.Ny);bw.Write(v.Nz);bw.Write(v.U0);bw.Write(v.V0);bw.Write(v.U1);bw.Write(v.V1); }
-                    foreach (uint ix in indices) bw.Write(ix);
-                    foreach (DrawBatch d in draws)
-                    {
-                        bw.Write(d.FirstIndex);bw.Write(d.IndexCount);bw.Write(d.BaseImage);bw.Write(d.EmissiveImage);
-                        bw.Write(d.Br);bw.Write(d.Bg);bw.Write(d.Bb);bw.Write(d.Ba);bw.Write(d.Er);bw.Write(d.Eg);bw.Write(d.Eb);bw.Write(d.EmissiveStrength);
-                        bw.Write(d.Metallic);bw.Write(d.Roughness);bw.Write(d.Specular);bw.Write(d.Clearcoat);
-                        bw.Write(d.BaseWrapS);bw.Write(d.BaseWrapT);bw.Write(d.EmissiveWrapS);bw.Write(d.EmissiveWrapT);bw.Write(d.AlphaMode);bw.Write(d.AlphaCutoff);bw.Write(d.Flags);
-                    }
-                    foreach (ImageData image in images)
-                    {
-                        if (image == null) { bw.Write(0);bw.Write(0);bw.Write(0);continue; }
-                        bw.Write(image.Width);bw.Write(image.Height);bw.Write(image.Bgra.Length);bw.Write(image.Bgra);
-                    }
-                }
-                if (File.Exists(cachePath)) File.Delete(cachePath);
-                File.Move(temp, cachePath);
-            }
-            finally { if (File.Exists(temp)) try { File.Delete(temp); } catch { } }
+            if(String.IsNullOrWhiteSpace(glbPath)||!File.Exists(glbPath))throw new FileNotFoundException("GPU shelf GLB was not found.",glbPath);maxTextureDimension=Math.Max(128,Math.Min(2048,maxTextureDimension));FileInfo sourceInfo=new FileInfo(glbPath);GlbDocument doc=GlbLoader.Read(glbPath);
+            List<Vertex> vertices=new List<Vertex>();List<uint> indices=new List<uint>();List<DrawBatch> draws=new List<DrawBatch>();double minX=Double.PositiveInfinity,minY=Double.PositiveInfinity,minZ=Double.PositiveInfinity,maxX=Double.NegativeInfinity,maxY=Double.NegativeInfinity,maxZ=Double.NegativeInfinity;
+            int sceneIndex=JsonUtil.Int(doc.Root,"scene",0);object[] roots=doc.Scenes.Count>0&&sceneIndex>=0&&sceneIndex<doc.Scenes.Count?JsonUtil.Arr(JsonUtil.Get(doc.Scenes[sceneIndex],"nodes")):new object[0];
+            if(roots.Length==0){HashSet<int> children=new HashSet<int>();for(int i=0;i<doc.Nodes.Count;i++)foreach(object c in JsonUtil.Arr(JsonUtil.Get(doc.Nodes[i],"children")))children.Add(Convert.ToInt32(c,CultureInfo.InvariantCulture));List<object> rootList=new List<object>();for(int i=0;i<doc.Nodes.Count;i++)if(!children.Contains(i))rootList.Add(i);roots=rootList.ToArray();}
+            for(int i=0;i<roots.Length;i++)EmitNode(doc,Convert.ToInt32(roots[i],CultureInfo.InvariantCulture),Identity(),new HashSet<int>(),vertices,indices,draws,ref minX,ref minY,ref minZ,ref maxX,ref maxY,ref maxZ);
+            if(vertices.Count==0||indices.Count==0||draws.Count==0)throw new InvalidDataException("GLB produced no GPU shelf triangle batches.");
+            List<ImageData> images=new List<ImageData>();for(int i=0;i<doc.Images.Count;i++)images.Add(DecodeImage(doc,i,maxTextureDimension));
+            string dir=Path.GetDirectoryName(cachePath);if(!String.IsNullOrWhiteSpace(dir))Directory.CreateDirectory(dir);string temp=cachePath+".tmp-"+Guid.NewGuid().ToString("N");
+            try{using(BinaryWriter bw=new BinaryWriter(File.Create(temp))){bw.Write(new char[]{'H','C','3','D'});bw.Write(CacheVersion);bw.Write(sourceInfo.Length);bw.Write(sourceInfo.LastWriteTimeUtc.Ticks);bw.Write(maxTextureDimension);bw.Write(vertices.Count);bw.Write(indices.Count);bw.Write(draws.Count);bw.Write(images.Count);bw.Write((float)minX);bw.Write((float)minY);bw.Write((float)minZ);bw.Write((float)maxX);bw.Write((float)maxY);bw.Write((float)maxZ);
+                foreach(Vertex v in vertices){bw.Write(v.Px);bw.Write(v.Py);bw.Write(v.Pz);bw.Write(v.Nx);bw.Write(v.Ny);bw.Write(v.Nz);bw.Write(v.Tx);bw.Write(v.Ty);bw.Write(v.Tz);bw.Write(v.Tw);bw.Write(v.U0);bw.Write(v.V0);bw.Write(v.U1);bw.Write(v.V1);bw.Write(v.U2);bw.Write(v.V2);bw.Write(v.U3);bw.Write(v.V3);bw.Write(v.U4);bw.Write(v.V4);}foreach(uint ix in indices)bw.Write(ix);
+                foreach(DrawBatch d in draws){bw.Write(d.FirstIndex);bw.Write(d.IndexCount);bw.Write(d.BaseImage);bw.Write(d.EmissiveImage);bw.Write(d.MetallicRoughnessImage);bw.Write(d.NormalImage);bw.Write(d.OcclusionImage);bw.Write(d.Br);bw.Write(d.Bg);bw.Write(d.Bb);bw.Write(d.Ba);bw.Write(d.Er);bw.Write(d.Eg);bw.Write(d.Eb);bw.Write(d.EmissiveStrength);bw.Write(d.Metallic);bw.Write(d.Roughness);bw.Write(d.Specular);bw.Write(d.Clearcoat);bw.Write(d.NormalScale);bw.Write(d.OcclusionStrength);bw.Write(d.BaseWrapS);bw.Write(d.BaseWrapT);bw.Write(d.EmissiveWrapS);bw.Write(d.EmissiveWrapT);bw.Write(d.MetallicRoughnessWrapS);bw.Write(d.MetallicRoughnessWrapT);bw.Write(d.NormalWrapS);bw.Write(d.NormalWrapT);bw.Write(d.OcclusionWrapS);bw.Write(d.OcclusionWrapT);bw.Write(d.AlphaMode);bw.Write(d.AlphaCutoff);bw.Write(d.Flags);}foreach(ImageData image in images){if(image==null){bw.Write(0);bw.Write(0);bw.Write(0);continue;}bw.Write(image.Width);bw.Write(image.Height);bw.Write(image.Bgra.Length);bw.Write(image.Bgra);}}
+                if(File.Exists(cachePath))File.Delete(cachePath);File.Move(temp,cachePath);}finally{if(File.Exists(temp))try{File.Delete(temp);}catch{}}
         }
 
-        public static string EnsureCompiled(string glbPath, string cachePath, int maxTextureDimension)
-        {
-            if (!IsCacheCurrent(glbPath, cachePath, maxTextureDimension)) Compile(glbPath, cachePath, maxTextureDimension);
-            return cachePath;
-        }
+        public static string EnsureCompiled(string glbPath, string cachePath, int maxTextureDimension){if(!IsCacheCurrent(glbPath,cachePath,maxTextureDimension))Compile(glbPath,cachePath,maxTextureDimension);return cachePath;}
     }
 }
