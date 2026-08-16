@@ -18,14 +18,15 @@ function New-Hc3dV3Probe {
     $fs=[IO.File]::Create($Path);$bw=New-Object IO.BinaryWriter($fs)
     try{
         $imageCount=if($Textured){1}else{0}
+        $baseImage=if($Textured){0}else{-1}
         $bw.Write([byte[]](0x48,0x43,0x33,0x44));$bw.Write([int32]3);$bw.Write([int64]4096);$bw.Write([int64]638909000000000000);$bw.Write([int32]512)
         $bw.Write([int32]4);$bw.Write([int32]6);$bw.Write([int32]1);$bw.Write([int32]$imageCount)
-        foreach($f in @([single]-1,[single](-.65),[single]0,[single]1,[single](.65),[single]0)){$bw.Write($f)}
+        foreach($f in @([single]-1,[single]-0.65,[single]0,[single]1,[single]0.65,[single]0)){$bw.Write($f)}
         $verts=@(
-            @(-1.0,-.65,0.0, 0.0,0.0,-1.0, 1.0,0.0,0.0,1.0, 0.0,0.0),
-            @( 1.0,-.65,0.0, 0.0,0.0,-1.0, 1.0,0.0,0.0,1.0, 1.0,0.0),
-            @( 1.0, .65,0.0, 0.0,0.0,-1.0, 1.0,0.0,0.0,1.0, 1.0,1.0),
-            @(-1.0, .65,0.0, 0.0,0.0,-1.0, 1.0,0.0,0.0,1.0, 0.0,1.0)
+            @(-1.0,-0.65,0.0, 0.0,0.0,-1.0, 1.0,0.0,0.0,1.0, 0.0,0.0),
+            @( 1.0,-0.65,0.0, 0.0,0.0,-1.0, 1.0,0.0,0.0,1.0, 1.0,0.0),
+            @( 1.0, 0.65,0.0, 0.0,0.0,-1.0, 1.0,0.0,0.0,1.0, 1.0,1.0),
+            @(-1.0, 0.65,0.0, 0.0,0.0,-1.0, 1.0,0.0,0.0,1.0, 0.0,1.0)
         )
         foreach($v in $verts){
             # position3 + normal3 + tangent4 + five UV pairs = 20 floats.
@@ -36,13 +37,13 @@ function New-Hc3dV3Probe {
         }
         foreach($i in @(0,1,2,0,2,3)){$bw.Write([uint32]$i)}
         $bw.Write([int32]0);$bw.Write([int32]6)
-        $bw.Write([int32](if($Textured){0}else{-1}))
+        $bw.Write([int32]$baseImage)
         foreach($image in @(-1,-1,-1,-1)){$bw.Write([int32]$image)}
-        if($Textured){foreach($f in @([single]1,[single]1,[single]1,$BaseAlpha)){$bw.Write($f)}}else{foreach($f in @([single].43,[single].14,[single].70,$BaseAlpha)){$bw.Write($f)}}
+        if($Textured){foreach($f in @([single]1,[single]1,[single]1,$BaseAlpha)){$bw.Write($f)}}else{foreach($f in @([single]0.43,[single]0.14,[single]0.70,$BaseAlpha)){$bw.Write($f)}}
         foreach($f in @([single]0,[single]0,[single]0,[single]1)){$bw.Write($f)}
-        foreach($f in @([single].18,[single].48,[single]1,[single]0,[single]1,[single]1)){$bw.Write($f)}
+        foreach($f in @([single]0.18,[single]0.48,[single]1,[single]0,[single]1,[single]1)){$bw.Write($f)}
         for($i=0;$i-lt10;$i++){$bw.Write([int32]10497)}
-        $bw.Write([int32]$AlphaMode);$bw.Write([single].5);$bw.Write([int32]0)
+        $bw.Write([int32]$AlphaMode);$bw.Write([single]0.5);$bw.Write([int32]0)
         if($Textured){
             $w=64;$h=32;$bytes=$w*$h*4;$bw.Write([int32]$w);$bw.Write([int32]$h);$bw.Write([int32]$bytes)
             for($y=0;$y-lt$h;$y++){for($x=0;$x-lt$w;$x++){
@@ -54,8 +55,8 @@ function New-Hc3dV3Probe {
 }
 
 try{
-    $opaque=Join-Path $temp 'opaque-purple.hc3d';New-Hc3dV3Probe -Path $opaque -Textured:$false -AlphaMode 0 -BaseAlpha ([single].25)
-    $mask=Join-Path $temp 'mask-purple.hc3d';New-Hc3dV3Probe -Path $mask -Textured:$false -AlphaMode 1 -BaseAlpha ([single].80)
+    $opaque=Join-Path $temp 'opaque-purple.hc3d';New-Hc3dV3Probe -Path $opaque -Textured:$false -AlphaMode 0 -BaseAlpha ([single]0.25)
+    $mask=Join-Path $temp 'mask-purple.hc3d';New-Hc3dV3Probe -Path $mask -Textured:$false -AlphaMode 1 -BaseAlpha ([single]0.80)
     $textured=Join-Path $temp 'textured.hc3d';New-Hc3dV3Probe -Path $textured -Textured:$true -AlphaMode 0 -BaseAlpha ([single]1)
 
     $dll=Join-Path $temp 'HuymaierD3D11CachedSmoke.dll';$cmd=Join-Path $temp 'build.cmd';$nativeDir=Join-Path $root 'Native'
