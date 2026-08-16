@@ -64,8 +64,8 @@ jobs:
           if($open.Contains('New-HcLiveModelView')){throw 'Full-screen viewer still creates the divergent WPF GLB renderer.'}
           $native=Get-Content -Raw '.\Native\HuymaierD3D11ShelfRuntime.cpp' -Encoding UTF8
           foreach($n in @('HC_GPU_SetShelfItemView','item.spin?phase*16.0f:0.0f','item.yawOffset','item.pitch')){if($native.IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Native shared viewer state missing: $n"}}
-          $host=Get-Content -Raw '.\Native\HuymaierD3D11ShelfHost.cs' -Encoding UTF8
-          foreach($n in @('HC_GPU_SetShelfItemView','public bool SetItemView','YawOffset','Pitch = -10.0f','Spin = true')){if($host.IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Managed shared viewer state missing: $n"}}
+          $hostText=Get-Content -Raw '.\Native\HuymaierD3D11ShelfHost.cs' -Encoding UTF8
+          foreach($n in @('HC_GPU_SetShelfItemView','public bool SetItemView','YawOffset','Pitch = -10.0f','Spin = true')){if($hostText.IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Managed shared viewer state missing: $n"}}
           Write-Host 'platformModelFullViewerSharedD3D11Gate: success'
           Write-Host 'platformModelFullViewerSameHc3dMaterialPathGate: success'
       - name: Commit materialized viewer
