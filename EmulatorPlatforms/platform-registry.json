@@ -661,10 +661,12 @@
       "backend": "Mesen Community Edition",
       "interface": "NES control-deck and cartridge interface",
       "displayName": "Nintendo Entertainment System",
-      "menuName": "Entertainment System",
+      "menuName": "Nintendo Entertainment System",
       "aliases": [
         "Nintendo Entertainment System",
         "NES",
+        "Nintendo NES",
+        "Entertainment System",
         "Mesen Community Edition"
       ],
       "version": "0.26.4-dev",
@@ -696,10 +698,13 @@
       "backend": "Mesen Community Edition",
       "interface": "SNES control-deck and cartridge interface",
       "displayName": "Super Nintendo Entertainment System",
-      "menuName": "Super Entertainment System",
+      "menuName": "Super Nintendo Entertainment System",
       "aliases": [
         "Super Nintendo Entertainment System",
         "SNES",
+        "Super NES",
+        "Super Nintendo",
+        "Super Entertainment System",
         "Mesen Community Edition"
       ],
       "version": "0.26.4-dev",

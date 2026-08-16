@@ -57,7 +57,10 @@ VSOut VSMain(VSIn v)
 }
 float4 PSMain(VSOut i) : SV_TARGET
 {
-    float4 tex = Flags.x != 0 ? BaseTexture.Sample(BaseSampler, i.uv0) : float4(1,1,1,1);
+    // HC3D v1 cache-space UV convention: restore authored glTF V before sampling.
+    float2 baseUv = float2(i.uv0.x, 1.0 - i.uv0.y);
+    float2 emissiveUv = float2(i.uv1.x, 1.0 - i.uv1.y);
+    float4 tex = Flags.x != 0 ? BaseTexture.Sample(BaseSampler, baseUv) : float4(1,1,1,1);
     float4 base = tex * BaseColor;
     if (Flags.z == 1 && base.a < Surface.w) discard;
     float3 n = normalize(i.n);
@@ -65,7 +68,7 @@ float4 PSMain(VSOut i) : SV_TARGET
     float diffuse = Flags.w != 0 ? 1.0 : (0.28 + 0.72 * saturate(dot(n, -lightDir)));
     float3 lit = base.rgb * diffuse;
     float3 emissive = Emissive.rgb * Emissive.a;
-    if (Flags.y != 0) emissive *= EmissiveTexture.Sample(EmissiveSampler, i.uv1).rgb;
+    if (Flags.y != 0) emissive *= EmissiveTexture.Sample(EmissiveSampler, emissiveUv).rgb;
     float specPower = lerp(8.0, 58.0, 1.0 - saturate(Surface.y));
     float3 viewDir = float3(0,0,-1);
     float3 halfDir = normalize(-lightDir + viewDir);
