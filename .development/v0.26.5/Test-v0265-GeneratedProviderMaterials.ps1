@@ -25,6 +25,13 @@ function Read-GlbJson([string]$Path){
     }finally{$br.Dispose();$fs.Dispose()}
 }
 
+function Get-OptionalPropertyValue($Object,[string]$Name,$Default=$null){
+    if($null-eq$Object){return $Default}
+    $prop=$Object.PSObject.Properties[$Name]
+    if($null-eq$prop-or$null-eq$prop.Value){return $Default}
+    return $prop.Value
+}
+
 try{
     $genExe=Join-Path $temp 'HuymaierBuiltInModelGenerator.exe'
     & $csc /noconfig /nologo /target:exe /platform:x64 /optimize+ ('/out:'+$genExe) $generator
@@ -43,9 +50,12 @@ try{
         if($rotation.Count-ne4-or[math]::Abs([double]$rotation[0])-gt.0001-or[math]::Abs([double]$rotation[1]-1)-gt.0001-or[math]::Abs([double]$rotation[2])-gt.0001-or[math]::Abs([double]$rotation[3])-gt.0001){throw "$($file.Name) does not face the default shelf camera through the audited 180-degree Y root rotation."}
         foreach($material in @($json.materials)){
             $materialCount++
-            $alpha=[string]$material.alphaMode;if([string]::IsNullOrWhiteSpace($alpha)){$alpha='OPAQUE'}
+            $alpha=[string](Get-OptionalPropertyValue $material 'alphaMode' 'OPAQUE')
+            if([string]::IsNullOrWhiteSpace($alpha)){$alpha='OPAQUE'}
             if($alpha-ne'OPAQUE'){throw "$($file.Name) generated material unexpectedly uses alphaMode=$alpha."}
-            $factor=@($material.pbrMetallicRoughness.baseColorFactor)
+            $pbr=Get-OptionalPropertyValue $material 'pbrMetallicRoughness' $null
+            if($null-eq$pbr){throw "$($file.Name) generated material has no pbrMetallicRoughness block."}
+            $factor=@(Get-OptionalPropertyValue $pbr 'baseColorFactor' @())
             if($factor.Count-ne4){throw "$($file.Name) generated material has no RGBA baseColorFactor."}
             if([math]::Abs([double]$factor[3]-1)-gt.0001){throw "$($file.Name) generated material is unexpectedly translucent (alpha=$($factor[3]))."}
         }
@@ -56,7 +66,8 @@ try{
 
     $gog=Join-Path $models 'gog.glb';$gogJson=Read-GlbJson $gog
     $purple=@($gogJson.materials|Where-Object{
-        $f=@($_.pbrMetallicRoughness.baseColorFactor)
+        $pbr=Get-OptionalPropertyValue $_ 'pbrMetallicRoughness' $null
+        $f=if($null-ne$pbr){@(Get-OptionalPropertyValue $pbr 'baseColorFactor' @())}else{@()}
         $f.Count-eq4 -and [math]::Abs([double]$f[0]-.43)-lt.02 -and [math]::Abs([double]$f[1]-.14)-lt.02 -and [math]::Abs([double]$f[2]-.70)-lt.02
     })
     if($purple.Count-lt1){throw 'Generated GOG GLB lost its authored purple material.'}
