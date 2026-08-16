@@ -1,0 +1,51 @@
+name: Apply temporary v0.26.5 V6 payload
+
+on:
+  push:
+    paths:
+      - '.development/v0.26.5/apply-v6.trigger'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v0.26.5-performance-and-downloads
+          fetch-depth: 0
+
+      - name: Decode exact V6 sources
+        shell: python
+        run: |
+          import base64, gzip, hashlib, pathlib
+          root = pathlib.Path('.')
+          jobs = [
+              ('.development/v0.26.5/payload-v6/user-models.gz.b64', 'HuymaierUser3DModels.ps1', '8a61decd5565e36ad391de5050c3b22948a5e07af2f5030a64adf24115d761b8'),
+              ('.development/v0.26.5/payload-v6/live-platform-models.gz.b64', 'HuymaierLivePlatformModels.ps1', 'fbc28d2d146ea091ff949d60341f9ab38d60b47e355d35225eb36e2cbd069c22'),
+              ('.development/v0.26.5/payload-v6/model-preview-worker.gz.b64', 'Native/HuymaierModelPreviewWorker.cs', 'b238a161edb83cfc808843dd08a3ce498266cb5c440a51de8f8004c230d98ba1'),
+              ('.development/v0.26.5/payload-v6/live-model-control.gz.b64', 'Native/HuymaierLiveModelControl.cs', '1939b887c0095f5032926f345a9afc55e825932299e9e6cf04c9f3c965606d9b'),
+          ]
+          for encoded_path, target_path, expected in jobs:
+              encoded = (root / encoded_path).read_text(encoding='utf-8').strip()
+              data = gzip.decompress(base64.b64decode(encoded))
+              actual = hashlib.sha256(data).hexdigest()
+              if actual != expected:
+                  raise SystemExit(f'{target_path}: expected {expected}, got {actual}')
+              target = root / target_path
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(data)
+              print(f'{target_path}: {actual}')
+
+      - name: Commit exact V6 sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'thermalkil'
+          git config user.email '98826286+thermalkil@users.noreply.github.com'
+          git add HuymaierUser3DModels.ps1 HuymaierLivePlatformModels.ps1 Native/HuymaierModelPreviewWorker.cs Native/HuymaierLiveModelControl.cs
+          git diff --cached --quiet && { echo 'No V6 source changes to commit.'; exit 0; }
+          git commit -m 'Add compact dual 3D shelves and full GLB material compatibility'
+          git push origin HEAD:feature/v0.26.5-performance-and-downloads
