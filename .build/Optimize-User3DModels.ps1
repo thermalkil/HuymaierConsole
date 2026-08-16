@@ -9,7 +9,9 @@ foreach($path in @($CorePath,$BootstrapPath,$InstallerScriptPath)){if(-not(Test-
 $repoRoot=Split-Path -Parent $PSScriptRoot
 $userRuntime=Join-Path $repoRoot 'HuymaierUser3DModels.ps1'
 $gpuRuntime=Join-Path $repoRoot 'HuymaierGpuPlatformShelves.ps1'
-foreach($required in @($userRuntime,$gpuRuntime)){if(-not(Test-Path -LiteralPath $required -PathType Leaf)){throw "User/GPU 3D-model runtime missing: $required"}}
+$manualRecompsRuntime=Join-Path $repoRoot 'HuymaierRecompsManual.ps1'
+$finalRecompsRuntime=Join-Path $repoRoot 'HuymaierRecompsFinal.ps1'
+foreach($required in @($userRuntime,$gpuRuntime,$manualRecompsRuntime,$finalRecompsRuntime)){if(-not(Test-Path -LiteralPath $required -PathType Leaf)){throw "User/GPU/Recomps runtime missing: $required"}}
 
 $core=Get-Content -Raw -LiteralPath $CorePath -Encoding UTF8
 if($core -notmatch 'HUYMAIER_USER_3D_MODELS_RUNTIME_LOAD_V1'){
@@ -57,6 +59,29 @@ if (Test-Path -LiteralPath $script:GpuPlatformShelvesModulePath) {
 '@
     $core=$core.Replace($load,$replacement)
 }
+if($core -notmatch 'HUYMAIER_MANUAL_RECOMPS_FINAL_LOAD_V1'){
+    $pathNeedle='$script:GpuPlatformShelvesModulePath = Join-Path $script:BaseDir ''HuymaierGpuPlatformShelves.ps1'''
+    if(-not$core.Contains($pathNeedle)){throw 'Final manual Recomps ownership requires the V7 GPU shelf path first.'}
+    $core=$core.Replace($pathNeedle,$pathNeedle+"`r`n`$script:ManualRecompsFinalModulePath = Join-Path `$script:BaseDir 'HuymaierRecompsFinal.ps1'")
+    $load=@'
+if (Test-Path -LiteralPath $script:GpuPlatformShelvesModulePath) {
+    try { . $script:GpuPlatformShelvesModulePath }
+    catch { Write-Log "GPU platform shelves module load failed: $($_.Exception.Message)" 'ERROR' }
+}
+'@
+    if(-not$core.Contains($load)){throw 'Final manual Recomps ownership could not find the V7 GPU shelf load block.'}
+    $replacement=$load+@'
+
+# HUYMAIER_MANUAL_RECOMPS_FINAL_LOAD_V1
+# V7 historically wrapped Recomps for folder scanning. Reclaim only those final
+# hooks so the explicit one-EXE-at-a-time library remains authoritative.
+if (Test-Path -LiteralPath $script:ManualRecompsFinalModulePath) {
+    try { . $script:ManualRecompsFinalModulePath }
+    catch { Write-Log "Final manual Recomps ownership load failed: $($_.Exception.Message)" 'ERROR' }
+}
+'@
+    $core=$core.Replace($load,$replacement)
+}
 Set-Content -LiteralPath $CorePath -Value $core -Encoding UTF8
 
 $bootstrap=Get-Content -Raw -LiteralPath $BootstrapPath -Encoding UTF8
@@ -76,6 +101,14 @@ if($bootstrap -notmatch 'HUYMAIER_GPU_3D_SHELVES_PREFLIGHT_V1'){
     if(-not$bootstrap.Contains($entry)){throw 'GPU shelf preflight could not find user-model entry.'}
     $bootstrap=$bootstrap.Replace($entry,$entry+"`r`n        [pscustomobject]@{Path=`$gpuPlatformShelvesPath;Label='D3D11 GPU platform shelves runtime'},")
 }
+if($bootstrap -notmatch 'HUYMAIER_MANUAL_RECOMPS_PREFLIGHT_V1'){
+    $needle='$gpuPlatformShelvesPath=Join-Path $baseDir ''HuymaierGpuPlatformShelves.ps1'''
+    if(-not$bootstrap.Contains($needle)){throw 'Manual Recomps preflight requires GPU shelf path first.'}
+    $bootstrap=$bootstrap.Replace($needle,$needle+"`r`n# HUYMAIER_MANUAL_RECOMPS_PREFLIGHT_V1`r`n`$manualRecompsPath=Join-Path `$baseDir 'HuymaierRecompsManual.ps1'`r`n`$finalRecompsPath=Join-Path `$baseDir 'HuymaierRecompsFinal.ps1'")
+    $entry="        [pscustomobject]@{Path=`$gpuPlatformShelvesPath;Label='D3D11 GPU platform shelves runtime'},"
+    if(-not$bootstrap.Contains($entry)){throw 'Manual Recomps preflight could not find GPU shelf entry.'}
+    $bootstrap=$bootstrap.Replace($entry,$entry+"`r`n        [pscustomobject]@{Path=`$manualRecompsPath;Label='Manual Recomps library runtime'},`r`n        [pscustomobject]@{Path=`$finalRecompsPath;Label='Manual Recomps final ownership runtime'},")
+}
 Set-Content -LiteralPath $BootstrapPath -Value $bootstrap -Encoding UTF8
 
 $installer=Get-Content -Raw -LiteralPath $InstallerScriptPath -Encoding UTF8
@@ -89,5 +122,10 @@ if($installer -notmatch 'HUYMAIER_GPU_3D_SHELVES_INSTALLER_CACHE_V1'){
     if(-not$installer.Contains($needle)){throw 'GPU shelf installer cache requires user-model runtime entry.'}
     $installer=$installer.Replace($needle,$needle+"`r`n            # HUYMAIER_GPU_3D_SHELVES_INSTALLER_CACHE_V1`r`n            'HuymaierGpuPlatformShelves.ps1',`r`n            'HuymaierD3D11ShelfRenderer.dll',
             'HuymaierGpuShelfHost.dll',`r`n            'HuymaierGpuShelfAssetCompiler.exe',")
+}
+if($installer -notmatch 'HUYMAIER_MANUAL_RECOMPS_INSTALLER_CACHE_V1'){
+    $needle="            'HuymaierGpuPlatformShelves.ps1',"
+    if(-not$installer.Contains($needle)){throw 'Manual Recomps installer cache requires GPU shelf runtime entry.'}
+    $installer=$installer.Replace($needle,$needle+"`r`n            # HUYMAIER_MANUAL_RECOMPS_INSTALLER_CACHE_V1`r`n            'HuymaierRecompsManual.ps1',`r`n            'HuymaierRecompsFinal.ps1',")
 }
 Set-Content -LiteralPath $InstallerScriptPath -Value $installer -Encoding UTF8
