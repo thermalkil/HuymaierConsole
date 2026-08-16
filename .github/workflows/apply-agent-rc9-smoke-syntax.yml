@@ -1,0 +1,36 @@
+name: Apply RC9 WARP Smoke Syntax Repair
+
+on:
+  push:
+    branches:
+      - agent/v0265-rc9-shader-recomps-picker
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/v0265-rc9-shader-recomps-picker
+      - name: Repair smoke syntax
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $path='Native\HuymaierD3D11ShelfAssetSmoke.cpp'
+          $text=Get-Content -Raw -LiteralPath $path -Encoding UTF8
+          $bad='if(FAILED(device->CreateTexture2D(&sd,nullptr,staging.GetAddressOf()))return 44;'
+          $good='if(FAILED(device->CreateTexture2D(&sd,nullptr,staging.GetAddressOf())))return 44;'
+          if(-not$text.Contains($bad)){throw 'Expected RC9 smoke syntax defect was not found.'}
+          $text=$text.Replace($bad,$good)
+          [IO.File]::WriteAllText((Resolve-Path $path),$text,(New-Object Text.UTF8Encoding($false)))
+          git diff --check
+          if($LASTEXITCODE -ne0){throw 'Smoke syntax repair failed diff check.'}
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- $path
+          git commit -m 'Fix production shader WARP smoke syntax'
+          git push origin HEAD:agent/v0265-rc9-shader-recomps-picker
