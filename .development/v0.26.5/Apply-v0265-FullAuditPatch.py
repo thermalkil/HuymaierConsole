@@ -178,3 +178,4 @@ text=text.replace(old,new,1)
 live.write_text(text,encoding='utf-8')
 
 print('fullAuditPatchApplied: success')
+# trigger materialization on Windows
