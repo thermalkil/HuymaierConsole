@@ -1,0 +1,59 @@
+name: Apply RC9 Recomps EXE-only Browser Repair
+
+on:
+  push:
+    branches:
+      - agent/v0265-rc9-shader-recomps-picker
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/v0265-rc9-shader-recomps-picker
+      - name: Keep only EXEs in Recomps picker
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $path='HuymaierRecompsManual.ps1'
+          $text=Get-Content -Raw -LiteralPath $path -Encoding UTF8
+          $old=@'
+    foreach($entry in @($base)){
+        if($null-eq$entry){continue}
+        [void]$items.Add($entry)
+        $full=[string](Get-EntryProperty $entry 'FullName' '')
+        if($full){$seen[$full.ToLowerInvariant()]=$true}
+    }
+'@
+          $new=@'
+    foreach($entry in @($base)){
+        if($null-eq$entry){continue}
+        $type=[string](Get-EntryProperty $entry 'Type' '')
+        $full=[string](Get-EntryProperty $entry 'FullName' '')
+        if([string]::Equals($type,'File',[StringComparison]::OrdinalIgnoreCase)){
+            $extension=[string](Get-EntryProperty $entry 'Extension' '')
+            if([string]::IsNullOrWhiteSpace($extension) -and $full){try{$extension=[IO.Path]::GetExtension($full)}catch{}}
+            if(-not [string]::Equals($extension,'.exe',[StringComparison]::OrdinalIgnoreCase)){continue}
+        }
+        [void]$items.Add($entry)
+        if($full){$seen[$full.ToLowerInvariant()]=$true}
+    }
+'@
+          if(-not$text.Contains($old)){throw 'Expected Recomps browser merge block was not found.'}
+          $text=$text.Replace($old,$new)
+          [IO.File]::WriteAllText((Resolve-Path $path),$text,(New-Object Text.UTF8Encoding($false)))
+          $tokens=$null;$errors=$null
+          [void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path),[ref]$tokens,[ref]$errors)
+          if(@($errors).Count){throw "Recomps browser repair failed PowerShell 5.1 parse: $(@($errors|ForEach-Object{$_.Message}) -join '; ')"}
+          git diff --check
+          if($LASTEXITCODE-ne0){throw 'Recomps browser repair failed diff check.'}
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- $path
+          git commit -m 'Restrict Recomps native browser to EXE files'
+          git push origin HEAD:agent/v0265-rc9-shader-recomps-picker
