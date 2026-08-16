@@ -5,13 +5,16 @@ $cpp=Join-Path $root 'Native\HuymaierD3D11ShelfRenderer.cpp'
 $assetCpp=Join-Path $root 'Native\HuymaierD3D11ShelfAsset.cpp'
 $assetH=Join-Path $root 'Native\HuymaierD3D11ShelfAsset.h'
 $runtimeCpp=Join-Path $root 'Native\HuymaierD3D11ShelfRuntime.cpp'
+$uvSmokeCpp=Join-Path $root 'Native\HuymaierD3D11UvAddressSmoke.cpp'
 $hostSource=Join-Path $root 'Native\HuymaierD3D11ShelfHost.cs'
-foreach($p in @($cpp,$assetCpp,$assetH,$runtimeCpp,$hostSource)){if(-not(Test-Path -LiteralPath $p -PathType Leaf)){throw "D3D11 shelf source missing: $p"}}
+foreach($p in @($cpp,$assetCpp,$assetH,$runtimeCpp,$uvSmokeCpp,$hostSource)){if(-not(Test-Path -LiteralPath $p -PathType Leaf)){throw "D3D11 shelf source missing: $p"}}
 $cppText=Get-Content -Raw -LiteralPath $cpp -Encoding UTF8
 $runtimeText=Get-Content -Raw -LiteralPath $runtimeCpp -Encoding UTF8
+$uvSmokeText=Get-Content -Raw -LiteralPath $uvSmokeCpp -Encoding UTF8
 $hostText=Get-Content -Raw -LiteralPath $hostSource -Encoding UTF8
 foreach($n in @('HC_D3D11SmokeTest','D3D11CreateDevice','Direct3DCreate9Ex','OpenSharedResource','D3D11_CREATE_DEVICE_BGRA_SUPPORT','D3DCompile')){if($cppText.IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Native D3D11 proof contract missing: $n"}}
-foreach($n in @('HUYMAIER_D3D11_SHARED_SHELF_RUNTIME_V1','HC_GPU_CreateShelfSurface','HC_GPU_LoadShelfModel','HC_GPU_SetShelfItem','HC_GPU_RenderShelfSurface','HC_GPU_GetCachedAssetCount','AcquireAssetLocked','GenerateMips')){if(($runtimeText+(Get-Content -Raw $assetCpp)).IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Production D3D11 shelf contract missing: $n"}}
+foreach($n in @('HUYMAIER_D3D11_SHARED_SHELF_RUNTIME_V1','HC_GPU_CreateShelfSurface','HC_GPU_LoadShelfModel','HC_GPU_SetShelfItem','HC_GPU_RenderShelfSurface','HC_GPU_GetCachedAssetCount','AcquireAssetLocked','GenerateMips','float2 baseUv = float2(i.uv0.x, 1.0 - i.uv0.y)','float2 emissiveUv = float2(i.uv1.x, 1.0 - i.uv1.y)')){if(($runtimeText+(Get-Content -Raw $assetCpp)).IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Production D3D11 shelf contract missing: $n"}}
+foreach($n in @('HC_D3D11UvAddressSmokeTest','D3D11_TEXTURE_ADDRESS_WRAP','D3D11_TEXTURE_ADDRESS_CLAMP','D3D11_TEXTURE_ADDRESS_MIRROR','PixelEquals')){if($uvSmokeText.IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "UV-addressing native smoke contract missing: $n"}}
 foreach($n in @('HUYMAIER_D3D11_SHELF_HOST_V2','D3DImage','D3DResourceType.IDirect3DSurface9','CompositionTarget.Rendering','HC_GPU_LoadShelfModel','HC_GPU_SetShelfItem','ReplayState','LoadedModelCount')){if($hostText.IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Managed D3D11 bridge V2 contract missing: $n"}}
 
 $tokens=$null;$errors=$null
@@ -35,7 +38,7 @@ try{
 @echo off
 call "$vcvars" >nul
 if errorlevel 1 exit /b %errorlevel%
-cl.exe /nologo /LD /O2 /EHsc /std:c++17 /MD /DUNICODE /D_UNICODE /I"$nativeDir" "$cpp" "$assetCpp" "$runtimeCpp" /link /OUT:"$nativeDll" d3d11.lib d3d9.lib d3dcompiler.lib dxgi.lib user32.lib ole32.lib
+cl.exe /nologo /LD /O2 /EHsc /std:c++17 /MD /DUNICODE /D_UNICODE /I"$nativeDir" "$cpp" "$assetCpp" "$runtimeCpp" "$uvSmokeCpp" /link /OUT:"$nativeDll" d3d11.lib d3d9.lib d3dcompiler.lib dxgi.lib user32.lib ole32.lib
 exit /b %errorlevel%
 "@
     Set-Content -LiteralPath $cmdFile -Value $cmd -Encoding ASCII
@@ -47,7 +50,7 @@ exit /b %errorlevel%
     $headers=(& $dumpbin.FullName /nologo /headers $nativeDll)-join"`n"
     if($headers-notmatch'(?i)machine \(x64\)|8664 machine'){throw 'HuymaierD3D11ShelfRenderer.dll is not x64.'}
     $exports=(& $dumpbin.FullName /nologo /exports $nativeDll)-join"`n"
-    foreach($name in @('HC_D3D11SmokeTest','HC_GPU_CreateShelfSurface','HC_GPU_LoadShelfModel','HC_GPU_SetShelfItem','HC_GPU_ClearShelfItems','HC_GPU_RenderShelfSurface','HC_GPU_ReleaseShelfSurfacePointer','HC_GPU_DestroyShelfSurface','HC_GPU_GetCachedAssetCount')){if($exports-notmatch[regex]::Escape($name)){throw "Production native shelf DLL export missing: $name"}}
+    foreach($name in @('HC_D3D11SmokeTest','HC_D3D11UvAddressSmokeTest','HC_GPU_CreateShelfSurface','HC_GPU_LoadShelfModel','HC_GPU_SetShelfItem','HC_GPU_ClearShelfItems','HC_GPU_RenderShelfSurface','HC_GPU_ReleaseShelfSurfacePointer','HC_GPU_DestroyShelfSurface','HC_GPU_GetCachedAssetCount')){if($exports-notmatch[regex]::Escape($name)){throw "Production native shelf DLL export missing: $name"}}
 
     Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml
     $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
@@ -67,6 +70,8 @@ using System.Runtime.InteropServices;
 public static class HcNativeSearchPath {
   [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
   public static extern bool SetDllDirectory(string path);
+  [DllImport("HuymaierD3D11ShelfRenderer.dll", CallingConvention=CallingConvention.Cdecl)]
+  public static extern int HC_D3D11UvAddressSmokeTest();
 }
 '@
     if(-not[HcNativeSearchPath]::SetDllDirectory($temp)){throw 'Could not set native DLL search path for D3D11 smoke test.'}
@@ -77,11 +82,15 @@ public static class HcNativeSearchPath {
     if($null-eq$smokeMethod){throw 'D3D11ShelfSurface.RunNativeSmokeTest was not found through loaded assembly.'}
     $result=[int]$smokeMethod.Invoke($null,@())
     if([int]$result-ne1){throw "D3D11 shader/render/readback smoke test failed with code $result"}
+    $uvResult=[HcNativeSearchPath]::HC_D3D11UvAddressSmokeTest()
+    if([int]$uvResult-ne1){throw "D3D11 UV/sampler addressing pixel smoke failed with code $uvResult"}
 
     Write-Host 'platformModelD3D11NativeCompileGate: success'
     Write-Host 'platformModelD3D11X64Gate: success'
     Write-Host 'platformModelD3D11ShaderGate: success'
     Write-Host 'platformModelD3D11WarpSmokeGate: success'
+    Write-Host 'platformModelD3D11PackagedUvExportGate: success'
+    Write-Host 'platformModelD3D11PackagedUvPixelGate: success'
     Write-Host 'platformModelD3DImageBridgeV2CompileGate: success'
     Write-Host 'platformModelD3D11ProductionExportsGate: success'
     Write-Host 'platformModelD3D11SharedAssetCacheGate: success'
