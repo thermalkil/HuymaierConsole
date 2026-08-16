@@ -18,6 +18,23 @@ $script:HcGpuShelfCompileTimer=$null
 $script:HcGpuShelfGroups=@{}
 $script:HcGpuShelfGeneration=0
 
+function Get-HcGpuShelfHostType {
+    $typeName='HuymaierConsole.Modeling.D3D11ShelfSurface'
+    foreach($assembly in @([AppDomain]::CurrentDomain.GetAssemblies())){
+        try{
+            $candidate=$assembly.GetType($typeName,$false)
+            if($null-ne$candidate){return $candidate}
+        }catch{}
+    }
+    try{
+        # HUYMAIER_D3D11_LOADFROM_TYPE_RESOLUTION_V1
+        # Resolve from the actual assembly object. Assembly-qualified Type.GetType
+        # can return null for assemblies loaded through the LoadFrom context.
+        $assembly=[Reflection.Assembly]::LoadFrom($script:HcGpuShelfHostDll)
+        return $assembly.GetType($typeName,$false)
+    }catch{return $null}
+}
+
 function Initialize-HcGpuShelfRuntime {
     if($script:HcGpuShelfRuntimeReady){return $true}
     try{
@@ -26,11 +43,7 @@ function Initialize-HcGpuShelfRuntime {
         if(-not(Test-Path -LiteralPath $script:HcGpuShelfHostDll -PathType Leaf)){throw 'HuymaierGpuShelfHost.dll is missing.'}
         New-Item -ItemType Directory -Force -Path $script:HcGpuShelfCacheDir|Out-Null
         if(($env:PATH -split ';') -notcontains $script:BaseDir){$env:PATH=$script:BaseDir+';'+$env:PATH}
-        $gpuType=[type]::GetType('HuymaierConsole.Modeling.D3D11ShelfSurface, HuymaierGpuShelfHost',$false)
-        if($null-eq$gpuType){
-            Add-Type -Path $script:HcGpuShelfHostDll -ErrorAction Stop
-            $gpuType=[type]::GetType('HuymaierConsole.Modeling.D3D11ShelfSurface, HuymaierGpuShelfHost',$false)
-        }
+        $gpuType=Get-HcGpuShelfHostType
         if($null-eq$gpuType){throw 'D3D11ShelfSurface type is unavailable.'}
         $script:HcGpuShelfRuntimeReady=$true
         try{Write-Log 'D3D11 GPU shelf runtime initialized.'}catch{}
@@ -94,7 +107,6 @@ function Get-HcGpuShelfSelectedCard {
     return $null
 }
 
-# Keep the stable V6 viewer/action helpers working against the V7 card list.
 function Get-Hc3DShelfSelectedCard { return (Get-HcGpuShelfSelectedCard) }
 function Get-Hc3DShelfGroup([string]$Key){return (Get-HcGpuShelfGroup $Key)}
 function Get-Hc3DShelfSelectedCardForGroup([string]$Key){return (Get-HcGpuShelfSelectedCardForGroup $Key)}
