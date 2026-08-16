@@ -1,0 +1,43 @@
+name: Tighten V6 rotation-safe framing envelope
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-v6-rotation-envelope.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v0.26.5-performance-and-downloads
+          fetch-depth: 0
+      - name: Tighten rotation envelope and self-clean
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('Native/HuymaierLiveModelControl.cs')
+          text = p.read_text(encoding='utf-8-sig')
+          old = 'normalizedScale = 2.80 / boundingDiameter;'
+          new = 'normalizedScale = 2.60 / boundingDiameter;'
+          if old not in text:
+              raise SystemExit('Expected V6 bounding-diameter normalization was not found')
+          text = text.replace(old, new, 1)
+          old_comment = '// so wide/deep console models cannot become clipped at oblique yaw.'
+          new_comment = '// so wide/deep console models cannot become clipped at oblique yaw.\n            // 2.60 keeps perspective headroom for the near side of the rotating bounds.'
+          text = text.replace(old_comment, new_comment, 1)
+          p.write_text(text, encoding='utf-8')
+          Path('.github/workflows/fix-v6-rotation-envelope.yml').unlink()
+      - name: Commit framing correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'thermalkil'
+          git config user.email '98826286+thermalkil@users.noreply.github.com'
+          git add -A
+          git commit -m 'Tighten V6 perspective-safe model rotation envelope'
+          git push origin HEAD:feature/v0.26.5-performance-and-downloads
