@@ -15,7 +15,10 @@ $temp=Join-Path $(if($env:RUNNER_TEMP){$env:RUNNER_TEMP}else{[IO.Path]::GetTempP
 function New-Hc3dProbe([string]$Path){
     $fs=[IO.File]::Create($Path);$bw=New-Object IO.BinaryWriter($fs)
     try{
-        $bw.Write([byte[]](0x48,0x43,0x33,0x44));$bw.Write([int32]1);$bw.Write([int64]4096);$bw.Write([int64]638909000000000000);$bw.Write([int32]512)
+        # HC3D v2 preserves the v1 binary layout but normalizes baked triangle
+        # winding for negative-determinant glTF nodes. Keep this synthetic cache
+        # on the exact version accepted by the production loader.
+        $bw.Write([byte[]](0x48,0x43,0x33,0x44));$bw.Write([int32]2);$bw.Write([int64]4096);$bw.Write([int64]638909000000000000);$bw.Write([int32]512)
         $bw.Write([int32]4);$bw.Write([int32]6);$bw.Write([int32]1);$bw.Write([int32]1)
         foreach($f in @([single](-1),[single](-0.65),[single]0,[single]1,[single](0.65),[single]0)){$bw.Write($f)}
         $verts=@(

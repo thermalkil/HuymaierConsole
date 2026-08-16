@@ -13,7 +13,7 @@ $runtimeText=Get-Content -Raw -LiteralPath $runtimeCpp -Encoding UTF8
 $uvSmokeText=Get-Content -Raw -LiteralPath $uvSmokeCpp -Encoding UTF8
 $hostText=Get-Content -Raw -LiteralPath $hostSource -Encoding UTF8
 foreach($n in @('HC_D3D11SmokeTest','D3D11CreateDevice','Direct3DCreate9Ex','OpenSharedResource','D3D11_CREATE_DEVICE_BGRA_SUPPORT','D3DCompile')){if($cppText.IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Native D3D11 proof contract missing: $n"}}
-foreach($n in @('HUYMAIER_D3D11_SHARED_SHELF_RUNTIME_V1','HC_GPU_CreateShelfSurface','HC_GPU_LoadShelfModel','HC_GPU_SetShelfItem','HC_GPU_RenderShelfSurface','HC_GPU_GetCachedAssetCount','AcquireAssetLocked','GenerateMips','float2 baseUv = float2(i.uv0.x, 1.0 - i.uv0.y)','float2 emissiveUv = float2(i.uv1.x, 1.0 - i.uv1.y)')){if(($runtimeText+(Get-Content -Raw $assetCpp)).IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Production D3D11 shelf contract missing: $n"}}
+foreach($n in @('HUYMAIER_D3D11_SHARED_SHELF_RUNTIME_V1','HC_GPU_CreateShelfSurface','HC_GPU_LoadShelfModel','HC_GPU_SetShelfItem','HC_GPU_SetShelfBrightness','HC_GPU_RenderShelfSurface','HC_GPU_GetCachedAssetCount','AcquireAssetLocked','GenerateMips','float2 baseUv = float2(i.uv0.x, 1.0 - i.uv0.y)','float2 emissiveUv = float2(i.uv1.x, 1.0 - i.uv1.y)')){if(($runtimeText+(Get-Content -Raw $assetCpp)).IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Production D3D11 shelf contract missing: $n"}}
 foreach($n in @('HC_D3D11UvAddressSmokeTest','D3D11_TEXTURE_ADDRESS_WRAP','D3D11_TEXTURE_ADDRESS_CLAMP','D3D11_TEXTURE_ADDRESS_MIRROR','PixelEquals')){if($uvSmokeText.IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "UV-addressing native smoke contract missing: $n"}}
 foreach($n in @('HUYMAIER_D3D11_SHELF_HOST_V2','D3DImage','D3DResourceType.IDirect3DSurface9','CompositionTarget.Rendering','HC_GPU_LoadShelfModel','HC_GPU_SetShelfItem','ReplayState','LoadedModelCount')){if($hostText.IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Managed D3D11 bridge V2 contract missing: $n"}}
 
@@ -50,7 +50,7 @@ exit /b %errorlevel%
     $headers=(& $dumpbin.FullName /nologo /headers $nativeDll)-join"`n"
     if($headers-notmatch'(?i)machine \(x64\)|8664 machine'){throw 'HuymaierD3D11ShelfRenderer.dll is not x64.'}
     $exports=(& $dumpbin.FullName /nologo /exports $nativeDll)-join"`n"
-    foreach($name in @('HC_D3D11SmokeTest','HC_D3D11UvAddressSmokeTest','HC_GPU_CreateShelfSurface','HC_GPU_LoadShelfModel','HC_GPU_SetShelfItem','HC_GPU_ClearShelfItems','HC_GPU_RenderShelfSurface','HC_GPU_ReleaseShelfSurfacePointer','HC_GPU_DestroyShelfSurface','HC_GPU_GetCachedAssetCount')){if($exports-notmatch[regex]::Escape($name)){throw "Production native shelf DLL export missing: $name"}}
+    foreach($name in @('HC_D3D11SmokeTest','HC_D3D11UvAddressSmokeTest','HC_GPU_CreateShelfSurface','HC_GPU_LoadShelfModel','HC_GPU_SetShelfItem','HC_GPU_SetShelfBrightness','HC_GPU_ClearShelfItems','HC_GPU_RenderShelfSurface','HC_GPU_ReleaseShelfSurfacePointer','HC_GPU_DestroyShelfSurface','HC_GPU_GetCachedAssetCount')){if($exports-notmatch[regex]::Escape($name)){throw "Production native shelf DLL export missing: $name"}}
 
     Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml
     $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'

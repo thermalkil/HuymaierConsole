@@ -38,6 +38,7 @@ function New-HcLiveModelView {
     try{
         $view=$(if($CardMode){New-Object HuymaierConsole.Modeling.LiveModelView -ArgumentList @($Path,$true)}else{New-Object HuymaierConsole.Modeling.LiveModelView -ArgumentList $Path})
         $view.SetScalePercent([double]$ScalePercent)
+        try{if($view.PSObject.Methods['SetBrightnessPercent']){$view.SetBrightnessPercent([double]$script:Config.PlatformModelBrightness)}}catch{}
         return $view
     }catch{
         try{Write-Log ('Live model view failed for '+$Path+': '+$_.Exception.Message) 'WARN'}catch{}

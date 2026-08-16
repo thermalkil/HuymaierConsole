@@ -30,6 +30,12 @@ function Get-HcCanonicalPlatformName([string]$Platform){
         'super nintendo' {return 'Super Nintendo Entertainment System'}
         'super entertainment system' {return 'Super Nintendo Entertainment System'}
         'super nintendo entertainment system' {return 'Super Nintendo Entertainment System'}
+        '4' {return 'PS4'}
+        'ps4' {return 'PS4'}
+        'playstation 4' {return 'PS4'}
+        'cd' {return 'Sega CD'}
+        'segacd' {return 'Sega CD'}
+        'sega cd' {return 'Sega CD'}
         default {return $Platform}
     }
 }
@@ -88,12 +94,12 @@ function Get-HcRecompGames {
     $items=New-Object System.Collections.ArrayList;$seen=@{}
     foreach($exe in @(Get-ChildItem -LiteralPath $root -Filter '*.exe' -File -ErrorAction SilentlyContinue|Where-Object{Test-HcRecompExecutable $_})){
         $key=$exe.FullName.ToLowerInvariant();if($seen.ContainsKey($key)){continue};$seen[$key]=$true
-        [void]$items.Add([pscustomobject]@{Id=('Recomps:'+$key);Name=$exe.BaseName;Source='Recomps';LaunchTarget=$exe.FullName;Path=$exe.DirectoryName;ArtworkPath='';Installed=$true})
+        [void]$items.Add([pscustomobject]@{Id=('Recomps:'+$key);Name=$exe.BaseName;Source='Recomps';Provider='Recomps';LaunchTarget=$exe.FullName;Path=$exe.DirectoryName;InstallPath=$exe.DirectoryName;ArtworkPath='';Installed=$true;Description=('Native recomp build at '+$exe.DirectoryName)})
     }
     foreach($dir in @(Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue|Sort-Object Name)){
         $exe=Select-HcRecompExecutable $dir;if($null -eq $exe){continue}
         $key=$exe.FullName.ToLowerInvariant();if($seen.ContainsKey($key)){continue};$seen[$key]=$true
-        [void]$items.Add([pscustomobject]@{Id=('Recomps:'+$key);Name=$dir.Name;Source='Recomps';LaunchTarget=$exe.FullName;Path=$dir.FullName;ArtworkPath='';Installed=$true})
+        [void]$items.Add([pscustomobject]@{Id=('Recomps:'+$key);Name=$dir.Name;Source='Recomps';Provider='Recomps';LaunchTarget=$exe.FullName;Path=$dir.FullName;InstallPath=$dir.FullName;ArtworkPath='';Installed=$true;Description=('Native recomp build at '+$dir.FullName)})
     }
     $script:HcRecompCacheRoot=$root;$script:HcRecompCache=[object[]]$items.ToArray();$script:HcRecompCacheUntil=[datetime]::Now.AddSeconds(10)
     return [object[]]@($script:HcRecompCache)
@@ -222,7 +228,7 @@ function Test-HcGpuShelfCacheCurrent([string]$ModelPath,[string]$CachePath){
         $reader=New-Object IO.BinaryReader($stream)
         $magic=-join$reader.ReadChars(4)
         if($magic-ne'HC3D'){return $false}
-        if($reader.ReadInt32()-ne1){return $false}
+        if($reader.ReadInt32()-ne2){return $false}
         if($reader.ReadInt64()-ne[int64]$source.Length){return $false}
         if($reader.ReadInt64()-ne[int64]$source.LastWriteTimeUtc.Ticks){return $false}
         return ($reader.ReadInt32()-eq[int]$script:HcGpuShelfCacheQuality)
@@ -385,6 +391,13 @@ function Center-HcGpuShelfSelection($Card){
     try{$group.Row.UpdateLayout();$group.Scroll.UpdateLayout();$point=$Card.Button.TranslatePoint((New-Object System.Windows.Point 0,0),$group.Row);$target=[double]$point.X+([double]$Card.Button.ActualWidth/2)-([double]$group.Scroll.ViewportWidth/2);$group.Scroll.ScrollToHorizontalOffset([math]::Max(0,$target))}catch{}
 }
 
+function Update-HcGpuShelfBrightness {
+    foreach($key in @('Providers','Consoles')){
+        $group=Get-HcGpuShelfGroup $key
+        if($group-and$group.Surface-and$group.Surface.PSObject.Methods['SetBrightnessPercent']){try{$group.Surface.SetBrightnessPercent([double]$script:Config.PlatformModelBrightness)}catch{}}
+    }
+}
+
 function Update-HcGpuShelfLayout {
     if(-not$script:Hc3DShelfMounted){return}
     $focused=Get-HcGpuShelfSelectedCard
@@ -418,7 +431,7 @@ function Add-HcGpuShelfGroup([string]$Key,[string]$Title,[object[]]$Entries,[dou
     if($Entries.Count-le0){return}
     $header=New-Object System.Windows.Controls.TextBlock;$header.Text=$Title;$header.FontSize=17;$header.FontWeight='SemiBold';$header.Foreground='#D8E0EA';$header.Margin='8,3,0,3';$script:ActionPanel.Children.Add($header)|Out-Null
     $container=New-Object System.Windows.Controls.Grid;$container.Height=$Height;$container.ClipToBounds=$true;$container.Background='Transparent'
-    $surface=$null;if(Initialize-HcGpuShelfRuntime){try{$surface=New-Object HuymaierConsole.Modeling.D3D11ShelfSurface;$surface.HorizontalAlignment='Stretch';$surface.VerticalAlignment='Stretch';$container.Children.Add($surface)|Out-Null}catch{try{Write-Log ('GPU shelf surface creation failed: '+$_.Exception.Message) 'WARN'}catch{}}}
+    $surface=$null;if(Initialize-HcGpuShelfRuntime){try{$surface=New-Object HuymaierConsole.Modeling.D3D11ShelfSurface;$surface.HorizontalAlignment='Stretch';$surface.VerticalAlignment='Stretch';if($surface.PSObject.Methods['SetBrightnessPercent']){$surface.SetBrightnessPercent([double]$script:Config.PlatformModelBrightness)};$container.Children.Add($surface)|Out-Null}catch{try{Write-Log ('GPU shelf surface creation failed: '+$_.Exception.Message) 'WARN'}catch{}}}
     $row=New-Object System.Windows.Controls.StackPanel;$row.Orientation='Horizontal';$row.VerticalAlignment='Center';$row.Margin='14,0,14,0'
     $cards=New-Object System.Collections.ArrayList;$start=$script:ActionButtons.Count
     for($local=0;$local-lt$Entries.Count;$local++){$entry=$Entries[$local];$platform=[string]$entry.Platform;$platformIndex=[int]$entry.PlatformIndex;$actionIndex=$script:ActionButtons.Count;$card=New-HcGpuShelfCard $platform $platformIndex $Key $local $actionIndex;[void]$cards.Add($card);[void]$script:Hc3DShelfCards.Add($card);$row.Children.Add($card.Button)|Out-Null;$script:ActionButtons+=$card.Button;$script:CurrentActions+=(New-Action ('platform-select:'+$platformIndex) $platform)}

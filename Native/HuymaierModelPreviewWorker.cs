@@ -492,7 +492,7 @@ namespace HuymaierConsole.Modeling
 
         private static Point TransformTextureCoordinate(TextureBinding binding, double u, double v)
         {
-            if (binding == null) return new Point(u, 1.0 - v);
+            if (binding == null) return new Point(u, v);
 
             double su = u * binding.ScaleX;
             double sv = v * binding.ScaleY;
@@ -509,7 +509,7 @@ namespace HuymaierConsole.Modeling
             sv += binding.OffsetY;
             su = WrapCoordinate(su, binding.WrapS);
             sv = WrapCoordinate(sv, binding.WrapT);
-            return new Point(su, 1.0 - sv);
+            return new Point(su, sv);
         }
 
         private static GeometryModel3D BuildPrimitive(GlbDocument doc, Dictionary<string, object> primitive)
