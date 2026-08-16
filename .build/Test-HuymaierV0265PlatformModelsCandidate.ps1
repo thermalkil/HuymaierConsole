@@ -59,8 +59,8 @@ if([string]$ps4[0].menuName-ne'PS4'){throw "Staged PS4 menuName is invalid: $([s
 if([string]$segacd[0].menuName-ne'Sega CD'){throw "Staged Sega CD menuName is invalid: $([string]$segacd[0].menuName)"}
 foreach($alias in @('NES','Nintendo NES','Entertainment System','Nintendo Entertainment System')){if(@($nes[0].aliases)-notcontains$alias){throw "Staged NES alias missing: $alias"}}
 foreach($alias in @('SNES','Super NES','Super Nintendo','Super Entertainment System','Super Nintendo Entertainment System')){if(@($snes[0].aliases)-notcontains$alias){throw "Staged SNES alias missing: $alias"}}
-if(@($ps4[0].aliases)-notcontains'4'){throw 'Staged PS4 legacy alias 4 is missing.'}
-if(@($segacd[0].aliases)-notcontains'CD'){throw 'Staged Sega CD legacy alias CD is missing.'}
+if(@($ps4[0].aliases)-notcontains '4'){throw 'Staged PS4 legacy alias 4 is missing.'}
+if(@($segacd[0].aliases)-notcontains 'CD'){throw 'Staged Sega CD legacy alias CD is missing.'}
 $modelMap=Get-Content -Raw -LiteralPath (NeedFile 'Assets\Models\model-map.json') -Encoding UTF8|ConvertFrom-Json
 foreach($alias in @('NES','Nintendo NES','Entertainment System','Nintendo Entertainment System')){if([string]$modelMap.models.$alias-ne'atlas:nintendo-entertainment-system'){throw "Staged NES model alias mismatch: $alias"}}
 foreach($alias in @('SNES','Super NES','Super Nintendo','Super Entertainment System','Super Nintendo Entertainment System')){if([string]$modelMap.models.$alias-ne'atlas:super-nintendo-entertainment-system'){throw "Staged SNES model alias mismatch: $alias"}}
@@ -126,7 +126,7 @@ try{
   $br.BaseStream.Position+=($vc*40)
   $indices=@();for($i=0;$i-lt$ic;$i++){$indices+=$br.ReadUInt32()}
   $expected=@(0,2,1,0,3,2)
-  for($i=0;$i-lt$expected.Count;$i++){if([uint32]$indices[$i]-ne[uint32]$expected[$i]){throw "Staged HC3D v2 mirrored winding mismatch at $i: got $($indices[$i]) expected $($expected[$i])"}}
+  for($i=0;$i-lt$expected.Count;$i++){if([uint32]$indices[$i]-ne[uint32]$expected[$i]){throw "Staged HC3D v2 mirrored winding mismatch at ${i}: got $($indices[$i]) expected $($expected[$i])"}}
  }finally{$br.Dispose()}
 }finally{Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue}
 
