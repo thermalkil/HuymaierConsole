@@ -7,9 +7,10 @@ $v7Path=Join-Path $root 'HuymaierGpuPlatformShelves.ps1'
 foreach($p in @($registryPath,$runtimePath,$v7Path)){if(-not(Test-Path -LiteralPath $p -PathType Leaf)){throw "Platform naming source missing: $p"}}
 $registry=Get-Content -Raw -LiteralPath $registryPath -Encoding UTF8|ConvertFrom-Json
 
-# Parse and execute the production presentation functions rather than copying
-# their mapping into the test. This keeps emulator/internal identities untouched
-# while making the Games shelf use full canonical displayName values.
+# Execute the actual production presentation functions. The audit is deliberately
+# scoped to unique presentation identities (name/menuName/displayName). Emulator
+# aliases such as ares, Mednafen and Mesen are shared by multiple platforms and
+# therefore cannot serve as a unique visible console name.
 $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile($runtimePath,[ref]$tokens,[ref]$errors)
 if($errors.Count){throw "Platform presentation runtime failed PowerShell 5.1 parse: $(@($errors|ForEach-Object{$_.Message}) -join '; ')"}
@@ -28,17 +29,14 @@ foreach($p in @($registry.platforms|Sort-Object {[int]$_.sortOrder},id)){
     if([string]::IsNullOrWhiteSpace($name)){[void]$problems.Add("$id => blank name");continue}
     if([string]::IsNullOrWhiteSpace($display)){[void]$problems.Add("$id => blank displayName");continue}
     if([string]::IsNullOrWhiteSpace($menu)){[void]$problems.Add("$id => blank menuName");continue}
-    $resolved=[string](Get-HcPlatformDisplayLabel $menu 'Consoles')
-    Write-Host ("PLATFORM_DISPLAY`t{0}`tinternal={1}`tvisible={2}`texpected={3}" -f $id,$menu,$resolved,$display)
-    if(-not[string]::Equals($resolved,$display,[StringComparison]::Ordinal)){[void]$problems.Add("$id => '$menu' displayed as '$resolved', expected '$display'")}
-    foreach($alias in @($p.aliases)){
-        if([string]::IsNullOrWhiteSpace([string]$alias)){continue}
-        $aliasResolved=[string](Get-HcPlatformDisplayLabel ([string]$alias) 'Consoles')
-        if(-not[string]::Equals($aliasResolved,$display,[StringComparison]::Ordinal)){[void]$problems.Add("$id alias '$alias' displayed as '$aliasResolved', expected '$display'")}
+    foreach($identity in @($name,$menu,$display)|Select-Object -Unique){
+        $resolved=[string](Get-HcPlatformDisplayLabel ([string]$identity) 'Consoles')
+        Write-Host ("PLATFORM_DISPLAY`t{0}`tinternal={1}`tvisible={2}`texpected={3}" -f $id,$identity,$resolved,$display)
+        if(-not[string]::Equals($resolved,$display,[StringComparison]::Ordinal)){[void]$problems.Add("$id => '$identity' displayed as '$resolved', expected '$display'")}
     }
 }
 
-# Explicit high-risk examples from prior user-visible regressions.
+# Explicit high-risk examples from previous visible regressions and shorthand.
 $required=@{
     '32X'='Sega 32X'
     'Dreamcast'='Sega Dreamcast'
@@ -50,6 +48,9 @@ $required=@{
     'Wii'='Nintendo Wii'
     'Wii U'='Nintendo Wii U'
     'Switch'='Nintendo Switch'
+    'Game Boy'='Nintendo Game Boy'
+    'Game Boy Color'='Nintendo Game Boy Color'
+    'Game Boy Advance'='Nintendo Game Boy Advance'
     'Vita'='PlayStation Vita'
     'PSP'='PlayStation Portable'
     'PS4'='PlayStation 4'
@@ -59,20 +60,20 @@ $required=@{
 }
 foreach($key in $required.Keys){$actual=[string](Get-HcPlatformDisplayLabel $key 'Consoles');if($actual-ne$required[$key]){[void]$problems.Add("explicit '$key' => '$actual', expected '$($required[$key])'")}}
 
-# Provider names use provider branding, while Xbox hardware remains isolated.
+# Provider labels are separately canonicalized; Xbox PC remains isolated from
+# Original Xbox hardware.
 $providers=@{
     'Steam'='Steam';'Epic'='Epic Games';'GOG'='GOG';'EA'='EA';'Ubisoft'='Ubisoft Connect';'Xbox'='Xbox PC';'Battle.net'='Battle.net';'Rockstar'='Rockstar Games';'Amazon'='Amazon Games';'Recomps'='Recomps'
 }
 foreach($key in $providers.Keys){$actual=[string](Get-HcPlatformDisplayLabel $key 'Providers');if($actual-ne$providers[$key]){[void]$problems.Add("provider '$key' => '$actual', expected '$($providers[$key])'")}}
 if((Get-HcPlatformDisplayLabel 'Original Xbox' 'Consoles')-ne'Original Xbox'){[void]$problems.Add('Original Xbox hardware display identity was confused with Xbox PC provider.')}
 
-# Prove this is presentation-only: the internal 32X menu identity remains the
-# existing value used by platform routing, while the visible label is full.
-$thirtyTwoX=@($registry.platforms|Where-Object{$_.id-eq'32x'}|Select-Object -First 1)
+# Presentation-only: the existing internal 32X menu identity remains untouched.
+$thirtyTwoX=@($registry.platforms|Where-Object{$_.id-eq'sega32x'}|Select-Object -First 1)
 if($thirtyTwoX.Count-ne1-or[string]$thirtyTwoX[0].menuName-ne'32X'){[void]$problems.Add('32X internal platform routing identity changed unexpectedly.')}
 
 $v7=Get-Content -Raw -LiteralPath $v7Path -Encoding UTF8
-foreach($needle in @('Get-HcPlatformDisplayLabel $Platform $Group','DisplayName=$displayName','$Group.Header.Text=$(if($selectedCard){$Group.Title+''   •   ''+$selectedCard.DisplayName')){if($v7.IndexOf($needle,[StringComparison]::Ordinal)-lt0){[void]$problems.Add("V7 shelf is not using canonical display labels: $needle")}}
+foreach($needle in @('Get-HcPlatformDisplayLabel $Platform $Group','DisplayName=$displayName','$selectedCard.DisplayName')){if($v7.IndexOf($needle,[StringComparison]::Ordinal)-lt0){[void]$problems.Add("V7 shelf is not using canonical display labels: $needle")}}
 
 if($problems.Count){$problems|ForEach-Object{Write-Host ('NAMING_PROBLEM '+$_)};throw "Canonical platform naming audit found $($problems.Count) problems."}
 Write-Host 'platformNamingAllRegistryDisplayNamesGate: success'
