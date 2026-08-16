@@ -21,19 +21,14 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Apply exact-source patch
+      - name: Recheck materialized source
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
           & '.\.development\v0.26.5\Apply-v0265-UvAliasesRecompsV4.ps1'
-
-      - name: Parse and safety audit
-        shell: powershell
-        run: |
-          $ErrorActionPreference='Stop'
           & '.\.development\v0.26.5\Test-v0265-PowerShellSafety.ps1'
 
-      - name: Validate GPU models and canonical providers
+      - name: Recheck GPU models and canonical providers
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
@@ -47,12 +42,25 @@ jobs:
           & '.\.development\v0.26.5\Test-v0265-GpuPlatformShelvesV7.ps1'
           & '.\.development\v0.26.5\Test-v0265-CanonicalRecomps.ps1'
 
-      - name: Commit validated transformed source
+      - name: Materialize normal-workflow validation source
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
-          if(-not (git status --porcelain)){Write-Host 'Validated source already committed.';exit 0}
+          & '.\.development\v0.26.5\Finalize-v0265-AgentNormalWorkflowValidation.ps1'
           git config user.name 'huymaier-validation-bot'
           git config user.email 'actions@users.noreply.github.com'
-          git add -- EmulatorPlatforms/platform-registry.json Assets/Models/model-map.json Native/HuymaierD3D11ShelfAssetSmoke.cpp Native/HuymaierD3D11ShelfRuntime.cpp HuymaierGpuPlatformShelves.ps1 .development/v0.26.5/Test-v0265-CanonicalRecomps.ps1
-          if(-not (git diff --cached --quiet)){git commit -m 'Apply canonical platform and Recomps integration';git push origin HEAD:agent/v0265-uv-alias-recomps}
+          git add -A -- `
+            '.github/workflows/validate-v0265-platform-models.yml' `
+            '.github/workflows/validate-v0265-unified-cursor.yml' `
+            '.github/workflows/validate-v0265-performance.yml' `
+            '.github/workflows/validate-v0265-download-refresh.yml' `
+            '.github/workflows/validate-v0265-gamecube.yml' `
+            '.github/workflows/validate-agent-v0265-uv-alias-recomps.yml' `
+            '.development/v0.26.5/Apply-v0265-UvAliasesRecomps.ps1' `
+            '.development/v0.26.5/Apply-v0265-UvAliasesRecompsV2.ps1' `
+            '.development/v0.26.5/Apply-v0265-UvAliasesRecompsV3.ps1' `
+            '.development/v0.26.5/Apply-v0265-UvAliasesRecompsV4.ps1' `
+            '.development/v0.26.5/Finalize-v0265-AgentNormalWorkflowValidation.ps1'
+          if(git diff --cached --quiet){throw 'Expected normal-workflow/final cleanup delta was empty.'}
+          git commit -m 'Prepare exact v0.26.5 five-workflow validation source'
+          git push origin HEAD:agent/v0265-uv-alias-recomps
