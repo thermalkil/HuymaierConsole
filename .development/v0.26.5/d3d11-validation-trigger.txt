@@ -1,3 +1,3 @@
-D3D11 shelf backend phase-2 validation retry.
-Native backend + D3DImage bridge + persistent .hc3d cache compiler.
-Framework C# local-shadowing issue corrected.
+D3D11 shelf backend phase-3 validation.
+HC3D compiler + native GPU asset load + mipmapped texture/model shader smoke.
+Strict-mode cached-model fixture corrected.
