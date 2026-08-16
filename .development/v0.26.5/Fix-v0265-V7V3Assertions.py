@@ -20,3 +20,4 @@ if text.count(old)!=1: raise RuntimeError('V7 release build assertion block did 
 text=text.replace(old,new,1)
 p.write_text(text,encoding='utf-8')
 print('v7Hc3dV3AssertionCleanupGate: success')
+# validation trigger only; remove this helper before final source freeze
