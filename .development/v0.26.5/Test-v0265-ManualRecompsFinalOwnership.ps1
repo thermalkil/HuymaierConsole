@@ -12,7 +12,7 @@ foreach($p in @($core,$optimizer,$manual,$final,$bootstrap,$installer,$sourceLis
 foreach($p in @($optimizer,$manual,$final)){$t=$null;$e=$null;[void][Management.Automation.Language.Parser]::ParseFile($p,[ref]$t,[ref]$e);if(@($e).Count){throw "$p failed Windows PowerShell 5.1 parse: $(@($e|ForEach-Object{$_.Message}) -join '; ')"}}
 
 $optimizerText=Get-Content -Raw -LiteralPath $optimizer -Encoding UTF8
-foreach($needle in @('HUYMAIER_MANUAL_RECOMPS_FINAL_LOAD_V1','HuymaierRecompsManual.ps1','HuymaierRecompsFinal.ps1','HUYMAIER_MANUAL_RECOMPS_PREFLIGHT_V1','HUYMAIER_MANUAL_RECOMPS_INSTALLER_CACHE_V1')){if($optimizerText.IndexOf($needle,[StringComparison]::Ordinal)-lt0){throw "Manual Recomps release transform contract missing: $needle"}}
+foreach($needle in @('HUYMAIER_MANUAL_RECOMPS_CONFIG_TRANSFORM_V1','HUYMAIER_MANUAL_RECOMPS_CONFIG_V1','RecompGames','RecompGame','HUYMAIER_MANUAL_RECOMPS_FINAL_LOAD_V1','HuymaierRecompsManual.ps1','HuymaierRecompsFinal.ps1','HUYMAIER_MANUAL_RECOMPS_PREFLIGHT_V1','HUYMAIER_MANUAL_RECOMPS_INSTALLER_CACHE_V1')){if($optimizerText.IndexOf($needle,[StringComparison]::Ordinal)-lt0){throw "Manual Recomps release transform contract missing: $needle"}}
 $sources=@(Get-Content -LiteralPath $sourceList -Encoding UTF8)
 foreach($name in @('HuymaierRecompsManual.ps1','HuymaierRecompsFinal.ps1')){if($sources-notcontains$name){throw "Release source list omits $name"}}
 
@@ -34,7 +34,8 @@ try{
     $v7=$coreText.IndexOf('HUYMAIER_GPU_3D_SHELVES_RUNTIME_LOAD_V1',[StringComparison]::Ordinal)
     $manualFinal=$coreText.IndexOf('HUYMAIER_MANUAL_RECOMPS_FINAL_LOAD_V1',[StringComparison]::Ordinal)
     if($v7-lt0-or$manualFinal-le$v7){throw 'Final manual Recomps ownership is not loaded after the V7 GPU shelf runtime.'}
-    foreach($needle in @("ManualRecompsFinalModulePath = Join-Path `$script:BaseDir 'HuymaierRecompsFinal.ps1'",'. $script:ManualRecompsFinalModulePath')){if($coreText.IndexOf($needle,[StringComparison]::Ordinal)-lt0){throw "Transformed core is missing final manual Recomps load contract: $needle"}}
+    foreach($needle in @("ManualRecompsFinalModulePath = Join-Path `$script:BaseDir 'HuymaierRecompsFinal.ps1'",'. $script:ManualRecompsFinalModulePath','HUYMAIER_MANUAL_RECOMPS_CONFIG_V1','RecompGames = @()',"'FavoriteGames','RecompGames')) {","'ProviderInstallRoots','FavoriteGames','RecompGames')) {","EntryType,'RecompGame'", "{@('.exe')}else{@('.exe','.lnk','.url')}")){if($coreText.IndexOf($needle,[StringComparison]::Ordinal)-lt0){throw "Transformed core is missing manual Recomps persistence/picker contract: $needle"}}
+    if($coreText.IndexOf("if (`$script:FileBrowserMode -eq 'PickExecutable') { `$allowed=@('.exe','.lnk','.url') }",[StringComparison]::Ordinal)-ge0){throw 'Transformed core still exposes shortcut/URL choices to the RecompGame picker.'}
 
     $bootText=Get-Content -Raw -LiteralPath $bootCopy -Encoding UTF8
     foreach($needle in @('HUYMAIER_MANUAL_RECOMPS_PREFLIGHT_V1','HuymaierRecompsManual.ps1','HuymaierRecompsFinal.ps1','Manual Recomps library runtime','Manual Recomps final ownership runtime')){if($bootText.IndexOf($needle,[StringComparison]::Ordinal)-lt0){throw "Bootstrap omits manual Recomps preflight contract: $needle"}}
@@ -82,6 +83,8 @@ try{
     if(@($page.Actions|Where-Object{$_.Id-eq'recomps-root'}).Count-ne0){throw 'Final owner allowed the obsolete V7 Recomps root setting to survive.'}
     if([string]$script:HcManualRecompsFinalOwner-ne'HuymaierRecompsFinal'){throw 'Final manual Recomps owner marker is missing.'}
 
+    Write-Host 'manualRecompsNativeConfigPersistenceGate: success'
+    Write-Host 'manualRecompsExeOnlyPickerGate: success'
     Write-Host 'manualRecompsFinalAfterV7Gate: success'
     Write-Host 'manualRecompsBootstrapPreflightGate: success'
     Write-Host 'manualRecompsInstallerCacheGate: success'
