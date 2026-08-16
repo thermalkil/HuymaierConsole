@@ -1,0 +1,20 @@
+name: Validate v0.26.5 Model Provider Fixes
+
+on:
+  push:
+    branches:
+      - agent/v0265-model-provider-fixes
+
+permissions:
+  contents: read
+
+jobs:
+  naming-audit:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit platform names
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          & '.\.development\v0.26.5\Test-v0265-PlatformNamingAudit.ps1'
