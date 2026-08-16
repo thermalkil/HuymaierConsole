@@ -1,0 +1,48 @@
+name: Apply Full Audit Fixes
+on:
+  push:
+    branches: [agent/v0265-recomps-wpf-render-fix]
+    paths: ['.development/v0.26.5/Apply-v0265-FullAuditPatch.py']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/v0265-recomps-wpf-render-fix
+          fetch-depth: 0
+      - name: Apply audited transformations
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          python '.\.development\v0.26.5\Apply-v0265-FullAuditPatch.py'
+          $targets=@('HuymaierUser3DModels.ps1','HuymaierGpuPlatformShelves.ps1','HuymaierLivePlatformModels.ps1','Native\HuymaierModelPreviewWorker.cs','Native\HuymaierBuiltInModelGenerator.cs')
+          foreach($p in $targets){if(-not(Test-Path $p)){throw "Patched target missing: $p"}}
+          $psTargets=@('HuymaierUser3DModels.ps1','HuymaierGpuPlatformShelves.ps1','HuymaierLivePlatformModels.ps1')
+          foreach($p in $psTargets){$t=$null;$e=$null;[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p),[ref]$t,[ref]$e);if($e.Count){$e|ForEach-Object{Write-Host "$p:$($_.Extent.StartLineNumber):$($_.Extent.StartColumnNumber) $($_.Message)"};throw "PowerShell parse failed: $p"}}
+      - name: Compile changed managed renderer sources
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Web.Extensions
+          $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          $framework=[Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()
+          $refs=@([Uri].Assembly.Location,[Linq.Enumerable].Assembly.Location,[Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,[ComponentModel.ISupportInitialize].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,[Windows.Window].Assembly.Location,(Join-Path $framework 'System.Xaml.dll'))|Select-Object -Unique
+          $args=@('/noconfig','/nologo','/target:library','/platform:x64','/optimize+',('/out:'+(Join-Path $env:RUNNER_TEMP 'audit-models.dll')));foreach($r in $refs){$args+=('/reference:'+$r)};$args+=@('.\Native\HuymaierModelPreviewWorker.cs','.\Native\HuymaierModelPreviewWpfAliases.cs','.\Native\HuymaierGpuShelfAssetCompiler.cs')
+          & $csc @args
+          if($LASTEXITCODE-ne0){throw 'Patched model sources failed C# compilation.'}
+          & $csc /noconfig /nologo /target:exe /platform:x64 /optimize+ ('/out:'+(Join-Path $env:RUNNER_TEMP 'generator.exe')) '.\Native\HuymaierBuiltInModelGenerator.cs'
+          if($LASTEXITCODE-ne0){throw 'Patched built-in generator failed C# compilation.'}
+      - name: Commit materialized fixes
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          git config user.name 'thermalkil'
+          git config user.email '98826286+thermalkil@users.noreply.github.com'
+          git add HuymaierUser3DModels.ps1 HuymaierGpuPlatformShelves.ps1 HuymaierLivePlatformModels.ps1 Native/HuymaierModelPreviewWorker.cs Native/HuymaierBuiltInModelGenerator.cs
+          if(git diff --cached --quiet){Write-Host 'No source changes to commit.';exit 0}
+          git commit -m 'Materialize full model and naming audit fixes'
+          git push origin HEAD:agent/v0265-recomps-wpf-render-fix
