@@ -14,6 +14,33 @@ $finalRecompsRuntime=Join-Path $repoRoot 'HuymaierRecompsFinal.ps1'
 foreach($required in @($userRuntime,$gpuRuntime,$manualRecompsRuntime,$finalRecompsRuntime)){if(-not(Test-Path -LiteralPath $required -PathType Leaf)){throw "User/GPU/Recomps runtime missing: $required"}}
 
 $core=Get-Content -Raw -LiteralPath $CorePath -Encoding UTF8
+
+# HUYMAIER_MANUAL_RECOMPS_CONFIG_TRANSFORM_V1
+# Make the manual multi-game list a first-class persisted core property in the
+# release-shaped runtime. This prevents any early startup Save-Config call from
+# dropping RecompGames before the manual provider module has initialized.
+if($core -notmatch 'HUYMAIER_MANUAL_RECOMPS_CONFIG_V1'){
+    $defaultNeedle='        FavoriteGames = @()'
+    if(-not$core.Contains($defaultNeedle)){throw 'Manual Recomps config transform could not find the FavoriteGames default anchor.'}
+    $core=$core.Replace($defaultNeedle,$defaultNeedle+"`r`n        # HUYMAIER_MANUAL_RECOMPS_CONFIG_V1`r`n        RecompGames = @()")
+
+    $loadNeedle="'PlatformBackgroundsEnabled','FavoriteGames')) {"
+    if(-not$core.Contains($loadNeedle)){throw 'Manual Recomps config transform could not find the config-load whitelist anchor.'}
+    $core=$core.Replace($loadNeedle,"'PlatformBackgroundsEnabled','FavoriteGames','RecompGames')) {")
+
+    $arrayNeedle="'ProviderInstallRoots','FavoriteGames')) {"
+    if(-not$core.Contains($arrayNeedle)){throw 'Manual Recomps config transform could not find the stable-array whitelist anchor.'}
+    $core=$core.Replace($arrayNeedle,"'ProviderInstallRoots','FavoriteGames','RecompGames')) {")
+
+    # A generic executable picker intentionally supports shortcuts/URLs, but a
+    # manual recomp record is an exact native executable identity. Show only EXE
+    # files for EntryType=RecompGame so the UI cannot offer invalid choices.
+    $pickerNeedle="if (`$script:FileBrowserMode -eq 'PickExecutable') { `$allowed=@('.exe','.lnk','.url') }"
+    if(-not$core.Contains($pickerNeedle)){throw 'Manual Recomps config transform could not find the executable-picker filter anchor.'}
+    $pickerReplacement="if (`$script:FileBrowserMode -eq 'PickExecutable') { `$allowed=`$(if([string]::Equals([string]`$script:FileBrowserEntryType,'RecompGame',[StringComparison]::OrdinalIgnoreCase)){@('.exe')}else{@('.exe','.lnk','.url')}) }"
+    $core=$core.Replace($pickerNeedle,$pickerReplacement)
+}
+
 if($core -notmatch 'HUYMAIER_USER_3D_MODELS_RUNTIME_LOAD_V1'){
     $pathNeedle='$script:LivePlatformModelsModulePath = Join-Path $script:BaseDir ''HuymaierLivePlatformModels.ps1'''
     if(-not $core.Contains($pathNeedle)){throw 'User 3D-model runtime requires live-model helper path first.'}
