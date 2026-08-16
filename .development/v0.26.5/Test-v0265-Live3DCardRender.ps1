@@ -4,7 +4,7 @@ $root=(Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $worker=Join-Path $root 'Native\HuymaierModelPreviewWorker.cs';$aliases=Join-Path $root 'Native\HuymaierModelPreviewWpfAliases.cs';$control=Join-Path $root 'Native\HuymaierLiveModelControl.cs'
 foreach($p in @($worker,$aliases,$control)){if(-not(Test-Path -LiteralPath $p -PathType Leaf)){throw "Live 3D render source missing: $p"}}
 $workerText=Get-Content -Raw $worker -Encoding UTF8;$controlText=Get-Content -Raw $control -Encoding UTF8
-foreach($n in @('HUYMAIER_GLTF_MATERIAL_COMPAT_V2','KHR_texture_transform','KHR_materials_emissive_strength','alphaMode','WrapMode','ImageCache')){if(-not$workerText.Contains($n)){throw "V6 material renderer missing: $n"}}
+foreach($n in @('HUYMAIER_GLTF_MATERIAL_COMPAT_V2','KHR_texture_transform','KHR_materials_emissive_strength','alphaMode','WrapCoordinate','ImageCache')){if(-not$workerText.Contains($n)){throw "V6 material renderer missing: $n"}}
 if(-not$controlText.Contains('HUYMAIER_ROTATION_SAFE_MODEL_FRAMING_V2')){throw 'V6 rotation-safe framing marker is missing.'}
 Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml,System.Web.Extensions
 $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe';if(-not(Test-Path -LiteralPath $csc)){throw 'Framework64 csc.exe was not found.'}
