@@ -1,0 +1,30 @@
+name: Fix V7 validator Host collision
+on:
+  push:
+    paths: ['.github/workflows/fix-v7-validator-host.yml']
+permissions: {contents: write}
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: feature/v0.26.5-performance-and-downloads, fetch-depth: 0}
+      - name: Rename validator variable and self-clean
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('.development/v0.26.5/Test-v0265-GpuPlatformShelvesV7.ps1')
+          text=p.read_text(encoding='utf-8-sig')
+          text=text.replace('$host=Join-Path $root', '$hostSource=Join-Path $root', 1)
+          text=text.replace('$host,$compiler', '$hostSource,$compiler', 1)
+          text=text.replace('$host -Encoding', '$hostSource -Encoding', 1)
+          p.write_text(text,encoding='utf-8')
+          Path('.github/workflows/fix-v7-validator-host.yml').unlink()
+      - name: Commit validator fix
+        shell: bash
+        run: |
+          git config user.name thermalkil
+          git config user.email 98826286+thermalkil@users.noreply.github.com
+          git add -A
+          git commit -m 'Fix V7 validator protected Host variable collision'
+          git push origin HEAD:feature/v0.26.5-performance-and-downloads
