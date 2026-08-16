@@ -10,6 +10,7 @@ using System.Windows.Media;
 namespace HuymaierConsole.Modeling
 {
     // HUYMAIER_D3D11_SHELF_HOST_V2
+    // HUYMAIER_D3D11_DPI_AWARE_SHELF_V1
     // WPF owns navigation and chrome. The persistent shelf surface, asset cache,
     // turntable animation and model rendering are owned by native D3D11.
     internal static class D3D11ShelfNative
@@ -63,6 +64,8 @@ namespace HuymaierConsole.Modeling
         private int pixelHeight;
         private bool rendering;
         private bool disposed;
+        private double dpiScaleX = 1.0;
+        private double dpiScaleY = 1.0;
 
         public bool NativeReady { get { return nativeHandle != IntPtr.Zero && nativeSurface != IntPtr.Zero; } }
         public int PixelWidth { get { return pixelWidth; } }
@@ -73,6 +76,41 @@ namespace HuymaierConsole.Modeling
         public static int RunNativeSmokeTest()
         {
             return D3D11ShelfNative.HC_D3D11SmokeTest();
+        }
+
+        private bool RefreshDpiScale()
+        {
+            DpiScale dpi = VisualTreeHelper.GetDpi(this);
+            double x = dpi.DpiScaleX > 0.0 ? dpi.DpiScaleX : 1.0;
+            double y = dpi.DpiScaleY > 0.0 ? dpi.DpiScaleY : 1.0;
+            bool changed = Math.Abs(x - dpiScaleX) > 0.0001 || Math.Abs(y - dpiScaleY) > 0.0001;
+            dpiScaleX = x;
+            dpiScaleY = y;
+            return changed;
+        }
+
+        private int PixelWidthFor(double logicalWidth)
+        {
+            return Math.Max(1, (int)Math.Ceiling(Math.Max(0.0, logicalWidth) * dpiScaleX));
+        }
+
+        private int PixelHeightFor(double logicalHeight)
+        {
+            return Math.Max(1, (int)Math.Ceiling(Math.Max(0.0, logicalHeight) * dpiScaleY));
+        }
+
+        private bool ApplyItemToNative(int id, ItemState state)
+        {
+            if (!NativeReady || state == null) return true;
+            try
+            {
+                return D3D11ShelfNative.HC_GPU_SetShelfItem(
+                    nativeHandle, id,
+                    state.X * (float)dpiScaleX, state.Y * (float)dpiScaleY,
+                    state.Width * (float)dpiScaleX, state.Height * (float)dpiScaleY,
+                    state.Scale, state.Selected ? 1 : 0, state.Visible ? 1 : 0) != 0;
+            }
+            catch { return false; }
         }
 
         public D3D11ShelfSurface()
@@ -118,14 +156,7 @@ namespace HuymaierConsole.Modeling
                 Visible = visible
             };
             itemStates[id] = state;
-            if (!NativeReady) return true;
-            try
-            {
-                return D3D11ShelfNative.HC_GPU_SetShelfItem(
-                    nativeHandle, id, state.X, state.Y, state.Width, state.Height,
-                    state.Scale, state.Selected ? 1 : 0, state.Visible ? 1 : 0) != 0;
-            }
-            catch { return false; }
+            return ApplyItemToNative(id, state);
         }
 
         public void ClearModels()
@@ -146,13 +177,7 @@ namespace HuymaierConsole.Modeling
             foreach (KeyValuePair<int, ItemState> pair in itemStates)
             {
                 ItemState state = pair.Value;
-                try
-                {
-                    D3D11ShelfNative.HC_GPU_SetShelfItem(
-                        nativeHandle, pair.Key, state.X, state.Y, state.Width, state.Height,
-                        state.Scale, state.Selected ? 1 : 0, state.Visible ? 1 : 0);
-                }
-                catch { }
+                ApplyItemToNative(pair.Key, state);
             }
         }
 
@@ -178,8 +203,9 @@ namespace HuymaierConsole.Modeling
         private void OnSizeChanged(object sender, SizeChangedEventArgs e)
         {
             if (!IsLoaded || disposed) return;
-            int w = Math.Max(1, (int)Math.Ceiling(ActualWidth));
-            int h = Math.Max(1, (int)Math.Ceiling(ActualHeight));
+            RefreshDpiScale();
+            int w = PixelWidthFor(ActualWidth);
+            int h = PixelHeightFor(ActualHeight);
             if (Math.Abs(w - pixelWidth) >= 2 || Math.Abs(h - pixelHeight) >= 2)
                 RecreateSurface(w, h);
         }
@@ -187,8 +213,9 @@ namespace HuymaierConsole.Modeling
         private void EnsureSurface()
         {
             if (disposed || NativeReady) return;
-            int w = Math.Max(1, (int)Math.Ceiling(ActualWidth));
-            int h = Math.Max(1, (int)Math.Ceiling(ActualHeight));
+            RefreshDpiScale();
+            int w = PixelWidthFor(ActualWidth);
+            int h = PixelHeightFor(ActualHeight);
             if (w <= 1) w = 960;
             if (h <= 1) h = 320;
             RecreateSurface(w, h);
@@ -225,6 +252,16 @@ namespace HuymaierConsole.Modeling
         private void OnRendering(object sender, EventArgs e)
         {
             if (disposed || !NativeReady || pixelWidth <= 0 || pixelHeight <= 0) return;
+            if (RefreshDpiScale())
+            {
+                int dpiWidth = PixelWidthFor(ActualWidth);
+                int dpiHeight = PixelHeightFor(ActualHeight);
+                if (dpiWidth != pixelWidth || dpiHeight != pixelHeight)
+                {
+                    RecreateSurface(dpiWidth, dpiHeight);
+                    if (!NativeReady) return;
+                }
+            }
             float phase = (float)renderClock.Elapsed.TotalSeconds;
             int rendered;
             try { rendered = D3D11ShelfNative.HC_GPU_RenderShelfSurface(nativeHandle, phase); }
