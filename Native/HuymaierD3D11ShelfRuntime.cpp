@@ -106,69 +106,6 @@ namespace
     // float alpha=Flags.z==2?saturate(base.a):1.0;
     // if (Flags.z == 1 && base.a < Extra.x) discard;
     // float4 tex = Flags.x != 0 ? BaseTexture.Sample(BaseSampler, i.uv0) : float4(1,1,1,1);
-    struct Constants
-    {
-        XMFLOAT4X4 worldViewProjection;
-        XMFLOAT4X4 world;
-        XMFLOAT4 baseColor;
-        XMFLOAT4 emissive;
-        XMFLOAT4 surface;
-        XMFLOAT4 extra;
-        XMFLOAT4 materialParams;
-        XMINT4 flags;
-        XMINT4 maps;
-    };
-
-    struct Item
-    {
-        int id = 0;
-        std::shared_ptr<Asset> asset;
-        float x = 0, y = 0, width = 1, height = 1;
-        float modelScale = 0.70f;
-        float yawOffset = 0.0f;
-        float pitch = -10.0f;
-        bool spin = true;
-        bool selected = false;
-        bool visible = false;
-    };
-
-    struct ShelfSurface
-    {
-        UINT width = 0;
-        UINT height = 0;
-        ComPtr<IDirect3D9Ex> d3d9;
-        ComPtr<IDirect3DDevice9Ex> device9;
-        ComPtr<IDirect3DTexture9> texture9;
-        ComPtr<IDirect3DSurface9> surface9;
-        HANDLE sharedHandle = nullptr;
-        ComPtr<ID3D11Texture2D> texture11;
-        ComPtr<ID3D11RenderTargetView> rtv;
-        ComPtr<ID3D11Texture2D> depth;
-        ComPtr<ID3D11DepthStencilView> dsv;
-        std::unordered_map<int, Item> items;
-        float brightness = 1.35f;
-    };
-
-    struct Core
-    {
-        std::mutex lock;
-        bool initialized = false;
-        HRESULT initResult = E_PENDING;
-        ComPtr<ID3D11Device> device;
-        ComPtr<ID3D11DeviceContext> context;
-        ComPtr<ID3D11VertexShader> vertexShader;
-        ComPtr<ID3D11PixelShader> pixelShader;
-        ComPtr<ID3D11InputLayout> inputLayout;
-        ComPtr<ID3D11Buffer> constants;
-        ComPtr<ID3D11RasterizerState> rasterizerSingleSided;
-        ComPtr<ID3D11RasterizerState> rasterizerDoubleSided;
-        ComPtr<ID3D11BlendState> blend;
-        std::unordered_map<uint64_t, ComPtr<ID3D11SamplerState>> samplers;
-        std::unordered_map<std::wstring, std::weak_ptr<Asset>> assets;
-    };
-
-    Core g_core;
-
     // Keep the old binary-inspection needles alive for the RC8-era staged
     // validator while production and WARP now compile the shared v4 HLSL above.
     // This is diagnostic metadata only; it is never used for rendering.
