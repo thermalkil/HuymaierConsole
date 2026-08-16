@@ -10,75 +10,87 @@ Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System
 $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if(-not(Test-Path -LiteralPath $csc -PathType Leaf)){throw 'Framework64 csc.exe was not found.'}
 $tempRoot=$(if($env:RUNNER_TEMP){$env:RUNNER_TEMP}else{[IO.Path]::GetTempPath()})
-$temp=Join-Path $tempRoot ('hc-live3d-visual-'+[guid]::NewGuid().ToString('N'))
+$temp=Join-Path $tempRoot ('hc-live3d-textured-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $temp|Out-Null
 
-function New-HcVisualProbeGlb {
-    param([string]$Path)
-    $json='{"asset":{"version":"2.0"},"scene":0,"scenes":[{"nodes":[0]}],"nodes":[{"children":[1],"matrix":[1,0,0,0,0,1,0,0,0,0,1,0,5,-2,3,1]},{"mesh":0}],"meshes":[{"primitives":[{"attributes":{"POSITION":0,"NORMAL":1},"indices":2,"material":0,"mode":4}]}],"materials":[{"doubleSided":true,"pbrMetallicRoughness":{"baseColorFactor":[0.92,0.58,0.12,1],"metallicFactor":0.12,"roughnessFactor":0.48}}],"buffers":[{"byteLength":80}],"bufferViews":[{"buffer":0,"byteOffset":0,"byteLength":36},{"buffer":0,"byteOffset":36,"byteLength":36},{"buffer":0,"byteOffset":72,"byteLength":6}],"accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3","min":[-1,-0.7,0],"max":[1,1,0]},{"bufferView":1,"componentType":5126,"count":3,"type":"VEC3"},{"bufferView":2,"componentType":5123,"count":3,"type":"SCALAR","min":[0],"max":[2]}]}'
-    $jsonBytes=[Text.Encoding]::UTF8.GetBytes($json)
-    $jsonPad=(4-($jsonBytes.Length%4))%4
-    $jsonChunk=New-Object byte[] ($jsonBytes.Length+$jsonPad)
-    [Array]::Copy($jsonBytes,$jsonChunk,$jsonBytes.Length)
-    for($i=$jsonBytes.Length;$i-lt$jsonChunk.Length;$i++){$jsonChunk[$i]=0x20}
-    $binStream=New-Object IO.MemoryStream
-    $bw=New-Object IO.BinaryWriter($binStream)
-    foreach($f in @([single]-1,[single]-0.7,[single]0,[single]1,[single]-0.7,[single]0,[single]0,[single]1,[single]0)){$bw.Write($f)}
-    foreach($f in @([single]0,[single]0,[single]1,[single]0,[single]0,[single]1,[single]0,[single]0,[single]1)){$bw.Write($f)}
-    foreach($ix in @([uint16]0,[uint16]1,[uint16]2)){$bw.Write($ix)}
-    $bw.Write([uint16]0)
-    $bw.Flush();$bin=$binStream.ToArray();$bw.Dispose();$binStream.Dispose()
-    $total=12+8+$jsonChunk.Length+8+$bin.Length
-    $fs=[IO.File]::Create($Path);$out=New-Object IO.BinaryWriter($fs)
-    try{
-        $out.Write([byte[]](0x67,0x6C,0x54,0x46));$out.Write([uint32]2);$out.Write([uint32]$total)
-        $out.Write([uint32]$jsonChunk.Length);$out.Write([uint32]0x4E4F534A);$out.Write($jsonChunk)
-        $out.Write([uint32]$bin.Length);$out.Write([uint32]0x004E4942);$out.Write($bin)
-    }finally{$out.Dispose();$fs.Dispose()}
+function New-HcCheckerPngBytes {
+    $width=8;$height=8;$stride=$width*4;$pixels=New-Object byte[] ($stride*$height)
+    for($y=0;$y-lt$height;$y++){
+        for($x=0;$x-lt$width;$x++){
+            $offset=($y*$stride)+($x*4)
+            $redHalf=$x-lt($width/2)
+            if($redHalf){$pixels[$offset]=24;$pixels[$offset+1]=32;$pixels[$offset+2]=238}else{$pixels[$offset]=238;$pixels[$offset+1]=48;$pixels[$offset+2]=30}
+            $pixels[$offset+3]=255
+        }
+    }
+    $bitmap=[Windows.Media.Imaging.BitmapSource]::Create($width,$height,96,96,[Windows.Media.PixelFormats]::Bgra32,$null,$pixels,$stride)
+    $encoder=New-Object Windows.Media.Imaging.PngBitmapEncoder
+    $encoder.Frames.Add([Windows.Media.Imaging.BitmapFrame]::Create($bitmap))
+    $stream=New-Object IO.MemoryStream
+    try{$encoder.Save($stream);return ,([byte[]]$stream.ToArray())}finally{$stream.Dispose()}
 }
 
-function Assert-HcViewHasVisiblePixels {
+function New-HcTexturedVisualProbeGlb {
+    param([string]$Path)
+    $png=New-HcCheckerPngBytes
+    $binStream=New-Object IO.MemoryStream;$bw=New-Object IO.BinaryWriter($binStream)
+    try{
+        foreach($f in @([single]-1,[single]-1,[single]0,[single]1,[single]-1,[single]0,[single]1,[single]1,[single]0,[single]-1,[single]1,[single]0)){$bw.Write($f)}
+        foreach($i in 0..3){$bw.Write([single]0);$bw.Write([single]0);$bw.Write([single]1)}
+        foreach($f in @([single]0,[single]0,[single]1,[single]0,[single]1,[single]1,[single]0,[single]1)){$bw.Write($f)}
+        foreach($ix in @([uint16]0,[uint16]1,[uint16]2,[uint16]0,[uint16]2,[uint16]3)){$bw.Write($ix)}
+        $imageOffset=[int]$binStream.Position;$bw.Write($png)
+        while(($binStream.Position%4)-ne0){$bw.Write([byte]0)}
+        $bw.Flush();$bin=[byte[]]$binStream.ToArray()
+    }finally{$bw.Dispose();$binStream.Dispose()}
+    $json=@"
+{"asset":{"version":"2.0"},"scene":0,"scenes":[{"nodes":[0]}],"nodes":[{"mesh":0}],"meshes":[{"primitives":[{"attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2},"indices":3,"material":0,"mode":4}]}],"materials":[{"doubleSided":true,"pbrMetallicRoughness":{"baseColorFactor":[1,1,1,1],"baseColorTexture":{"index":0,"texCoord":0},"metallicFactor":0,"roughnessFactor":1}}],"textures":[{"source":0}],"images":[{"bufferView":4,"mimeType":"image/png"}],"buffers":[{"byteLength":$($bin.Length)}],"bufferViews":[{"buffer":0,"byteOffset":0,"byteLength":48},{"buffer":0,"byteOffset":48,"byteLength":48},{"buffer":0,"byteOffset":96,"byteLength":32},{"buffer":0,"byteOffset":128,"byteLength":12},{"buffer":0,"byteOffset":$imageOffset,"byteLength":$($png.Length)}],"accessors":[{"bufferView":0,"componentType":5126,"count":4,"type":"VEC3","min":[-1,-1,0],"max":[1,1,0]},{"bufferView":1,"componentType":5126,"count":4,"type":"VEC3"},{"bufferView":2,"componentType":5126,"count":4,"type":"VEC2"},{"bufferView":3,"componentType":5123,"count":6,"type":"SCALAR","min":[0],"max":[3]}]}
+"@
+    $jsonBytes=[Text.Encoding]::UTF8.GetBytes($json.Trim())
+    $jsonPad=(4-($jsonBytes.Length%4))%4;$jsonChunk=New-Object byte[] ($jsonBytes.Length+$jsonPad);[Array]::Copy($jsonBytes,$jsonChunk,$jsonBytes.Length);for($i=$jsonBytes.Length;$i-lt$jsonChunk.Length;$i++){$jsonChunk[$i]=0x20}
+    $total=12+8+$jsonChunk.Length+8+$bin.Length
+    $fs=[IO.File]::Create($Path);$out=New-Object IO.BinaryWriter($fs)
+    try{$out.Write([byte[]](0x67,0x6C,0x54,0x46));$out.Write([uint32]2);$out.Write([uint32]$total);$out.Write([uint32]$jsonChunk.Length);$out.Write([uint32]0x4E4F534A);$out.Write($jsonChunk);$out.Write([uint32]$bin.Length);$out.Write([uint32]0x004E4942);$out.Write($bin)}finally{$out.Dispose();$fs.Dispose()}
+}
+
+function Get-HcRenderStats {
     param($View,[string]$Label)
-    $width=160;$height=120
-    $View.Width=$width;$View.Height=$height
-    $View.Measure((New-Object Windows.Size($width,$height)))
-    $View.Arrange((New-Object Windows.Rect(0,0,$width,$height)))
-    $View.UpdateLayout()
-    $bitmap=New-Object Windows.Media.Imaging.RenderTargetBitmap($width,$height,96,96,[Windows.Media.PixelFormats]::Pbgra32)
-    $bitmap.Render($View)
-    $stride=$width*4
-    $pixels=New-Object byte[] ($stride*$height)
-    $bitmap.CopyPixels($pixels,$stride,0)
-    $visible=0
-    for($i=3;$i-lt$pixels.Length;$i+=4){if($pixels[$i]-gt12){$visible++}}
-    if($visible-lt100){throw "$Label rendered only $visible non-transparent pixels; live 3D visual is effectively blank."}
-    Write-Host ($Label+' visiblePixels='+$visible)
+    $width=220;$height=180;$View.Width=$width;$View.Height=$height
+    $View.Measure((New-Object Windows.Size($width,$height)));$View.Arrange((New-Object Windows.Rect(0,0,$width,$height)));$View.UpdateLayout()
+    $bitmap=New-Object Windows.Media.Imaging.RenderTargetBitmap($width,$height,96,96,[Windows.Media.PixelFormats]::Pbgra32);$bitmap.Render($View)
+    $stride=$width*4;$pixels=New-Object byte[] ($stride*$height);$bitmap.CopyPixels($pixels,$stride,0)
+    $visible=0;$red=0;$blue=0;$edge=0
+    for($y=0;$y-lt$height;$y++){
+        for($x=0;$x-lt$width;$x++){
+            $offset=($y*$stride)+($x*4);$b=[int]$pixels[$offset];$g=[int]$pixels[$offset+1];$r=[int]$pixels[$offset+2];$a=[int]$pixels[$offset+3]
+            if($a-le12){continue};$visible++
+            if($r-gt($b+25)-and$r-gt($g+18)){$red++}
+            if($b-gt($r+25)-and$b-gt($g+18)){$blue++}
+            if($x-lt2-or$y-lt2-or$x-ge($width-2)-or$y-ge($height-2)){$edge++}
+        }
+    }
+    if($visible-lt500){throw "$Label rendered only $visible non-transparent pixels; textured live 3D shelf visual is effectively blank."}
+    if($red-lt40-or$blue-lt40){throw "$Label did not preserve the embedded checker texture (red=$red blue=$blue visible=$visible)."}
+    Write-Host ($Label+' visiblePixels='+$visible+' redPixels='+$red+' bluePixels='+$blue+' edgePixels='+$edge)
+    [pscustomobject]@{Visible=$visible;Red=$red;Blue=$blue;Edge=$edge}
 }
 
 try{
     $refs=@([Uri].Assembly.Location,[Linq.Enumerable].Assembly.Location,[Web.Script.Serialization.JavaScriptSerializer].Assembly.Location,[Windows.DependencyObject].Assembly.Location,[Windows.Media.Visual].Assembly.Location,[Windows.Window].Assembly.Location,[System.Xaml.XamlReader].Assembly.Location)|Select-Object -Unique
-    $dll=Join-Path $temp 'HuymaierLiveModel3D.dll'
-    $args=@('/noconfig','/nologo','/target:library','/platform:x64','/optimize+',('/out:'+$dll))
-    foreach($r in $refs){$args+=('/reference:'+$r)}
-    $args+=@($worker,$aliases,$control)
-    & $csc @args
-    if($LASTEXITCODE-ne0-or-not(Test-Path -LiteralPath $dll -PathType Leaf)){throw 'Live 3D visual-probe DLL compilation failed.'}
+    $dll=Join-Path $temp 'HuymaierLiveModel3D.dll';$args=@('/noconfig','/nologo','/target:library','/platform:x64','/optimize+',('/out:'+$dll));foreach($r in $refs){$args+=('/reference:'+$r)};$args+=@($worker,$aliases,$control);& $csc @args
+    if($LASTEXITCODE-ne0-or-not(Test-Path -LiteralPath $dll -PathType Leaf)){throw 'Live 3D textured-shelf visual-probe DLL compilation failed.'}
     Add-Type -Path $dll
-    $glb=Join-Path $temp 'visual-probe.glb';New-HcVisualProbeGlb $glb
-
-    $card=New-Object HuymaierConsole.Modeling.LiveModelView -ArgumentList @($glb,$true)
-    if(-not[bool]$card.CardMode){throw 'Card-mode LiveModelView did not enter lightweight card mode.'}
-    if([int]$card.GeometryCount-ne1-or[int]$card.VertexCount-ne3){throw "Card-mode scene counts are unexpected: geometry=$($card.GeometryCount) vertices=$($card.VertexCount)"}
-    Assert-HcViewHasVisiblePixels $card 'cardModeLive3D'
-    $startYaw=[double]$card.Yaw;$card.Rotate(14,5);$card.Zoom(.25);$card.SetScalePercent(130)
-    if([math]::Abs([double]$card.Yaw-$startYaw)-lt1){throw 'Card-mode live model did not rotate.'}
-    Assert-HcViewHasVisiblePixels $card 'cardModeLive3DRotated'
-
-    $full=New-Object HuymaierConsole.Modeling.LiveModelView -ArgumentList $glb
-    if([bool]$full.CardMode){throw 'Full viewer unexpectedly entered card mode.'}
-    Assert-HcViewHasVisiblePixels $full 'fullViewerLive3D'
-
-    Write-Host 'platformModelLiveCardPixelGate: success'
-    Write-Host 'platformModelLiveCardGeometryOnlyGate: success'
-    Write-Host 'platformModelFullViewerPixelGate: success'
+    $glb=Join-Path $temp 'textured-shelf-probe.glb';New-HcTexturedVisualProbeGlb $glb
+    $shelf=New-Object HuymaierConsole.Modeling.LiveModelView -ArgumentList @($glb)
+    if([bool]$shelf.CardMode){throw 'V5 shelf unexpectedly entered geometry-only card mode.'}
+    if([int]$shelf.GeometryCount-ne1-or[int]$shelf.VertexCount-ne4){throw "Textured shelf scene counts are unexpected: geometry=$($shelf.GeometryCount) vertices=$($shelf.VertexCount)"}
+    $shelf.SetScalePercent(84);$before=Get-HcRenderStats $shelf 'texturedShelfLive3D'
+    if([int]$before.Edge-gt0){throw "Safe maximum V5 shelf framing touched the viewport edge before rotation ($($before.Edge) pixels)."}
+    $startYaw=[double]$shelf.Yaw;$shelf.Rotate(35,0);$after=Get-HcRenderStats $shelf 'texturedShelfLive3DRotated'
+    if([math]::Abs([double]$shelf.Yaw-$startYaw)-lt20){throw 'Textured shelf model did not rotate.'}
+    if([int]$after.Edge-gt0){throw "Safe maximum V5 shelf framing clipped/touched the viewport edge after rotation ($($after.Edge) pixels)."}
+    Write-Host 'platformModelTexturedShelfPixelGate: success'
+    Write-Host 'platformModelTexturedShelfTextureGate: success'
+    Write-Host 'platformModelTexturedShelfRotationGate: success'
+    Write-Host 'platformModelSafeRotationFramingPixelGate: success'
 }finally{Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue}
