@@ -28,6 +28,21 @@ jobs:
           & '.\.development\v0.26.5\Apply-v0265-ModelRenderingFixesV2.ps1'
           & '.\.development\v0.26.5\Apply-v0265-ModelRenderingTestUpdates.ps1'
 
+      - name: Diagnose transformed provider parse
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $tokens=$null;$errors=$null
+          [void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path '.\HuymaierGameProviders.ps1'),[ref]$tokens,[ref]$errors)
+          if(@($errors).Count){
+            foreach($e in @($errors)){Write-Host ("PROVIDER_PARSE line={0} col={1} text=[{2}] message={3}" -f $e.Extent.StartLineNumber,$e.Extent.StartColumnNumber,$e.Extent.Text,$e.Message)}
+            $lines=Get-Content '.\HuymaierGameProviders.ps1'
+            $line=[int]$errors[0].Extent.StartLineNumber
+            $start=[math]::Max(1,$line-18);$end=[math]::Min($lines.Count,$line+18)
+            for($i=$start;$i-le$end;$i++){Write-Host (('{0,5}: ' -f $i)+$lines[$i-1])}
+            throw 'Transformed HuymaierGameProviders.ps1 failed parse.'
+          }
+
       - name: Parse and audit naming
         shell: powershell
         run: |
