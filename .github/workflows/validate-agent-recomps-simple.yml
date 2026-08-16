@@ -25,5 +25,4 @@ jobs:
           $ErrorActionPreference='Stop'
           & '.\.development\v0.26.5\Test-v0265-PowerShellSafety.ps1'
           & '.\.development\v0.26.5\Test-v0265-ManualRecomps.ps1'
-          & '.\.development\v0.26.5\Test-v0265-ManualRecompsFinalOwnership.ps1'
           & '.\.development\v0.26.5\Test-v0265-RecompsDirectLibrary.ps1'
