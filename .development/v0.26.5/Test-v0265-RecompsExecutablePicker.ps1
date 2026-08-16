@@ -17,6 +17,11 @@ function Import-HcFunctionFromFile([string]$Path,[string]$Name){
     $fn=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and [string]::Equals($n.Name,$Name,[StringComparison]::OrdinalIgnoreCase)},$true)|Select-Object -Last 1)
     if($fn.Count-ne1){throw "Could not isolate $Name from $Path"}
     Invoke-Expression $fn[0].Extent.Text
+    $imported=Get-Command $Name -CommandType Function -ErrorAction Stop
+    # Invoke-Expression above runs in this helper's local scope. Publish the
+    # actual implementation for the remainder of this isolated test process so
+    # RecompsManual can capture it exactly as the application bootstrap does.
+    Set-Item -Path ('Function:global:'+$Name) -Value $imported.ScriptBlock -Force
 }
 
 # Use the actual core browser implementation instead of a mock. RecompsManual
