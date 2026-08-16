@@ -64,7 +64,9 @@ if($LASTEXITCODE -ne 0 -or -not(Test-Path -LiteralPath $gpuCompilerExe -PathType
 '@
     $builder=$builder.Replace($anchor,$block)
 
-    $archAnchor="$liveModelHeaders=(& `$dumpbin /nologo /headers `$liveModelDll) -join \"``n\";if(`$liveModelHeaders -notmatch '(?i)machine \\(x64\\)|8664 machine'){throw 'HuymaierLiveModel3D.dll is not x64.'}"
+    $archAnchor=@'
+$liveModelHeaders=(& $dumpbin /nologo /headers $liveModelDll) -join "`n";if($liveModelHeaders -notmatch '(?i)machine \(x64\)|8664 machine'){throw 'HuymaierLiveModel3D.dll is not x64.'}
+'@
     if(-not$builder.Contains($archAnchor)){throw 'GPU shelf build could not find live-model architecture gate.'}
     $arch=$archAnchor+@'
 $gpuNativeHeaders=(& $dumpbin /nologo /headers $gpuNativeDll) -join "`n";if($gpuNativeHeaders -notmatch '(?i)machine \(x64\)|8664 machine'){throw 'HuymaierD3D11ShelfRenderer.dll is not x64.'}
