@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "source": "User supplied Console Models Part 1/Part 2 archives; audited 2026-08-16",
+  "modelCount": 36,
+  "materialCount": 199,
+  "alphaModes": {
+    "OPAQUE": 182,
+    "BLEND": 17,
+    "MASK": 0
+  },
+  "doubleSidedMaterials": 188,
+  "textureBindings": {
+    "baseColor": 95,
+    "metallicRoughness": 88,
+    "normal": 92,
+    "occlusion": 59,
+    "emissive": 16
+  },
+  "textureCoordinateSets": {
+    "baseColor:TEXCOORD_0": 95,
+    "emissive:TEXCOORD_0": 16,
+    "metallicRoughness:TEXCOORD_0": 84,
+    "metallicRoughness:TEXCOORD_1": 4,
+    "normal:TEXCOORD_0": 88,
+    "normal:TEXCOORD_2": 4,
+    "occlusion:TEXCOORD_0": 59
+  },
+  "textureTransforms": {
+    "baseColor": 1,
+    "normal": 1
+  },
+  "emissiveFactorNonzeroMaterials": 21,
+  "extensions": {
+    "KHR_materials_clearcoat": ["Nintendo Wii U.glb"],
+    "KHR_materials_emissive_strength": ["Nintendo Game Boy Advance.glb", "Nintendo Wii U.glb", "Steam.glb"],
+    "KHR_materials_pbrSpecularGlossiness": ["Nintendo Game Boy Advance.glb", "Sega Master System.glb", "Sony Playstation Vita.glb", "Xbox One.glb"],
+    "KHR_materials_specular": ["Atari 2600.glb", "Sega Saturn.glb", "Steam.glb"],
+    "KHR_materials_unlit": ["Epic Games.glb", "Sega Dreamcast.glb"]
+  },
+  "fullyTexturelessModels": [
+    "Playstation 5.glb",
+    "Sega Logo.glb",
+    "Sega Master System.glb",
+    "Sony Playstation Vita.glb",
+    "XBOX 360.glb",
+    "Xbox One.glb",
+    "Xbox.glb"
+  ],
+  "notes": [
+    "No original material uses alphaMode MASK.",
+    "No original primitive uses COLOR_0.",
+    "No original accessor is sparse.",
+    "166 primitives use a normal-textured material; 165 provide TANGENT and one PS2 primitive requires a fallback tangent.",
+    "Original material texture bindings require TEXCOORD_0 plus metallic/roughness TEXCOORD_1 and normal TEXCOORD_2 support."
+  ]
+}
