@@ -61,8 +61,9 @@ $userOpt=Get-Content -Raw $userOptimizer -Encoding UTF8;foreach($n in @('HUYMAIE
 # Prove transformed core load order: compatibility helpers first, V7 final owner second.
 $temp=Join-Path $(if($env:RUNNER_TEMP){$env:RUNNER_TEMP}else{[IO.Path]::GetTempPath()}) ('hc-v7-order-'+[guid]::NewGuid().ToString('N'));New-Item -ItemType Directory -Force -Path $temp|Out-Null
 try{
-    $core=Join-Path $temp 'HuymaierConsole.ps1';$bootstrap=Join-Path $temp 'HuymaierBootstrap.ps1';$installer=Join-Path $temp 'Install-HuymaierConsole.ps1'
-    Copy-Item (Join-Path $root 'HuymaierConsole.ps1') $core;Copy-Item (Join-Path $root 'HuymaierBootstrap.ps1') $bootstrap;Copy-Item (Join-Path $root 'Install-HuymaierConsole.ps1') $installer
+    $core=Join-Path $temp 'HuymaierConsole.ps1';$bootstrap=Join-Path $temp 'HuymaierBootstrap.ps1';$installer=Join-Path $temp 'Install-HuymaierConsole.ps1';$builder=Join-Path $temp 'Build-HuymaierReleaseCandidate.Core.ps1'
+    Copy-Item (Join-Path $root 'HuymaierConsole.ps1') $core;Copy-Item (Join-Path $root 'HuymaierBootstrap.ps1') $bootstrap;Copy-Item (Join-Path $root 'Install-HuymaierConsole.ps1') $installer;Copy-Item (Join-Path $root '.build\Build-HuymaierReleaseCandidate.Core.ps1') $builder
+    & $platformOptimizer -CorePath $core -BootstrapPath $bootstrap -InstallerScriptPath $installer -CoreBuilderPath $builder
     & $userOptimizer -CorePath $core -BootstrapPath $bootstrap -InstallerScriptPath $installer
     $coreText=Get-Content -Raw $core -Encoding UTF8;$v6=$coreText.IndexOf('HUYMAIER_USER_3D_MODELS_RUNTIME_LOAD_V1',[StringComparison]::Ordinal);$v7=$coreText.IndexOf('HUYMAIER_GPU_3D_SHELVES_RUNTIME_LOAD_V1',[StringComparison]::Ordinal)
     if($v6-lt0-or$v7-le$v6){throw 'V7 GPU shelf owner does not load after compatibility helpers.'}
