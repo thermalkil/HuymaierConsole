@@ -17,7 +17,7 @@ function New-Hc3dProbe([string]$Path){
     try{
         $bw.Write([byte[]](0x48,0x43,0x33,0x44));$bw.Write([int32]1);$bw.Write([int64]4096);$bw.Write([int64]638909000000000000);$bw.Write([int32]512)
         $bw.Write([int32]4);$bw.Write([int32]6);$bw.Write([int32]1);$bw.Write([int32]1)
-        foreach($f in @([single]-1,[single]-.65,[single]0,[single]1,[single].65,[single]0)){$bw.Write($f)}
+        foreach($f in @([single](-1),[single](-0.65),[single]0,[single]1,[single](0.65),[single]0)){$bw.Write($f)}
         $verts=@(
             @(-1.0,-.65,0.0, 0.0,0.0,-1.0, 0.0,1.0, 0.0,1.0),
             @( 1.0,-.65,0.0, 0.0,0.0,-1.0, 1.0,1.0, 1.0,1.0),
@@ -28,7 +28,7 @@ function New-Hc3dProbe([string]$Path){
         foreach($i in @(0,1,2,0,2,3)){$bw.Write([uint32]$i)}
         $bw.Write([int32]0);$bw.Write([int32]6);$bw.Write([int32]0);$bw.Write([int32]-1)
         foreach($f in @(1,1,1,1, 0,0,0,1, .15,.72,1,0)){$bw.Write([single]$f)}
-        foreach($i in @(10497,10497,10497,10497,0)){$bw.Write([int32]$i)};$bw.Write([single].5);$bw.Write([int32]1)
+        foreach($i in @(10497,10497,10497,10497,0)){$bw.Write([int32]$i)};$bw.Write([single](0.5));$bw.Write([int32]1)
         $w=64;$h=32;$bytes=$w*$h*4;$bw.Write([int32]$w);$bw.Write([int32]$h);$bw.Write([int32]$bytes)
         for($y=0;$y-lt$h;$y++){for($x=0;$x-lt$w;$x++){if($x-lt($w/2)){$b=25;$g=48;$r=235}else{$b=225;$g=58;$r=28};$bw.Write([byte]$b);$bw.Write([byte]$g);$bw.Write([byte]$r);$bw.Write([byte]255)}}
     }finally{$bw.Dispose();$fs.Dispose()}
