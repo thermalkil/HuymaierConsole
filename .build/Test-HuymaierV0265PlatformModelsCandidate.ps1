@@ -30,6 +30,7 @@ if($v6-lt0-or$v7-le$v6){throw 'Staged V7 GPU presentation owner does not load af
 
 $v7Text=NeedText 'HuymaierGpuPlatformShelves.ps1' @(
  'HUYMAIER_USER_3D_MODELS_RUNTIME_V7','HUYMAIER_D3D11_GPU_SHELVES_V1','HUYMAIER_D3D11_LOADFROM_TYPE_RESOLUTION_V1','HuymaierGpuPlatformShelvesV7',
+ 'HUYMAIER_V0265_CANONICAL_RECOMPS_V1','Get-HcCanonicalPlatformName','Get-HcRecompGames','recomps-root',
  "Join-Path `$script:DataDir '3D Model Cache'",'HuymaierGpuShelfAssetCompiler.exe','HuymaierD3D11ShelfRenderer.dll','HuymaierGpuShelfHost.dll',
  'Test-HcGpuShelfCacheCurrent','Start-Process -FilePath $script:HcGpuShelfCompilerExe','-WindowStyle Hidden -PassThru',
  'LoadModel([int]$Card.ActionIndex','$Card.GpuReady=$true','$Card.Icon.Opacity=0.0','Get-HcGpuShelfDimensions','PrimaryScreenHeight',
@@ -38,6 +39,19 @@ $v7Text=NeedText 'HuymaierGpuPlatformShelves.ps1' @(
 foreach($bad in @('Test-Hc3DCardShouldStayResident','Trim-Hc3DShelfResidency','Start-Hc3DShelfSpinTimer','New-Hc3DShelfLiveModelView','textureResidency=3','maxTextureResidency=4','$card.View=$null','$Card.Icon.Opacity=1','$card.Icon.Opacity=1')){if($v7Text.Contains($bad)){throw "Staged V7 contains retired distance/icon or WPF shelf behavior: $bad"}}
 $layoutStart=$v7Text.IndexOf('function Update-HcGpuShelfLayoutForGroup');$layoutEnd=$v7Text.IndexOf('function Center-HcGpuShelfSelection',$layoutStart);if($layoutStart-lt0-or$layoutEnd-le$layoutStart){throw 'Staged V7 GPU layout function could not be isolated.'};$layout=$v7Text.Substring($layoutStart,$layoutEnd-$layoutStart);if($layout.Contains('LoadModel(')-or$layout.Contains('Compile')){throw 'Staged V7 scrolling/layout path reloads or recompiles model assets.'}
 foreach($screen in @(1080.0,2160.0)){$provider=[math]::Max(300,[math]::Min(620,[math]::Round($screen*.32)));$console=[math]::Max(360,[math]::Min(760,[math]::Round($screen*.38)));if((($provider+$console)/$screen)-lt.62){throw "Staged V7 shelves do not use enough vertical canvas at ${screen}px."}}
+
+$registry=Get-Content -Raw -LiteralPath (NeedFile 'EmulatorPlatforms\platform-registry.json') -Encoding UTF8|ConvertFrom-Json
+$nes=@($registry.platforms|Where-Object{$_.id -eq 'nes'}|Select-Object -First 1)
+$snes=@($registry.platforms|Where-Object{$_.id -eq 'snes'}|Select-Object -First 1)
+if($nes.Count-ne1-or$snes.Count-ne1){throw 'Staged NES/SNES canonical registry entries are missing.'}
+if([string]$nes[0].menuName-ne'Nintendo Entertainment System'){throw 'Staged NES menuName is not canonical.'}
+if([string]$snes[0].menuName-ne'Super Nintendo Entertainment System'){throw 'Staged SNES menuName is not canonical.'}
+foreach($alias in @('NES','Nintendo NES','Entertainment System','Nintendo Entertainment System')){if(@($nes[0].aliases)-notcontains$alias){throw "Staged NES alias missing: $alias"}}
+foreach($alias in @('SNES','Super NES','Super Nintendo','Super Entertainment System','Super Nintendo Entertainment System')){if(@($snes[0].aliases)-notcontains$alias){throw "Staged SNES alias missing: $alias"}}
+$modelMap=Get-Content -Raw -LiteralPath (NeedFile 'Assets\Models\model-map.json') -Encoding UTF8|ConvertFrom-Json
+foreach($alias in @('NES','Nintendo NES','Entertainment System','Nintendo Entertainment System')){if([string]$modelMap.models.$alias-ne'atlas:nintendo-entertainment-system'){throw "Staged NES model alias mismatch: $alias"}}
+foreach($alias in @('SNES','Super NES','Super Nintendo','Super Entertainment System','Super Nintendo Entertainment System')){if([string]$modelMap.models.$alias-ne'atlas:super-nintendo-entertainment-system'){throw "Staged SNES model alias mismatch: $alias"}}
+if([string]$modelMap.models.Xbox-eq[string]$modelMap.models.'Original Xbox'){throw 'Staged Xbox PC provider collapsed into Original Xbox hardware model identity.'}
 
 foreach($binary in @('HuymaierLiveModel3D.dll','HuymaierD3D11ShelfRenderer.dll','HuymaierGpuShelfHost.dll','HuymaierGpuShelfAssetCompiler.exe')){$path=NeedFile $binary;$machine=Get-PeMachine $path;if($machine-ne0x8664){throw ("$binary is not x64 (0x{0:X4})." -f $machine)}}
 
@@ -50,12 +64,16 @@ public static class HcV7NativeProbe {
  [DllImport("kernel32.dll",CharSet=CharSet.Ansi,SetLastError=true)] public static extern IntPtr GetProcAddress(IntPtr module,string name);
  [DllImport("kernel32.dll",SetLastError=true)] public static extern bool FreeLibrary(IntPtr module);
  [DllImport("HuymaierD3D11ShelfRenderer.dll",CallingConvention=CallingConvention.Cdecl)] public static extern int HC_D3D11SmokeTest();
+ [DllImport("HuymaierD3D11ShelfRenderer.dll",CallingConvention=CallingConvention.Cdecl)] public static extern int HC_D3D11UvAddressSmokeTest();
 }
 '@
 if(-not[HcV7NativeProbe]::SetDllDirectory($StageRoot)){throw 'Could not set staged native DLL search path.'}
 $nativePath=NeedFile 'HuymaierD3D11ShelfRenderer.dll';$module=[HcV7NativeProbe]::LoadLibrary($nativePath);if($module-eq[IntPtr]::Zero){throw 'Staged native D3D11 shelf DLL could not be loaded.'}
-try{foreach($name in @('HC_D3D11SmokeTest','HC_GPU_CreateShelfSurface','HC_GPU_LoadShelfModel','HC_GPU_SetShelfItem','HC_GPU_ClearShelfItems','HC_GPU_RenderShelfSurface','HC_GPU_ReleaseShelfSurfacePointer','HC_GPU_DestroyShelfSurface','HC_GPU_GetCachedAssetCount')){if([HcV7NativeProbe]::GetProcAddress($module,$name)-eq[IntPtr]::Zero){throw "Staged native D3D11 shelf export missing: $name"}}}finally{[void][HcV7NativeProbe]::FreeLibrary($module)}
+try{foreach($name in @('HC_D3D11SmokeTest','HC_D3D11UvAddressSmokeTest','HC_GPU_CreateShelfSurface','HC_GPU_LoadShelfModel','HC_GPU_SetShelfItem','HC_GPU_ClearShelfItems','HC_GPU_RenderShelfSurface','HC_GPU_ReleaseShelfSurfacePointer','HC_GPU_DestroyShelfSurface','HC_GPU_GetCachedAssetCount')){if([HcV7NativeProbe]::GetProcAddress($module,$name)-eq[IntPtr]::Zero){throw "Staged native D3D11 shelf export missing: $name"}}}finally{[void][HcV7NativeProbe]::FreeLibrary($module)}
+$nativeAscii=[Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($nativePath))
+foreach($needle in @('float2 baseUv = float2(i.uv0.x, 1.0 - i.uv0.y)','float2 emissiveUv = float2(i.uv1.x, 1.0 - i.uv1.y)')){if($nativeAscii.IndexOf($needle,[StringComparison]::Ordinal)-lt0){throw "Staged native GPU shader is missing corrected HC3D/glTF UV contract: $needle"}}
 $smoke=[HcV7NativeProbe]::HC_D3D11SmokeTest();if($smoke-ne1){throw "Staged D3D11 WARP shader/readback smoke failed with code $smoke"}
+$uvSmoke=[HcV7NativeProbe]::HC_D3D11UvAddressSmokeTest();if($uvSmoke-ne1){throw "Staged D3D11 UV/sampler WARP pixel smoke failed with code $uvSmoke"}
 
 Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml
 $gpuAssembly=[Reflection.Assembly]::LoadFrom((NeedFile 'HuymaierGpuShelfHost.dll'))
@@ -81,7 +99,8 @@ try{$glb=Join-Path $temp 'probe.glb';$cache=Join-Path $temp 'probe.hc3d';New-HcV
 $validation=Get-Content -Raw -LiteralPath $ValidationPath -Encoding UTF8|ConvertFrom-Json
 $gates=@(
  'platformModelSettingGate','platformModelPersistenceGate','platformModelScaleGate','platformModelMapCoverageGate','platformModelPresentationBaseGate','platformModelHelperOnlyGate','platformModelViewerControlGate','platformModelLiveDllX64Gate','platformModelUserFolderGate','platformModelOriginalNamingGate','platformModelCustomizationOnlyGate','platformModelNoBundledGlbGate','platformModelNoBundledGeneratorGate','platformModelRetiredAtlasGate','platformModelRetiredPreviewWorkerGate','platformModelRetiredPayloadPruneGate',
- 'platformModelV7FinalOwnerGate','platformModelAllInstalledModelsStay3DGate','platformModelNoDistanceIconReversionGate','platformModelGpuShelfFullHeightGate','platformModelBackgroundCacheCompilerGate','platformModelGpuViewportOnlyCullingGate','platformModelNativeTurntableGate','platformModelSharedGpuAssetCacheGate','platformModelGpuMipTextureGate','platformModelD3D11DpiAwareShelfGate','platformModelV7LoadOrderGate','platformModelV7InstallerPayloadGate','platformModelD3D11NativeCompileGate','platformModelD3D11X64Gate','platformModelD3D11ProductionExportsGate','platformModelD3D11WarpSmokeGate','platformModelGpuAssetCompilerGate','platformModelGpuCacheFreshnessGate','platformModelGpuHostLoadFromResolutionGate'
+ 'platformModelV7FinalOwnerGate','platformModelAllInstalledModelsStay3DGate','platformModelNoDistanceIconReversionGate','platformModelGpuShelfFullHeightGate','platformModelBackgroundCacheCompilerGate','platformModelGpuViewportOnlyCullingGate','platformModelNativeTurntableGate','platformModelSharedGpuAssetCacheGate','platformModelGpuMipTextureGate','platformModelD3D11DpiAwareShelfGate','platformModelV7LoadOrderGate','platformModelV7InstallerPayloadGate','platformModelD3D11NativeCompileGate','platformModelD3D11X64Gate','platformModelD3D11ProductionExportsGate','platformModelD3D11WarpSmokeGate','platformModelGpuAssetCompilerGate','platformModelGpuCacheFreshnessGate','platformModelGpuHostLoadFromResolutionGate',
+ 'platformModelD3D11PackagedUvExportGate','platformModelD3D11PackagedUvShaderGate','platformModelD3D11PackagedUvPixelGate','platformModelStagedCanonicalNesSnesGate','platformModelStagedCanonicalAliasGate','platformModelStagedXboxIsolationGate','recompsStagedProviderRuntimeGate'
 )
 foreach($gate in $gates){$validation|Add-Member -NotePropertyName $gate -NotePropertyValue 'success' -Force;Write-Host ($gate+': success')}
 $validation|ConvertTo-Json -Depth 12|Set-Content -LiteralPath $ValidationPath -Encoding UTF8
