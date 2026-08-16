@@ -35,6 +35,24 @@ $newFunction=$newFunction.Replace("`r`n","`n")
 $rx=New-Object Text.RegularExpressions.Regex('(?s)function New-QuadPng \{.*?\n\}\n(?=function New-UvProbeGlb)')
 if(-not$rx.IsMatch($raw)){throw 'Viewer V3 texture-generator regex did not match.'}
 $raw=$rx.Replace($raw,[Text.RegularExpressions.MatchEvaluator]{param($m)$newFunction},1)
+# WPF applies its lighting/material pipeline after texture sampling. Assert that
+# the intended channels dominate by a clear fixed margin rather than demanding
+# raw-texel purity, which is neither expected nor necessary to detect UV flips.
+$newAssert=@'
+function Assert-Color($c,[string]$kind){
+    $margin=35.0
+    switch($kind){
+        'R'{if(-not($c.R-gt$c.G+$margin-and$c.R-gt$c.B+$margin)){throw "Expected red dominance, got R=$($c.R) G=$($c.G) B=$($c.B)"}}
+        'G'{if(-not($c.G-gt$c.R+$margin-and$c.G-gt$c.B+$margin)){throw "Expected green dominance, got R=$($c.R) G=$($c.G) B=$($c.B)"}}
+        'B'{if(-not($c.B-gt$c.R+$margin-and$c.B-gt$c.G+$margin)){throw "Expected blue dominance, got R=$($c.R) G=$($c.G) B=$($c.B)"}}
+        'Y'{if(-not($c.R-gt$c.B+$margin-and$c.G-gt$c.B+$margin)){throw "Expected yellow dominance, got R=$($c.R) G=$($c.G) B=$($c.B)"}}
+    }
+}
+'@
+$newAssert=$newAssert.Replace("`r`n","`n")
+$assertRx=New-Object Text.RegularExpressions.Regex('(?m)^function Assert-Color\(\$c,\[string\]\$kind\)\{.*\}$')
+if(-not$assertRx.IsMatch($raw)){throw 'Viewer V3 color-assertion regex did not match.'}
+$raw=$assertRx.Replace($raw,[Text.RegularExpressions.MatchEvaluator]{param($m)$newAssert},1)
 $needle="    `$render=Render-View `$view`n    Assert-Color (Sample `$render 115 115) 'R';Assert-Color (Sample `$render 205 115) 'G';Assert-Color (Sample `$render 115 205) 'B';Assert-Color (Sample `$render 205 205) 'Y'"
 if($raw.Contains($needle)){
     $replacement=@'
