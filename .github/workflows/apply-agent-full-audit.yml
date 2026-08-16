@@ -4,6 +4,7 @@ on:
     branches: [agent/v0265-recomps-wpf-render-fix]
     paths:
       - '.development/v0.26.5/Apply-v0265-FullAuditPatch.py'
+      - '.development/v0.26.5/Fix-v0265-FullAuditPatchNewlines.py'
       - '.github/workflows/apply-agent-full-audit.yml'
   workflow_dispatch:
 permissions:
@@ -21,6 +22,7 @@ jobs:
         run: |
           $ErrorActionPreference='Stop'
           python '.\.development\v0.26.5\Apply-v0265-FullAuditPatch.py'
+          python '.\.development\v0.26.5\Fix-v0265-FullAuditPatchNewlines.py'
           $targets=@('HuymaierUser3DModels.ps1','HuymaierGpuPlatformShelves.ps1','HuymaierLivePlatformModels.ps1','Native\HuymaierModelPreviewWorker.cs','Native\HuymaierBuiltInModelGenerator.cs')
           foreach($p in $targets){if(-not(Test-Path $p)){throw "Patched target missing: $p"}}
           $psTargets=@('HuymaierUser3DModels.ps1','HuymaierGpuPlatformShelves.ps1','HuymaierLivePlatformModels.ps1')
