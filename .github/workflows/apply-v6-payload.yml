@@ -22,6 +22,19 @@ jobs:
         run: |
           import base64, gzip, hashlib, pathlib
           root = pathlib.Path('.')
+          fragment_hashes = {
+              '.development/v0.26.5/payload-v6/model-preview.b64.00': '99e4fcb221c036d611937125297f051fdfd7596388daaeb5c7971c01b327b283',
+              '.development/v0.26.5/payload-v6/model-preview.b64.01': '59cde743ea8772a02232feb1a0d5f9f7fb1fdbf439d6d7b5d28ba917ad93177a',
+              '.development/v0.26.5/payload-v6/model-preview.b64.02': 'c6b4ce87b19f2c3a8322fd1c8bea774b442eb00b0f4d280111f97ace30a243bf',
+              '.development/v0.26.5/payload-v6/live-model-control.gz.b64': '20b0508deb46731972b94cd6fa06126003b0a9dc3074834ef3f7a08095b01a12',
+          }
+          for p, expected_fragment in fragment_hashes.items():
+              text = (root / p).read_text(encoding='utf-8').strip()
+              actual_fragment = hashlib.sha256(text.encode('utf-8')).hexdigest()
+              print(f'{p}: {actual_fragment}')
+              if actual_fragment != expected_fragment:
+                  raise SystemExit(f'{p}: transfer mismatch; expected {expected_fragment}, got {actual_fragment}')
+
           jobs = [
               (['.development/v0.26.5/payload-v6/user-models.gz.b64'], 'HuymaierUser3DModels.ps1', '8a61decd5565e36ad391de5050c3b22948a5e07af2f5030a64adf24115d761b8'),
               (['.development/v0.26.5/payload-v6/live-platform-models.gz.b64'], 'HuymaierLivePlatformModels.ps1', 'fbc28d2d146ea091ff949d60341f9ab38d60b47e355d35225eb36e2cbd069c22'),
