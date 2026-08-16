@@ -164,9 +164,9 @@ namespace HuymaierConsole.Modeling
             object[] matrix = JsonUtil.Arr(JsonUtil.Get(node, "matrix"));
             if (matrix.Length == 16)
             {
-                double[] m = new double[16];
-                for (int i = 0; i < 16; i++) m[i] = Convert.ToDouble(matrix[i], CultureInfo.InvariantCulture);
-                return m;
+                double[] matrixValues = new double[16];
+                for (int i = 0; i < 16; i++) matrixValues[i] = Convert.ToDouble(matrix[i], CultureInfo.InvariantCulture);
+                return matrixValues;
             }
 
             double sx = 1, sy = 1, sz = 1;
