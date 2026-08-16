@@ -115,6 +115,8 @@ HuymaierLibraryWorker.ps1
 HuymaierLivePlatformModels.ps1
 HuymaierUser3DModels.ps1
 HuymaierGpuPlatformShelves.ps1
+HuymaierRecompsManual.ps1
+HuymaierRecompsFinal.ps1
 HuymaierNativeAudio.cs
 HuymaierNativeConsoleLibraryWorker.ps1
 HuymaierNativeDisplay.cs
