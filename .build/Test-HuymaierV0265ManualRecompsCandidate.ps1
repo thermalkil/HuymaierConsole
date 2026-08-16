@@ -44,6 +44,14 @@ if(-not(Test-Path -LiteralPath $wpfPaintTest -PathType Leaf)){throw "Staged Reco
 & $wpfPaintTest -FinalPath $finalPath
 Write-Host 'stagedManualRecompsWpfPaintGate: success'
 
+# Execute the actual core file-browser function plus the staged manual Recomps
+# override against real visible/hidden EXEs. This catches the RC8 picker that
+# entered FilePicker but displayed no selectable game executables.
+$pickerVisibilityTest=Join-Path (Split-Path $PSScriptRoot -Parent) '.development\v0.26.5\Test-v0265-RecompsExecutablePicker.ps1'
+if(-not(Test-Path -LiteralPath $pickerVisibilityTest -PathType Leaf)){throw "Staged Recomps executable-picker regression test missing: $pickerVisibilityTest"}
+& $pickerVisibilityTest -CorePath (NeedFile 'HuymaierConsole.ps1') -ManualPath (NeedFile 'HuymaierRecompsManual.ps1')
+Write-Host 'stagedManualRecompsExePickerVisibilityGate: success'
+
 # Execute the packaged final owner in a small fake Games environment. This is
 # deliberately behavioral: the candidate fails if the packaged runtime sends
 # Recomps into PlatformChoice/ProviderStore even when all source strings exist.
@@ -126,6 +134,7 @@ try{
 $validation=Get-Content -Raw -LiteralPath $ValidationPath -Encoding UTF8|ConvertFrom-Json
 if($null-eq$validation){throw 'Candidate validation record is unreadable.'}
 $validation|Add-Member -NotePropertyName stagedManualRecompsWpfPaintGate -NotePropertyValue 'success' -Force
+$validation|Add-Member -NotePropertyName stagedManualRecompsExePickerVisibilityGate -NotePropertyValue 'success' -Force
 $validation|ConvertTo-Json -Depth 12|Set-Content -LiteralPath $ValidationPath -Encoding UTF8
 Write-Host 'stagedManualRecompsMultiGameLibraryGate: success'
 Write-Host 'stagedManualRecompsNativeConfigPersistenceGate: success'
