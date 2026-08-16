@@ -44,7 +44,7 @@ function New-HcRecompCommandCard {
     $grid.RowDefinitions.Add((New-Object System.Windows.Controls.RowDefinition -Property @{Height='Auto'}))
     $grid.RowDefinitions.Add((New-Object System.Windows.Controls.RowDefinition -Property @{Height='*'}))
     if($Glyph){$g=New-Object System.Windows.Controls.TextBlock;$g.Text=$Glyph;$g.FontSize=11;$g.FontWeight='Bold';$g.Foreground='#E7C45E';$g.Margin='0,0,0,8';[System.Windows.Controls.Grid]::SetRow($g,0);$grid.Children.Add($g)|Out-Null}
-    $title=New-Object System.Windows.Controls.TextBlock;$title.Text=$Title;$title.FontSize=21;$title.FontWeight='Bold';$title.Foreground='White';$title.TextWrapping='Wrap';[System.Windows.Controls.Grid]::SetRow($title,1);$grid.Children.Add($title)|Out-Null
+    $titleText=New-Object System.Windows.Controls.TextBlock;$titleText.Text=$Title;$titleText.FontSize=21;$titleText.FontWeight='Bold';$titleText.Foreground='White';$titleText.TextWrapping='Wrap';[System.Windows.Controls.Grid]::SetRow($titleText,1);$grid.Children.Add($titleText)|Out-Null
     $sub=New-Object System.Windows.Controls.TextBlock;$sub.Text=$Subtitle;$sub.FontSize=12;$sub.Foreground='#AEBBD0';$sub.TextWrapping='Wrap';$sub.LineHeight=17;$sub.MaxHeight=38;$sub.Margin='0,6,0,0';[System.Windows.Controls.Grid]::SetRow($sub,2);$grid.Children.Add($sub)|Out-Null
     $button.Content=$grid
     $button.Add_Click({param($sender,$eventArgs)Invoke-UiFeedback 'Confirm';Invoke-Action ([string]$sender.Tag)})
@@ -71,7 +71,7 @@ function Add-HcRecompHeader {
     param([string]$Title,[string]$Subtitle='')
     $stack=New-Object System.Windows.Controls.StackPanel;$stack.Margin='0,0,0,18'
     $eyebrow=New-Object System.Windows.Controls.TextBlock;$eyebrow.Text='RECOMPS';$eyebrow.FontSize=12;$eyebrow.FontWeight='Bold';$eyebrow.Foreground='#E7C45E';$stack.Children.Add($eyebrow)|Out-Null
-    $title=New-Object System.Windows.Controls.TextBlock;$title.Text=$Title;$title.FontSize=32;$title.FontWeight='Bold';$title.Foreground='#F5F7FB';$title.Margin='0,5,0,0';$stack.Children.Add($title)|Out-Null
+    $titleText=New-Object System.Windows.Controls.TextBlock;$titleText.Text=$Title;$titleText.FontSize=32;$titleText.FontWeight='Bold';$titleText.Foreground='#F5F7FB';$titleText.Margin='0,5,0,0';$stack.Children.Add($titleText)|Out-Null
     if($Subtitle){$sub=New-Object System.Windows.Controls.TextBlock;$sub.Text=$Subtitle;$sub.FontSize=14;$sub.Foreground='#AAB7C9';$sub.Margin='0,6,0,0';$sub.TextWrapping='Wrap';$stack.Children.Add($sub)|Out-Null}
     $script:ActionPanel.Children.Add($stack)|Out-Null
 }
