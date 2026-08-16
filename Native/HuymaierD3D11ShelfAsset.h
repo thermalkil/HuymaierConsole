@@ -9,6 +9,170 @@
 
 namespace HuymaierGpuShelf
 {
+// HUYMAIER_D3D11_SHELF_SHADER_V4_COLOR_MANAGED_UI_PBR
+    // Shared production shader for the shelf runtime and WARP pixel regressions.
+    // glTF base-color/emissive textures are authored in sRGB; MR/normal/AO remain linear.
+    // The WPF/D3DImage target is an ordinary UNORM desktop surface, so the final linear
+    // lighting result is encoded back to sRGB before premultiplied-alpha output.
+        static const char* HcShelfShaderSource = R"HLSL(
+    cbuffer ModelConstants : register(b0)
+    {
+        row_major float4x4 WorldViewProjection;
+        row_major float4x4 World;
+        float4 BaseColor;
+        float4 Emissive;
+        float4 Surface;
+        float4 Extra;
+        float4 MaterialParams;
+        int4 Flags;
+        int4 Maps;
+    };
+    Texture2D BaseTexture : register(t0);
+    Texture2D EmissiveTexture : register(t1);
+    Texture2D MetallicRoughnessTexture : register(t2);
+    Texture2D NormalTexture : register(t3);
+    Texture2D OcclusionTexture : register(t4);
+    SamplerState BaseSampler : register(s0);
+    SamplerState EmissiveSampler : register(s1);
+    SamplerState MetallicRoughnessSampler : register(s2);
+    SamplerState NormalSampler : register(s3);
+    SamplerState OcclusionSampler : register(s4);
+
+    float3 SrgbToLinear(float3 c)
+    {
+        c=saturate(c);
+        float3 lo=c/12.92;
+        float3 hi=pow(max((c+0.055)/1.055,0.0),2.4);
+        return lerp(lo,hi,step(float3(0.04045,0.04045,0.04045),c));
+    }
+    float3 LinearToSrgb(float3 c)
+    {
+        c=max(c,0.0);
+        float3 lo=c*12.92;
+        float3 hi=1.055*pow(max(c,0.0),1.0/2.4)-0.055;
+        return lerp(lo,hi,step(float3(0.0031308,0.0031308,0.0031308),c));
+    }
+
+    struct VSIn
+    {
+        float3 p:POSITION;
+        float3 n:NORMAL;
+        float4 t:TANGENT;
+        float2 uv0:TEXCOORD0;
+        float2 uv1:TEXCOORD1;
+        float2 uv2:TEXCOORD2;
+        float2 uv3:TEXCOORD3;
+        float2 uv4:TEXCOORD4;
+    };
+    struct VSOut
+    {
+        float4 p:SV_POSITION;
+        float3 n:NORMAL;
+        float4 t:TANGENT;
+        float2 uv0:TEXCOORD0;
+        float2 uv1:TEXCOORD1;
+        float2 uv2:TEXCOORD2;
+        float2 uv3:TEXCOORD3;
+        float2 uv4:TEXCOORD4;
+        float3 wp:TEXCOORD5;
+    };
+    VSOut VSMain(VSIn v)
+    {
+        VSOut o;
+        float4 worldPosition=mul(float4(v.p,1),World);
+        o.p=mul(float4(v.p,1),WorldViewProjection);
+        o.wp=worldPosition.xyz;
+        o.n=normalize(mul(float4(v.n,0),World).xyz);
+        o.t=float4(normalize(mul(float4(v.t.xyz,0),World).xyz),v.t.w);
+        o.uv0=v.uv0;o.uv1=v.uv1;o.uv2=v.uv2;o.uv3=v.uv3;o.uv4=v.uv4;
+        return o;
+    }
+    float4 PSMain(VSOut i, bool isFrontFace : SV_IsFrontFace) : SV_TARGET
+    {
+        float4 sampledBase=Flags.x!=0?BaseTexture.Sample(BaseSampler,i.uv0):float4(1,1,1,1);
+        float3 baseTextureLinear=Flags.x!=0?SrgbToLinear(sampledBase.rgb):float3(1,1,1);
+        float3 baseRgb=max(baseTextureLinear*BaseColor.rgb,0.0);
+        float baseAlpha=saturate(sampledBase.a*BaseColor.a);
+        if(Flags.z==1 && baseAlpha<Extra.x)discard;
+
+        float metallic=saturate(Surface.x);
+        float roughness=saturate(Surface.y);
+        if(Maps.x!=0)
+        {
+            float4 mr=MetallicRoughnessTexture.Sample(MetallicRoughnessSampler,i.uv2);
+            roughness=saturate(roughness*mr.g);
+            metallic=saturate(metallic*mr.b);
+        }
+
+        float3 n=normalize(i.n);
+        float3 t=normalize(i.t.xyz-n*dot(n,i.t.xyz));
+        if(Maps.w!=0 && !isFrontFace)n=-n;
+        if(Maps.y!=0)
+        {
+            float3 sampled=NormalTexture.Sample(NormalSampler,i.uv3).xyz*2.0-1.0;
+            sampled.xy*=MaterialParams.x;
+            sampled=normalize(sampled);
+            float3 b=normalize(cross(n,t)*i.t.w);
+            n=normalize(t*sampled.x+b*sampled.y+n*sampled.z);
+        }
+
+        float occlusion=1.0;
+        if(Maps.z!=0)
+        {
+            float ao=OcclusionTexture.Sample(OcclusionSampler,i.uv4).r;
+            occlusion=lerp(1.0,ao,saturate(MaterialParams.y));
+        }
+
+        float3 em=Emissive.rgb*Emissive.a;
+        if(Flags.y!=0)em*=SrgbToLinear(EmissiveTexture.Sample(EmissiveSampler,i.uv1).rgb);
+
+        float3 lit;
+        if(Flags.w!=0)
+        {
+            lit=baseRgb;
+        }
+        else
+        {
+            // UI-oriented image-based approximation: readable from every shelf angle,
+            // with camera-facing key/fill directions and colored metallic response.
+            float3 v=normalize(float3(0.0,0.08,-4.2)-i.wp);
+            float3 l0=normalize(float3(-0.45,0.72,-0.62));
+            float3 l1=normalize(float3(0.75,0.25,-0.55));
+            float d0=saturate(dot(n,l0));
+            float d1=saturate(dot(n,l1));
+            float3 h0=normalize(l0+v);
+            float3 h1=normalize(l1+v);
+
+            float3 diffuseColor=baseRgb*(1.0-metallic);
+            float diffuseLight=0.40+d0*0.62+d1*0.28;
+            float3 diffuse=diffuseColor*diffuseLight;
+
+            float specularFactor=saturate(Surface.z);
+            float3 dielectricF0=float3(0.04,0.04,0.04)*specularFactor;
+            float3 f0=lerp(dielectricF0,baseRgb,metallic);
+            float specPower=lerp(12.0,96.0,1.0-roughness);
+            float directSpec0=pow(saturate(dot(n,h0)),specPower)*d0;
+            float directSpec1=pow(saturate(dot(n,h1)),specPower)*d1;
+            float specEnvelope=lerp(0.42,1.0,1.0-roughness);
+            float3 directSpec=f0*(directSpec0*0.92+directSpec1*0.36)*specEnvelope;
+
+            // Fake environment reflection keeps metallic authored colors visible even
+            // when their direct highlight is off-angle; clearcoat adds a small lift.
+            float environmentStrength=0.30+(1.0-roughness)*0.34+saturate(Surface.w)*0.10;
+            float3 environmentSpec=f0*environmentStrength;
+            float3 metallicBody=baseRgb*metallic*0.18;
+            lit=(diffuse+directSpec+environmentSpec+metallicBody)*occlusion;
+        }
+
+        float selectedLift=Extra.y>.5?0.035:0.0;
+        float alpha=Flags.z==2?baseAlpha:1.0;
+        float brightness=max(0.25,Extra.z);
+        float3 linearRgb=max((lit+em+selectedLift.xxx)*brightness,0.0);
+        float3 displayRgb=LinearToSrgb(saturate(linearRgb));
+        return float4(displayRgb*alpha,alpha);
+    }
+    )HLSL";
+
     // HUYMAIER_D3D11_GPU_ASSET_V3
     struct Vertex
     {

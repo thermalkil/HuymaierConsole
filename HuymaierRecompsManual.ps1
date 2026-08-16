@@ -16,6 +16,7 @@ $script:HcManualRecompsBaseCompleteProviderConfirmation=${function:Complete-Prov
 $script:HcManualRecompsBaseCompleteNativeFileSelection=${function:Complete-NativeFileSelection}
 $script:HcManualRecompsBaseGetPageDefinition=${function:Get-PageDefinition}
 $script:HcManualRecompsBaseInvokeAction=${function:Invoke-Action}
+$script:HcManualRecompsBaseGetFileBrowserItems=${function:Get-FileBrowserItems}
 
 function Initialize-HcManualRecompConfig {
     if($null -eq $script:Config.PSObject.Properties['RecompGames']){
@@ -227,6 +228,50 @@ function Get-GameProviderPageDefinition {
         }
     }
     return (& $script:HcManualRecompsBaseGetGameProviderPageDefinition)
+}
+
+# HUYMAIER_RECOMPS_EXE_PICKER_VISIBILITY_V2
+# The generic native browser intentionally hides some protected entries. Recomps
+# must be able to select the exact game EXE, so merge every visible/hidden .exe
+# from the current directory back into the picker results without broadening the
+# accepted file type. This also makes the manual picker independent of generic
+# PickExecutable filtering quirks.
+function Get-FileBrowserItems {
+    $base=[object[]]@(& $script:HcManualRecompsBaseGetFileBrowserItems)
+    if(-not [string]::Equals([string]$script:FileBrowserEntryType,'RecompGame',[StringComparison]::OrdinalIgnoreCase) -or
+       -not [string]::Equals([string]$script:FileBrowserMode,'PickExecutable',[StringComparison]::OrdinalIgnoreCase) -or
+       [string]::IsNullOrWhiteSpace([string]$script:FileBrowserPath)){return $base}
+
+    $items=New-Object System.Collections.ArrayList
+    $seen=@{}
+    foreach($entry in @($base)){
+        if($null-eq$entry){continue}
+        $type=[string](Get-EntryProperty $entry 'Type' '')
+        $full=[string](Get-EntryProperty $entry 'FullName' '')
+        if([string]::Equals($type,'File',[StringComparison]::OrdinalIgnoreCase)){
+            $extension=[string](Get-EntryProperty $entry 'Extension' '')
+            if([string]::IsNullOrWhiteSpace($extension) -and $full){try{$extension=[IO.Path]::GetExtension($full)}catch{}}
+            if(-not [string]::Equals($extension,'.exe',[StringComparison]::OrdinalIgnoreCase)){continue}
+        }
+        [void]$items.Add($entry)
+        if($full){$seen[$full.ToLowerInvariant()]=$true}
+    }
+    try{
+        foreach($exe in @(Get-ChildItem -LiteralPath $script:FileBrowserPath -Force -File -Filter '*.exe' -ErrorAction Stop|Sort-Object Name)){
+            if($null-eq$exe){continue}
+            $full=[string]$exe.FullName
+            if([string]::IsNullOrWhiteSpace($full)){continue}
+            $key=$full.ToLowerInvariant()
+            if($seen.ContainsKey($key)){continue}
+            $seen[$key]=$true
+            [void]$items.Add([pscustomobject]@{
+                Type='File';Name=[string]$exe.Name;FullName=$full
+                Description="$(Format-FileSize ([long]$exe.Length))  |  $($exe.LastWriteTime.ToString('g'))"
+                Extension='.exe';Length=[long]$exe.Length
+            })
+        }
+    }catch{try{Write-Log ("Recomps picker could not enumerate executables in '$($script:FileBrowserPath)': "+$_.Exception.Message) 'WARN'}catch{}}
+    return [object[]]$items.ToArray()
 }
 
 function Start-HcManualRecompPicker {

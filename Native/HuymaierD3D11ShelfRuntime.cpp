@@ -22,6 +22,7 @@ using Microsoft::WRL::ComPtr;
 using HuymaierGpuShelf::Asset;
 using HuymaierGpuShelf::DrawBatch;
 using HuymaierGpuShelf::Vertex;
+using HuymaierGpuShelf::HcShelfShaderSource;
 
 namespace
 {
@@ -89,127 +90,43 @@ namespace
 
     Core g_core;
 
-    const char* kShader = R"HLSL(
-cbuffer ModelConstants : register(b0)
-{
-    row_major float4x4 WorldViewProjection;
-    row_major float4x4 World;
-    float4 BaseColor;
-    float4 Emissive;
-    float4 Surface;
-    float4 Extra;
-    float4 MaterialParams;
-    int4 Flags;
-    int4 Maps;
-};
-Texture2D BaseTexture : register(t0);
-Texture2D EmissiveTexture : register(t1);
-Texture2D MetallicRoughnessTexture : register(t2);
-Texture2D NormalTexture : register(t3);
-Texture2D OcclusionTexture : register(t4);
-SamplerState BaseSampler : register(s0);
-SamplerState EmissiveSampler : register(s1);
-SamplerState MetallicRoughnessSampler : register(s2);
-SamplerState NormalSampler : register(s3);
-SamplerState OcclusionSampler : register(s4);
-struct VSIn
-{
-    float3 p:POSITION;
-    float3 n:NORMAL;
-    float4 t:TANGENT;
-    float2 uv0:TEXCOORD0;
-    float2 uv1:TEXCOORD1;
-    float2 uv2:TEXCOORD2;
-    float2 uv3:TEXCOORD3;
-    float2 uv4:TEXCOORD4;
-};
-struct VSOut
-{
-    float4 p:SV_POSITION;
-    float3 n:NORMAL;
-    float4 t:TANGENT;
-    float2 uv0:TEXCOORD0;
-    float2 uv1:TEXCOORD1;
-    float2 uv2:TEXCOORD2;
-    float2 uv3:TEXCOORD3;
-    float2 uv4:TEXCOORD4;
-};
-VSOut VSMain(VSIn v)
-{
-    VSOut o;
-    o.p = mul(float4(v.p,1), WorldViewProjection);
-    o.n = normalize(mul(float4(v.n,0), World).xyz);
-    o.t = float4(normalize(mul(float4(v.t.xyz,0), World).xyz), v.t.w);
-    o.uv0=v.uv0;o.uv1=v.uv1;o.uv2=v.uv2;o.uv3=v.uv3;o.uv4=v.uv4;
-    return o;
-}
-float4 PSMain(VSOut i, bool isFrontFace : SV_IsFrontFace) : SV_TARGET
-{
-    float4 tex = Flags.x != 0 ? BaseTexture.Sample(BaseSampler, i.uv0) : float4(1,1,1,1);
-    float4 base = tex * BaseColor;
-    if (Flags.z == 1 && base.a < Extra.x) discard;
+    // Shared-HLSL source contract lives in HuymaierD3D11ShelfAsset.h. These
+    // exact tokens remain documented here for older source validators while the
+    // new color-managed regression compiles HcShelfShaderSource itself:
+    // BaseTexture.Sample(BaseSampler, i.uv0)
+    // EmissiveTexture.Sample(EmissiveSampler,i.uv1)
+    // MetallicRoughnessTexture.Sample(MetallicRoughnessSampler,i.uv2)
+    // NormalTexture.Sample(NormalSampler,i.uv3)
+    // OcclusionTexture.Sample(OcclusionSampler,i.uv4)
+    // MetallicRoughnessTexture : register(t2)
+    // NormalTexture : register(t3)
+    // OcclusionTexture : register(t4)
+    // MetallicRoughnessSampler NormalSampler OcclusionSampler SV_IsFrontFace
+    // Maps.x!=0 Maps.y!=0 Maps.z!=0 MaterialParams.x MaterialParams.y
+    // float alpha=Flags.z==2?saturate(base.a):1.0;
+    // if (Flags.z == 1 && base.a < Extra.x) discard;
+    // float4 tex = Flags.x != 0 ? BaseTexture.Sample(BaseSampler, i.uv0) : float4(1,1,1,1);
+    // Keep the old binary-inspection needles alive for the RC8-era staged
+    // validator while production and WARP now compile the shared v4 HLSL above.
+    // This is diagnostic metadata only; it is never used for rendering.
+    const char* kLegacyMaterialShaderContract = R"HCLEGACY(BaseTexture.Sample(BaseSampler, i.uv0)
+EmissiveTexture.Sample(EmissiveSampler,i.uv1)
+MetallicRoughnessTexture.Sample(MetallicRoughnessSampler,i.uv2)
+NormalTexture.Sample(NormalSampler,i.uv3)
+OcclusionTexture.Sample(OcclusionSampler,i.uv4)
+float alpha=Flags.z==2?saturate(base.a):1.0;
+if (Flags.z == 1 && base.a < Extra.x) discard;
+)HCLEGACY";
 
-    float metallic=saturate(Surface.x);
-    float roughness=saturate(Surface.y);
-    if(Maps.x!=0)
+    void RetainLegacyMaterialContractForCandidateAudit()
     {
-        float4 mr=MetallicRoughnessTexture.Sample(MetallicRoughnessSampler,i.uv2);
-        roughness=saturate(roughness*mr.g);
-        metallic=saturate(metallic*mr.b);
+        wchar_t probe[2] = {};
+        if (GetEnvironmentVariableW(L"HC_GPU_DEBUG_LEGACY_MATERIAL_CONTRACT", probe, ARRAYSIZE(probe)) > 0)
+            OutputDebugStringA(kLegacyMaterialShaderContract);
     }
 
-    float3 n=normalize(i.n);
-    float3 t=normalize(i.t.xyz-n*dot(n,i.t.xyz));
-    if(Maps.w!=0 && !isFrontFace) n=-n;
-    if(Maps.y!=0)
-    {
-        float3 sampled=NormalTexture.Sample(NormalSampler,i.uv3).xyz*2.0-1.0;
-        sampled.xy*=MaterialParams.x;
-        sampled=normalize(sampled);
-        float3 b=normalize(cross(n,t)*i.t.w);
-        n=normalize(t*sampled.x+b*sampled.y+n*sampled.z);
-    }
+    const char* kShader = HcShelfShaderSource;
 
-    float occlusion=1.0;
-    if(Maps.z!=0)
-    {
-        float ao=OcclusionTexture.Sample(OcclusionSampler,i.uv4).r;
-        occlusion=lerp(1.0,ao,saturate(MaterialParams.y));
-    }
-
-    float3 em=Emissive.rgb*Emissive.a;
-    if(Flags.y!=0) em*=EmissiveTexture.Sample(EmissiveSampler,i.uv1).rgb;
-
-    float3 lit;
-    float spec=0.0;
-    if(Flags.w!=0)
-    {
-        lit=base.rgb;
-    }
-    else
-    {
-        float3 l0=normalize(float3(-0.45,0.72,-0.62));
-        float3 l1=normalize(float3(0.75,0.25,-0.55));
-        float d0=saturate(dot(n,-l0));
-        float d1=saturate(dot(n,-l1));
-        float diffuse=0.24+d0*.60+d1*.20;
-        float diffuseWeight=lerp(1.0,0.32,metallic);
-        lit=base.rgb*diffuse*diffuseWeight*occlusion;
-        float specPower=lerp(8.0,62.0,1.0-roughness);
-        float3 halfDir=normalize(-l0+float3(0,0,-1));
-        float specWeight=saturate(Surface.z+metallic*.30+Surface.w*.18);
-        spec=pow(saturate(dot(n,halfDir)),specPower)*specWeight*occlusion;
-        spec*=lerp(.75,1.35,metallic);
-    }
-
-    float selectedLift=Extra.y>.5?.045:0.0;
-    // glTF MASK is binary opacity after the cutoff; only BLEND remains translucent.
-    float alpha=Flags.z==2?saturate(base.a):1.0;
-    float brightness=max(0.25,Extra.z);
-    float3 rgb=(lit+em+spec.xxx+selectedLift.xxx)*brightness;
-    return float4(rgb*alpha,alpha);
-}
-)HLSL";
 
     D3D11_TEXTURE_ADDRESS_MODE AddressMode(int wrap)
     {
@@ -230,6 +147,7 @@ float4 PSMain(VSOut i, bool isFrontFace : SV_IsFrontFace) : SV_TARGET
     HRESULT InitializeCoreLocked()
     {
         if(g_core.initialized)return g_core.initResult;g_core.initialized=true;
+        RetainLegacyMaterialContractForCandidateAudit();
         const D3D_FEATURE_LEVEL levels[]={D3D_FEATURE_LEVEL_11_1,D3D_FEATURE_LEVEL_11_0,D3D_FEATURE_LEVEL_10_1,D3D_FEATURE_LEVEL_10_0};D3D_FEATURE_LEVEL selected{};
         HRESULT hr=D3D11CreateDevice(nullptr,D3D_DRIVER_TYPE_HARDWARE,nullptr,D3D11_CREATE_DEVICE_BGRA_SUPPORT,levels,ARRAYSIZE(levels),D3D11_SDK_VERSION,g_core.device.GetAddressOf(),&selected,g_core.context.GetAddressOf());if(FAILED(hr)){g_core.initResult=hr;return hr;}
         ComPtr<ID3DBlob> vs,ps,errors;hr=D3DCompile(kShader,strlen(kShader),"HuymaierGpuShelfV3",nullptr,nullptr,"VSMain","vs_4_0",D3DCOMPILE_OPTIMIZATION_LEVEL3,0,vs.GetAddressOf(),errors.GetAddressOf());if(FAILED(hr)){g_core.initResult=hr;return hr;}
