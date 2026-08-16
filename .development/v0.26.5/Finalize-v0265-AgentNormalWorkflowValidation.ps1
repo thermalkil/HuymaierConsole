@@ -47,6 +47,7 @@ $temporary=@(
     '.development\v0.26.5\Apply-v0265-UvAliasesRecompsV2.ps1',
     '.development\v0.26.5\Apply-v0265-UvAliasesRecompsV3.ps1',
     '.development\v0.26.5\Apply-v0265-UvAliasesRecompsV4.ps1',
+    '.development\v0.26.5\Finalize-v0265-AgentNormalWorkflowValidation.ps1',
     '.github\workflows\validate-agent-v0265-uv-alias-recomps.yml'
 )
 foreach($relative in $temporary){
