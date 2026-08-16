@@ -128,3 +128,8 @@ $liveModelHeaders=(& $dumpbin /nologo /headers $liveModelDll) -join "`n";if($liv
 '@)
 }
 Set-Content -LiteralPath $CoreBuilderPath -Value $builder -Encoding UTF8
+
+# HUYMAIER_D3D11_GPU_SHELF_BUILD_TRANSFORM_V1
+$gpuShelfBuildTransform=Join-Path $PSScriptRoot 'Optimize-GpuPlatformShelves.ps1'
+if(-not(Test-Path -LiteralPath $gpuShelfBuildTransform -PathType Leaf)){throw "GPU shelf build transform missing: $gpuShelfBuildTransform"}
+& $gpuShelfBuildTransform -CoreBuilderPath $CoreBuilderPath

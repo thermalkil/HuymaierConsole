@@ -87,6 +87,7 @@ if($installer -notmatch 'HUYMAIER_USER_3D_MODELS_INSTALLER_CACHE_V1'){
 if($installer -notmatch 'HUYMAIER_GPU_3D_SHELVES_INSTALLER_CACHE_V1'){
     $needle="            'HuymaierUser3DModels.ps1',"
     if(-not$installer.Contains($needle)){throw 'GPU shelf installer cache requires user-model runtime entry.'}
-    $installer=$installer.Replace($needle,$needle+"`r`n            # HUYMAIER_GPU_3D_SHELVES_INSTALLER_CACHE_V1`r`n            'HuymaierGpuPlatformShelves.ps1',`r`n            'HuymaierD3D11ShelfRenderer.dll',`r`n            'HuymaierGpuShelfAssetCompiler.exe',")
+    $installer=$installer.Replace($needle,$needle+"`r`n            # HUYMAIER_GPU_3D_SHELVES_INSTALLER_CACHE_V1`r`n            'HuymaierGpuPlatformShelves.ps1',`r`n            'HuymaierD3D11ShelfRenderer.dll',
+            'HuymaierGpuShelfHost.dll',`r`n            'HuymaierGpuShelfAssetCompiler.exe',")
 }
 Set-Content -LiteralPath $InstallerScriptPath -Value $installer -Encoding UTF8

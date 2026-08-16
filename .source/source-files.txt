@@ -114,6 +114,7 @@ HuymaierGameProviderWorker.ps1
 HuymaierLibraryWorker.ps1
 HuymaierLivePlatformModels.ps1
 HuymaierUser3DModels.ps1
+HuymaierGpuPlatformShelves.ps1
 HuymaierNativeAudio.cs
 HuymaierNativeConsoleLibraryWorker.ps1
 HuymaierNativeDisplay.cs
@@ -148,6 +149,13 @@ Native/HuymaierConsole.NativeApp.cs
 Native/HuymaierConsole.Ps1.cs
 Native/HuymaierConsole.SystemOverlay.cs
 Native/HuymaierGameInputBridge.cpp
+Native/HuymaierGpuShelfAssetCompilerProgram.cs
+Native/HuymaierGpuShelfAssetCompiler.cs
+Native/HuymaierD3D11ShelfHost.cs
+Native/HuymaierD3D11ShelfAsset.cpp
+Native/HuymaierD3D11ShelfAsset.h
+Native/HuymaierD3D11ShelfRuntime.cpp
+Native/HuymaierD3D11ShelfRenderer.cpp
 Native/HuymaierLiveModelControl.cs
 Native/HuymaierModelPreviewWorker.cs
 Native/HuymaierModelPreviewWpfAliases.cs

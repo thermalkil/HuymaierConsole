@@ -9,6 +9,7 @@ $script:HcGpuShelfCacheQuality=512
 $script:HcGpuShelfCacheDir=Join-Path $script:DataDir '3D Model Cache'
 $script:HcGpuShelfCompilerExe=Join-Path $script:BaseDir 'HuymaierGpuShelfAssetCompiler.exe'
 $script:HcGpuShelfNativeDll=Join-Path $script:BaseDir 'HuymaierD3D11ShelfRenderer.dll'
+$script:HcGpuShelfHostDll=Join-Path $script:BaseDir 'HuymaierGpuShelfHost.dll'
 $script:HcGpuShelfRuntimeReady=$false
 $script:HcGpuShelfCompileQueue=New-Object System.Collections.ArrayList
 $script:HcGpuShelfCompileProcess=$null
@@ -22,14 +23,15 @@ function Initialize-HcGpuShelfRuntime {
     try{
         if(-not(Test-Path -LiteralPath $script:HcGpuShelfNativeDll -PathType Leaf)){throw 'HuymaierD3D11ShelfRenderer.dll is missing.'}
         if(-not(Test-Path -LiteralPath $script:HcGpuShelfCompilerExe -PathType Leaf)){throw 'HuymaierGpuShelfAssetCompiler.exe is missing.'}
+        if(-not(Test-Path -LiteralPath $script:HcGpuShelfHostDll -PathType Leaf)){throw 'HuymaierGpuShelfHost.dll is missing.'}
         New-Item -ItemType Directory -Force -Path $script:HcGpuShelfCacheDir|Out-Null
         if(($env:PATH -split ';') -notcontains $script:BaseDir){$env:PATH=$script:BaseDir+';'+$env:PATH}
-        if(-not(Initialize-HcLiveModelAssembly)){throw 'HuymaierLiveModel3D.dll could not be loaded.'}
-        $type=[type]::GetType('HuymaierConsole.Modeling.D3D11ShelfSurface, HuymaierLiveModel3D',$false)
-        if($null-eq$type){
-            try{$type=[HuymaierConsole.Modeling.D3D11ShelfSurface]}catch{}
+        $gpuType=[type]::GetType('HuymaierConsole.Modeling.D3D11ShelfSurface, HuymaierGpuShelfHost',$false)
+        if($null-eq$gpuType){
+            Add-Type -Path $script:HcGpuShelfHostDll -ErrorAction Stop
+            $gpuType=[type]::GetType('HuymaierConsole.Modeling.D3D11ShelfSurface, HuymaierGpuShelfHost',$false)
         }
-        if($null-eq$type){throw 'D3D11ShelfSurface type is unavailable.'}
+        if($null-eq$gpuType){throw 'D3D11ShelfSurface type is unavailable.'}
         $script:HcGpuShelfRuntimeReady=$true
         try{Write-Log 'D3D11 GPU shelf runtime initialized.'}catch{}
         return $true
