@@ -24,6 +24,7 @@ function Import-HcFunctionFromFile([string]$Path,[string]$Name){
 Import-HcFunctionFromFile $CorePath 'Format-FileSize'
 Import-HcFunctionFromFile $CorePath 'Get-FileBrowserItems'
 function Get-EntryProperty {param($Object,[string]$Name,$Default=$null);if($null-eq$Object){return $Default};$p=$Object.PSObject.Properties[$Name];if($null-eq$p){return $Default};return $p.Value}
+function Convert-ToStableArray {param($Value);$list=New-Object System.Collections.ArrayList;if($null-ne$Value){foreach($item in @($Value)){[void]$list.Add($item)}};return ,([object[]]$list.ToArray())}
 function Get-GameProviderDefinitions {return @()}
 function Get-ProviderCatalogNode {param([string]$Provider);return $null}
 function Add-ProviderControlRail {param([string]$Provider)}
@@ -35,6 +36,13 @@ function Complete-NativeFileSelection {param($Entry)}
 function Get-PageDefinition {param([int]$Index);return $null}
 function Invoke-Action {param([string]$Id)}
 function Write-Log {param([string]$Message,[string]$Level='INFO')}
+function Save-Config {}
+
+# HuymaierRecompsManual initializes its persisted library when it is loaded.
+# Supply the minimum real-shaped config first so this browser regression tests
+# the picker itself rather than failing on unrelated bootstrap state.
+$script:Config=[pscustomobject]@{RecompGames=@();RecentGames=@();FavoriteGames=@()}
+$script:ConfigPath=''
 
 . $ManualPath
 $manual=Get-Content -Raw -LiteralPath $ManualPath -Encoding UTF8
