@@ -22,30 +22,28 @@ jobs:
           $ErrorActionPreference='Stop'
           $path='HuymaierRecompsManual.ps1'
           $text=Get-Content -Raw -LiteralPath $path -Encoding UTF8
-          $old=@'
-    foreach($entry in @($base)){
-        if($null-eq$entry){continue}
-        [void]$items.Add($entry)
-        $full=[string](Get-EntryProperty $entry 'FullName' '')
-        if($full){$seen[$full.ToLowerInvariant()]=$true}
-    }
-'@
-          $new=@'
-    foreach($entry in @($base)){
-        if($null-eq$entry){continue}
-        $type=[string](Get-EntryProperty $entry 'Type' '')
-        $full=[string](Get-EntryProperty $entry 'FullName' '')
-        if([string]::Equals($type,'File',[StringComparison]::OrdinalIgnoreCase)){
-            $extension=[string](Get-EntryProperty $entry 'Extension' '')
-            if([string]::IsNullOrWhiteSpace($extension) -and $full){try{$extension=[IO.Path]::GetExtension($full)}catch{}}
-            if(-not [string]::Equals($extension,'.exe',[StringComparison]::OrdinalIgnoreCase)){continue}
-        }
-        [void]$items.Add($entry)
-        if($full){$seen[$full.ToLowerInvariant()]=$true}
-    }
-'@
-          if(-not$text.Contains($old)){throw 'Expected Recomps browser merge block was not found.'}
-          $text=$text.Replace($old,$new)
+          $start=$text.IndexOf('    foreach($entry in @($base)){',[StringComparison]::Ordinal)
+          if($start-lt0){throw 'Expected Recomps base browser loop was not found.'}
+          $end=$text.IndexOf('    try{',$start,[StringComparison]::Ordinal)
+          if($end-lt0){throw 'Expected Recomps forced-EXE enumeration block was not found.'}
+          $nl=$(if($text.Contains("`r`n")){"`r`n"}else{"`n"})
+          $lines=@(
+            '    foreach($entry in @($base)){',
+            '        if($null-eq$entry){continue}',
+            '        $type=[string](Get-EntryProperty $entry ''Type'' '''')',
+            '        $full=[string](Get-EntryProperty $entry ''FullName'' '''')',
+            '        if([string]::Equals($type,''File'',[StringComparison]::OrdinalIgnoreCase)){',
+            '            $extension=[string](Get-EntryProperty $entry ''Extension'' '''')',
+            '            if([string]::IsNullOrWhiteSpace($extension) -and $full){try{$extension=[IO.Path]::GetExtension($full)}catch{}}',
+            '            if(-not [string]::Equals($extension,''.exe'',[StringComparison]::OrdinalIgnoreCase)){continue}',
+            '        }',
+            '        [void]$items.Add($entry)',
+            '        if($full){$seen[$full.ToLowerInvariant()]=$true}',
+            '    }',
+            ''
+          )
+          $replacement=[string]::Join($nl,$lines)
+          $text=$text.Substring(0,$start)+$replacement+$text.Substring($end)
           [IO.File]::WriteAllText((Resolve-Path $path),$text,(New-Object Text.UTF8Encoding($false)))
           $tokens=$null;$errors=$null
           [void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path),[ref]$tokens,[ref]$errors)
