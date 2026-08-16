@@ -29,7 +29,8 @@ foreach($alias in @('SNES','Super NES','Super Nintendo','Super Entertainment Sys
 }
 if([string]$modelMap.models.Xbox-eq[string]$modelMap.models.'Original Xbox'){throw 'Xbox PC provider collapsed into Original Xbox model identity.'}
 $userModelText=Get-Content -Raw -LiteralPath $userModels -Encoding UTF8
-if($userModelText -notmatch "'xbox'\s*\{\[void\]\$names\.Add\('Xbox App\.glb'\)"){throw 'Xbox PC provider no longer prefers Xbox App.glb.'}
+$xboxProviderNeedle='''xbox'' {[void]$names.Add(''Xbox App.glb'')'
+if($userModelText.IndexOf($xboxProviderNeedle,[StringComparison]::Ordinal)-lt0){throw 'Xbox PC provider no longer prefers Xbox App.glb.'}
 
 $tempRoot=$(if($env:RUNNER_TEMP){$env:RUNNER_TEMP}else{[IO.Path]::GetTempPath()})
 $temp=Join-Path $tempRoot ('hc-recomps-'+[guid]::NewGuid().ToString('N'))

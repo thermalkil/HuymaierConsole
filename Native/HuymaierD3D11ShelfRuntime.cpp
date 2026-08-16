@@ -224,7 +224,7 @@ float4 PSMain(VSOut i) : SV_TARGET
         D3DPRESENT_PARAMETERS pp{};pp.Windowed=TRUE;pp.SwapEffect=D3DSWAPEFFECT_DISCARD;pp.hDeviceWindow=GetDesktopWindow();pp.BackBufferWidth=1;pp.BackBufferHeight=1;pp.BackBufferFormat=D3DFMT_A8R8G8B8;pp.PresentationInterval=D3DPRESENT_INTERVAL_IMMEDIATE;
         hr=s.d3d9->CreateDeviceEx(D3DADAPTER_DEFAULT,D3DDEVTYPE_HAL,GetDesktopWindow(),D3DCREATE_HARDWARE_VERTEXPROCESSING|D3DCREATE_MULTITHREADED|D3DCREATE_FPU_PRESERVE,&pp,nullptr,s.device9.GetAddressOf());if(FAILED(hr))return hr;
         s.sharedHandle=nullptr;
-        hr=s.d3d9->CreateTexture(width,height,1,D3DUSAGE_RENDERTARGET,D3DFMT_A8R8G8B8,D3DPOOL_DEFAULT,s.texture9.GetAddressOf(),&s.sharedHandle);if(FAILED(hr)||!s.sharedHandle)return FAILED(hr)?hr:E_FAIL;
+        hr=s.device9->CreateTexture(width,height,1,D3DUSAGE_RENDERTARGET,D3DFMT_A8R8G8B8,D3DPOOL_DEFAULT,s.texture9.GetAddressOf(),&s.sharedHandle);if(FAILED(hr)||!s.sharedHandle)return FAILED(hr)?hr:E_FAIL;
         if(FAILED(hr=s.texture9->GetSurfaceLevel(0,s.surface9.GetAddressOf())))return hr;
         if(FAILED(hr=g_core.device->OpenSharedResource(s.sharedHandle,__uuidof(ID3D11Texture2D),reinterpret_cast<void**>(s.texture11.GetAddressOf()))))return hr;
         if(FAILED(hr=g_core.device->CreateRenderTargetView(s.texture11.Get(),nullptr,s.rtv.GetAddressOf())))return hr;
