@@ -35,6 +35,15 @@ foreach($needle in @('HUYMAIER_MANUAL_RECOMPS_PREFLIGHT_V1','HuymaierRecompsManu
 $installer=Get-Content -Raw -LiteralPath (NeedFile 'Install-HuymaierConsole.ps1') -Encoding UTF8
 foreach($needle in @('HUYMAIER_MANUAL_RECOMPS_INSTALLER_CACHE_V1',"'HuymaierRecompsManual.ps1'","'HuymaierRecompsFinal.ps1'")){if($installer.IndexOf($needle,[StringComparison]::Ordinal)-lt0){throw "Staged installer omits manual Recomps cache payload: $needle"}}
 
+# Paint the actual packaged Recomps owner through WPF before any headless
+# renderer replacement. This specifically protects the blank-page regression:
+# empty library, populated library and game actions must all create visible WPF
+# controls from the release-shaped staged HuymaierRecompsFinal.ps1.
+$wpfPaintTest=Join-Path (Split-Path $PSScriptRoot -Parent) '.development\v0.26.5\Test-v0265-RecompsWpfRender.ps1'
+if(-not(Test-Path -LiteralPath $wpfPaintTest -PathType Leaf)){throw "Staged Recomps WPF paint regression test missing: $wpfPaintTest"}
+& $wpfPaintTest -FinalPath $finalPath
+Write-Host 'stagedManualRecompsWpfPaintGate: success'
+
 # Execute the packaged final owner in a small fake Games environment. This is
 # deliberately behavioral: the candidate fails if the packaged runtime sends
 # Recomps into PlatformChoice/ProviderStore even when all source strings exist.
@@ -81,7 +90,8 @@ try{
     if($script:StageBaseAction){throw "Packaged Recomps tile leaked into generic platform routing: $($script:StageBaseAction)"}
 
     # Replace the visual renderers only after loading the actual packaged owner;
-    # this lets us exercise navigation in a headless CI process without WPF UI.
+    # WPF paint was already validated above. This lets the rest of navigation run
+    # in a compact headless fixture without changing the packaged code under test.
     function Render-HcRecompsLibrary {$script:StageRendered='recomps-library'}
     function Render-HcRecompGame {$script:StageRendered='recomps-game'}
     foreach($stale in @('PlatformChoice','ProviderStore','PlatformHome','PlatformShelf','PlatformLibrary')){
@@ -115,6 +125,8 @@ try{
 
 $validation=Get-Content -Raw -LiteralPath $ValidationPath -Encoding UTF8|ConvertFrom-Json
 if($null-eq$validation){throw 'Candidate validation record is unreadable.'}
+$validation|Add-Member -NotePropertyName stagedManualRecompsWpfPaintGate -NotePropertyValue 'success' -Force
+$validation|ConvertTo-Json -Depth 12|Set-Content -LiteralPath $ValidationPath -Encoding UTF8
 Write-Host 'stagedManualRecompsMultiGameLibraryGate: success'
 Write-Host 'stagedManualRecompsNativeConfigPersistenceGate: success'
 Write-Host 'stagedManualRecompsExactExeGate: success'
@@ -127,3 +139,4 @@ Write-Host 'stagedManualRecompsNoPlatformChoiceGate: success'
 Write-Host 'stagedManualRecompsNoProviderStoreGate: success'
 Write-Host 'stagedManualRecompsBehavioralRoutingGate: success'
 Write-Host 'stagedManualRecompsInstallerBootstrapGate: success'
+Write-Host 'stagedManualRecompsWpfPaintGate: success'
