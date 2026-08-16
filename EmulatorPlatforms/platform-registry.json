@@ -882,10 +882,11 @@
       "backend": "ares",
       "interface": "Sega CD BIOS / CD-player inspired disc interface",
       "displayName": "Sega CD",
-      "menuName": "CD",
+      "menuName": "Sega CD",
       "aliases": [
         "Sega CD",
         "SegaCD",
+        "CD",
         "ares"
       ],
       "version": "0.26.4-dev",
@@ -1209,10 +1210,11 @@
       "backend": "shadPS4",
       "interface": "PS4 dynamic menu with installed application content area and system settings",
       "displayName": "PlayStation 4",
-      "menuName": "4",
+      "menuName": "PS4",
       "aliases": [
         "PlayStation 4",
         "PS4",
+        "4",
         "shadPS4"
       ],
       "version": "0.26.4-dev",

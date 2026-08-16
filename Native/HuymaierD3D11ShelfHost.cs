@@ -30,6 +30,9 @@ namespace HuymaierConsole.Modeling
         internal static extern int HC_GPU_SetShelfItem(IntPtr handle, int id, float x, float y, float width, float height, float scale, int selected, int visible);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int HC_GPU_SetShelfBrightness(IntPtr handle, float brightness);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void HC_GPU_ClearShelfItems(IntPtr handle);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
@@ -66,6 +69,7 @@ namespace HuymaierConsole.Modeling
         private bool disposed;
         private double dpiScaleX = 1.0;
         private double dpiScaleY = 1.0;
+        private double brightnessPercent = 135.0;
 
         public bool NativeReady { get { return nativeHandle != IntPtr.Zero && nativeSurface != IntPtr.Zero; } }
         public int PixelWidth { get { return pixelWidth; } }
@@ -166,6 +170,12 @@ namespace HuymaierConsole.Modeling
             if (!NativeReady) return;
             try { D3D11ShelfNative.HC_GPU_ClearShelfItems(nativeHandle); } catch { }
         }
+        public void SetBrightnessPercent(double percent)
+        {
+            brightnessPercent = Math.Max(50.0, Math.Min(250.0, percent));
+            if (!NativeReady) return;
+            try { D3D11ShelfNative.HC_GPU_SetShelfBrightness(nativeHandle, (float)(brightnessPercent / 100.0)); } catch { }
+        }
 
         private void ReplayState()
         {
@@ -246,6 +256,7 @@ namespace HuymaierConsole.Modeling
                 source.AddDirtyRect(new Int32Rect(0, 0, width, height));
             }
             finally { source.Unlock(); }
+            try { D3D11ShelfNative.HC_GPU_SetShelfBrightness(nativeHandle, (float)(brightnessPercent / 100.0)); } catch { }
             ReplayState();
         }
 

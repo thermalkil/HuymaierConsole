@@ -99,7 +99,7 @@ namespace HuymaierGpuShelf
         if (!Read(stream, version) || !Read(stream, sourceLength) || !Read(stream, sourceTicks) ||
             !Read(stream, quality) || !Read(stream, vertexCount) || !Read(stream, indexCount) ||
             !Read(stream, drawCount) || !Read(stream, imageCount)) return HRESULT_FROM_WIN32(ERROR_BAD_FORMAT);
-        if (version != 1 || quality < 128 || quality > 2048 ||
+        if (version != 2 || quality < 128 || quality > 2048 ||
             !SafeCount(vertexCount, 10000000) || !SafeCount(indexCount, 30000000) ||
             !SafeCount(drawCount, 100000) || !SafeCount(imageCount, 4096) ||
             vertexCount == 0 || indexCount == 0 || drawCount == 0)

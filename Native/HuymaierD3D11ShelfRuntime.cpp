@@ -64,6 +64,7 @@ namespace
         ComPtr<ID3D11Texture2D> depth;
         ComPtr<ID3D11DepthStencilView> dsv;
         std::unordered_map<int, Item> items;
+        float brightness = 1.35f;
     };
 
     struct Core
@@ -77,7 +78,8 @@ namespace
         ComPtr<ID3D11PixelShader> pixelShader;
         ComPtr<ID3D11InputLayout> inputLayout;
         ComPtr<ID3D11Buffer> constants;
-        ComPtr<ID3D11RasterizerState> rasterizer;
+        ComPtr<ID3D11RasterizerState> rasterizerSingleSided;
+        ComPtr<ID3D11RasterizerState> rasterizerDoubleSided;
         ComPtr<ID3D11BlendState> blend;
         std::unordered_map<uint64_t, ComPtr<ID3D11SamplerState>> samplers;
         std::unordered_map<std::wstring, std::weak_ptr<Asset>> assets;
@@ -136,7 +138,8 @@ float4 PSMain(VSOut i) : SV_TARGET
     float spec = Flags.w != 0 ? 0.0 : pow(saturate(dot(n,halfDir)),specPower) * saturate(Surface.z + Surface.x*.30 + Surface.w*.18);
     float selectedLift = Extra.y > .5 ? .045 : 0.0;
     float alpha = Flags.z == 0 ? 1.0 : base.a;
-    return float4((lit + em + spec.xxx + selectedLift.xxx) * alpha, alpha);
+    float brightness = max(0.25, Extra.z);
+    return float4((lit + em + spec.xxx + selectedLift.xxx) * brightness * alpha, alpha);
 }
 )HLSL";
 
@@ -197,8 +200,10 @@ float4 PSMain(VSOut i) : SV_TARGET
         if (FAILED(hr=g_core.device->CreateInputLayout(layout,ARRAYSIZE(layout),vs->GetBufferPointer(),vs->GetBufferSize(),g_core.inputLayout.GetAddressOf()))) { g_core.initResult=hr; return hr; }
         D3D11_BUFFER_DESC cb{};cb.ByteWidth=sizeof(Constants);cb.Usage=D3D11_USAGE_DYNAMIC;cb.BindFlags=D3D11_BIND_CONSTANT_BUFFER;cb.CPUAccessFlags=D3D11_CPU_ACCESS_WRITE;
         if (FAILED(hr=g_core.device->CreateBuffer(&cb,nullptr,g_core.constants.GetAddressOf()))) { g_core.initResult=hr; return hr; }
-        D3D11_RASTERIZER_DESC rd{};rd.FillMode=D3D11_FILL_SOLID;rd.CullMode=D3D11_CULL_NONE;rd.DepthClipEnable=TRUE;rd.MultisampleEnable=FALSE;
-        if (FAILED(hr=g_core.device->CreateRasterizerState(&rd,g_core.rasterizer.GetAddressOf()))) { g_core.initResult=hr; return hr; }
+        D3D11_RASTERIZER_DESC rd{};rd.FillMode=D3D11_FILL_SOLID;rd.CullMode=D3D11_CULL_BACK;rd.FrontCounterClockwise=TRUE;rd.DepthClipEnable=TRUE;rd.MultisampleEnable=FALSE;
+        if (FAILED(hr=g_core.device->CreateRasterizerState(&rd,g_core.rasterizerSingleSided.GetAddressOf()))) { g_core.initResult=hr; return hr; }
+        rd.CullMode=D3D11_CULL_NONE;
+        if (FAILED(hr=g_core.device->CreateRasterizerState(&rd,g_core.rasterizerDoubleSided.GetAddressOf()))) { g_core.initResult=hr; return hr; }
         D3D11_BLEND_DESC bd{};bd.RenderTarget[0].BlendEnable=TRUE;bd.RenderTarget[0].SrcBlend=D3D11_BLEND_ONE;bd.RenderTarget[0].DestBlend=D3D11_BLEND_INV_SRC_ALPHA;bd.RenderTarget[0].BlendOp=D3D11_BLEND_OP_ADD;bd.RenderTarget[0].SrcBlendAlpha=D3D11_BLEND_ONE;bd.RenderTarget[0].DestBlendAlpha=D3D11_BLEND_INV_SRC_ALPHA;bd.RenderTarget[0].BlendOpAlpha=D3D11_BLEND_OP_ADD;bd.RenderTarget[0].RenderTargetWriteMask=D3D11_COLOR_WRITE_ENABLE_ALL;
         if (FAILED(hr=g_core.device->CreateBlendState(&bd,g_core.blend.GetAddressOf()))) { g_core.initResult=hr; return hr; }
         g_core.initResult=S_OK;
@@ -252,7 +257,8 @@ float4 PSMain(VSOut i) : SV_TARGET
         XMMATRIX proj=XMMatrixPerspectiveFovLH(XMConvertToRadians(34.0f),vp.Width/vp.Height,.01f,100.0f);XMMATRIX wvp=world*view*proj;
         for(const DrawBatch& d:a.draws)
         {
-            Constants c{};XMStoreFloat4x4(&c.worldViewProjection,wvp);XMStoreFloat4x4(&c.world,world);c.baseColor=XMFLOAT4(d.baseColor[0],d.baseColor[1],d.baseColor[2],d.baseColor[3]);c.emissive=XMFLOAT4(d.emissiveColor[0],d.emissiveColor[1],d.emissiveColor[2],d.emissiveStrength);c.surface=XMFLOAT4(d.metallic,d.roughness,d.specular,d.clearcoat);c.extra=XMFLOAT4(d.alphaCutoff,item.selected?1.0f:0.0f,0,0);c.flags=XMINT4(d.baseImage>=0?1:0,d.emissiveImage>=0?1:0,d.alphaMode,(d.flags&2)?1:0);
+            Constants c{};XMStoreFloat4x4(&c.worldViewProjection,wvp);XMStoreFloat4x4(&c.world,world);c.baseColor=XMFLOAT4(d.baseColor[0],d.baseColor[1],d.baseColor[2],d.baseColor[3]);c.emissive=XMFLOAT4(d.emissiveColor[0],d.emissiveColor[1],d.emissiveColor[2],d.emissiveStrength);c.surface=XMFLOAT4(d.metallic,d.roughness,d.specular,d.clearcoat);c.extra=XMFLOAT4(d.alphaCutoff,item.selected?1.0f:0.0f,s.brightness,0);c.flags=XMINT4(d.baseImage>=0?1:0,d.emissiveImage>=0?1:0,d.alphaMode,(d.flags&2)?1:0);
+            g_core.context->RSSetState((d.flags&1)?g_core.rasterizerDoubleSided.Get():g_core.rasterizerSingleSided.Get());
             D3D11_MAPPED_SUBRESOURCE mapped{};if(FAILED(g_core.context->Map(g_core.constants.Get(),0,D3D11_MAP_WRITE_DISCARD,0,&mapped)))continue;memcpy(mapped.pData,&c,sizeof(c));g_core.context->Unmap(g_core.constants.Get(),0);
             ID3D11ShaderResourceView* srvs[2]={nullptr,nullptr};if(d.baseImage>=0&&(size_t)d.baseImage<a.textures.size())srvs[0]=a.textures[(size_t)d.baseImage].view.Get();if(d.emissiveImage>=0&&(size_t)d.emissiveImage<a.textures.size())srvs[1]=a.textures[(size_t)d.emissiveImage].view.Get();g_core.context->PSSetShaderResources(0,2,srvs);
             ID3D11SamplerState* samplers[2]={GetSampler(d.baseWrapS,d.baseWrapT),GetSampler(d.emissiveWrapS,d.emissiveWrapT)};g_core.context->PSSetSamplers(0,2,samplers);
@@ -263,7 +269,7 @@ float4 PSMain(VSOut i) : SV_TARGET
     int RenderSurfaceLocked(ShelfSurface& s, float phase)
     {
         if(!s.rtv||!s.dsv)return 0;const float clear[4]={0,0,0,0};g_core.context->OMSetRenderTargets(1,s.rtv.GetAddressOf(),s.dsv.Get());g_core.context->ClearRenderTargetView(s.rtv.Get(),clear);
-        g_core.context->IASetInputLayout(g_core.inputLayout.Get());g_core.context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);g_core.context->VSSetShader(g_core.vertexShader.Get(),nullptr,0);g_core.context->PSSetShader(g_core.pixelShader.Get(),nullptr,0);ID3D11Buffer* cb=g_core.constants.Get();g_core.context->VSSetConstantBuffers(0,1,&cb);g_core.context->PSSetConstantBuffers(0,1,&cb);g_core.context->RSSetState(g_core.rasterizer.Get());float blendFactor[4]={0,0,0,0};g_core.context->OMSetBlendState(g_core.blend.Get(),blendFactor,0xffffffffu);
+        g_core.context->IASetInputLayout(g_core.inputLayout.Get());g_core.context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);g_core.context->VSSetShader(g_core.vertexShader.Get(),nullptr,0);g_core.context->PSSetShader(g_core.pixelShader.Get(),nullptr,0);ID3D11Buffer* cb=g_core.constants.Get();g_core.context->VSSetConstantBuffers(0,1,&cb);g_core.context->PSSetConstantBuffers(0,1,&cb);float blendFactor[4]={0,0,0,0};g_core.context->OMSetBlendState(g_core.blend.Get(),blendFactor,0xffffffffu);
         for(auto& pair:s.items)if(pair.second.visible&&pair.second.asset)RenderAssetLocked(s,pair.second,phase);g_core.context->Flush();return 1;
     }
 }
@@ -283,6 +289,11 @@ extern "C" __declspec(dllexport) int __cdecl HC_GPU_LoadShelfModel(void* handle,
 extern "C" __declspec(dllexport) int __cdecl HC_GPU_SetShelfItem(void* handle,int id,float x,float y,float width,float height,float scale,int selected,int visible)
 {
     if(!handle||width<0||height<0)return 0;std::lock_guard<std::mutex>guard(g_core.lock);ShelfSurface*s=static_cast<ShelfSurface*>(handle);auto it=s->items.find(id);if(it==s->items.end())return 0;Item&i=it->second;i.x=x;i.y=y;i.width=width;i.height=height;i.modelScale=scale;i.selected=selected!=0;i.visible=visible!=0;return 1;
+}
+
+extern "C" __declspec(dllexport) int __cdecl HC_GPU_SetShelfBrightness(void* handle,float brightness)
+{
+    if(!handle)return 0;std::lock_guard<std::mutex>guard(g_core.lock);ShelfSurface*s=static_cast<ShelfSurface*>(handle);s->brightness=std::max(0.50f,std::min(2.50f,brightness));return 1;
 }
 
 extern "C" __declspec(dllexport) void __cdecl HC_GPU_ClearShelfItems(void* handle)

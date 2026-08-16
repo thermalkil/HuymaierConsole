@@ -295,7 +295,13 @@ namespace HuymaierConsole.Modeling
         private readonly AxisAngleRotation3D pitchRotation;
         private readonly AxisAngleRotation3D yawRotation;
         private readonly double normalizedScale;
+        private readonly AmbientLight ambientLight;
+        private readonly DirectionalLight keyLight;
+        private readonly DirectionalLight fillLight;
+        private readonly DirectionalLight rimLight;
+        private readonly AmbientLight brightnessLight;
         private double zoomDistance;
+        public double BrightnessPercent { get; private set; }
 
         public string ModelPath { get; private set; }
         public bool CardMode { get; private set; }
@@ -365,10 +371,17 @@ namespace HuymaierConsole.Modeling
             modelVisual.Transform = modelTransform;
 
             Model3DGroup lights = new Model3DGroup();
-            lights.Children.Add(new AmbientLight(Color.FromRgb(128, 133, 145)));
-            lights.Children.Add(new DirectionalLight(Color.FromRgb(255, 252, 242), new Vector3D(-0.6, -0.8, -1.7)));
-            lights.Children.Add(new DirectionalLight(Color.FromRgb(145, 177, 220), new Vector3D(1.0, 0.35, -0.8)));
-            lights.Children.Add(new DirectionalLight(Color.FromRgb(218, 184, 104), new Vector3D(0.25, 0.8, 0.65)));
+            ambientLight = new AmbientLight(Color.FromRgb(128, 133, 145));
+            keyLight = new DirectionalLight(Color.FromRgb(255, 252, 242), new Vector3D(-0.6, -0.8, -1.7));
+            fillLight = new DirectionalLight(Color.FromRgb(145, 177, 220), new Vector3D(1.0, 0.35, -0.8));
+            rimLight = new DirectionalLight(Color.FromRgb(218, 184, 104), new Vector3D(0.25, 0.8, 0.65));
+            brightnessLight = new AmbientLight(Color.FromRgb(0, 0, 0));
+            lights.Children.Add(ambientLight);
+            lights.Children.Add(keyLight);
+            lights.Children.Add(fillLight);
+            lights.Children.Add(rimLight);
+            lights.Children.Add(brightnessLight);
+            SetBrightnessPercent(100.0);
             ModelVisual3D lightVisual = new ModelVisual3D();
             lightVisual.Content = lights;
 
@@ -435,6 +448,25 @@ namespace HuymaierConsole.Modeling
             scaleTransform.ScaleX = value;
             scaleTransform.ScaleY = value;
             scaleTransform.ScaleZ = value;
+        }
+
+        private static Color ScaleLight(Color source, double factor)
+        {
+            factor = Math.Max(0.0, Math.Min(1.0, factor));
+            return Color.FromRgb((byte)Math.Round(source.R * factor),(byte)Math.Round(source.G * factor),(byte)Math.Round(source.B * factor));
+        }
+
+        public void SetBrightnessPercent(double percent)
+        {
+            BrightnessPercent = Math.Max(50.0, Math.Min(250.0, percent));
+            double factor = BrightnessPercent / 100.0;
+            double baseScale = Math.Min(1.0, factor);
+            ambientLight.Color = ScaleLight(Color.FromRgb(128,133,145), baseScale);
+            keyLight.Color = ScaleLight(Color.FromRgb(255,252,242), baseScale);
+            fillLight.Color = ScaleLight(Color.FromRgb(145,177,220), baseScale);
+            rimLight.Color = ScaleLight(Color.FromRgb(218,184,104), baseScale);
+            int boost = factor > 1.0 ? (int)Math.Round(Math.Min(175.0, (factor - 1.0) * 115.0)) : 0;
+            brightnessLight.Color = Color.FromRgb((byte)boost,(byte)boost,(byte)boost);
         }
 
         public void Rotate(double yawDelta, double pitchDelta)

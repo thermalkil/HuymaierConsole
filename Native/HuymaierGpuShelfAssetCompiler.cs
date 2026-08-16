@@ -13,7 +13,7 @@ namespace HuymaierConsole.Modeling
     // The cache freshness key is source length + last-write UTC ticks + quality.
     public static class GpuShelfAssetCompiler
     {
-        public const int CacheVersion = 1;
+        public const int CacheVersion = 2;
         public const int DefaultShelfTextureSize = 512;
 
         private sealed class TextureBinding
@@ -207,6 +207,13 @@ namespace HuymaierConsole.Modeling
             else { ox = 0; oy = 1; oz = 0; }
         }
 
+        private static double Determinant3x3(double[] m)
+        {
+            return m[0] * (m[5] * m[10] - m[9] * m[6])
+                 - m[4] * (m[1] * m[10] - m[9] * m[2])
+                 + m[8] * (m[1] * m[6] - m[5] * m[2]);
+        }
+
         private static double ArrDouble(object[] a, int i, double fallback)
         {
             if (a == null || i < 0 || i >= a.Length) return fallback;
@@ -384,7 +391,22 @@ namespace HuymaierConsole.Modeling
                     int[] ix = ReadIndices(doc, JsonUtil.Int(primitive, "indices", -1), pos.Length);
                     DrawBatch batch = MaterialBatch(doc, materialIndex);
                     batch.FirstIndex = indices.Count; batch.IndexCount = ix.Length;
-                    for (int i = 0; i < ix.Length; i++) indices.Add((uint)(baseVertex + ix[i]));
+                    bool mirrored = Determinant3x3(world) < -0.0000000001;
+                    if (mirrored)
+                    {
+                        // Negative-determinant node transforms reverse glTF's
+                        // authored CCW winding when baked into positions.
+                        for (int i = 0; i + 2 < ix.Length; i += 3)
+                        {
+                            indices.Add((uint)(baseVertex + ix[i]));
+                            indices.Add((uint)(baseVertex + ix[i + 2]));
+                            indices.Add((uint)(baseVertex + ix[i + 1]));
+                        }
+                    }
+                    else
+                    {
+                        for (int i = 0; i < ix.Length; i++) indices.Add((uint)(baseVertex + ix[i]));
+                    }
                     draws.Add(batch);
                 }
             }
