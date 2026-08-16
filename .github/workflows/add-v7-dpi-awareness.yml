@@ -1,0 +1,52 @@
+name: Add V7 D3D11 shelf DPI awareness
+on:
+  push:
+    paths: ['.github/workflows/add-v7-dpi-awareness.yml']
+permissions: {contents: write}
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: feature/v0.26.5-performance-and-downloads, fetch-depth: 0}
+      - name: Patch managed D3DImage bridge and self-clean
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('Native/HuymaierD3D11ShelfHost.cs')
+          text=p.read_text(encoding='utf-8-sig')
+          text=text.replace('// HUYMAIER_D3D11_SHELF_HOST_V2', '// HUYMAIER_D3D11_SHELF_HOST_V2\n    // HUYMAIER_D3D11_DPI_AWARE_SHELF_V1', 1)
+          old='''        private bool rendering;\n        private bool disposed;\n'''
+          new='''        private bool rendering;\n        private bool disposed;\n        private double dpiScaleX = 1.0;\n        private double dpiScaleY = 1.0;\n'''
+          if old not in text: raise SystemExit('DPI field anchor missing')
+          text=text.replace(old,new,1)
+          anchor='''        public D3D11ShelfSurface()\n        {\n'''
+          helper='''        private bool RefreshDpiScale()\n        {\n            DpiScale dpi = VisualTreeHelper.GetDpi(this);\n            double x = dpi.DpiScaleX > 0.0 ? dpi.DpiScaleX : 1.0;\n            double y = dpi.DpiScaleY > 0.0 ? dpi.DpiScaleY : 1.0;\n            bool changed = Math.Abs(x - dpiScaleX) > 0.0001 || Math.Abs(y - dpiScaleY) > 0.0001;\n            dpiScaleX = x;\n            dpiScaleY = y;\n            return changed;\n        }\n\n        private int PixelWidthFor(double logicalWidth)\n        {\n            return Math.Max(1, (int)Math.Ceiling(Math.Max(0.0, logicalWidth) * dpiScaleX));\n        }\n\n        private int PixelHeightFor(double logicalHeight)\n        {\n            return Math.Max(1, (int)Math.Ceiling(Math.Max(0.0, logicalHeight) * dpiScaleY));\n        }\n\n        private bool ApplyItemToNative(int id, ItemState state)\n        {\n            if (!NativeReady || state == null) return true;\n            try\n            {\n                return D3D11ShelfNative.HC_GPU_SetShelfItem(\n                    nativeHandle, id,\n                    state.X * (float)dpiScaleX, state.Y * (float)dpiScaleY,\n                    state.Width * (float)dpiScaleX, state.Height * (float)dpiScaleY,\n                    state.Scale, state.Selected ? 1 : 0, state.Visible ? 1 : 0) != 0;\n            }\n            catch { return false; }\n        }\n\n'''+anchor
+          if anchor not in text: raise SystemExit('Constructor anchor missing')
+          text=text.replace(anchor,helper,1)
+          old='''            if (!NativeReady) return true;\n            try\n            {\n                return D3D11ShelfNative.HC_GPU_SetShelfItem(\n                    nativeHandle, id, state.X, state.Y, state.Width, state.Height,\n                    state.Scale, state.Selected ? 1 : 0, state.Visible ? 1 : 0) != 0;\n            }\n            catch { return false; }\n'''
+          new='''            return ApplyItemToNative(id, state);\n'''
+          if old not in text: raise SystemExit('SetItem native call anchor missing')
+          text=text.replace(old,new,1)
+          old='''                try\n                {\n                    D3D11ShelfNative.HC_GPU_SetShelfItem(\n                        nativeHandle, pair.Key, state.X, state.Y, state.Width, state.Height,\n                        state.Scale, state.Selected ? 1 : 0, state.Visible ? 1 : 0);\n                }\n                catch { }\n'''
+          new='''                ApplyItemToNative(pair.Key, state);\n'''
+          if old not in text: raise SystemExit('ReplayState native call anchor missing')
+          text=text.replace(old,new,1)
+          old='''            int w = Math.Max(1, (int)Math.Ceiling(ActualWidth));\n            int h = Math.Max(1, (int)Math.Ceiling(ActualHeight));\n'''
+          new='''            RefreshDpiScale();\n            int w = PixelWidthFor(ActualWidth);\n            int h = PixelHeightFor(ActualHeight);\n'''
+          if text.count(old) < 2: raise SystemExit('Expected two logical surface size blocks')
+          text=text.replace(old,new,2)
+          old='''            if (disposed || !NativeReady || pixelWidth <= 0 || pixelHeight <= 0) return;\n            float phase = (float)renderClock.Elapsed.TotalSeconds;\n'''
+          new='''            if (disposed || !NativeReady || pixelWidth <= 0 || pixelHeight <= 0) return;\n            if (RefreshDpiScale())\n            {\n                int dpiWidth = PixelWidthFor(ActualWidth);\n                int dpiHeight = PixelHeightFor(ActualHeight);\n                if (dpiWidth != pixelWidth || dpiHeight != pixelHeight)\n                {\n                    RecreateSurface(dpiWidth, dpiHeight);\n                    if (!NativeReady) return;\n                }\n            }\n            float phase = (float)renderClock.Elapsed.TotalSeconds;\n'''
+          if old not in text: raise SystemExit('Rendering DPI check anchor missing')
+          text=text.replace(old,new,1)
+          p.write_text(text,encoding='utf-8')
+          Path('.github/workflows/add-v7-dpi-awareness.yml').unlink()
+      - name: Commit DPI support
+        shell: bash
+        run: |
+          git config user.name thermalkil
+          git config user.email 98826286+thermalkil@users.noreply.github.com
+          git add -A
+          git commit -m 'Make V7 D3D11 shelves per-monitor DPI aware'
+          git push origin HEAD:feature/v0.26.5-performance-and-downloads
