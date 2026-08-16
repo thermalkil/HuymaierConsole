@@ -17,7 +17,8 @@ foreach($forbidden in @('Select-HcRecompExecutable','Get-ChildItem -LiteralPath 
 $custom=Get-Content -Raw -LiteralPath (NeedFile 'HuymaierCustomization.ps1') -Encoding UTF8
 if($custom.IndexOf('HuymaierRecompsManual.ps1',[StringComparison]::Ordinal)-lt0){throw 'Staged customization does not initialize the manual Recomps library.'}
 $final=Get-Content -Raw -LiteralPath (NeedFile 'HuymaierRecompsFinal.ps1') -Encoding UTF8
-foreach($needle in @('Get-HcManualRecompGames','HcManualRecompsBaseGetPageDefinition','HcManualRecompsBaseInvokeAction','HcManualRecompsFinalOwner')){if($final.IndexOf($needle,[StringComparison]::Ordinal)-lt0){throw "Staged final manual Recomps owner missing: $needle"}}
+foreach($needle in @('Get-HcManualRecompGames','HcRecompsSimpleLibraryInstalled','HcRecompsSimpleBaseRenderGamesHub','HcRecompsSimpleBaseInvokeAction','RecompsLibrary','RecompsGame','recomps-add-game','recomp-open:','recomp-launch','recomp-remove','HuymaierRecompsFinal.SimpleLibrary')){if($final.IndexOf($needle,[StringComparison]::Ordinal)-lt0){throw "Staged simple Recomps final owner missing: $needle"}}
+foreach($forbidden in @("$script:SubPage='PlatformChoice'","$script:SubPage='ProviderStore';$script:SelectedAction=0;Render-Page")){if($final.IndexOf($forbidden,[StringComparison]::Ordinal)-ge0){throw "Staged final Recomps owner can still route into the retired generic provider/platform chooser: $forbidden"}}
 
 $core=Get-Content -Raw -LiteralPath (NeedFile 'HuymaierConsole.ps1') -Encoding UTF8
 $v7=$core.IndexOf('HUYMAIER_GPU_3D_SHELVES_RUNTIME_LOAD_V1',[StringComparison]::Ordinal)
@@ -40,4 +41,7 @@ Write-Host 'stagedManualRecompsExeOnlyPickerGate: success'
 Write-Host 'stagedManualRecompsRemoveWithoutDeleteGate: success'
 Write-Host 'stagedManualRecompsNoFolderScanGate: success'
 Write-Host 'stagedManualRecompsFinalAfterV7Gate: success'
+Write-Host 'stagedManualRecompsDirectLibraryGate: success'
+Write-Host 'stagedManualRecompsNoPlatformChoiceGate: success'
+Write-Host 'stagedManualRecompsNoProviderStoreGate: success'
 Write-Host 'stagedManualRecompsInstallerBootstrapGate: success'
