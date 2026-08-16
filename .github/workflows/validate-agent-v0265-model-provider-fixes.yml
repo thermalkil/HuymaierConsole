@@ -8,13 +8,44 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: huymaier-v0265-model-provider-fixes
+  cancel-in-progress: true
+
 jobs:
-  naming-audit:
+  validate:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Audit platform names
+        with:
+          fetch-depth: 0
+
+      - name: Apply model/provider fixes
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
+          & '.\.development\v0.26.5\Apply-v0265-NamingRecompsFixes.ps1'
+          & '.\.development\v0.26.5\Apply-v0265-ModelRenderingFixes.ps1'
+          & '.\.development\v0.26.5\Apply-v0265-ModelRenderingTestUpdates.ps1'
+
+      - name: Parse and audit naming
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          & '.\.development\v0.26.5\Test-v0265-PowerShellSafety.ps1'
           & '.\.development\v0.26.5\Test-v0265-PlatformNamingAudit.ps1'
+
+      - name: Validate Recomps and GPU models
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          & '.\.development\v0.26.5\Prepare-v0265-PlatformModelValidation.ps1'
+          & '.\.development\v0.26.5\Test-v0265-PlatformModels.ps1'
+          & '.\.development\v0.26.5\Test-v0265-User3DModels.ps1'
+          & '.\.development\v0.26.5\Test-v0265-Live3DCardRender.ps1'
+          & '.\.development\v0.26.5\Test-v0265-D3D11ShelfBackend.ps1'
+          & '.\.development\v0.26.5\Test-v0265-GpuShelfAssetCompiler.ps1'
+          & '.\.development\v0.26.5\Test-v0265-D3D11CachedModelRender.ps1'
+          & '.\.development\v0.26.5\Test-v0265-D3D11UvAddressing.ps1'
+          & '.\.development\v0.26.5\Test-v0265-GpuPlatformShelvesV7.ps1'
+          & '.\.development\v0.26.5\Test-v0265-CanonicalRecomps.ps1'
