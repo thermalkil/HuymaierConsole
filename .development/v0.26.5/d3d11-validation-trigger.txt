@@ -1,3 +1,3 @@
-D3D11 shelf backend phase-4 integration validation.
+D3D11 shelf backend phase-4 integration validation retry.
 V7 GPU runtime + full-height shelves + persistent HC3D cache + production native/managed binary staging.
-Distance-based icon reversion is retired.
+PowerShell 5.1 build-transform anchor corrected.
