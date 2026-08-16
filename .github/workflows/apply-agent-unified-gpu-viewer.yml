@@ -56,7 +56,7 @@ jobs:
         run: |
           $ErrorActionPreference='Stop'
           $viewer=Get-Content -Raw '.\HuymaierLivePlatformModels.ps1' -Encoding UTF8
-          foreach($n in @('HUYMAIER_SHARED_D3D11_MODEL_VIEWER_V1','Get-HcModelViewerGpuCache','Get-HcGpuShelfHostType','SetItemView(0','HuymaierGpuShelfAssetCompiler.exe','Update-HcGpuModelViewerItem')){if($viewer.IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Unified viewer contract missing: $n"}}
+          foreach($n in @('HUYMAIER_SHARED_D3D11_MODEL_VIEWER_V1','Get-HcModelViewerGpuCache','Get-HcGpuShelfHostType','SetItemView(0','$script:HcGpuShelfCompilerExe','Update-HcGpuModelViewerItem')){if($viewer.IndexOf($n,[StringComparison]::Ordinal)-lt0){throw "Unified viewer contract missing: $n"}}
           $openStart=$viewer.IndexOf('function Open-HcPlatformModelViewer {',[StringComparison]::Ordinal)
           $openEnd=$viewer.IndexOf('function Invoke-SecondaryAction {',[StringComparison]::Ordinal)
           if($openStart-lt0-or$openEnd-le$openStart){throw 'Could not inspect full-screen viewer implementation.'}
