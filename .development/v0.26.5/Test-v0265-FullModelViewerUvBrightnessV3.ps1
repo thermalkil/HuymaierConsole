@@ -1,7 +1,13 @@
 Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
+$repoRoot=(Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $source=Join-Path $PSScriptRoot 'Test-v0265-FullModelViewerUvBrightness.ps1'
 $raw=([IO.File]::ReadAllText($source)).Replace("`r`n","`n")
+# The generated test executes from %TEMP%; pin its repository root before doing so.
+$rootLine='$root=(Resolve-Path (Join-Path $PSScriptRoot ''..\..'')).Path'
+$escapedRoot=$repoRoot.Replace("'","''")
+if(-not$raw.Contains($rootLine)){throw 'Viewer V3 repository-root anchor missing.'}
+$raw=$raw.Replace($rootLine,("`$root='"+$escapedRoot+"'"))
 $newFunction=@'
 function New-QuadPng {
     $w=8;$h=8;$stride=$w*4;$pixels=New-Object byte[] ($stride*$h)
@@ -29,7 +35,6 @@ $newFunction=$newFunction.Replace("`r`n","`n")
 $rx=New-Object Text.RegularExpressions.Regex('(?s)function New-QuadPng \{.*?\n\}\n(?=function New-UvProbeGlb)')
 if(-not$rx.IsMatch($raw)){throw 'Viewer V3 texture-generator regex did not match.'}
 $raw=$rx.Replace($raw,[Text.RegularExpressions.MatchEvaluator]{param($m)$newFunction},1)
-# Add sample diagnostics without changing the original assertions.
 $needle="    `$render=Render-View `$view`n    Assert-Color (Sample `$render 115 115) 'R';Assert-Color (Sample `$render 205 115) 'G';Assert-Color (Sample `$render 115 205) 'B';Assert-Color (Sample `$render 205 205) 'Y'"
 if($raw.Contains($needle)){
     $replacement=@'
