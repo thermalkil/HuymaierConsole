@@ -350,6 +350,27 @@ namespace HuymaierConsole.Modeling
             return brush;
         }
 
+        private static BitmapSource ApplyBaseColor(BitmapSource bitmap, Color factor, string alphaMode, double cutoff)
+        {
+            if (bitmap == null) return null;
+            BitmapSource source = bitmap.Format == PixelFormats.Bgra32 ? bitmap : new FormatConvertedBitmap(bitmap, PixelFormats.Bgra32, null, 0);
+            int width=source.PixelWidth,height=source.PixelHeight,stride=width*4;
+            byte[] pixels=new byte[stride*height]; source.CopyPixels(pixels,stride,0);
+            bool blend=String.Equals(alphaMode,"BLEND",StringComparison.OrdinalIgnoreCase);
+            bool mask=String.Equals(alphaMode,"MASK",StringComparison.OrdinalIgnoreCase);
+            int cutoffByte=(int)Math.Max(0,Math.Min(255,cutoff*255.0));
+            for(int i=0;i<pixels.Length;i+=4)
+            {
+                pixels[i]=(byte)((pixels[i]*factor.B+127)/255);
+                pixels[i+1]=(byte)((pixels[i+1]*factor.G+127)/255);
+                pixels[i+2]=(byte)((pixels[i+2]*factor.R+127)/255);
+                int alpha=(pixels[i+3]*factor.A+127)/255;
+                pixels[i+3]=(byte)(mask?(alpha>=cutoffByte?255:0):(blend?alpha:255));
+            }
+            BitmapSource result=BitmapSource.Create(width,height,source.DpiX,source.DpiY,PixelFormats.Bgra32,null,pixels,stride);
+            if(result.CanFreeze)result.Freeze();return result;
+        }
+
         private static double AverageFactor(object[] values, double fallback)
         {
             if (values == null || values.Length < 3) return fallback;
@@ -377,9 +398,10 @@ namespace HuymaierConsole.Modeling
             Color color = FactorColor(factor);
 
             string alphaMode = Convert.ToString(JsonUtil.Get(material, "alphaMode"), CultureInfo.InvariantCulture) ?? "OPAQUE";
-            bool transparent = String.Equals(alphaMode, "BLEND", StringComparison.OrdinalIgnoreCase) ||
-                               String.Equals(alphaMode, "MASK", StringComparison.OrdinalIgnoreCase);
-            double materialOpacity = transparent ? color.A / 255.0 : 1.0;
+            bool blend = String.Equals(alphaMode, "BLEND", StringComparison.OrdinalIgnoreCase);
+            bool mask = String.Equals(alphaMode, "MASK", StringComparison.OrdinalIgnoreCase);
+            double alphaCutoff = JsonUtil.Double(material, "alphaCutoff", 0.5);
+            double materialOpacity = blend ? color.A / 255.0 : 1.0;
 
             TextureBinding baseBinding = GetBaseTextureBinding(doc, material);
             uvBinding = baseBinding;
@@ -388,7 +410,8 @@ namespace HuymaierConsole.Modeling
             Brush diffuseBrush;
             if (baseBitmap != null)
             {
-                diffuseBrush = CreateImageBrush(baseBitmap, materialOpacity);
+                baseBitmap = ApplyBaseColor(baseBitmap, color, alphaMode, alphaCutoff);
+                diffuseBrush = CreateImageBrush(baseBitmap, 1.0);
             }
             else
             {
@@ -401,13 +424,14 @@ namespace HuymaierConsole.Modeling
             }
 
             MaterialGroup group = new MaterialGroup();
-            group.Children.Add(new DiffuseMaterial(diffuseBrush));
-
             Dictionary<string, object> unlit = JsonUtil.Obj(JsonUtil.Get(extensions, "KHR_materials_unlit"));
+            if (unlit.Count > 0) group.Children.Add(new EmissiveMaterial(diffuseBrush));
+            else group.Children.Add(new DiffuseMaterial(diffuseBrush));
+
             if (unlit.Count == 0)
             {
-                double metallic = JsonUtil.Double(pbr, "metallicFactor", 0.0);
-                double roughness = JsonUtil.Double(pbr, "roughnessFactor", 0.70);
+                double metallic = JsonUtil.Double(pbr, "metallicFactor", 1.0);
+                double roughness = JsonUtil.Double(pbr, "roughnessFactor", 1.0);
                 double specularWeight = 1.0;
 
                 if (specGloss.Count > 0)

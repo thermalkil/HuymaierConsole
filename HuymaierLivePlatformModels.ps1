@@ -104,7 +104,8 @@ function Open-HcPlatformModelViewer {
     $overlay.RowDefinitions.Add((New-Object System.Windows.Controls.RowDefinition -Property @{Height='70'}))
 
     $title=New-Object System.Windows.Controls.TextBlock
-    $title.Text=$Platform+' — 3D MODEL';$title.FontSize=30;$title.FontWeight='Bold';$title.Foreground='White';$title.Margin='42,26,42,0'
+    $viewerGroup=$(if(Test-HcStorefrontPlatform $Platform){'Providers'}else{'Consoles'})
+    $title.Text=(Get-HcPlatformDisplayLabel $Platform $viewerGroup)+' — 3D MODEL';$title.FontSize=30;$title.FontWeight='Bold';$title.Foreground='White';$title.Margin='42,26,42,0'
     [System.Windows.Controls.Grid]::SetRow($title,0);[void]$overlay.Children.Add($title)
 
     $stage=New-Object System.Windows.Controls.Border
