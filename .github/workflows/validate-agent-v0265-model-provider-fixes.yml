@@ -65,3 +65,4 @@ jobs:
           & '.\.development\v0.26.5\Test-v0265-D3D11UvAddressing.ps1'
           & '.\.development\v0.26.5\Test-v0265-GpuPlatformShelvesV7.ps1'
           & '.\.development\v0.26.5\Test-v0265-CanonicalRecomps.ps1'
+          & '.\.development\v0.26.5\Test-v0265-RecompsProviderActions.ps1'
