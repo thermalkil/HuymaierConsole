@@ -1,0 +1,58 @@
+name: Validate v0.26.5 UV Aliases Recomps
+
+on:
+  push:
+    branches:
+      - agent/v0265-uv-alias-recomps
+
+permissions:
+  contents: write
+
+concurrency:
+  group: huymaier-v0265-uv-alias-recomps
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Apply exact-source patch
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          & '.\.development\v0.26.5\Apply-v0265-UvAliasesRecompsV2.ps1'
+
+      - name: Parse and safety audit
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          & '.\.development\v0.26.5\Test-v0265-PowerShellSafety.ps1'
+
+      - name: Validate GPU models and canonical providers
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          & '.\.development\v0.26.5\Prepare-v0265-PlatformModelValidation.ps1'
+          & '.\.development\v0.26.5\Test-v0265-PlatformModels.ps1'
+          & '.\.development\v0.26.5\Test-v0265-User3DModels.ps1'
+          & '.\.development\v0.26.5\Test-v0265-D3D11ShelfBackend.ps1'
+          & '.\.development\v0.26.5\Test-v0265-GpuShelfAssetCompiler.ps1'
+          & '.\.development\v0.26.5\Test-v0265-D3D11CachedModelRender.ps1'
+          & '.\.development\v0.26.5\Test-v0265-D3D11UvAddressing.ps1'
+          & '.\.development\v0.26.5\Test-v0265-GpuPlatformShelvesV7.ps1'
+          & '.\.development\v0.26.5\Test-v0265-CanonicalRecomps.ps1'
+
+      - name: Commit validated transformed source
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          if(-not (git status --porcelain)){Write-Host 'Validated source already committed.';exit 0}
+          git config user.name 'huymaier-validation-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -- EmulatorPlatforms/platform-registry.json Assets/Models/model-map.json Native/HuymaierD3D11ShelfAssetSmoke.cpp HuymaierGpuPlatformShelves.ps1
+          if(-not (git diff --cached --quiet)){git commit -m 'Apply canonical platform and Recomps integration';git push origin HEAD:agent/v0265-uv-alias-recomps}
