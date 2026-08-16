@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -7,9 +9,9 @@ using System.Windows.Media;
 
 namespace HuymaierConsole.Modeling
 {
-    // HUYMAIER_D3D11_SHELF_HOST_V1
-    // WPF owns navigation/chrome; the shelf pixels are produced by the native
-    // D3D11 backend and shared into WPF without a CPU readback through D3DImage.
+    // HUYMAIER_D3D11_SHELF_HOST_V2
+    // WPF owns navigation and chrome. The persistent shelf surface, asset cache,
+    // turntable animation and model rendering are owned by native D3D11.
     internal static class D3D11ShelfNative
     {
         private const string DllName = "HuymaierD3D11ShelfRenderer.dll";
@@ -17,34 +19,56 @@ namespace HuymaierConsole.Modeling
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int HC_D3D11SmokeTest();
 
-        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr HC_D3D11CreateWpfSurface(int width, int height, out IntPtr surface9);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
+        internal static extern IntPtr HC_GPU_CreateShelfSurface(int width, int height, out IntPtr surface9);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
+        internal static extern int HC_GPU_LoadShelfModel(IntPtr handle, int id, string cachePath);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int HC_D3D11RenderWpfSurface(IntPtr handle, float phase);
+        internal static extern int HC_GPU_SetShelfItem(IntPtr handle, int id, float x, float y, float width, float height, float scale, int selected, int visible);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void HC_D3D11ReleaseSurfacePointer(IntPtr surface9);
+        internal static extern void HC_GPU_ClearShelfItems(IntPtr handle);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void HC_D3D11DestroyWpfSurface(IntPtr handle);
+        internal static extern int HC_GPU_RenderShelfSurface(IntPtr handle, float phase);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void HC_GPU_ReleaseShelfSurfacePointer(IntPtr surface9);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void HC_GPU_DestroyShelfSurface(IntPtr handle);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int HC_GPU_GetCachedAssetCount();
     }
 
     public sealed class D3D11ShelfSurface : Grid, IDisposable
     {
+        private sealed class ItemState
+        {
+            public float X, Y, Width, Height, Scale;
+            public bool Selected, Visible;
+        }
+
         private readonly Image image;
         private readonly D3DImage source;
+        private readonly Dictionary<int, string> modelPaths = new Dictionary<int, string>();
+        private readonly Dictionary<int, ItemState> itemStates = new Dictionary<int, ItemState>();
+        private readonly Stopwatch renderClock = Stopwatch.StartNew();
         private IntPtr nativeHandle;
         private IntPtr nativeSurface;
         private int pixelWidth;
         private int pixelHeight;
         private bool rendering;
         private bool disposed;
-        private float phase;
 
         public bool NativeReady { get { return nativeHandle != IntPtr.Zero && nativeSurface != IntPtr.Zero; } }
         public int PixelWidth { get { return pixelWidth; } }
         public int PixelHeight { get { return pixelHeight; } }
+        public int LoadedModelCount { get { return modelPaths.Count; } }
+        public static int NativeCachedAssetCount { get { try { return D3D11ShelfNative.HC_GPU_GetCachedAssetCount(); } catch { return 0; } } }
 
         public static int RunNativeSmokeTest()
         {
@@ -69,6 +93,67 @@ namespace HuymaierConsole.Modeling
             Loaded += OnLoaded;
             Unloaded += OnUnloaded;
             SizeChanged += OnSizeChanged;
+        }
+
+        public bool LoadModel(int id, string cachePath)
+        {
+            if (disposed || id < 0 || String.IsNullOrWhiteSpace(cachePath)) return false;
+            modelPaths[id] = cachePath;
+            if (!NativeReady) return true;
+            try { return D3D11ShelfNative.HC_GPU_LoadShelfModel(nativeHandle, id, cachePath) != 0; }
+            catch { return false; }
+        }
+
+        public bool SetItem(int id, double x, double y, double width, double height, double scale, bool selected, bool visible)
+        {
+            if (disposed || id < 0) return false;
+            ItemState state = new ItemState
+            {
+                X = (float)x,
+                Y = (float)y,
+                Width = Math.Max(0, (float)width),
+                Height = Math.Max(0, (float)height),
+                Scale = Math.Max(.40f, Math.Min(.90f, (float)scale)),
+                Selected = selected,
+                Visible = visible
+            };
+            itemStates[id] = state;
+            if (!NativeReady) return true;
+            try
+            {
+                return D3D11ShelfNative.HC_GPU_SetShelfItem(
+                    nativeHandle, id, state.X, state.Y, state.Width, state.Height,
+                    state.Scale, state.Selected ? 1 : 0, state.Visible ? 1 : 0) != 0;
+            }
+            catch { return false; }
+        }
+
+        public void ClearModels()
+        {
+            modelPaths.Clear();
+            itemStates.Clear();
+            if (!NativeReady) return;
+            try { D3D11ShelfNative.HC_GPU_ClearShelfItems(nativeHandle); } catch { }
+        }
+
+        private void ReplayState()
+        {
+            if (!NativeReady) return;
+            foreach (KeyValuePair<int, string> pair in modelPaths)
+            {
+                try { D3D11ShelfNative.HC_GPU_LoadShelfModel(nativeHandle, pair.Key, pair.Value); } catch { }
+            }
+            foreach (KeyValuePair<int, ItemState> pair in itemStates)
+            {
+                ItemState state = pair.Value;
+                try
+                {
+                    D3D11ShelfNative.HC_GPU_SetShelfItem(
+                        nativeHandle, pair.Key, state.X, state.Y, state.Width, state.Height,
+                        state.Scale, state.Selected ? 1 : 0, state.Visible ? 1 : 0);
+                }
+                catch { }
+            }
         }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
@@ -104,20 +189,22 @@ namespace HuymaierConsole.Modeling
             if (disposed || NativeReady) return;
             int w = Math.Max(1, (int)Math.Ceiling(ActualWidth));
             int h = Math.Max(1, (int)Math.Ceiling(ActualHeight));
-            if (w <= 1) w = 640;
-            if (h <= 1) h = 220;
+            if (w <= 1) w = 960;
+            if (h <= 1) h = 320;
             RecreateSurface(w, h);
         }
 
         private void RecreateSurface(int width, int height)
         {
-            ReleaseSurface();
+            ReleaseNativeSurface();
             IntPtr surface9;
-            IntPtr handle = D3D11ShelfNative.HC_D3D11CreateWpfSurface(width, height, out surface9);
+            IntPtr handle;
+            try { handle = D3D11ShelfNative.HC_GPU_CreateShelfSurface(width, height, out surface9); }
+            catch { return; }
             if (handle == IntPtr.Zero || surface9 == IntPtr.Zero)
             {
-                if (surface9 != IntPtr.Zero) D3D11ShelfNative.HC_D3D11ReleaseSurfacePointer(surface9);
-                if (handle != IntPtr.Zero) D3D11ShelfNative.HC_D3D11DestroyWpfSurface(handle);
+                if (surface9 != IntPtr.Zero) try { D3D11ShelfNative.HC_GPU_ReleaseShelfSurfacePointer(surface9); } catch { }
+                if (handle != IntPtr.Zero) try { D3D11ShelfNative.HC_GPU_DestroyShelfSurface(handle); } catch { }
                 return;
             }
 
@@ -132,20 +219,23 @@ namespace HuymaierConsole.Modeling
                 source.AddDirtyRect(new Int32Rect(0, 0, width, height));
             }
             finally { source.Unlock(); }
+            ReplayState();
         }
 
         private void OnRendering(object sender, EventArgs e)
         {
             if (disposed || !NativeReady || pixelWidth <= 0 || pixelHeight <= 0) return;
-            phase += 0.0125f;
-            if (phase > 10000.0f) phase = 0.0f;
-            if (D3D11ShelfNative.HC_D3D11RenderWpfSurface(nativeHandle, phase) == 0) return;
+            float phase = (float)renderClock.Elapsed.TotalSeconds;
+            int rendered;
+            try { rendered = D3D11ShelfNative.HC_GPU_RenderShelfSurface(nativeHandle, phase); }
+            catch { return; }
+            if (rendered == 0) return;
             source.Lock();
             try { source.AddDirtyRect(new Int32Rect(0, 0, pixelWidth, pixelHeight)); }
             finally { source.Unlock(); }
         }
 
-        private void ReleaseSurface()
+        private void ReleaseNativeSurface()
         {
             if (nativeSurface != IntPtr.Zero)
             {
@@ -156,12 +246,12 @@ namespace HuymaierConsole.Modeling
                     finally { source.Unlock(); }
                 }
                 catch { }
-                D3D11ShelfNative.HC_D3D11ReleaseSurfacePointer(nativeSurface);
+                try { D3D11ShelfNative.HC_GPU_ReleaseShelfSurfacePointer(nativeSurface); } catch { }
                 nativeSurface = IntPtr.Zero;
             }
             if (nativeHandle != IntPtr.Zero)
             {
-                D3D11ShelfNative.HC_D3D11DestroyWpfSurface(nativeHandle);
+                try { D3D11ShelfNative.HC_GPU_DestroyShelfSurface(nativeHandle); } catch { }
                 nativeHandle = IntPtr.Zero;
             }
             pixelWidth = 0;
@@ -177,7 +267,9 @@ namespace HuymaierConsole.Modeling
                 CompositionTarget.Rendering -= OnRendering;
                 rendering = false;
             }
-            ReleaseSurface();
+            ReleaseNativeSurface();
+            modelPaths.Clear();
+            itemStates.Clear();
             GC.SuppressFinalize(this);
         }
     }
