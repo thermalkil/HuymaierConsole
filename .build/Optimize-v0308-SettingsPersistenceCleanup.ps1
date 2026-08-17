@@ -1,7 +1,7 @@
 param()
 Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
-# HUYMAIER_V0308_SETTINGS_PERSISTENCE_CLEANUP_TRANSFORM_V4
+# HUYMAIER_V0308_SETTINGS_PERSISTENCE_CLEANUP_TRANSFORM_V5
 $root=Split-Path -Parent $PSScriptRoot
 $lf="`n"
 function Read-Normalized([string]$Path){([IO.File]::ReadAllText($Path,[Text.Encoding]::UTF8)).Replace("`r`n","`n")}
@@ -9,10 +9,12 @@ function Write-Normalized([string]$Path,[string]$Text){[IO.File]::WriteAllText($
 function Replace-Required([string]$Text,[string]$Old,[string]$New,[string]$Label){if(-not$Text.Contains($Old)){throw "v0.30.8 settings/cleanup transform anchor missing: $Label"};$Text.Replace($Old,$New)}
 function Replace-Range([string]$Text,[string]$Start,[string]$End,[string]$Replacement,[string]$Label){$a=$Text.IndexOf($Start,[StringComparison]::Ordinal);if($a-lt0){throw "Range start missing ($Label): $Start"};$b=$Text.IndexOf($End,$a+$Start.Length,[StringComparison]::Ordinal);if($b-lt0){throw "Range end missing ($Label): $End"};$Text.Remove($a,$b-$a).Insert($a,$Replacement.TrimEnd()+$lf+$lf)}
 
+# One settings persistence owner. Every property already present in config.json is
+# merged back into the live config, including module-owned settings added later.
 $corePath=Join-Path $root 'HuymaierConsole.ps1';$core=Read-Normalized $corePath
-if($core-notmatch'HUYMAIER_V0308_SETTINGS_STORE_CORE_V4'){
+if($core-notmatch'HUYMAIER_V0308_SETTINGS_STORE_CORE_V5'){
     $anchor='$script:BackgroundTasksModulePath = Join-Path $script:BaseDir ''HuymaierBackgroundTasks.ps1'' # HUYMAIER_V0308_BACKGROUND_TASK_CORE_V2'
-    $core=Replace-Required $core $anchor (@($anchor,'$script:SettingsStoreModulePath = Join-Path $script:BaseDir ''HuymaierSettingsStore.ps1'' # HUYMAIER_V0308_SETTINGS_STORE_CORE_V4')-join$lf) 'settings store path'
+    $core=Replace-Required $core $anchor (@($anchor,'$script:SettingsStoreModulePath = Join-Path $script:BaseDir ''HuymaierSettingsStore.ps1'' # HUYMAIER_V0308_SETTINGS_STORE_CORE_V5')-join$lf) 'settings store path'
     $anchor='function New-DefaultConfig {'
     $pre=@'
 if (Test-Path -LiteralPath $script:SettingsStoreModulePath) {
@@ -28,7 +30,7 @@ function New-DefaultConfig {
 function Load-Config {
     $defaults=New-DefaultConfig
     try{$loaded=Read-HcPersistedConfig -Path $script:ConfigPath;if($null-ne$loaded){$defaults=Merge-HcPersistedConfig -Defaults $defaults -Loaded $loaded}}catch{Write-Log "Config load failed: $($_.Exception.Message)" 'WARN'}
-    foreach($name in @('CustomGames','CustomApps','ImportedGames','RecentGames','RecentApps','StorefrontRoots','StorefrontInstallOverrides','ProviderInstallRoots','FavoriteGames','RecompGames','PlatformModelDefaultViews')){if($null-ne$defaults.PSObject.Properties[$name]){$defaults.$name=Convert-ToStableArray $defaults.$name}}
+    foreach($name in @('CustomGames','CustomApps','ImportedGames','RecentGames','RecentApps','StorefrontRoots','StorefrontInstallOverrides','ProviderInstallRoots','FavoriteGames','RecompGames','PlatformModelDefaultViews','GamesPlatformOrder','GamesHiddenPlatforms','GamesPlatformSizes')){if($null-ne$defaults.PSObject.Properties[$name]){$defaults.$name=Convert-ToStableArray $defaults.$name}}
     try{$defaults.GameBarScale=[math]::Max(70,[math]::Min(140,[int]$defaults.GameBarScale))}catch{$defaults.GameBarScale=100}
     try{$defaults.PlatformIconScale=[math]::Max(60,[math]::Min(180,[int]$defaults.PlatformIconScale))}catch{$defaults.PlatformIconScale=100}
     try{$defaults.PlatformModelScale=[math]::Max(50,[math]::Min(200,[int]$defaults.PlatformModelScale))}catch{$defaults.PlatformModelScale=100}
@@ -55,17 +57,20 @@ function Save-Config {
 }
 Write-Normalized $corePath $core
 
+# Remove the old one-off brightness reload hack now that dynamic config merge owns it.
 $customPath=Join-Path $root 'HuymaierCustomization.ps1';$custom=Read-Normalized $customPath
-if($custom-notmatch'HUYMAIER_V0308_SETTINGS_DYNAMIC_MERGE_V4'){
+if($custom-notmatch'HUYMAIER_V0308_SETTINGS_DYNAMIC_MERGE_V5'){
     $start="    if(`$null -eq `$script:Config.PSObject.Properties['ConsoleBrightness']){";$end='    try{$script:Config.UiSoundVolume='
     $a=$custom.IndexOf($start,[StringComparison]::Ordinal);if($a-ge0){$b=$custom.IndexOf($end,$a,[StringComparison]::Ordinal);if($b-lt0){throw 'Brightness workaround end anchor missing.'};$custom=$custom.Remove($a,$b-$a)}
-    $anchor="    Add-HcCustomizationConfigProperty 'UiSoundVolume' 62";$custom=Replace-Required $custom $anchor (@($anchor,"    Add-HcCustomizationConfigProperty 'ConsoleBrightness' 100 # HUYMAIER_V0308_SETTINGS_DYNAMIC_MERGE_V4")-join$lf) 'brightness config owner'
+    $anchor="    Add-HcCustomizationConfigProperty 'UiSoundVolume' 62";$custom=Replace-Required $custom $anchor (@($anchor,"    Add-HcCustomizationConfigProperty 'ConsoleBrightness' 100 # HUYMAIER_V0308_SETTINGS_DYNAMIC_MERGE_V5")-join$lf) 'brightness config owner'
 }
 Write-Normalized $customPath $custom
 
+# Advanced per-console 3D presentation auto-saves after a short idle interval.
+# Explicit Cancel remains a true cancel by restoring AND persisting the snapshot.
 $modelPath=Join-Path $root 'HuymaierConsoleModelPresentation.ps1';$model=Read-Normalized $modelPath
-if($model-notmatch'HUYMAIER_V0308_MODEL_SETTINGS_AUTOSAVE_V4'){
-    $anchor='$script:HcModelEditorFanPercent=100';$model=Replace-Required $model $anchor (@($anchor,'$script:HcModelEditorAutoSaveTimer=$null # HUYMAIER_V0308_MODEL_SETTINGS_AUTOSAVE_V4','$script:HcModelEditorAutoSaveDirty=$false')-join$lf) 'model autosave state'
+if($model-notmatch'HUYMAIER_V0308_MODEL_SETTINGS_AUTOSAVE_V5'){
+    $anchor='$script:HcModelEditorFanPercent=100';$model=Replace-Required $model $anchor (@($anchor,'$script:HcModelEditorAutoSaveTimer=$null # HUYMAIER_V0308_MODEL_SETTINGS_AUTOSAVE_V5','$script:HcModelEditorAutoSaveDirty=$false')-join$lf) 'model autosave state'
     $anchor='function Get-HcModelEditorValueText {'
     $helpers=@'
 function Save-HcModelViewSnapshotToConfig {
@@ -106,9 +111,7 @@ function Cancel-HcModelOrientationEditor {
 }
 '@
     $model=Replace-Range $model 'function Cancel-HcModelOrientationEditor {' 'function Step-HcModelEditorField' $cancel 'model cancel'
-    $old='    $script:HcModelViewerSpin=$false;Update-HcGpuModelViewerItem;Update-HcModelEditorChrome'
-    $new='    $script:HcModelViewerSpin=$false;Queue-HcModelEditorAutoSave;Update-HcGpuModelViewerItem;Update-HcModelEditorChrome'
-    $model=Replace-Required $model $old $new 'model adjustment autosave'
+    $model=Replace-Required $model '    $script:HcModelViewerSpin=$false;Update-HcGpuModelViewerItem;Update-HcModelEditorChrome' '    $script:HcModelViewerSpin=$false;Queue-HcModelEditorAutoSave;Update-HcGpuModelViewerItem;Update-HcModelEditorChrome' 'model adjustment autosave'
     $close=@'
 function Close-HcPlatformModelViewer {
     if($script:HcModelEditorActive){Flush-HcModelEditorAutoSave};Stop-HcModelEditorAutoSave -Discard
@@ -119,33 +122,26 @@ function Close-HcPlatformModelViewer {
 }
 Write-Normalized $modelPath $model
 
+# Bootstrap and installer fail closed if the centralized settings store is missing.
 $bootstrapPath=Join-Path $root 'HuymaierBootstrap.ps1';$bootstrap=Read-Normalized $bootstrapPath
-if($bootstrap-notmatch'HUYMAIER_V0308_SETTINGS_STORE_PREFLIGHT_V4'){
-    $anchor='$backgroundTasksPath=Join-Path $baseDir ''HuymaierBackgroundTasks.ps1'' # HUYMAIER_V0308_BACKGROUND_TASK_PREFLIGHT_V2';$bootstrap=Replace-Required $bootstrap $anchor (@($anchor,'$settingsStorePath=Join-Path $baseDir ''HuymaierSettingsStore.ps1'' # HUYMAIER_V0308_SETTINGS_STORE_PREFLIGHT_V4')-join$lf) 'settings preflight path'
+if($bootstrap-notmatch'HUYMAIER_V0308_SETTINGS_STORE_PREFLIGHT_V5'){
+    $anchor='$backgroundTasksPath=Join-Path $baseDir ''HuymaierBackgroundTasks.ps1'' # HUYMAIER_V0308_BACKGROUND_TASK_PREFLIGHT_V2';$bootstrap=Replace-Required $bootstrap $anchor (@($anchor,'$settingsStorePath=Join-Path $baseDir ''HuymaierSettingsStore.ps1'' # HUYMAIER_V0308_SETTINGS_STORE_PREFLIGHT_V5')-join$lf) 'settings preflight path'
     $anchor="        [pscustomobject]@{Path=`$backgroundTasksPath;Label='Background task HUD and coordinator'},";$bootstrap=Replace-Required $bootstrap $anchor (@($anchor,"        [pscustomobject]@{Path=`$settingsStorePath;Label='Central settings persistence store'},")-join$lf) 'settings preflight entry'
 }
 Write-Normalized $bootstrapPath $bootstrap
-
 $installerPath=Join-Path $root 'Install-HuymaierConsole.ps1';$installer=Read-Normalized $installerPath
-if($installer-notmatch'HUYMAIER_V0308_SETTINGS_STORE_INSTALLER_V4'){$anchor="            'HuymaierBackgroundTasks.ps1', # HUYMAIER_V0308_BACKGROUND_TASK_INSTALLER_V2";$installer=Replace-Required $installer $anchor (@($anchor,"            'HuymaierSettingsStore.ps1', # HUYMAIER_V0308_SETTINGS_STORE_INSTALLER_V4")-join$lf) 'settings installer cache'}
+if($installer-notmatch'HUYMAIER_V0308_SETTINGS_STORE_INSTALLER_V5'){$anchor="            'HuymaierBackgroundTasks.ps1', # HUYMAIER_V0308_BACKGROUND_TASK_INSTALLER_V2";$installer=Replace-Required $installer $anchor (@($anchor,"            'HuymaierSettingsStore.ps1', # HUYMAIER_V0308_SETTINGS_STORE_INSTALLER_V5")-join$lf) 'settings installer cache'}
 Write-Normalized $installerPath $installer
-
 $installerCorePath=Join-Path $root 'HuymaierInstallerCore.ps1';$installerCore=Read-Normalized $installerCorePath
-if($installerCore-notmatch'HUYMAIER_V0308_SETTINGS_STORE_REQUIRED_V4'){
+if($installerCore-notmatch'HUYMAIER_V0308_SETTINGS_STORE_REQUIRED_V5'){
     $anchor="'HuymaierArtworkSources.ps1','HuymaierArtworkSourcesTgdbSchema.ps1','HuymaierArtworkManagement.ps1','HuymaierBackgroundTasks.ps1','HuymaierGameBar.ps1', # HUYMAIER_V0308_ARTWORK_INSTALLER_REQUIRED_V2 HUYMAIER_V0308_BACKGROUND_TASK_REQUIRED_V2"
-    $insert="'HuymaierArtworkSources.ps1','HuymaierArtworkSourcesTgdbSchema.ps1','HuymaierArtworkManagement.ps1','HuymaierBackgroundTasks.ps1','HuymaierSettingsStore.ps1','HuymaierGameBar.ps1', # HUYMAIER_V0308_ARTWORK_INSTALLER_REQUIRED_V2 HUYMAIER_V0308_BACKGROUND_TASK_REQUIRED_V2 HUYMAIER_V0308_SETTINGS_STORE_REQUIRED_V4"
+    $insert="'HuymaierArtworkSources.ps1','HuymaierArtworkSourcesTgdbSchema.ps1','HuymaierArtworkManagement.ps1','HuymaierBackgroundTasks.ps1','HuymaierSettingsStore.ps1','HuymaierGameBar.ps1', # HUYMAIER_V0308_ARTWORK_INSTALLER_REQUIRED_V2 HUYMAIER_V0308_BACKGROUND_TASK_REQUIRED_V2 HUYMAIER_V0308_SETTINGS_STORE_REQUIRED_V5"
     $installerCore=Replace-Required $installerCore $anchor $insert 'settings required payload'
 }
 Write-Normalized $installerCorePath $installerCore
 
-# Remove only old compatibility scripts with no active production reference.
-$retired=@('HuymaierV0262Hardening.ps1','HuymaierV0262ProviderRuntime.ps1','HuymaierV0262Runtime.ps1')
-$prod=@(Get-ChildItem -LiteralPath $root -Recurse -File|Where-Object{$rel=$_.FullName.Substring($root.Length).TrimStart([char[]]'\/').Replace('\','/');$rel-notmatch '^(\.git/|\.github/|\.development/|\.build/|\.release/|\.source/|Docs/)' -and $_.Extension-in@('.ps1','.psm1','.psd1','.cs','.cpp','.h','.json','.cmd')})
-foreach($name in $retired){$refs=@();foreach($file in $prod){if($file.Name-eq$name){continue};try{if([IO.File]::ReadAllText($file.FullName,[Text.Encoding]::UTF8).IndexOf($name,[StringComparison]::OrdinalIgnoreCase)-ge0){$refs+=$file.FullName}}catch{}};if($refs.Count){throw ('Cannot retire '+$name+'; references remain: '+($refs-join', '))};Remove-Item -LiteralPath (Join-Path $root $name) -Force -ErrorAction SilentlyContinue}
-
-$buildPath=Join-Path $root '.build/Build-HuymaierReleaseCandidate.ps1';$build=Read-Normalized $buildPath
-if($build-notmatch'HUYMAIER_V0308_RETIRED_RUNTIME_CLEANUP_V4'){
-    $anchor="    'Native\GuideBridge'";$first=$anchor+", # HUYMAIER_V0308_RETIRED_RUNTIME_CLEANUP_V4";$build=Replace-Required $build $anchor (@($first,"    'HuymaierV0262Hardening.ps1',","    'HuymaierV0262ProviderRuntime.ps1',","    'HuymaierV0262Runtime.ps1'")-join$lf) 'candidate retired runtime strip list'
-}
-Write-Normalized $buildPath $build
-Write-Host 'Applied v0.30.8 centralized settings persistence, 3D model auto-save, and production runtime cleanup.'
+# Cleanup audit result: the v0.26.2 runtime/provider/hardening files are NOT dead.
+# HuymaierColorPicker.ps1 intentionally loads the runtime/provider layers, and the
+# provider layer loads hardening. Preserve them until their behavior is deliberately
+# migrated into named modern modules instead of deleting live functionality.
+Write-Host 'Applied v0.30.8 centralized settings persistence and 3D model auto-save; preserved audited active compatibility layers.'
