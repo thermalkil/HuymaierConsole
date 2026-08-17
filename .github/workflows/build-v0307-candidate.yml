@@ -1,0 +1,203 @@
+name: Build Huymaier Console v0.30.7 Candidate
+
+on:
+  push:
+    branches: [feature/v0.30.7-console-studio-light]
+    paths: ['.development/v0.30.7/candidate-request.json']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: huymaier-console-v0307-candidate
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Check out exact requested source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Validate v0.30.7 candidate request
+        id: request
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $path='.development\v0.30.7\candidate-request.json'
+          $data=Get-Content -Raw -LiteralPath $path -Encoding UTF8|ConvertFrom-Json
+          foreach($required in @('candidate','version','base_release','base_asset','package_root','asset_name','production_source')){
+            if([string]::IsNullOrWhiteSpace([string]$data.$required)){throw "Candidate request missing $required"}
+          }
+          if([string]$data.version -ne '0.30.7'){throw 'Candidate version must be 0.30.7.'}
+          if([string]$data.base_release -ne 'v0.30.6' -or [string]$data.base_asset -ne 'HC0306.zip'){throw 'v0.30.7 must stage cumulatively from published v0.30.6 / HC0306.zip.'}
+          if([string]$data.package_root -ne 'HC0307' -or [string]$data.asset_name -ne 'HC0307.zip'){throw 'v0.30.7 package identity must be HC0307 / HC0307.zip.'}
+          $parent=(& git rev-parse HEAD^).Trim()
+          if([string]$data.production_source -ne $parent){throw "production_source $($data.production_source) is not exact request parent $parent"}
+          "path=$path"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "candidate=$([string]$data.candidate)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "asset=$([string]$data.asset_name)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "package_root=$([string]$data.package_root)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Parse v0.30.7 release and console-light scripts
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $paths=@(
+            '.\.build\Set-HuymaierCandidateVersion.ps1',
+            '.\.build\Build-HuymaierReleaseCandidate.ps1',
+            '.\.build\Build-HuymaierReleaseCandidate.Core.ps1',
+            '.\.build\Optimize-ConsoleBrightness.ps1',
+            '.\.build\Optimize-ModelDefaultViews.ps1',
+            '.\.build\Optimize-ModelWinding.ps1',
+            '.\.build\Optimize-ConsoleModelScale.ps1',
+            '.\.build\Optimize-ConsoleModelPresentation.ps1',
+            '.\.build\Optimize-ConsoleStudioLight.ps1',
+            '.\.build\Test-HuymaierCandidate.ps1',
+            '.\.build\Test-HuymaierV0307Candidate.ps1',
+            '.\.development\v0.30.2\Test-v0302-ConsoleBrightness.ps1',
+            '.\.development\v0.30.3\Test-v0303-FseUpdaterHandoff.ps1',
+            '.\.development\v0.30.4\Test-v0304-ModelDefaultViews.ps1',
+            '.\.development\v0.30.5\Test-v0305-AdaptiveModelWinding.ps1',
+            '.\.development\v0.30.6\Test-v0306-ConsoleModelScale.ps1',
+            '.\.development\v0.30.6\Test-v0306-ConsoleModelPresentation.ps1',
+            '.\.development\v0.30.7\Test-v0307-ConsoleStudioLight.ps1',
+            '.\HuymaierModelDefaults.ps1',
+            '.\HuymaierConsoleModelPresentation.ps1'
+          )
+          foreach($p in $paths){
+            $tokens=$null;$errors=$null
+            [void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p),[ref]$tokens,[ref]$errors)
+            if($errors.Count){$errors|ForEach-Object{Write-Host "$p : $($_.Message)"};throw "$p failed Windows PowerShell 5.1 parse"}
+          }
+
+      - name: Apply pre-presentation carry-forward transforms
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          & '.\.build\Optimize-ConsoleBrightness.ps1' -CustomizationPath '.\HuymaierCustomization.ps1'
+          & '.\.build\Optimize-ModelWinding.ps1'
+          & '.\.build\Optimize-ConsoleModelScale.ps1'
+          & '.\.development\v0.30.2\Test-v0302-ConsoleBrightness.ps1'
+          & '.\.development\v0.30.3\Test-v0303-FseUpdaterHandoff.ps1'
+          & '.\.development\v0.30.4\Test-v0304-ModelDefaultViews.ps1'
+          & '.\.development\v0.30.5\Test-v0305-AdaptiveModelWinding.ps1'
+          & '.\.development\v0.30.6\Test-v0306-ConsoleModelScale.ps1'
+
+      - name: Run carry-forward stabilization gates
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          & '.\.development\v0.26.5\Test-v0265-PowerShellSafety.ps1'
+          & '.\.development\v0.26.5\Test-v0265-PerformanceAndOwnership.ps1'
+          & '.\.development\v0.26.5\Test-v0265-Stabilization.ps1'
+          & '.\.development\v0.26.5\Test-v0265-StreamingController.ps1'
+          & '.\.development\v0.26.5\Test-v0265-UnifiedCursor.ps1'
+          & '.\.development\v0.26.5\Test-v0265-DownloadRefreshPolicy.ps1'
+          & '.\.development\v0.26.5\Test-v0265-GameCubeHubNavigation.ps1'
+          & '.\.development\v0.26.5\Test-NintendoLibraryOwnership.ps1'
+          & '.\.development\v0.26.5\Test-v0265-ManualRecomps.ps1'
+
+      - name: Run carry-forward platform renderer gates
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          try {
+            & '.\.development\v0.26.5\Prepare-v0265-PlatformModelValidation.ps1'
+            Get-ChildItem '.\.development\v0.26.5' -Filter '*.ps1' -File -Recurse | ForEach-Object {
+              $text=[IO.File]::ReadAllText($_.FullName,[Text.Encoding]::UTF8)
+              if($text.Contains('HUYMAIER_D3D11_SHELF_HOST_V2')){
+                $text=$text.Replace('HUYMAIER_D3D11_SHELF_HOST_V2','HUYMAIER_D3D11_SHELF_HOST_V3_BOUNDED_FAN_MOTION')
+                [IO.File]::WriteAllText($_.FullName,$text,(New-Object Text.UTF8Encoding($false)))
+              }
+            }
+            & '.\.development\v0.26.5\Test-v0265-PlatformModels.ps1'
+            & '.\.development\v0.26.5\Test-v0265-User3DModels.ps1'
+            & '.\.development\v0.26.5\Test-v0265-Live3DCardRender.ps1'
+            & '.\.development\v0.26.5\Test-v0265-D3D11ShelfBackend.ps1'
+            & '.\.development\v0.26.5\Test-v0265-GpuShelfAssetCompiler.ps1'
+            & '.\.development\v0.26.5\Test-v0265-D3D11CachedModelRender.ps1'
+            & '.\.development\v0.26.5\Test-v0265-GpuPlatformShelvesV7.ps1'
+            & '.\.development\v0.26.5\Test-v0265-ManualRecompsFinalOwnership.ps1'
+            & '.\.development\v0.30.5\Test-v0305-AdaptiveModelWinding.ps1'
+            & '.\.development\v0.30.6\Test-v0306-ConsoleModelScale.ps1'
+          }
+          finally {
+            & git checkout -- '.development/v0.26.5'
+            & git clean -fd
+          }
+
+      - name: Apply and validate full console editor plus studio light
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          if(-not((Get-Content -Raw '.\HuymaierCustomization.ps1') -match 'HUYMAIER_V0302_CONSOLE_BRIGHTNESS_V1')){& '.\.build\Optimize-ConsoleBrightness.ps1' -CustomizationPath '.\HuymaierCustomization.ps1'}
+          & '.\.build\Optimize-ModelWinding.ps1'
+          & '.\.build\Optimize-ConsoleModelScale.ps1'
+          & '.\.build\Optimize-ConsoleModelPresentation.ps1'
+          & '.\.build\Optimize-ConsoleStudioLight.ps1'
+          & '.\.development\v0.30.5\Test-v0305-AdaptiveModelWinding.ps1'
+          & '.\.development\v0.30.6\Test-v0306-ConsoleModelScale.ps1'
+          & '.\.development\v0.30.6\Test-v0306-ConsoleModelPresentation.ps1'
+          & '.\.development\v0.30.7\Test-v0307-ConsoleStudioLight.ps1'
+
+      - name: Build exact x64 FSE Home host
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          if(-not(Test-Path $csc)){throw 'Framework64 csc missing'}
+          $source=Join-Path $env:GITHUB_WORKSPACE 'HuymaierFSEHost.cs'
+          $output=Join-Path $env:GITHUB_WORKSPACE 'FSEPackage\HuymaierFSEHost.exe'
+          $systemAssembly=[Diagnostics.Process].Assembly.Location
+          & $csc /noconfig /nologo /target:winexe /platform:x64 /optimize+ ('/reference:'+$systemAssembly) ('/out:'+$output) $source
+          if($LASTEXITCODE -ne 0 -or -not(Test-Path $output)){throw 'x64 FSE Home host compilation failed'}
+          git add -N -f FSEPackage/HuymaierFSEHost.exe
+
+      - name: Build release-shaped v0.30.7 package
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference='Stop'
+          & '.\.build\Build-HuymaierReleaseCandidate.ps1' -TriggerPath '${{ steps.request.outputs.path }}'
+
+      - name: Run installer and integrity failure-injection suite
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $stage=Join-Path $env:RUNNER_TEMP ('hc-stage\${{ steps.request.outputs.package_root }}')
+          $validation=Join-Path $env:HC_CANDIDATE_OUTPUT 'candidate-validation.json'
+          & '.\.build\Test-HuymaierCandidate.ps1' -StageRoot $stage -ValidationPath $validation
+
+      - name: Run v0.30.7 staged package gates
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $stage=Join-Path $env:RUNNER_TEMP ('hc-stage\${{ steps.request.outputs.package_root }}')
+          $validation=Join-Path $env:HC_CANDIDATE_OUTPUT 'candidate-validation.json'
+          & '.\.build\Test-HuymaierV0307Candidate.ps1' -StageRoot $stage -ValidationPath $validation
+
+      - name: Verify final release hash
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $validation=Get-Content -Raw (Join-Path $env:HC_CANDIDATE_OUTPUT 'candidate-validation.json') -Encoding UTF8|ConvertFrom-Json
+          $zip=Join-Path $env:HC_CANDIDATE_OUTPUT '${{ steps.request.outputs.asset }}'
+          $hash=(Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if($hash -ne [string]$validation.sha256){throw "Final ZIP hash $hash differs from validation $($validation.sha256)"}
+          Write-Host "Final HC0307 SHA-256: $hash"
+
+      - name: Upload exact validated bytes as Actions artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: '${{ steps.request.outputs.candidate }}'
+          path: |
+            ${{ env.HC_CANDIDATE_OUTPUT }}\${{ steps.request.outputs.asset }}
+            ${{ env.HC_CANDIDATE_OUTPUT }}\${{ steps.request.outputs.asset }}.sha256
+            ${{ env.HC_CANDIDATE_OUTPUT }}\candidate-validation.json
+          if-no-files-found: error
+          retention-days: 30
