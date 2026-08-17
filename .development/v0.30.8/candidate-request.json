@@ -1,11 +1,11 @@
 {
-  "candidate": "v0.30.8-rc2",
+  "candidate": "v0.30.8-rc3",
   "version": "0.30.8",
   "base_release": "v0.30.7",
   "base_asset": "HC0307.zip",
   "package_root": "HC0308",
   "asset_name": "HC0308.zip",
-  "production_source": "8ef1dc26b399ba2d95a296f655a9f828414a769f",
-  "attempt": 6,
-  "notes": "TheGamesDB-first platform-aware missing-cover fallback plus corrected 0.30.8/x64 native host build stamp and a compiled-host regression gate that rejects mixed native/script candidates before artifact upload."
+  "production_source": "21951bc2fd28776f3011462039e3cdf31afd14e4",
+  "attempt": 7,
+  "notes": "TheGamesDB-first platform-aware missing-cover fallback with corrected 0.30.8/x64 native stamp plus active HuymaierShellRedesign Console Settings exposure for TheGamesDB key, retry unresolved, platform refresh, and artwork cache controls."
 }
