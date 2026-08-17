@@ -1,7 +1,9 @@
 ﻿param(
     [Parameter(Mandatory=$true)][string]$PackagePath,
     [Parameter(Mandatory=$true)][int]$ParentProcessId,
-    [string]$InstallRoot=(Join-Path $env:LOCALAPPDATA 'Huymaier Console')
+    [string]$InstallRoot=(Join-Path $env:LOCALAPPDATA 'Huymaier Console'),
+    [switch]$FseManaged,
+    [string]$HandoffPath=''
 )
 Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
@@ -14,6 +16,7 @@ $mutex=$null
 $ownsMutex=$false
 $relaunch=''
 $success=$false
+if($FseManaged -and [string]::IsNullOrWhiteSpace($HandoffPath)){$HandoffPath=Join-Path $env:LOCALAPPDATA 'HuymaierConsoleFseUpdate.lock'}
 
 function Log([string]$Message,[string]$Level='INFO'){
     try{Add-Content -LiteralPath $log -Value ((Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff')+" [$Level] "+$Message) -Encoding UTF8}catch{}
@@ -56,6 +59,7 @@ try{
     }
     if(-not $ownsMutex){throw 'Another Huymaier Console update is already running.'}
 
+    if($FseManaged){Log "Windows FSE update handoff active: $HandoffPath"}
     Log "Waiting for Huymaier Console PID $ParentProcessId to exit."
     Wait-HcProcessExit -Id $ParentProcessId -TimeoutSeconds 90
     if(-not(Test-Path -LiteralPath $PackagePath -PathType Leaf)){throw "Downloaded update package is missing: $PackagePath"}
@@ -99,10 +103,15 @@ try{
     Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
     if($ownsMutex -and $null -ne $mutex){try{$mutex.ReleaseMutex()}catch{};$ownsMutex=$false}
     if($null -ne $mutex){try{$mutex.Dispose()}catch{};$mutex=$null}
+    if($FseManaged -and -not [string]::IsNullOrWhiteSpace($HandoffPath)){
+        Remove-Item -LiteralPath $HandoffPath -Force -ErrorAction SilentlyContinue
+        Log 'Released Windows FSE update handoff gate.'
+    }
 }
 
-# Release the updater gate before launching the new verified host. This avoids a
-# relaunch race where the new process sees an update still in progress.
-if($relaunch){Start-Sleep -Milliseconds 250;Start-Process -FilePath $relaunch -WorkingDirectory $InstallRoot|Out-Null}
+# In Windows/Xbox FSE mode the long-lived FSE host owns the post-update relaunch.
+# Desktop launches keep the existing updater-owned relaunch behavior.
+if($relaunch -and -not $FseManaged){Start-Sleep -Milliseconds 250;Start-Process -FilePath $relaunch -WorkingDirectory $InstallRoot|Out-Null}
+elseif($relaunch -and $FseManaged){Log 'Windows FSE host owns post-update relaunch.'}
 if(-not $success){exit 1}
 exit 0
