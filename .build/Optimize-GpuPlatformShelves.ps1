@@ -25,6 +25,7 @@ function Replace-HcGpuExact {
 $compilerPath=Join-Path $repoRoot 'Native\HuymaierGpuShelfAssetCompiler.cs'
 $assetHeaderPath=Join-Path $repoRoot 'Native\HuymaierD3D11ShelfAsset.h'
 $assetCppPath=Join-Path $repoRoot 'Native\HuymaierD3D11ShelfAsset.cpp'
+$rendererCppPath=Join-Path $repoRoot 'Native\HuymaierD3D11ShelfRenderer.cpp'
 $runtimeCppPath=Join-Path $repoRoot 'Native\HuymaierD3D11ShelfRuntime.cpp'
 $assetSmokePath=Join-Path $repoRoot 'Native\HuymaierD3D11ShelfAssetSmoke.cpp'
 $gpuRuntimePath=Join-Path $repoRoot 'HuymaierGpuPlatformShelves.ps1'
@@ -55,6 +56,10 @@ $layoutTail='            {"TEXCOORD",4,DXGI_FORMAT_R32G32_FLOAT,0,72,D3D11_INPUT
 $layoutV4='            {"TEXCOORD",4,DXGI_FORMAT_R32G32_FLOAT,0,72,D3D11_INPUT_PER_VERTEX_DATA,0},'+$nl+'            {"COLOR",0,DXGI_FORMAT_R32G32B32A32_FLOAT,0,80,D3D11_INPUT_PER_VERTEX_DATA,0}};'
 Replace-HcGpuExact $runtimeCppPath $layoutTail $layoutV4 'production D3D11 COLOR0 input layout'
 Replace-HcGpuExact $assetSmokePath $layoutTail $layoutV4 'WARP D3D11 COLOR0 input layout'
+$rendererLayoutTail='{"TEXCOORD",4,DXGI_FORMAT_R32G32_FLOAT,0,72,D3D11_INPUT_PER_VERTEX_DATA,0}};if(FAILED(device->CreateInputLayout'
+$rendererLayoutV4='{"TEXCOORD",4,DXGI_FORMAT_R32G32_FLOAT,0,72,D3D11_INPUT_PER_VERTEX_DATA,0},{"COLOR",0,DXGI_FORMAT_R32G32B32A32_FLOAT,0,80,D3D11_INPUT_PER_VERTEX_DATA,0}};if(FAILED(device->CreateInputLayout'
+Replace-HcGpuExact $rendererCppPath $rendererLayoutTail $rendererLayoutV4 'packaged hue smoke COLOR0 input layout'
+Replace-HcGpuExact $rendererCppPath 'verts[i].nz=-1;verts[i].tx=1;verts[i].tw=1;}' 'verts[i].nz=-1;verts[i].tx=1;verts[i].tw=1;verts[i].cr=1;verts[i].cg=1;verts[i].cb=1;verts[i].ca=1;}' 'packaged hue smoke white vertex color default'
 Replace-HcGpuExact $gpuRuntimePath 'if($reader.ReadInt32()-ne3){return $false}' 'if($reader.ReadInt32()-ne4){return $false}' 'PowerShell HC3D v4 cache validator'
 
 # Update regression gates that intentionally assert the active HC3D schema. These
