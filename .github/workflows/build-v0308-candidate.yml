@@ -43,10 +43,12 @@ jobs:
             '.build/Optimize-v0308-TgdbSchema.ps1',
             '.build/Optimize-v0308-InstallerVersion.ps1',
             '.build/Optimize-v0308-ShellArtworkUi.ps1',
+            '.build/Optimize-v0308-UiAuthorityCleanup.ps1',
             '.development/v0.30.8/Test-v0308-CoverArtFallback.ps1',
             '.development/v0.30.8/Test-v0308-TgdbSchema.ps1',
             '.development/v0.30.8/Test-v0308-NativeBuildStamp.ps1',
-            '.development/v0.30.8/Test-v0308-ShellArtworkUi.ps1'
+            '.development/v0.30.8/Test-v0308-ShellArtworkUi.ps1',
+            '.development/v0.30.8/Test-v0308-UiAuthority.ps1'
           )
           foreach($file in $files){
             $tokens=$null;$errors=$null;[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file),[ref]$tokens,[ref]$errors)
@@ -60,6 +62,7 @@ jobs:
           ./.build/Optimize-v0308-TgdbSchema.ps1
           ./.build/Optimize-v0308-InstallerVersion.ps1
           ./.build/Optimize-v0308-ShellArtworkUi.ps1
+          ./.build/Optimize-v0308-UiAuthorityCleanup.ps1
 
       - name: Validate transformed source
         shell: powershell
@@ -68,6 +71,7 @@ jobs:
           ./.development/v0.30.8/Test-v0308-TgdbSchema.ps1 -StageRoot .
           ./.development/v0.30.8/Test-v0308-NativeBuildStamp.ps1 -StageRoot .
           ./.development/v0.30.8/Test-v0308-ShellArtworkUi.ps1 -StageRoot .
+          ./.development/v0.30.8/Test-v0308-UiAuthority.ps1 -StageRoot .
 
       - name: Build release-shaped candidate from HC0307.zip
         shell: powershell
@@ -87,6 +91,7 @@ jobs:
           ./.development/v0.30.8/Test-v0308-CoverArtFallback.ps1 -StageRoot $stage
           ./.development/v0.30.8/Test-v0308-TgdbSchema.ps1 -StageRoot $stage
           ./.development/v0.30.8/Test-v0308-ShellArtworkUi.ps1 -StageRoot $stage
+          ./.development/v0.30.8/Test-v0308-UiAuthority.ps1 -StageRoot $stage
 
       - name: Run installer and integrity regression suite
         shell: powershell
@@ -110,7 +115,7 @@ jobs:
       - name: Upload full testable candidate
         uses: actions/upload-artifact@v4
         with:
-          name: v0.30.8-rc3
+          name: v0.30.8-rc4
           path: ${{ env.HC_CANDIDATE_OUTPUT }}\*
           if-no-files-found: error
           retention-days: 14
