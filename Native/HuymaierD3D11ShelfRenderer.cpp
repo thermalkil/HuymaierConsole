@@ -7,9 +7,14 @@
 #include <wrl/client.h>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <mutex>
 
+#include "HuymaierD3D11ShelfAsset.h"
+
 using Microsoft::WRL::ComPtr;
+using HuymaierGpuShelf::HcShelfShaderSource;
+using HuymaierGpuShelf::Vertex;
 
 namespace
 {
@@ -17,6 +22,19 @@ namespace
     {
         float x, y, z;
         float r, g, b, a;
+    };
+
+    struct ProductionConstants
+    {
+        float worldViewProjection[16];
+        float world[16];
+        float baseColor[4];
+        float emissive[4];
+        float surface[4];
+        float extra[4];
+        float materialParams[4];
+        int flags[4];
+        int maps[4];
     };
 
     struct ShelfSurface
@@ -317,11 +335,105 @@ float4 PSMain(VSOutput input) : SV_TARGET
         surface.context11->Unmap(staging.Get(), 0);
         return colored >= 40 ? 1 : 17;
     }
+
+    int RunProductionHuePreservationSmokeTest()
+    {
+        // HUYMAIER_D3D11_PACKAGED_HUE_SMOKE_V1
+        // This executes the exact shelf HLSL at the user's minimum brightness (50%).
+        // A deliberately over-range purple material must remain visibly purple; the
+        // previous per-channel saturate() path turned this case into a white silhouette.
+        const D3D_FEATURE_LEVEL levels[] = { D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0 };
+        D3D_FEATURE_LEVEL level{};
+        ComPtr<ID3D11Device> device;
+        ComPtr<ID3D11DeviceContext> context;
+        HRESULT hr = D3D11CreateDevice(nullptr,D3D_DRIVER_TYPE_WARP,nullptr,D3D11_CREATE_DEVICE_BGRA_SUPPORT,levels,ARRAYSIZE(levels),D3D11_SDK_VERSION,device.GetAddressOf(),&level,context.GetAddressOf());
+        if(FAILED(hr)) return 18;
+
+        ComPtr<ID3DBlob> vsBlob,psBlob,errors;
+        hr=D3DCompile(HcShelfShaderSource,strlen(HcShelfShaderSource),"HuymaierPackagedHueSmoke",nullptr,nullptr,"VSMain","vs_4_0",D3DCOMPILE_OPTIMIZATION_LEVEL3,0,vsBlob.GetAddressOf(),errors.GetAddressOf());
+        if(FAILED(hr)) return 19;
+        errors.Reset();
+        hr=D3DCompile(HcShelfShaderSource,strlen(HcShelfShaderSource),"HuymaierPackagedHueSmoke",nullptr,nullptr,"PSMain","ps_4_0",D3DCOMPILE_OPTIMIZATION_LEVEL3,0,psBlob.GetAddressOf(),errors.GetAddressOf());
+        if(FAILED(hr)) return 20;
+
+        ComPtr<ID3D11VertexShader> vs;
+        ComPtr<ID3D11PixelShader> ps;
+        ComPtr<ID3D11InputLayout> layout;
+        if(FAILED(device->CreateVertexShader(vsBlob->GetBufferPointer(),vsBlob->GetBufferSize(),nullptr,vs.GetAddressOf()))) return 21;
+        if(FAILED(device->CreatePixelShader(psBlob->GetBufferPointer(),psBlob->GetBufferSize(),nullptr,ps.GetAddressOf()))) return 22;
+        const D3D11_INPUT_ELEMENT_DESC elements[]={
+            {"POSITION",0,DXGI_FORMAT_R32G32B32_FLOAT,0,0,D3D11_INPUT_PER_VERTEX_DATA,0},
+            {"NORMAL",0,DXGI_FORMAT_R32G32B32_FLOAT,0,12,D3D11_INPUT_PER_VERTEX_DATA,0},
+            {"TANGENT",0,DXGI_FORMAT_R32G32B32A32_FLOAT,0,24,D3D11_INPUT_PER_VERTEX_DATA,0},
+            {"TEXCOORD",0,DXGI_FORMAT_R32G32_FLOAT,0,40,D3D11_INPUT_PER_VERTEX_DATA,0},
+            {"TEXCOORD",1,DXGI_FORMAT_R32G32_FLOAT,0,48,D3D11_INPUT_PER_VERTEX_DATA,0},
+            {"TEXCOORD",2,DXGI_FORMAT_R32G32_FLOAT,0,56,D3D11_INPUT_PER_VERTEX_DATA,0},
+            {"TEXCOORD",3,DXGI_FORMAT_R32G32_FLOAT,0,64,D3D11_INPUT_PER_VERTEX_DATA,0},
+            {"TEXCOORD",4,DXGI_FORMAT_R32G32_FLOAT,0,72,D3D11_INPUT_PER_VERTEX_DATA,0}};
+        if(FAILED(device->CreateInputLayout(elements,ARRAYSIZE(elements),vsBlob->GetBufferPointer(),vsBlob->GetBufferSize(),layout.GetAddressOf()))) return 23;
+
+        Vertex vertices[3]{};
+        const float positions[9]={-.82f,-.72f,0.0f,.82f,-.72f,0.0f,0.0f,.82f,0.0f};
+        for(int i=0;i<3;++i)
+        {
+            vertices[i].px=positions[i*3+0];vertices[i].py=positions[i*3+1];vertices[i].pz=positions[i*3+2];
+            vertices[i].nx=0.0f;vertices[i].ny=0.0f;vertices[i].nz=-1.0f;
+            vertices[i].tx=1.0f;vertices[i].ty=0.0f;vertices[i].tz=0.0f;vertices[i].tw=1.0f;
+        }
+        D3D11_BUFFER_DESC vbDesc{};vbDesc.ByteWidth=sizeof(vertices);vbDesc.Usage=D3D11_USAGE_IMMUTABLE;vbDesc.BindFlags=D3D11_BIND_VERTEX_BUFFER;
+        D3D11_SUBRESOURCE_DATA vbData{};vbData.pSysMem=vertices;ComPtr<ID3D11Buffer> vb;if(FAILED(device->CreateBuffer(&vbDesc,&vbData,vb.GetAddressOf()))) return 24;
+
+        ProductionConstants constants{};
+        for(int i=0;i<16;++i){constants.worldViewProjection[i]=(i%5)==0?1.0f:0.0f;constants.world[i]=(i%5)==0?1.0f:0.0f;}
+        constants.baseColor[0]=.43f;constants.baseColor[1]=.14f;constants.baseColor[2]=.70f;constants.baseColor[3]=1.0f;
+        constants.emissive[0]=.43f;constants.emissive[1]=.14f;constants.emissive[2]=.70f;constants.emissive[3]=15.0f;
+        constants.surface[0]=1.0f;constants.surface[1]=.20f;constants.surface[2]=1.0f;constants.surface[3]=0.0f;
+        constants.extra[0]=.5f;constants.extra[1]=0.0f;constants.extra[2]=.50f;constants.extra[3]=0.0f;
+        constants.materialParams[0]=1.0f;constants.materialParams[1]=1.0f;
+        D3D11_BUFFER_DESC cbDesc{};cbDesc.ByteWidth=sizeof(ProductionConstants);cbDesc.Usage=D3D11_USAGE_IMMUTABLE;cbDesc.BindFlags=D3D11_BIND_CONSTANT_BUFFER;
+        D3D11_SUBRESOURCE_DATA cbData{};cbData.pSysMem=&constants;ComPtr<ID3D11Buffer> cb;if(FAILED(device->CreateBuffer(&cbDesc,&cbData,cb.GetAddressOf()))) return 25;
+
+        const UINT width=128,height=96;
+        D3D11_TEXTURE2D_DESC targetDesc{};targetDesc.Width=width;targetDesc.Height=height;targetDesc.MipLevels=1;targetDesc.ArraySize=1;targetDesc.Format=DXGI_FORMAT_B8G8R8A8_UNORM;targetDesc.SampleDesc.Count=1;targetDesc.Usage=D3D11_USAGE_DEFAULT;targetDesc.BindFlags=D3D11_BIND_RENDER_TARGET;
+        ComPtr<ID3D11Texture2D> target;ComPtr<ID3D11RenderTargetView> rtv;if(FAILED(device->CreateTexture2D(&targetDesc,nullptr,target.GetAddressOf()))||FAILED(device->CreateRenderTargetView(target.Get(),nullptr,rtv.GetAddressOf()))) return 26;
+
+        const float clear[4]={0,0,0,0};context->OMSetRenderTargets(1,rtv.GetAddressOf(),nullptr);context->ClearRenderTargetView(rtv.Get(),clear);
+        D3D11_VIEWPORT vp{};vp.Width=(float)width;vp.Height=(float)height;vp.MaxDepth=1.0f;context->RSSetViewports(1,&vp);
+        UINT stride=sizeof(Vertex),offset=0;ID3D11Buffer* vbRaw=vb.Get();context->IASetVertexBuffers(0,1,&vbRaw,&stride,&offset);context->IASetInputLayout(layout.Get());context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);context->VSSetShader(vs.Get(),nullptr,0);context->PSSetShader(ps.Get(),nullptr,0);ID3D11Buffer* cbRaw=cb.Get();context->VSSetConstantBuffers(0,1,&cbRaw);context->PSSetConstantBuffers(0,1,&cbRaw);context->Draw(3,0);context->Flush();
+
+        D3D11_TEXTURE2D_DESC stageDesc=targetDesc;stageDesc.Usage=D3D11_USAGE_STAGING;stageDesc.BindFlags=0;stageDesc.CPUAccessFlags=D3D11_CPU_ACCESS_READ;ComPtr<ID3D11Texture2D> staging;if(FAILED(device->CreateTexture2D(&stageDesc,nullptr,staging.GetAddressOf()))) return 27;context->CopyResource(staging.Get(),target.Get());
+        D3D11_MAPPED_SUBRESOURCE mapped{};if(FAILED(context->Map(staging.Get(),0,D3D11_MAP_READ,0,&mapped))) return 28;
+        int visible=0,purple=0,neutralHot=0;
+        for(UINT y=0;y<height;y+=2)
+        {
+            const uint8_t* row=(const uint8_t*)mapped.pData+y*mapped.RowPitch;
+            for(UINT x=0;x<width;x+=2)
+            {
+                const uint8_t* p=row+x*4;
+                if(p[3]<200) continue;
+                visible++;
+                const int b=p[0],g=p[1],r=p[2];
+                const int mx=std::max(r,std::max(g,b)),mn=std::min(r,std::min(g,b));
+                if(b>g+30&&r>g+20&&mx-mn>35) purple++;
+                if(mx>225&&mx-mn<18) neutralHot++;
+            }
+        }
+        context->Unmap(staging.Get(),0);
+        if(visible<120) return 29;
+        if(purple<visible/2) return 30;
+        if(neutralHot>visible/20) return 31;
+        return 1;
+    }
 }
 
 extern "C" __declspec(dllexport) int __cdecl HC_D3D11SmokeTest()
 {
-    try { return RunOffscreenSmokeTest(); }
+    try
+    {
+        const int basic=RunOffscreenSmokeTest();
+        if(basic!=1) return basic;
+        return RunProductionHuePreservationSmokeTest();
+    }
     catch (...) { return 99; }
 }
 
