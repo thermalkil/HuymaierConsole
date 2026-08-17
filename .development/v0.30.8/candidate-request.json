@@ -5,7 +5,7 @@
   "base_asset": "HC0307.zip",
   "package_root": "HC0308",
   "asset_name": "HC0308.zip",
-  "production_source": "95d0d8b0585c61593890e7dedef330e1724c8961",
-  "attempt": 9,
+  "production_source": "58c192b69e5e4b27a028bc2313c6234d038d4075",
+  "attempt": 10,
   "notes": "Adds a unified top-right background-task HUD with persistent task names, progress/current detail, bounded multi-task stacking and short completion/error retention. Sequences combined library refresh before missing-art discovery so artwork always scans the fresh library, guarantees TheGamesDB/SteamGridDB API key persistence, accumulates artwork results across continuation batches, and removes the RC4 unified-cursor File.Replace warning flood. Preserves the consolidated active Settings ownership and TheGamesDB-first artwork pipeline."
 }
