@@ -1,4 +1,5 @@
 {
   "tag": "v0.30.6",
-  "reason": "Synchronize the authoritative public source/configuration tree from the newly published v0.30.6 release."
+  "reason": "Synchronize the authoritative public source/configuration tree from the newly published v0.30.6 release.",
+  "attempt": 2
 }
