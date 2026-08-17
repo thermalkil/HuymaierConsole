@@ -28,7 +28,7 @@ function New-Hc3dV4Probe {
             @( 1.0, 0.65,0.0, 0.0,0.0,-1.0, 1.0,0.0,0.0,1.0, 1.0,1.0),
             @(-1.0, 0.65,0.0, 0.0,0.0,-1.0, 1.0,0.0,0.0,1.0, 0.0,1.0)
         )
-        $vertexColor=$(if($VertexColorOnly){@([single].61,[single].03,[single].86,[single]1)}else{@([single]1,[single]1,[single]1,[single]1)})
+        $vertexColor=$(if($VertexColorOnly){@([single]0.61,[single]0.03,[single]0.86,[single]1)}else{@([single]1,[single]1,[single]1,[single]1)})
         foreach($v in $verts){
             # position3 + normal3 + tangent4 + five UV pairs + COLOR_0 RGBA = 24 floats / 96 bytes.
             foreach($f in $v){$bw.Write([single]$f)}
