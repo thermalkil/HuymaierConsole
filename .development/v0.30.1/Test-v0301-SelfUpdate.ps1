@@ -33,13 +33,13 @@ if(-not((Get-HcComparableVersion 'v0.30.1') -gt (Get-HcComparableVersion 'v0.3.0
 foreach($token in @(
     "'HuymaierConsole/'+`$CurrentVersion",
     'Select-PackageAsset -Release $release -VersionText $latestVersionText',
-    "$expected='HC'+`$digits+'.zip'",
-    '$sidecarPath=$target+\'.sha256\'',
+    "`$expected='HC'+`$digits+'.zip'",
+    "`$sidecarPath=`$target+'.sha256'",
     'Downloaded update ZIP does not match the SHA-256 published with the GitHub Release.'
 )){if(-not$worker.Contains($token)){throw "Missing updater download/integrity contract: $token"}}
 
 foreach($token in @(
-    "$sidecar=`$PackagePath+'.sha256'",
+    "`$sidecar=`$PackagePath+'.sha256'",
     'Wait-HcProcessExit -Id $ParentProcessId -TimeoutSeconds 90',
     "'-SilentUpdate'",
     'Downloaded update ZIP does not match the SHA-256 published with the release.',
