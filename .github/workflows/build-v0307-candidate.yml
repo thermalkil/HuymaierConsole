@@ -57,6 +57,7 @@ jobs:
             '.\.build\Optimize-ConsoleModelPresentation.ps1',
             '.\.build\Optimize-ConsoleStudioLight.ps1',
             '.\.build\Optimize-ConsoleStudioLightAdvanced.ps1',
+            '.\.build\Invoke-ConsoleStudioLightAdvanced.ps1',
             '.\.build\Test-HuymaierCandidate.ps1',
             '.\.build\Test-HuymaierV0307Candidate.ps1',
             '.\.development\v0.30.2\Test-v0302-ConsoleBrightness.ps1',
@@ -145,7 +146,7 @@ jobs:
           & '.\.development\v0.30.5\Test-v0305-AdaptiveModelWinding.ps1'
           & '.\.development\v0.30.6\Test-v0306-ConsoleModelScale.ps1'
           & '.\.development\v0.30.7\Test-v0307-ConsoleStudioLight.ps1'
-          & '.\.build\Optimize-ConsoleStudioLightAdvanced.ps1'
+          & '.\.build\Invoke-ConsoleStudioLightAdvanced.ps1'
           & '.\.development\v0.30.7\Test-v0307-ConsoleStudioLightAdvanced.ps1'
 
       - name: Build exact x64 FSE Home host
