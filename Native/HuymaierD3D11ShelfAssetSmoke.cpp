@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 
 #include "HuymaierD3D11ShelfAsset.h"
@@ -22,10 +23,11 @@ using HuymaierGpuShelf::HcShelfShaderSource;
 namespace
 {
     // HUYMAIER_D3D11_CACHED_ASSET_SMOKE_V3
-    // HUYMAIER_D3D11_CACHED_ASSET_SMOKE_V4_PRODUCTION_SHADER
-    // WARP renders HC3D caches with the exact production shelf shader. Besides
-    // geometry/material/alpha survival this rejects the old visually-dark path:
-    // authored colorful material pixels must reach a readable desktop intensity.
+    // HUYMAIER_D3D11_CACHED_ASSET_SMOKE_V5_COLOR_PRESERVATION
+    // WARP renders HC3D caches with the exact production shelf shader. The normal
+    // pass runs at the UI's minimum 50% brightness. A second diagnostic pass forces
+    // a deliberately over-range purple emissive material; it must remain purple
+    // rather than channel-clipping to white.
     struct Constants
     {
         XMFLOAT4X4 worldViewProjection;
@@ -46,7 +48,7 @@ namespace
         return D3D11_TEXTURE_ADDRESS_WRAP;
     }
 
-    int RunCachedSmoke(const wchar_t* cachePath)
+    int RunCachedSmoke(const wchar_t* cachePath,bool forceHotPurple)
     {
         const D3D_FEATURE_LEVEL levels[]={D3D_FEATURE_LEVEL_11_0,D3D_FEATURE_LEVEL_10_1,D3D_FEATURE_LEVEL_10_0};
         D3D_FEATURE_LEVEL level{};ComPtr<ID3D11Device> device;ComPtr<ID3D11DeviceContext> context;
@@ -56,8 +58,8 @@ namespace
         std::unique_ptr<Asset,void(*)(Asset*)> asset(raw,HuymaierGpuShelf::DestroyAsset);
 
         ComPtr<ID3DBlob> vsb,psb,err;
-        if(FAILED(D3DCompile(HcShelfShaderSource,strlen(HcShelfShaderSource),"HC3Dv4ProductionSmoke",nullptr,nullptr,"VSMain","vs_4_0",D3DCOMPILE_OPTIMIZATION_LEVEL3,0,vsb.GetAddressOf(),err.GetAddressOf())))return 32;
-        err.Reset();if(FAILED(D3DCompile(HcShelfShaderSource,strlen(HcShelfShaderSource),"HC3Dv4ProductionSmoke",nullptr,nullptr,"PSMain","ps_4_0",D3DCOMPILE_OPTIMIZATION_LEVEL3,0,psb.GetAddressOf(),err.GetAddressOf())))return 33;
+        if(FAILED(D3DCompile(HcShelfShaderSource,strlen(HcShelfShaderSource),"HC3Dv5ProductionSmoke",nullptr,nullptr,"VSMain","vs_4_0",D3DCOMPILE_OPTIMIZATION_LEVEL3,0,vsb.GetAddressOf(),err.GetAddressOf())))return 32;
+        err.Reset();if(FAILED(D3DCompile(HcShelfShaderSource,strlen(HcShelfShaderSource),"HC3Dv5ProductionSmoke",nullptr,nullptr,"PSMain","ps_4_0",D3DCOMPILE_OPTIMIZATION_LEVEL3,0,psb.GetAddressOf(),err.GetAddressOf())))return 33;
         ComPtr<ID3D11VertexShader> vs;ComPtr<ID3D11PixelShader> ps;ComPtr<ID3D11InputLayout> layout;
         if(FAILED(device->CreateVertexShader(vsb->GetBufferPointer(),vsb->GetBufferSize(),nullptr,vs.GetAddressOf())))return 34;
         if(FAILED(device->CreatePixelShader(psb->GetBufferPointer(),psb->GetBufferSize(),nullptr,ps.GetAddressOf())))return 35;
@@ -84,23 +86,44 @@ namespace
         XMMATRIX world=XMMatrixTranslation(-cx,-cy,-cz)*XMMatrixScaling(2.45f/diameter,2.45f/diameter,2.45f/diameter)*XMMatrixRotationY(XMConvertToRadians(18.0f));XMMATRIX view=XMMatrixLookAtLH(XMVectorSet(0,.04f,-4.2f,1),XMVectorZero(),XMVectorSet(0,1,0,0));XMMATRIX proj=XMMatrixPerspectiveFovLH(XMConvertToRadians(34.0f),(float)width/(float)height,.01f,100.0f);XMMATRIX wvp=world*view*proj;
         for(const DrawBatch& d:asset->draws)
         {
-            Constants c{};XMStoreFloat4x4(&c.worldViewProjection,wvp);XMStoreFloat4x4(&c.world,world);c.baseColor=XMFLOAT4(d.baseColor[0],d.baseColor[1],d.baseColor[2],d.baseColor[3]);c.emissive=XMFLOAT4(d.emissiveColor[0],d.emissiveColor[1],d.emissiveColor[2],d.emissiveStrength);c.surface=XMFLOAT4(d.metallic,d.roughness,d.specular,d.clearcoat);c.extra=XMFLOAT4(d.alphaCutoff,0.0f,1.35f,0.0f);c.materialParams=XMFLOAT4(d.normalScale,d.occlusionStrength,0,0);c.flags=XMINT4(d.baseImage>=0?1:0,d.emissiveImage>=0?1:0,d.alphaMode,(d.flags&2)?1:0);c.maps=XMINT4(d.metallicRoughnessImage>=0?1:0,d.normalImage>=0?1:0,d.occlusionImage>=0?1:0,(d.flags&1)?1:0);
+            Constants c{};XMStoreFloat4x4(&c.worldViewProjection,wvp);XMStoreFloat4x4(&c.world,world);
+            if(forceHotPurple)
+            {
+                c.baseColor=XMFLOAT4(.43f,.14f,.70f,1.0f);
+                c.emissive=XMFLOAT4(.43f,.14f,.70f,15.0f);
+                c.surface=XMFLOAT4(1.0f,.20f,1.0f,0.0f);
+                c.extra=XMFLOAT4(.5f,0.0f,.50f,0.0f);
+                c.materialParams=XMFLOAT4(1,1,0,0);
+                c.flags=XMINT4(0,0,0,(d.flags&1)?1:0);
+                c.maps=XMINT4(0,0,0,(d.flags&1)?1:0);
+            }
+            else
+            {
+                c.baseColor=XMFLOAT4(d.baseColor[0],d.baseColor[1],d.baseColor[2],d.baseColor[3]);c.emissive=XMFLOAT4(d.emissiveColor[0],d.emissiveColor[1],d.emissiveColor[2],d.emissiveStrength);c.surface=XMFLOAT4(d.metallic,d.roughness,d.specular,d.clearcoat);c.extra=XMFLOAT4(d.alphaCutoff,0.0f,.50f,0.0f);c.materialParams=XMFLOAT4(d.normalScale,d.occlusionStrength,0,0);c.flags=XMINT4(d.baseImage>=0?1:0,d.emissiveImage>=0?1:0,d.alphaMode,(d.flags&2)?1:0);c.maps=XMINT4(d.metallicRoughnessImage>=0?1:0,d.normalImage>=0?1:0,d.occlusionImage>=0?1:0,(d.flags&1)?1:0);
+            }
             D3D11_MAPPED_SUBRESOURCE map{};if(FAILED(context->Map(cb.Get(),0,D3D11_MAP_WRITE_DISCARD,0,&map)))return 42;memcpy(map.pData,&c,sizeof(c));context->Unmap(cb.Get(),0);
             ID3D11ShaderResourceView* srvs[5]={nullptr,nullptr,nullptr,nullptr,nullptr};
-            if(d.baseImage>=0&&(size_t)d.baseImage<asset->textures.size())srvs[0]=asset->textures[(size_t)d.baseImage].view.Get();if(d.emissiveImage>=0&&(size_t)d.emissiveImage<asset->textures.size())srvs[1]=asset->textures[(size_t)d.emissiveImage].view.Get();if(d.metallicRoughnessImage>=0&&(size_t)d.metallicRoughnessImage<asset->textures.size())srvs[2]=asset->textures[(size_t)d.metallicRoughnessImage].view.Get();if(d.normalImage>=0&&(size_t)d.normalImage<asset->textures.size())srvs[3]=asset->textures[(size_t)d.normalImage].view.Get();if(d.occlusionImage>=0&&(size_t)d.occlusionImage<asset->textures.size())srvs[4]=asset->textures[(size_t)d.occlusionImage].view.Get();context->PSSetShaderResources(0,5,srvs);
+            if(!forceHotPurple){if(d.baseImage>=0&&(size_t)d.baseImage<asset->textures.size())srvs[0]=asset->textures[(size_t)d.baseImage].view.Get();if(d.emissiveImage>=0&&(size_t)d.emissiveImage<asset->textures.size())srvs[1]=asset->textures[(size_t)d.emissiveImage].view.Get();if(d.metallicRoughnessImage>=0&&(size_t)d.metallicRoughnessImage<asset->textures.size())srvs[2]=asset->textures[(size_t)d.metallicRoughnessImage].view.Get();if(d.normalImage>=0&&(size_t)d.normalImage<asset->textures.size())srvs[3]=asset->textures[(size_t)d.normalImage].view.Get();if(d.occlusionImage>=0&&(size_t)d.occlusionImage<asset->textures.size())srvs[4]=asset->textures[(size_t)d.occlusionImage].view.Get();}
+            context->PSSetShaderResources(0,5,srvs);
             D3D11_SAMPLER_DESC sd{};sd.Filter=D3D11_FILTER_MIN_MAG_MIP_LINEAR;sd.AddressW=D3D11_TEXTURE_ADDRESS_CLAMP;sd.MaxLOD=D3D11_FLOAT32_MAX;ComPtr<ID3D11SamplerState> owned[5];ID3D11SamplerState* samplers[5]={};int wraps[10]={d.baseWrapS,d.baseWrapT,d.emissiveWrapS,d.emissiveWrapT,d.metallicRoughnessWrapS,d.metallicRoughnessWrapT,d.normalWrapS,d.normalWrapT,d.occlusionWrapS,d.occlusionWrapT};for(int si=0;si<5;++si){sd.AddressU=AddressMode(wraps[si*2]);sd.AddressV=AddressMode(wraps[si*2+1]);if(FAILED(device->CreateSamplerState(&sd,owned[si].GetAddressOf())))return 43;samplers[si]=owned[si].Get();}context->PSSetSamplers(0,5,samplers);
             context->DrawIndexed(d.indexCount,d.firstIndex,0);
         }
         context->Flush();D3D11_TEXTURE2D_DESC sd=td;sd.Usage=D3D11_USAGE_STAGING;sd.BindFlags=0;sd.CPUAccessFlags=D3D11_CPU_ACCESS_READ;ComPtr<ID3D11Texture2D> staging;if(FAILED(device->CreateTexture2D(&sd,nullptr,staging.GetAddressOf())))return 44;context->CopyResource(staging.Get(),target.Get());D3D11_MAPPED_SUBRESOURCE mapped{};if(FAILED(context->Map(staging.Get(),0,D3D11_MAP_READ,0,&mapped)))return 45;
-        int visible=0,colorful=0,brightColorful=0,semi=0;uint64_t sr=0,sg=0,sb=0;
-        for(UINT y=0;y<height;y+=2){const uint8_t* row=(const uint8_t*)mapped.pData+y*mapped.RowPitch;for(UINT x=0;x<width;x+=2){const uint8_t* p=row+x*4;if(p[3]>8){visible++;sr+=p[2];sg+=p[1];sb+=p[0];int mx=std::max(p[0],std::max(p[1],p[2]));int mn=std::min(p[0],std::min(p[1],p[2]));if(mx-mn>24){colorful++;if(mx>120)brightColorful++;}if(p[3]>8&&p[3]<247)semi++;}}}context->Unmap(staging.Get(),0);
-        if(visible<80)return 46;if(colorful<20)return 47;if(brightColorful<20)return 49;
-        bool hasBlend=false;for(const DrawBatch& d:asset->draws)if(d.alphaMode==2){hasBlend=true;break;}if(!hasBlend&&semi>visible/20)return 48;
+        int visible=0,colorful=0,brightColorful=0,semi=0,neutralHot=0;
+        for(UINT y=0;y<height;y+=2){const uint8_t* row=(const uint8_t*)mapped.pData+y*mapped.RowPitch;for(UINT x=0;x<width;x+=2){const uint8_t* p=row+x*4;if(p[3]>8){visible++;int mx=std::max(p[0],std::max(p[1],p[2]));int mn=std::min(p[0],std::min(p[1],p[2]));if(mx-mn>24){colorful++;if(mx>105)brightColorful++;}if(mx>225&&mx-mn<18)neutralHot++;if(p[3]<247)semi++;}}}context->Unmap(staging.Get(),0);
+        if(visible<80)return 46;if(colorful<20)return forceHotPurple?51:47;if(brightColorful<20)return forceHotPurple?52:49;if(forceHotPurple&&neutralHot>visible/8)return 53;
+        bool hasBlend=false;for(const DrawBatch& d:asset->draws)if(d.alphaMode==2){hasBlend=true;break;}if(!forceHotPurple&&!hasBlend&&semi>visible/20)return 48;
         return 1;
     }
 }
 
 extern "C" __declspec(dllexport) int __cdecl HC_D3D11CachedAssetSmokeTest(const wchar_t* cachePath)
 {
-    try{return RunCachedSmoke(cachePath);}catch(...){return 99;}
+    try
+    {
+        int normal=RunCachedSmoke(cachePath,false);if(normal!=1)return normal;
+        int hotPurple=RunCachedSmoke(cachePath,true);if(hotPurple!=1)return hotPurple;
+        return 1;
+    }
+    catch(...){return 99;}
 }
