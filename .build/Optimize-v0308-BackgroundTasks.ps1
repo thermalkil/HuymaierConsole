@@ -98,7 +98,7 @@ if($bootstrap -notmatch 'HUYMAIER_V0308_BACKGROUND_TASK_PREFLIGHT_V2'){
     $anchor='$artworkManagementPath=Join-Path $baseDir ''HuymaierArtworkManagement.ps1'''
     $insert=@($anchor,'$backgroundTasksPath=Join-Path $baseDir ''HuymaierBackgroundTasks.ps1'' # HUYMAIER_V0308_BACKGROUND_TASK_PREFLIGHT_V2') -join $lf
     $bootstrap=Replace-Required $bootstrap $anchor $insert 'background task preflight path'
-    $anchor="        [pscustomobject]@{Path=`$artworkManagementPath;Label='Artwork maintenance controls'},"
+    $anchor="        [pscustomobject]@{Path=`$artworkManagementPath;Label='Artwork management UI helpers'},"
     $insert=@($anchor,"        [pscustomobject]@{Path=`$backgroundTasksPath;Label='Background task HUD and coordinator'},") -join $lf
     $bootstrap=Replace-Required $bootstrap $anchor $insert 'background task preflight entry'
 }
