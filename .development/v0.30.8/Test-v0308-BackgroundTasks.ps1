@@ -45,8 +45,9 @@ Need ($tasks.Contains('Sequenced missing-artwork refresh started after library i
 Need ($tasks.Contains('$script:HcArtworkTaskScanned +=')) 'cumulative artwork scan accounting missing'
 Need ($tasks.Contains('$script:HcArtworkTaskResolved +=')) 'cumulative artwork resolved accounting missing'
 Need ($tasks.Contains('TheGamesDB key not configured')) 'HUD does not expose missing TGDB configuration'
-Need ($tasks.Contains('$Mode -in @(''TheGamesDbApiKey'',''SteamGridDbApiKey'')')) 'API key completion modes are not explicitly handled'
-Need ($tasks.Contains('Save-Config')) 'API key completion does not persist config'
+Need (-not $tasks.Contains('function Complete-NativeKeyboardInput')) 'background task module still owns global keyboard completion'
+Need (-not $tasks.Contains('HcBackgroundBaseCompleteKeyboard')) 'background task module still chains keyboard completion'
+Need (-not $tasks.Contains('Save-Config')) 'background task presentation/coordinator still writes main configuration directly'
 
 Need ($shell.Contains('HUYMAIER_V0308_SEQUENCED_ARTWORK_REFRESH_V2')) 'active shell refresh sequencing marker missing'
 Need ($shell.Contains("'^storefront-manage-refresh:(.+)$' {Start-HcLibraryAndArtworkRefresh;return}")) 'active storefront refresh does not use sequenced coordinator'
