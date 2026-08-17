@@ -1,11 +1,11 @@
 {
-  "candidate": "v0.30.8-rc3",
+  "candidate": "v0.30.8-rc4",
   "version": "0.30.8",
   "base_release": "v0.30.7",
   "base_asset": "HC0307.zip",
   "package_root": "HC0308",
   "asset_name": "HC0308.zip",
-  "production_source": "21951bc2fd28776f3011462039e3cdf31afd14e4",
-  "attempt": 7,
-  "notes": "TheGamesDB-first platform-aware missing-cover fallback with corrected 0.30.8/x64 native stamp plus active HuymaierShellRedesign Console Settings exposure for TheGamesDB key, retry unresolved, platform refresh, and artwork cache controls."
+  "production_source": "9183f2e7d432279a5e0b82dd16f95309e550a86b",
+  "attempt": 8,
+  "notes": "TheGamesDB-first platform-aware missing-cover fallback with consolidated active Settings ownership. Removes the unreachable legacy Artwork presentation from HuymaierConsole.ps1, exposes TGDB/SGDB and all artwork maintenance controls only in the active HuymaierShellRedesign Console Settings page, and adds UI-authority regression gates to prevent dead UI paths from passing CI."
 }
