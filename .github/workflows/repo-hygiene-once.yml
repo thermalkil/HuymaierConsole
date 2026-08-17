@@ -1,0 +1,65 @@
+name: One-time repository hygiene
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/repo-hygiene-once.yml']
+permissions:
+  contents: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Clean default branch workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch main
+          for f in .github/workflows/*.yml; do
+            [ -e "$f" ] || continue
+            case "$(basename "$f")" in
+              publish-release.yml|sync-source-from-release.yml|repo-hygiene-once.yml) ;;
+              *) git rm -f "$f" ;;
+            esac
+          done
+          git rm -f .github/workflows/repo-hygiene-once.yml
+          if ! git diff --cached --quiet; then
+            git commit -m 'Clean obsolete GitHub Actions workflows'
+            git push origin main
+          fi
+      - name: Clean active development branch workflows
+        shell: bash
+        env:
+          DEV_BRANCH: feature/v0.30.1-brightness-fan-motion
+        run: |
+          set -euo pipefail
+          git fetch origin "$DEV_BRANCH"
+          git switch -C "$DEV_BRANCH" "origin/$DEV_BRANCH"
+          if [ -d .github/workflows ]; then
+            find .github/workflows -maxdepth 1 -type f -name '*.yml' -print0 | xargs -0 -r git rm -f
+          fi
+          if ! git diff --cached --quiet; then
+            git commit -m 'Reset development workflows for v0.30.1'
+            git push origin "$DEV_BRANCH"
+          fi
+      - name: Prune stale branches
+        shell: bash
+        env:
+          DEV_BRANCH: feature/v0.30.1-brightness-fan-motion
+          BACKUP_BRANCH: backup/pre-repo-cleanup-20260817
+        run: |
+          set -euo pipefail
+          git fetch --prune origin
+          mapfile -t branches < <(git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin | grep -v '^HEAD$')
+          for branch in "${branches[@]}"; do
+            case "$branch" in
+              main|"$DEV_BRANCH"|"$BACKUP_BRANCH") continue ;;
+            esac
+            echo "Deleting stale branch: $branch"
+            git push origin --delete "$branch" || true
+          done
