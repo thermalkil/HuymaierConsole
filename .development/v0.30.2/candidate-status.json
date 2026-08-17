@@ -1,10 +1,10 @@
 ﻿{
-    "candidate":  "v0.30.2-release5",
+    "candidate":  "v0.30.2-release6",
     "result":  "failure",
-    "runId":  "32015693642",
+    "runId":  "32015865109",
     "runAttempt":  "1",
-    "commit":  "222959eca82be188aa13a70ec52353e257801b95",
-    "productionSource":  "97d15744b2cba05ff77aa1f1a8b37008ed530dd1",
+    "commit":  "2ac5bc029cf0fa130fa75e347347ead6656c1403",
+    "productionSource":  "3772cfadad890c79c92296b22a215dff65f4c7b3",
     "release":  "v0.30.2",
-    "recordedAtUtc":  "2026-08-17T09:32:08.4417149Z"
+    "recordedAtUtc":  "2026-08-17T09:36:41.3053359Z"
 }
