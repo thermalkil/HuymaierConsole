@@ -44,6 +44,11 @@ $new=@'
 '@.TrimEnd()
 Replace-TransformLine $old $new 'shader constants layout'
 
+# The v0.30.6 native presentation export uses `.20f` while the first advanced
+# transform draft expected `0.20f`. Correct only that old-anchor literal before
+# running the transform; the resulting 4.00f clamp remains unchanged.
+Replace-TransformLine "'i.lightScale=std::max(0.20f,std::min(2.00f,lightScale))'" "'i.lightScale=std::max(.20f,std::min(2.00f,lightScale))'" 'native overall-light clamp spelling'
+
 # Keep the temporary script beside the real transform so its $PSScriptRoot is
 # still .build and the transform resolves the repository root correctly.
 $temp=Join-Path $PSScriptRoot ('.tmp-advanced-light-'+[guid]::NewGuid().ToString('N')+'.ps1')
