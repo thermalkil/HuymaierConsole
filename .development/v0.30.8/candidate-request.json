@@ -1,11 +1,11 @@
 {
-  "candidate": "v0.30.8-rc4",
+  "candidate": "v0.30.8-rc5",
   "version": "0.30.8",
   "base_release": "v0.30.7",
   "base_asset": "HC0307.zip",
   "package_root": "HC0308",
   "asset_name": "HC0308.zip",
-  "production_source": "9183f2e7d432279a5e0b82dd16f95309e550a86b",
-  "attempt": 8,
-  "notes": "TheGamesDB-first platform-aware missing-cover fallback with consolidated active Settings ownership. Removes the unreachable legacy Artwork presentation from HuymaierConsole.ps1, exposes TGDB/SGDB and all artwork maintenance controls only in the active HuymaierShellRedesign Console Settings page, and adds UI-authority regression gates to prevent dead UI paths from passing CI."
+  "production_source": "95d0d8b0585c61593890e7dedef330e1724c8961",
+  "attempt": 9,
+  "notes": "Adds a unified top-right background-task HUD with persistent task names, progress/current detail, bounded multi-task stacking and short completion/error retention. Sequences combined library refresh before missing-art discovery so artwork always scans the fresh library, guarantees TheGamesDB/SteamGridDB API key persistence, accumulates artwork results across continuation batches, and removes the RC4 unified-cursor File.Replace warning flood. Preserves the consolidated active Settings ownership and TheGamesDB-first artwork pipeline."
 }
