@@ -15,7 +15,7 @@ $bootstrap=Read-Hc 'HuymaierBootstrap.ps1'
 $installer=Read-Hc 'Install-HuymaierConsole.ps1'
 $installerCore=Read-Hc 'HuymaierInstallerCore.ps1'
 
-Require ($core.Contains('HUYMAIER_V0308_SETTINGS_STORE_CORE_V2')) 'Core settings-store marker is missing.'
+Require ($core.Contains('HUYMAIER_V0308_SETTINGS_STORE_CORE_V3')) 'Core settings-store marker is missing.'
 Require ($core.Contains('Merge-HcPersistedConfig -Defaults $defaults -Loaded $loaded')) 'Core config loader is not using dynamic property merge.'
 Require (-not $core.Contains("foreach (`$name in @('BrowserName','BrowserPath'")) 'Legacy config property allowlist is still active.'
 Require ($core.Contains('Write-HcConfigAtomic -Path $script:ConfigPath -Config $script:Config -Depth 16')) 'Core config save is not atomic/deep.'
@@ -26,21 +26,18 @@ Require ($store.Contains('function Merge-HcPersistedConfig')) 'Settings merge fu
 Require ($store.Contains('function Write-HcConfigAtomic')) 'Atomic settings writer missing.'
 Require ($custom.Contains("Add-HcCustomizationConfigProperty 'ConsoleBrightness' 100")) 'Customization brightness default is missing.'
 Require (-not ($custom -match 'persistedBrightness|Get-Content -Raw -LiteralPath \$script:ConfigPath')) 'Customization still contains the old raw-config brightness workaround.'
-Require ($model.Contains('HUYMAIER_V0308_MODEL_SETTINGS_AUTOSAVE_V2')) 'Model editor auto-save marker missing.'
+Require ($model.Contains('HUYMAIER_V0308_MODEL_SETTINGS_AUTOSAVE_V3')) 'Model editor auto-save marker missing.'
 Require ($model.Contains('Queue-HcModelEditorAutoSave;Update-HcGpuModelViewerItem')) 'Model adjustments are not queued for persistence.'
 Require ($model.Contains('Save-HcModelViewSnapshotToConfig $script:HcModelEditorOriginalView')) 'Model Cancel does not persist the restored original snapshot.'
 Require ($bootstrap.Contains("Label='Central settings persistence store'")) 'Bootstrap does not preflight the settings store.'
 Require ($installer.Contains("'HuymaierSettingsStore.ps1'")) 'Installer startup cache omits the settings store.'
-Require ($installerCore.Contains('HUYMAIER_V0308_SETTINGS_STORE_REQUIRED_V2')) 'Installer required payload omits settings store.'
+Require ($installerCore.Contains('HUYMAIER_V0308_SETTINGS_STORE_REQUIRED_V3')) 'Installer required payload omits settings store.'
 
 foreach($retired in @('HuymaierV0262Hardening.ps1','HuymaierV0262ProviderRuntime.ps1','HuymaierV0262Runtime.ps1')){
     Require (-not(Test-Path -LiteralPath (Join-Path $root $retired))) "Retired production runtime survived cleanup: $retired"
     Require ($installerCore.Contains($retired)) "Installer legacy cleanup does not remove old installed runtime: $retired"
 }
 
-# Execute the storage module independently and prove module-owned unknown settings,
-# API keys, console brightness, and full advanced model presentation survive a
-# save/reload cycle without requiring a central allowlist edit.
 . (Join-Path $root 'HuymaierSettingsStore.ps1')
 $temp=Join-Path ([IO.Path]::GetTempPath()) ('hc-settings-test-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $temp|Out-Null
@@ -48,10 +45,7 @@ try{
     $path=Join-Path $temp 'config.json'
     $defaults=[pscustomobject]@{ConfigSchemaVersion=2;Known='default';ConsoleBrightness=100;TheGamesDbApiKey='';SteamGridDbApiKey='';PlatformModelDefaultViews=@()}
     $loaded=[pscustomobject]@{
-        Known='persisted'
-        ConsoleBrightness=170
-        TheGamesDbApiKey='tgdb-test-key'
-        SteamGridDbApiKey='sgdb-test-key'
+        Known='persisted';ConsoleBrightness=170;TheGamesDbApiKey='tgdb-test-key';SteamGridDbApiKey='sgdb-test-key'
         SyntheticModuleSetting=[pscustomobject]@{Enabled=$true;Mode='PersistMe'}
         PlatformModelDefaultViews=@([pscustomobject]@{Key='ps3.glb';Platform='PS3';LightPercent=240;KeyLightPercent=330;LightAzimuth=27;LightElevation=41;LightDistance=6.5;LightAimXPercent=15;LightAimYPercent=-10;ConeDegrees=75;ConeSoftnessPercent=35;FalloffPercent=80;LightTemperature=7200;AmbientPercent=180;SpecularPercent=260;HighlightSizePercent=175;FanPercent=50})
     }
