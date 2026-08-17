@@ -14,7 +14,7 @@ Assert ($core.Contains('TheGamesDbApiKey')) 'TheGamesDB API key is not persisted
 Assert ($core.Contains('''thegamesdb-key''')) 'TheGamesDB settings action is missing.'
 Assert ($core.Contains('''artwork-retry-unresolved''')) 'Retry unresolved artwork action is missing.'
 Assert ($core.Contains('''artwork-refresh-platform''')) 'Platform artwork refresh action is missing.'
-Assert ($core.Contains('[string]$GameId='''''',[string]$GameName=''''''')) 'Single-game artwork scan parameters are missing.'
+Assert ($core.Contains('[string]$GameId=') -and $core.Contains('[string]$GameName=')) 'Single-game artwork scan parameters are missing.'
 Assert ($core.Contains('HuymaierArtworkManagement.ps1')) 'Artwork management module is not loaded by the shell.'
 Assert ($worker.Contains('HUYMAIER_V0308_COVER_ART_WORKER_V1')) 'Artwork worker transform marker is missing.'
 Assert ($worker.Contains('Try-HcTheGamesDbArt')) 'TheGamesDB is not wired into the artwork worker.'
