@@ -25,9 +25,9 @@ $hostText=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierFSEHost.c
 $updaterText=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierSelfUpdater.ps1') -Encoding UTF8
 $shellText=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierShellRedesign.ps1') -Encoding UTF8
 $customText=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierCustomization.ps1') -Encoding UTF8
-foreach($needle in @('HUYMAIER_FSE_HOST','HuymaierConsoleFseUpdate.lock','WaitForUpdateHandoff')){if($hostText.IndexOf($needle,[StringComparison]::Ordinal) -lt 0){throw "Staged FSE host contract missing: $needle"}}
-foreach($needle in @('[switch]$FseManaged','Windows FSE host owns post-update relaunch.','Remove-Item -LiteralPath $HandoffPath -Force')){if($updaterText.IndexOf($needle,[StringComparison]::Ordinal) -lt 0){throw "Staged updater contract missing: $needle"}}
-foreach($needle in @('HUYMAIER_V0303_FSE_UPDATE_HANDOFF_V1','-FseManaged -HandoffPath','HuymaierConsoleFseUpdate.lock')){if($shellText.IndexOf($needle,[StringComparison]::Ordinal) -lt 0){throw "Staged shell handoff contract missing: $needle"}}
+foreach($needle in @('HUYMAIER_FSE_HOST','HuymaierConsoleFseUpdate.lock','WaitForUpdateHandoffToStart','DateTime.UtcNow.AddSeconds(2)','WaitForUpdateHandoff(handoffPath)')){if($hostText.IndexOf($needle,[StringComparison]::Ordinal) -lt 0){throw "Staged FSE host contract missing: $needle"}}
+foreach($needle in @("GetEnvironmentVariable('HUYMAIER_FSE_HOST')",'$isFseManaged=','[IO.File]::WriteAllText($HandoffPath','Windows FSE host owns post-update relaunch.','Remove-Item -LiteralPath $HandoffPath -Force')){if($updaterText.IndexOf($needle,[StringComparison]::Ordinal) -lt 0){throw "Staged updater contract missing: $needle"}}
+foreach($needle in @('Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList $arguments -WindowStyle Hidden|Out-Null','$script:AllowWindowClose=$true;$script:Window.Close()')){if($shellText.IndexOf($needle,[StringComparison]::Ordinal) -lt 0){throw "Staged existing shell update-launch contract missing: $needle"}}
 
 # v0.30.3 must carry forward the sole v0.30.2 product feature unchanged.
 foreach($needle in @('HUYMAIER_V0302_CONSOLE_BRIGHTNESS_V1',"New-SliderAction 'console-brightness-slider' 'Huymaier Console brightness'","0% to 200% in 10% steps")){if($customText.IndexOf($needle,[StringComparison]::Ordinal) -lt 0){throw "v0.30.2 brightness carry-forward missing: $needle"}}
@@ -36,5 +36,6 @@ foreach($required in @('HuymaierConsole.exe','FSEPackage\HuymaierFSEHost.exe','I
 
 Write-Host 'v0303VersionIdentityGate: success'
 Write-Host 'v0303FseUpdaterHandoffStageGate: success'
+Write-Host 'v0303FseUpdaterInheritedEnvironmentStageGate: success'
 Write-Host 'v0303DesktopUpdaterCarryForwardGate: success'
 Write-Host 'v0303ConsoleBrightnessCarryForwardGate: success'
