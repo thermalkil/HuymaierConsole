@@ -1,5 +1,5 @@
 {
-  "version": "0.3.0",
+  "version": "0.26.5",
   "tag": "v0.3.0",
   "title": "Huymaier Console v0.3.0",
   "asset_name": "HC265.zip",
@@ -12,5 +12,5 @@
   "candidate_artifact_name": "v0.26.5-rc11",
   "delete_paths": [],
   "publish": true,
-  "attempt": 1
+  "attempt": 2
 }
