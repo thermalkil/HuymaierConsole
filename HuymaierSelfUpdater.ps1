@@ -16,7 +16,8 @@ $mutex=$null
 $ownsMutex=$false
 $relaunch=''
 $success=$false
-if($FseManaged -and [string]::IsNullOrWhiteSpace($HandoffPath)){$HandoffPath=Join-Path $env:LOCALAPPDATA 'HuymaierConsoleFseUpdate.lock'}
+$isFseManaged=([bool]$FseManaged -or [string]::Equals([Environment]::GetEnvironmentVariable('HUYMAIER_FSE_HOST'),'1',[StringComparison]::Ordinal))
+if($isFseManaged -and [string]::IsNullOrWhiteSpace($HandoffPath)){$HandoffPath=Join-Path $env:LOCALAPPDATA 'HuymaierConsoleFseUpdate.lock'}
 
 function Log([string]$Message,[string]$Level='INFO'){
     try{Add-Content -LiteralPath $log -Value ((Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff')+" [$Level] "+$Message) -Encoding UTF8}catch{}
@@ -51,6 +52,15 @@ function Assert-HcZipEntriesSafe {
 }
 
 try{
+    # HuymaierFSEHost marks its child Console with HUYMAIER_FSE_HOST=1. The
+    # updater inherits that environment through Start-Process, so it can arm the
+    # FSE gate itself without requiring a fragile shell-source rewrite. This file
+    # is written before waiting for the parent Console to exit.
+    if($isFseManaged){
+        [IO.File]::WriteAllText($HandoffPath,($ParentProcessId.ToString()+'|'+[DateTime]::UtcNow.ToString('o')),(New-Object Text.UTF8Encoding($false)))
+        Log "Windows FSE update handoff armed: $HandoffPath"
+    }
+
     $mutex=New-Object System.Threading.Mutex -ArgumentList $false,'Local\HuymaierConsole.Updater'
     try{
         $ownsMutex=[bool]$mutex.WaitOne(0,$false)
@@ -59,7 +69,6 @@ try{
     }
     if(-not $ownsMutex){throw 'Another Huymaier Console update is already running.'}
 
-    if($FseManaged){Log "Windows FSE update handoff active: $HandoffPath"}
     Log "Waiting for Huymaier Console PID $ParentProcessId to exit."
     Wait-HcProcessExit -Id $ParentProcessId -TimeoutSeconds 90
     if(-not(Test-Path -LiteralPath $PackagePath -PathType Leaf)){throw "Downloaded update package is missing: $PackagePath"}
@@ -103,15 +112,15 @@ try{
     Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
     if($ownsMutex -and $null -ne $mutex){try{$mutex.ReleaseMutex()}catch{};$ownsMutex=$false}
     if($null -ne $mutex){try{$mutex.Dispose()}catch{};$mutex=$null}
-    if($FseManaged -and -not [string]::IsNullOrWhiteSpace($HandoffPath)){
+    if($isFseManaged -and -not [string]::IsNullOrWhiteSpace($HandoffPath)){
         Remove-Item -LiteralPath $HandoffPath -Force -ErrorAction SilentlyContinue
         Log 'Released Windows FSE update handoff gate.'
     }
 }
 
 # In Windows/Xbox FSE mode the long-lived FSE host owns the post-update relaunch.
-# Desktop launches keep the existing updater-owned relaunch behavior.
-if($relaunch -and -not $FseManaged){Start-Sleep -Milliseconds 250;Start-Process -FilePath $relaunch -WorkingDirectory $InstallRoot|Out-Null}
-elseif($relaunch -and $FseManaged){Log 'Windows FSE host owns post-update relaunch.'}
+# Desktop launches keep the already-proven updater-owned relaunch behavior.
+if($relaunch -and -not $isFseManaged){Start-Sleep -Milliseconds 250;Start-Process -FilePath $relaunch -WorkingDirectory $InstallRoot|Out-Null}
+elseif($relaunch -and $isFseManaged){Log 'Windows FSE host owns post-update relaunch.'}
 if(-not $success){exit 1}
 exit 0
