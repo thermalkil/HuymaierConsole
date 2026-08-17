@@ -1,0 +1,91 @@
+name: Build v0.30.8 cover-art candidate
+
+on:
+  push:
+    branches:
+      - agent/v0308-cover-art
+    paths:
+      - '.development/v0.30.8/candidate-request.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  candidate:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout candidate source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate candidate request
+        shell: powershell
+        run: |
+          $request=Get-Content -Raw -LiteralPath '.development/v0.30.8/candidate-request.json' -Encoding UTF8|ConvertFrom-Json
+          if([string]$request.version -ne '0.30.8'){throw 'Candidate version must be 0.30.8.'}
+          if([string]$request.base_release -ne 'v0.30.7'){throw 'Candidate must stage from published v0.30.7.'}
+          if([string]$request.base_asset -ne 'HC0307.zip'){throw 'Candidate must stage from HC0307.zip.'}
+          if([string]$request.package_root -ne 'HC0308'){throw 'Candidate package root must be HC0308.'}
+          if([string]$request.asset_name -ne 'HC0308.zip'){throw 'Candidate asset name must be HC0308.zip.'}
+          Write-Host "Building $($request.candidate) from immutable $($request.base_release)/$($request.base_asset)."
+
+      - name: Parse transform and tests before execution
+        shell: powershell
+        run: |
+          $files=@('.build/Optimize-CoverArtFallback.ps1','.development/v0.30.8/Test-v0308-CoverArtFallback.ps1')
+          foreach($file in $files){
+            $tokens=$null;$errors=$null;[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file),[ref]$tokens,[ref]$errors)
+            if($errors.Count){$errors|ForEach-Object{Write-Host "$file:$($_.Extent.StartLineNumber):$($_.Extent.StartColumnNumber) $($_.Message)"};throw "$file failed Windows PowerShell parsing."}
+          }
+
+      - name: Apply v0.30.8 cover-art transform
+        shell: powershell
+        run: ./.build/Optimize-CoverArtFallback.ps1
+
+      - name: Validate transformed source
+        shell: powershell
+        run: ./.development/v0.30.8/Test-v0308-CoverArtFallback.ps1 -StageRoot .
+
+      - name: Build release-shaped candidate from HC0307.zip
+        shell: powershell
+        run: ./.build/Build-HuymaierReleaseCandidate.ps1 -TriggerPath '.development/v0.30.8/candidate-request.json'
+
+      - name: Validate staged candidate artwork layer
+        shell: powershell
+        run: |
+          $stage=Join-Path $env:RUNNER_TEMP 'hc-stage\HC0308'
+          if(-not(Test-Path -LiteralPath $stage -PathType Container)){throw "Candidate stage is missing: $stage"}
+          ./.development/v0.30.8/Test-v0308-CoverArtFallback.ps1 -StageRoot $stage
+
+      - name: Run installer and integrity regression suite
+        shell: powershell
+        run: |
+          $stage=Join-Path $env:RUNNER_TEMP 'hc-stage\HC0308'
+          $validation=Join-Path $env:HC_CANDIDATE_OUTPUT 'candidate-validation.json'
+          ./.build/Test-HuymaierCandidate.ps1 -StageRoot $stage -ValidationPath $validation
+
+      - name: Verify final asset hash
+        shell: powershell
+        run: |
+          $zip=Join-Path $env:HC_CANDIDATE_OUTPUT 'HC0308.zip'
+          $sidecar=$zip+'.sha256'
+          if(-not(Test-Path -LiteralPath $zip -PathType Leaf)){throw 'HC0308.zip was not produced.'}
+          if(-not(Test-Path -LiteralPath $sidecar -PathType Leaf)){throw 'HC0308.zip.sha256 was not produced.'}
+          $expected=((Get-Content -LiteralPath $sidecar -Raw).Trim() -split '\s+')[0].ToLowerInvariant()
+          $actual=(Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if($actual -ne $expected){throw "Final candidate hash mismatch: $actual != $expected"}
+          Write-Host "HC0308.zip SHA-256: $actual"
+
+      - name: Upload full testable candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: v0.30.8-rc1
+          path: ${{ env.HC_CANDIDATE_OUTPUT }}\*
+          if-no-files-found: error
+          retention-days: 14
