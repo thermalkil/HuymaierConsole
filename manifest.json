@@ -1,8 +1,8 @@
 ﻿{
     "name":  "Huymaier Console FSE Shell, Storefront \u0026 Artwork Integration",
-    "version":  "0.30.6",
-    "baseVersion":  "0.30.4",
-    "build":  "console-model-presentation-editor-rc1",
+    "version":  "0.30.7",
+    "baseVersion":  "0.30.6",
+    "build":  "console-studio-light-rc1",
     "builtFrom":  "HC262.zip",
     "features":  [
                      "rebuilds N64 as an original Huymaier cartridge-console surface inspired by the supplied classic-mini reference without redistributing third-party theme assets",
@@ -20,11 +20,11 @@
                      "enables Atari Lynx, Neo Geo Pocket Color and PrimeHack native expansion surfaces while keeping Neo Geo and Jaguar staged pending backend-specific readiness audits",
                      "enables PS4/shadPS4 and PS Vita/Vita3K native installed-application surfaces using upstream-documented direct-launch contracts and native full backend settings",
                      "graduates PS4/shadPS4, PS Vita/Vita3K and Arcade/MAME after live x64 backend and runtime-contract validation while keeping FinalBurn Neo, Neo Geo and Jaguar staged",
-                     "expands Edit Model into a console-only presentation editor with saved yaw, pitch, roll, 30-300 percent scale, X/Y framing position, X/Y/Z mirroring, face mode, per-model lighting and fan-motion strength",
-                     "adds Normal, Reverse and TwoSided face handling plus mirror-aware D3D11 culling and tangent handedness so backwards or inside-out console assets can be corrected without editing the source GLB",
-                     "applies every saved console presentation setting to both the full-screen viewer and the Consoles shelf while explicitly leaving the top Providers shelf presentation unchanged",
-                     "carries forward adaptive negative-determinant winding correction and automatically refreshes corrected HC3D winding caches without modifying user source models",
-                     "retains v0.30.3 Windows/Xbox FSE updater handoff, overall console brightness, HC3D v4 COLOR_0 rendering, controller routing, Quick Access, Downloads, Recomps, GameCube, streaming and installer integrity"
+                     "adds console-only editable studio-light controls inside Edit Model: key-light intensity, horizontal azimuth, vertical elevation, 2500K-9000K color temperature, ambient fill and specular response",
+                     "uses one shader key light with the existing fixed fill light and no shadow map or additional geometry pass, keeping GPU cost very small",
+                     "persists every lighting control independently per console and applies it live to both the full-screen viewer and Consoles shelf",
+                     "keeps top provider/storefront models on the exact legacy showroom-light fallback unless the console-only SetItemStudioLight path is explicitly invoked",
+                     "carries forward the v0.30.6 full console presentation editor including transform, scale, mirror and face correction, plus v0.30.5 adaptive winding, v0.30.3 FSE updater handoff, console brightness, HC3D v4 COLOR_0, controller routing, Downloads, Recomps, GameCube, streaming and installer integrity"
                  ],
-    "description":  "v0.30.6 adds a complete per-console 3D presentation editor for orientation, size, position, mirroring, face handling, lighting and fan motion while leaving provider/storefront models unchanged."
+    "description":  "v0.30.7 adds a lightweight per-console editable studio/key light with direction, intensity, color temperature, ambient and specular controls while preserving the existing provider-model lighting path exactly."
 }

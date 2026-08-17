@@ -12,6 +12,8 @@ namespace HuymaierConsole.Modeling
     // HUYMAIER_D3D11_SHELF_HOST_V3_BOUNDED_FAN_MOTION
     // HUYMAIER_D3D11_DPI_AWARE_SHELF_V1
     // HUYMAIER_V0306_CONSOLE_PRESENTATION_NATIVE_BRIDGE_V1
+    // HUYMAIER_V0307_CONSOLE_STUDIO_LIGHT_NATIVE_BRIDGE_V1
+    // HUYMAIER_V0307_CONSOLE_STUDIO_LIGHT_ADVANCED_NATIVE_BRIDGE_V1
     // HUYMAIER_V0306_CONSOLE_MODEL_SCALE_CAPACITY_V1
     // WPF owns navigation and chrome. The persistent shelf surface, asset cache,
     // bounded presentation animation and model rendering are owned by native D3D11.
@@ -36,6 +38,9 @@ namespace HuymaierConsole.Modeling
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int HC_GPU_SetShelfItemPresentation(IntPtr handle, int id, float yawOffset, float pitch, float roll, float offsetX, float offsetY, int mirrorX, int mirrorY, int mirrorZ, int faceMode, float lightScale, float fanScale, int spin);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int HC_GPU_SetShelfItemStudioLight(IntPtr handle, int id, float keyLightScale, float azimuth, float elevation, float distance, float aimX, float aimY, float coneDegrees, float coneSoftness, float falloffScale, float temperatureKelvin, float ambientScale, float specularScale, float highlightScale);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int HC_GPU_SetShelfBrightness(IntPtr handle, float brightness);
@@ -68,6 +73,12 @@ namespace HuymaierConsole.Modeling
             public bool MirrorX, MirrorY, MirrorZ;
             public int FaceMode = 0;
             public float LightScale = 1.0f;
+            public float KeyLightScale = 1.0f;
+            public float LightAzimuth = -36.0f, LightElevation = 43.0f, LightTemperature = 6500.0f;
+            public float LightDistance = 8.0f, LightAimX = 0.0f, LightAimY = 0.0f;
+            public float ConeDegrees = 180.0f, ConeSoftness = 0.5f, FalloffScale = 0.0f;
+            public float AmbientScale = 1.0f, SpecularScale = 1.0f, HighlightScale = 1.0f;
+            public bool StudioLightOverride = false;
             public float FanScale = 1.0f;
             public bool Spin = true;
             public bool Selected, Visible;
@@ -138,7 +149,8 @@ namespace HuymaierConsole.Modeling
                     state.Width * (float)dpiScaleX, state.Height * (float)dpiScaleY,
                     state.Scale, state.Selected ? 1 : 0, state.Visible ? 1 : 0) != 0;
                 bool viewOk = D3D11ShelfNative.HC_GPU_SetShelfItemPresentation(nativeHandle, id, state.YawOffset, state.Pitch, state.Roll, state.OffsetX, state.OffsetY, state.MirrorX ? 1 : 0, state.MirrorY ? 1 : 0, state.MirrorZ ? 1 : 0, state.FaceMode, state.LightScale, state.FanScale, state.Spin ? 1 : 0) != 0;
-                return layoutOk && viewOk;
+                bool studioOk = !state.StudioLightOverride || D3D11ShelfNative.HC_GPU_SetShelfItemStudioLight(nativeHandle, id, state.KeyLightScale, state.LightAzimuth, state.LightElevation, state.LightDistance, state.LightAimX, state.LightAimY, state.ConeDegrees, state.ConeSoftness, state.FalloffScale, state.LightTemperature, state.AmbientScale, state.SpecularScale, state.HighlightScale) != 0;
+                return layoutOk && viewOk && studioOk;
             }
             catch { return false; }
         }
@@ -218,12 +230,36 @@ namespace HuymaierConsole.Modeling
             state.OffsetY = Math.Max(-50.0f, Math.Min(50.0f, (float)offsetY));
             state.MirrorX = mirrorX; state.MirrorY = mirrorY; state.MirrorZ = mirrorZ;
             state.FaceMode = Math.Max(0, Math.Min(2, faceMode));
-            state.LightScale = Math.Max(.20f, Math.Min(2.00f, (float)lightScale));
+            state.LightScale = Math.Max(.20f, Math.Min(4.00f, (float)lightScale));
             state.FanScale = Math.Max(0.0f, Math.Min(1.0f, (float)fanScale));
             state.Spin = spin;
             itemStates[id] = state;
             if (!NativeReady) return true;
             try { return D3D11ShelfNative.HC_GPU_SetShelfItemPresentation(nativeHandle, id, state.YawOffset, state.Pitch, state.Roll, state.OffsetX, state.OffsetY, state.MirrorX ? 1 : 0, state.MirrorY ? 1 : 0, state.MirrorZ ? 1 : 0, state.FaceMode, state.LightScale, state.FanScale, state.Spin ? 1 : 0) != 0; }
+            catch { return false; }
+        }
+        public bool SetItemStudioLight(int id, double keyLightScale, double azimuth, double elevation, double distance, double aimX, double aimY, double coneDegrees, double coneSoftness, double falloffScale, double temperatureKelvin, double ambientScale, double specularScale, double highlightScale)
+        {
+            if (disposed || id < 0) return false;
+            ItemState state;
+            if (!itemStates.TryGetValue(id, out state) || state == null)
+                state = new ItemState { Width = 1.0f, Height = 1.0f, Scale = .82f, Visible = true };
+            state.KeyLightScale = Math.Max(0.0f, Math.Min(5.0f, (float)keyLightScale));
+            state.LightAzimuth = (float)azimuth;
+            state.LightElevation = Math.Max(-89.0f, Math.Min(89.0f, (float)elevation));
+            state.LightDistance = Math.Max(1.0f, Math.Min(20.0f, (float)distance));
+            state.LightAimX = Math.Max(-1.0f, Math.Min(1.0f, (float)aimX)); state.LightAimY = Math.Max(-1.0f, Math.Min(1.0f, (float)aimY));
+            state.ConeDegrees = Math.Max(5.0f, Math.Min(180.0f, (float)coneDegrees));
+            state.ConeSoftness = Math.Max(0.0f, Math.Min(1.0f, (float)coneSoftness));
+            state.FalloffScale = Math.Max(0.0f, Math.Min(2.0f, (float)falloffScale));
+            state.LightTemperature = Math.Max(1800.0f, Math.Min(12000.0f, (float)temperatureKelvin));
+            state.AmbientScale = Math.Max(0.0f, Math.Min(3.0f, (float)ambientScale));
+            state.SpecularScale = Math.Max(0.0f, Math.Min(4.0f, (float)specularScale));
+            state.HighlightScale = Math.Max(0.25f, Math.Min(4.0f, (float)highlightScale));
+            state.StudioLightOverride = true;
+            itemStates[id] = state;
+            if (!NativeReady) return true;
+            try { return D3D11ShelfNative.HC_GPU_SetShelfItemStudioLight(nativeHandle, id, state.KeyLightScale, state.LightAzimuth, state.LightElevation, state.LightDistance, state.LightAimX, state.LightAimY, state.ConeDegrees, state.ConeSoftness, state.FalloffScale, state.LightTemperature, state.AmbientScale, state.SpecularScale, state.HighlightScale) != 0; }
             catch { return false; }
         }
         public void ClearModels()
@@ -389,5 +425,7 @@ namespace HuymaierConsole.Modeling
         }
     }
 }
+
+
 
 

@@ -6,7 +6,7 @@ namespace HuymaierConsole.NativeApp
 {
     public static class HuymaierBuildStamp
     {
-        public const string Version = "0.30.6";
+        public const string Version = "0.30.7";
         public const string Architecture = "x64";
     }
 

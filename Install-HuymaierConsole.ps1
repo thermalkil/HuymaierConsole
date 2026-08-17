@@ -12,7 +12,7 @@ if(-not(Test-Path -LiteralPath $core -PathType Leaf)){
 }
 
 function Write-HuymaierStartupPreflightCache {
-    param([string]$InstallRoot,[string]$Version='0.30.6')
+    param([string]$InstallRoot,[string]$Version='0.30.7')
     try{
         $entries=@(
             'HuymaierConsole.ps1',
@@ -92,7 +92,7 @@ function Write-HuymaierStartupPreflightCache {
 $global:LASTEXITCODE=0
 & $core -PackageRoot $PSScriptRoot -SilentUpdate:$SilentUpdate
 if([int]$global:LASTEXITCODE -eq 0){
-    Write-HuymaierStartupPreflightCache -InstallRoot (Join-Path $env:LOCALAPPDATA 'Huymaier Console') -Version '0.30.6'
+    Write-HuymaierStartupPreflightCache -InstallRoot (Join-Path $env:LOCALAPPDATA 'Huymaier Console') -Version '0.30.7'
 }
 exit ([int]$global:LASTEXITCODE)
 
