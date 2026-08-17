@@ -25,10 +25,10 @@ foreach($needle in @(
 )){
     if($defaults.IndexOf($needle,[StringComparison]::Ordinal)-lt0){throw "Staged v0.30.6 console model scale contract missing: $needle"}
 }
-$host=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'Native\HuymaierD3D11ShelfHost.cs') -Encoding UTF8
-$native=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'Native\HuymaierD3D11ShelfRuntime.cpp') -Encoding UTF8
-if($host.IndexOf('HUYMAIER_V0306_CONSOLE_MODEL_SCALE_CAPACITY_V1',[StringComparison]::Ordinal)-lt0 -or $host.IndexOf('Math.Max(.12f, Math.Min(2.50f, (float)scale))',[StringComparison]::Ordinal)-lt0){throw 'Staged managed console scale capacity missing.'}
-if($native.IndexOf('HUYMAIER_V0306_CONSOLE_MODEL_SCALE_CAPACITY_V1',[StringComparison]::Ordinal)-lt0 -or $native.IndexOf('std::max(.12f,std::min(2.50f,item.modelScale))',[StringComparison]::Ordinal)-lt0){throw 'Staged native console scale capacity missing.'}
+$hostText=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'Native\HuymaierD3D11ShelfHost.cs') -Encoding UTF8
+$nativeText=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'Native\HuymaierD3D11ShelfRuntime.cpp') -Encoding UTF8
+if($hostText.IndexOf('HUYMAIER_V0306_CONSOLE_MODEL_SCALE_CAPACITY_V1',[StringComparison]::Ordinal)-lt0 -or $hostText.IndexOf('Math.Max(.12f, Math.Min(2.50f, (float)scale))',[StringComparison]::Ordinal)-lt0){throw 'Staged managed console scale capacity missing.'}
+if($nativeText.IndexOf('HUYMAIER_V0306_CONSOLE_MODEL_SCALE_CAPACITY_V1',[StringComparison]::Ordinal)-lt0 -or $nativeText.IndexOf('std::max(.12f,std::min(2.50f,item.modelScale))',[StringComparison]::Ordinal)-lt0){throw 'Staged native console scale capacity missing.'}
 Write-Host 'v0306ConsoleScalePersistenceGate: success'
 Write-Host 'v0306ConsoleScaleProviderIsolationGate: success'
 Write-Host 'v0306ConsoleScaleRendererCapacityGate: success'
