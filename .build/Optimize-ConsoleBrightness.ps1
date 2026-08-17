@@ -5,11 +5,17 @@ Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
 
 if(-not(Test-Path -LiteralPath $CustomizationPath -PathType Leaf)){throw "Customization source missing: $CustomizationPath"}
-$text=[IO.File]::ReadAllText($CustomizationPath,[Text.Encoding]::UTF8)
+function Convert-HcLf([string]$Value){
+    if($null -eq $Value){return ''}
+    return $Value.Replace("`r`n","`n").Replace("`r","`n")
+}
+$text=Convert-HcLf ([IO.File]::ReadAllText($CustomizationPath,[Text.Encoding]::UTF8))
 if($text.Contains('HUYMAIER_V0302_CONSOLE_BRIGHTNESS_V1')){Write-Host 'v0.30.2 console brightness transform already applied.';return}
 
 function Replace-ExactlyOnce([string]$Old,[string]$New,[string]$Label){
+    $Old=Convert-HcLf $Old;$New=Convert-HcLf $New
     $count=([regex]::Matches($script:text,[regex]::Escape($Old))).Count
+    Write-Host "v0.30.2 transform anchor '$Label': $count match(es)"
     if($count -ne 1){throw "Expected exactly one $Label marker, found $count."}
     $script:text=$script:text.Replace($Old,$New)
 }
