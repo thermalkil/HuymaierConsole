@@ -1,13 +1,13 @@
 {
   "tag": "v0.3.0",
-  "version": "0.3.0",
+  "version": "0.26.5",
   "asset": "HC265.zip",
-  "result": "failure",
+  "result": "success",
   "alreadyPublished": false,
-  "releaseCommit": "f29f3b3f4d2c0f71e141fa45ad3d7f6c1fd6ed87",
+  "releaseCommit": "0332c443216dfb20ee310d361273f09d6f66ce0c",
   "candidateRunId": "32007767975",
   "candidateRunAttempt": "1",
   "candidateCommit": "b2e225f2b914e07be18234f9950d30aaae37f31c",
   "candidateSha256": "3719a70aee7593f8c45bd57de266031b966cad804909f8838ebd6fe4cd240a24",
-  "recordedAtUtc": "2026-08-17T08:24:13.956967+00:00"
+  "recordedAtUtc": "2026-08-17T08:27:03.206155+00:00"
 }
