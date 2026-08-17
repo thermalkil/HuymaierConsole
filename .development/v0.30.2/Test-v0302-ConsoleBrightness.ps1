@@ -40,8 +40,8 @@ foreach($needle in @(
 
 # Guard the requested exact controller interval. The generic shell still sends
 # +/-5 for ordinary sliders; this one must map direction to exactly +/-10.
-if($text -match "console-brightness-slider'[\s\S]{0,900}\$current\+\$Delta"){throw 'Console brightness still applies the generic +/-5 delta directly.'}
-if($text -notmatch "console-brightness-slider'[\s\S]{0,900}-10[\s\S]{0,100}\+10"){throw 'Console brightness does not expose both exact 10-percent directions.'}
+if($text -match 'console-brightness-slider''[\s\S]{0,900}\$current\+\$Delta'){throw 'Console brightness still applies the generic +/-5 delta directly.'}
+if($text -notmatch 'console-brightness-slider''[\s\S]{0,900}-10[\s\S]{0,100}\+10'){throw 'Console brightness does not expose both exact 10-percent directions.'}
 
 $tokens=$null;$errors=$null
 [void][Management.Automation.Language.Parser]::ParseFile($customization,[ref]$tokens,[ref]$errors)
