@@ -44,18 +44,21 @@ jobs:
             '.build/Optimize-v0308-InstallerVersion.ps1',
             '.build/Optimize-v0308-ShellArtworkUi.ps1',
             '.build/Optimize-v0308-UiAuthorityCleanup.ps1',
+            '.build/Optimize-v0308-BackgroundTasks.ps1',
+            'HuymaierBackgroundTasks.ps1',
             '.development/v0.30.8/Test-v0308-CoverArtFallback.ps1',
             '.development/v0.30.8/Test-v0308-TgdbSchema.ps1',
             '.development/v0.30.8/Test-v0308-NativeBuildStamp.ps1',
             '.development/v0.30.8/Test-v0308-ShellArtworkUi.ps1',
-            '.development/v0.30.8/Test-v0308-UiAuthority.ps1'
+            '.development/v0.30.8/Test-v0308-UiAuthority.ps1',
+            '.development/v0.30.8/Test-v0308-BackgroundTasks.ps1'
           )
           foreach($file in $files){
             $tokens=$null;$errors=$null;[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file),[ref]$tokens,[ref]$errors)
             if($errors.Count){$errors|ForEach-Object{Write-Host ('{0}:{1}:{2} {3}' -f $file,$_.Extent.StartLineNumber,$_.Extent.StartColumnNumber,$_.Message)};throw "$file failed Windows PowerShell parsing."}
           }
 
-      - name: Apply v0.30.8 cover-art transforms
+      - name: Apply v0.30.8 transforms
         shell: powershell
         run: |
           ./.build/Optimize-CoverArtFallback.ps1
@@ -63,6 +66,7 @@ jobs:
           ./.build/Optimize-v0308-InstallerVersion.ps1
           ./.build/Optimize-v0308-ShellArtworkUi.ps1
           ./.build/Optimize-v0308-UiAuthorityCleanup.ps1
+          ./.build/Optimize-v0308-BackgroundTasks.ps1
 
       - name: Validate transformed source
         shell: powershell
@@ -72,6 +76,7 @@ jobs:
           ./.development/v0.30.8/Test-v0308-NativeBuildStamp.ps1 -StageRoot .
           ./.development/v0.30.8/Test-v0308-ShellArtworkUi.ps1 -StageRoot .
           ./.development/v0.30.8/Test-v0308-UiAuthority.ps1 -StageRoot .
+          ./.development/v0.30.8/Test-v0308-BackgroundTasks.ps1 -StageRoot .
 
       - name: Build release-shaped candidate from HC0307.zip
         shell: powershell
@@ -83,7 +88,7 @@ jobs:
           $stage=Join-Path $env:RUNNER_TEMP 'hc-stage\HC0308'
           ./.development/v0.30.8/Test-v0308-NativeBuildStamp.ps1 -StageRoot $stage -VerifyCompiledHost
 
-      - name: Validate staged candidate artwork layer
+      - name: Validate staged candidate layers
         shell: powershell
         run: |
           $stage=Join-Path $env:RUNNER_TEMP 'hc-stage\HC0308'
@@ -92,6 +97,7 @@ jobs:
           ./.development/v0.30.8/Test-v0308-TgdbSchema.ps1 -StageRoot $stage
           ./.development/v0.30.8/Test-v0308-ShellArtworkUi.ps1 -StageRoot $stage
           ./.development/v0.30.8/Test-v0308-UiAuthority.ps1 -StageRoot $stage
+          ./.development/v0.30.8/Test-v0308-BackgroundTasks.ps1 -StageRoot $stage
 
       - name: Run installer and integrity regression suite
         shell: powershell
@@ -115,7 +121,7 @@ jobs:
       - name: Upload full testable candidate
         uses: actions/upload-artifact@v4
         with:
-          name: v0.30.8-rc4
+          name: v0.30.8-rc5
           path: ${{ env.HC_CANDIDATE_OUTPUT }}\*
           if-no-files-found: error
           retention-days: 14
