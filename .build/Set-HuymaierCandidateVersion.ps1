@@ -14,7 +14,7 @@ $ErrorActionPreference='Stop'
 $trigger=Get-Content -Raw -LiteralPath $TriggerPath -Encoding UTF8|ConvertFrom-Json
 $version=[string]$trigger.version
 if([string]::IsNullOrWhiteSpace($version)){throw 'Candidate version stamping requires trigger.version.'}
-if($version -ne '0.30.2'){throw "This v0.30.2 stamping transform refuses unexpected version '$version'."}
+if($version -ne '0.30.3'){throw "This v0.30.3 stamping transform refuses unexpected version '$version'."}
 
 function Replace-ExactlyOnce([string]$Path,[string]$Old,[string]$New,[string]$Label){
     $text=[IO.File]::ReadAllText($Path,[Text.Encoding]::UTF8)
@@ -33,16 +33,16 @@ Replace-ExactlyOnce $InstallerScriptPath "-Version '0.26.4'" "-Version '$version
 $manifest=Get-Content -Raw -LiteralPath $ManifestPath -Encoding UTF8|ConvertFrom-Json
 if([string]$manifest.version -ne '0.26.4'){throw "Expected source manifest version 0.26.4 before candidate stamping, found $($manifest.version)."}
 $manifest.version=$version
-$manifest.baseVersion='0.30.1'
-$manifest.build='console-brightness-rc1'
-$manifest.description='v0.30.2 is a deliberately narrow follow-up to v0.30.1. It adds one controller-friendly overall Huymaier Console brightness control from 0 to 200 percent in exact 10 percent steps while preserving the v0.30.1 updater repair, 3D-model brightness range, bounded fan motion, and all validated platform/controller/download behavior.'
+$manifest.baseVersion='0.30.2'
+$manifest.build='fse-updater-handoff-rc1'
+$manifest.description='v0.30.3 is a focused updater reliability release. It keeps the Windows/Xbox FSE host alive during self-update, blocks the host from relaunching the old runtime while files are being replaced, and lets the FSE host relaunch the newly installed build after the updater releases its handoff gate.'
 $features=New-Object System.Collections.ArrayList
 foreach($feature in @($manifest.features)){[void]$features.Add([string]$feature)}
 foreach($feature in @(
-    'adds a persisted overall Huymaier Console brightness control from 0 to 200 percent in exact 10 percent steps without changing Windows display brightness or external applications',
-    'preserves the v0.30.1 self-update bridge so installed v0.30.1 systems recognize v0.30.2 and select HC0302.zip plus its SHA-256 sidecar',
-    'preserves the v0.30.1 0-200 percent 3D-model brightness control and bounded fan-style presentation motion',
-    'preserves HC3D v4 COLOR_0 vertex colors, balanced material response, controller routing, Quick Access, Downloads, Recomps, GameCube, streaming and installer integrity'
+    'coordinates Huymaier Console self-update with the Windows/Xbox FSE home host through a bounded handoff gate so the old runtime cannot immediately relaunch during installation',
+    'keeps desktop-mode self-update behavior unchanged while FSE-mode relaunch ownership moves to the long-lived FSE host',
+    'carries forward the v0.30.2 overall Huymaier Console brightness control from 0 to 200 percent in exact 10 percent steps',
+    'preserves the v0.30.1 updater version ordering repair, 0-200 percent 3D-model brightness, bounded fan motion, HC3D v4 COLOR_0 rendering, controller routing, Quick Access, Downloads, Recomps, GameCube, streaming and installer integrity'
 )){
     if($features -notcontains $feature){[void]$features.Add($feature)}
 }
@@ -51,9 +51,9 @@ $manifest|ConvertTo-Json -Depth 20|Set-Content -LiteralPath $ManifestPath -Encod
 
 $appx=[IO.File]::ReadAllText($AppxManifestPath,[Text.Encoding]::UTF8)
 $oldAppx='Version="0.26.4.0"'
-$newAppx='Version="0.30.2.0"'
+$newAppx='Version="0.30.3.0"'
 if(([regex]::Matches($appx,[regex]::Escape($oldAppx))).Count -ne 1){throw 'Expected exactly one v0.26.4.0 AppX identity before candidate stamping.'}
 $appx=$appx.Replace($oldAppx,$newAppx)
 [IO.File]::WriteAllText($AppxManifestPath,$appx,(New-Object Text.UTF8Encoding($false)))
 
-Write-Host "Stamped shell, bootstrap, installer core/cache, native build stamp, manifest and AppX as Huymaier Console v$version / console-brightness-rc1."
+Write-Host "Stamped shell, bootstrap, installer core/cache, native build stamp, manifest and AppX as Huymaier Console v$version / fse-updater-handoff-rc1."
