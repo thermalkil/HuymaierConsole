@@ -1,13 +1,13 @@
 {
-  "tag": "v0.30.3",
-  "version": "0.30.3",
-  "asset": "HC0303.zip",
-  "result": "success",
+  "tag": "v0.30.4",
+  "version": "0.30.4",
+  "asset": "HC0304.zip",
+  "result": "failure",
   "alreadyPublished": false,
-  "releaseCommit": "16482e43da0eb08668f3f99c17ddee7722501307",
-  "candidateRunId": "32020763844",
+  "releaseCommit": "3111e75056198de19c68aa020488f69ce19e5ce9",
+  "candidateRunId": "32022567293",
   "candidateRunAttempt": "1",
-  "candidateCommit": "9467b63dd6e22c81a013fe1c8586506cfc2899be",
-  "candidateSha256": "fc9757709958207fce93fd701030e677f225ce724d2f023bf7b706b7cacf359a",
-  "recordedAtUtc": "2026-08-17T10:39:44.829685+00:00"
+  "candidateCommit": "27ff0662ee399ee21aa8327fcdf5e8fddb9dd78f",
+  "candidateSha256": "172aedff27bfd8b82e9eac3f2e1981abafb5d984ab0582e39953a624cee733b0",
+  "recordedAtUtc": "2026-08-17T11:01:04.091397+00:00"
 }
