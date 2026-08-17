@@ -82,12 +82,6 @@ function Complete-NativeKeyboardInput {
         }
 '@
     $storefront=Replace-Range $storefront "        'SteamGridDbApiKey' {" "        'CreateFolder' {" $new 'API key and customization dispatch cases'
-    $old=@'
-function Get-NativeKeyboardBuffer {
-    if($script:KeyboardSecure){return [string]$script:KeyboardSecureBuffer}
-    return [string]$script:KeyboardTextBox.Text
-}
-'@
     $new=@'
 function Get-NativeKeyboardBuffer {
     if($script:KeyboardSecure){
@@ -103,7 +97,7 @@ function Get-NativeKeyboardBuffer {
     return [string]$script:KeyboardTextBox.Text
 }
 '@
-    $storefront=Replace-Required $storefront $old.TrimEnd() $new.TrimEnd() 'secure first-edit replacement'
+    $storefront=Replace-Range $storefront 'function Get-NativeKeyboardBuffer {' 'function Set-NativeKeyboardBuffer {' $new 'secure first-edit replacement'
 }
 Write-Normalized $storefrontPath $storefront
 
