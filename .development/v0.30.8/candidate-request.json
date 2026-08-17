@@ -5,7 +5,7 @@
   "base_asset": "HC0307.zip",
   "package_root": "HC0308",
   "asset_name": "HC0308.zip",
-  "production_source": "22bf445215a105e68d47531b8b5ab9e2c9f52ee9",
-  "attempt": 15,
+  "production_source": "16a8735cd593c838567999221f8a53ebebe196ae",
+  "attempt": 16,
   "notes": "Adds centralized dynamic settings persistence so module-owned settings survive restart without a core allowlist, atomic/deep config writes, first-class ConsoleBrightness persistence, debounced auto-save and shutdown flush for all advanced console 3D model presentation/lighting settings, and production runtime cleanup for proven-unreferenced v0.26.2 compatibility scripts. Retains RC5 background-task HUD, sequenced artwork refresh, TheGamesDB-first matching, API-key persistence, cumulative artwork results, active Settings ownership, and cursor-state cleanup."
 }
