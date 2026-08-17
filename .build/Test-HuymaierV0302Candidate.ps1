@@ -53,7 +53,7 @@ $customization=Require-Text 'HuymaierCustomization.ps1' @(
     "`$persistedConfig.PSObject.Properties['ConsoleBrightness']",
     'Save-Config'
 )
-if($customization -match "console-brightness-slider'[\s\S]{0,900}\$current\+\$Delta"){throw 'Staged console brightness still uses the generic +/-5 delta directly.'}
+if($customization -match 'console-brightness-slider''[\s\S]{0,900}\$current\+\$Delta'){throw 'Staged console brightness still uses the generic +/-5 delta directly.'}
 
 $userModels=Require-Text 'HuymaierUser3DModels.ps1' @(
     'HUYMAIER_V0301_BRIGHTNESS_0_200_AND_FAN_MOTION_V1',
