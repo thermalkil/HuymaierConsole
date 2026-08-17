@@ -48,6 +48,7 @@ jobs:
             '.build/Optimize-v0308-UiAuthorityCleanup.ps1',
             '.build/Optimize-v0308-BackgroundTasks.ps1',
             '.build/Optimize-v0308-SettingsPersistenceCleanup.ps1',
+            '.build/Optimize-v0308-SettingsInputAuthority.ps1',
             'HuymaierBackgroundTasks.ps1',
             'HuymaierSettingsStore.ps1',
             '.development/v0.30.8/Test-v0308-CoverArtFallback.ps1',
@@ -56,7 +57,9 @@ jobs:
             '.development/v0.30.8/Test-v0308-ShellArtworkUi.ps1',
             '.development/v0.30.8/Test-v0308-UiAuthority.ps1',
             '.development/v0.30.8/Test-v0308-BackgroundTasks.ps1',
-            '.development/v0.30.8/Test-v0308-SettingsPersistenceCleanup.ps1'
+            '.development/v0.30.8/Test-v0308-SettingsPersistenceCleanup.ps1',
+            '.development/v0.30.8/Test-v0308-SettingsInputAuthority.ps1',
+            '.development/v0.30.8/Test-v0308-ProductionRuntimeAudit.ps1'
           )
           foreach($file in $files){
             $tokens=$null;$errors=$null;[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file),[ref]$tokens,[ref]$errors)
@@ -73,6 +76,7 @@ jobs:
           ./.build/Optimize-v0308-UiAuthorityCleanup.ps1
           ./.build/Optimize-v0308-BackgroundTasks.ps1
           ./.build/Optimize-v0308-SettingsPersistenceCleanup.ps1
+          ./.build/Optimize-v0308-SettingsInputAuthority.ps1
 
       - name: Validate transformed source
         shell: powershell
@@ -84,6 +88,8 @@ jobs:
           ./.development/v0.30.8/Test-v0308-UiAuthority.ps1 -StageRoot .
           ./.development/v0.30.8/Test-v0308-BackgroundTasks.ps1 -StageRoot .
           ./.development/v0.30.8/Test-v0308-SettingsPersistenceCleanup.ps1 -StageRoot .
+          ./.development/v0.30.8/Test-v0308-SettingsInputAuthority.ps1 -StageRoot .
+          ./.development/v0.30.8/Test-v0308-ProductionRuntimeAudit.ps1 -StageRoot .
 
       - name: Build release-shaped candidate from HC0307.zip
         shell: powershell
@@ -106,6 +112,8 @@ jobs:
           ./.development/v0.30.8/Test-v0308-UiAuthority.ps1 -StageRoot $stage
           ./.development/v0.30.8/Test-v0308-BackgroundTasks.ps1 -StageRoot $stage
           ./.development/v0.30.8/Test-v0308-SettingsPersistenceCleanup.ps1 -StageRoot $stage
+          ./.development/v0.30.8/Test-v0308-SettingsInputAuthority.ps1 -StageRoot $stage
+          ./.development/v0.30.8/Test-v0308-ProductionRuntimeAudit.ps1 -StageRoot $stage
 
       - name: Run installer and integrity regression suite
         shell: powershell
