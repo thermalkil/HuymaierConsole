@@ -4,7 +4,7 @@ $ErrorActionPreference='Stop'
 $root=(Resolve-Path -LiteralPath $StageRoot).Path
 function Require([bool]$Condition,[string]$Message){if(-not$Condition){throw $Message}}
 function Read-Hc([string]$Relative){$path=Join-Path $root $Relative;if(-not(Test-Path -LiteralPath $path -PathType Leaf)){throw "Required file missing: $Relative"};return [IO.File]::ReadAllText($path,[Text.Encoding]::UTF8)}
-function Parse-Hc([string]$Relative){$path=Join-Path $root $Relative;$tokens=$null;$errors=$null;[void][Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors);if($errors.Count){throw (($errors|ForEach-Object{"$Relative:$($_.Extent.StartLineNumber):$($_.Extent.StartColumnNumber) $($_.Message)"})-join"`n")}}
+function Parse-Hc([string]$Relative){$path=Join-Path $root $Relative;$tokens=$null;$errors=$null;[void][Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors);if($errors.Count){throw (($errors|ForEach-Object{"${Relative}:$($_.Extent.StartLineNumber):$($_.Extent.StartColumnNumber) $($_.Message)"})-join"`n")}}
 
 foreach($file in @('HuymaierConsole.ps1','HuymaierSettingsStore.ps1','HuymaierCustomization.ps1','HuymaierConsoleModelPresentation.ps1','HuymaierBootstrap.ps1','Install-HuymaierConsole.ps1','HuymaierInstallerCore.ps1')){Parse-Hc $file}
 $core=Read-Hc 'HuymaierConsole.ps1'
@@ -15,7 +15,7 @@ $bootstrap=Read-Hc 'HuymaierBootstrap.ps1'
 $installer=Read-Hc 'Install-HuymaierConsole.ps1'
 $installerCore=Read-Hc 'HuymaierInstallerCore.ps1'
 
-Require ($core.Contains('HUYMAIER_V0308_SETTINGS_STORE_CORE_V1')) 'Core settings-store marker is missing.'
+Require ($core.Contains('HUYMAIER_V0308_SETTINGS_STORE_CORE_V2')) 'Core settings-store marker is missing.'
 Require ($core.Contains('Merge-HcPersistedConfig -Defaults $defaults -Loaded $loaded')) 'Core config loader is not using dynamic property merge.'
 Require (-not $core.Contains("foreach (`$name in @('BrowserName','BrowserPath'")) 'Legacy config property allowlist is still active.'
 Require ($core.Contains('Write-HcConfigAtomic -Path $script:ConfigPath -Config $script:Config -Depth 16')) 'Core config save is not atomic/deep.'
@@ -25,13 +25,13 @@ Require ($core.Contains('Flush-HcModelEditorAutoSave')) 'Shutdown does not flush
 Require ($store.Contains('function Merge-HcPersistedConfig')) 'Settings merge function missing.'
 Require ($store.Contains('function Write-HcConfigAtomic')) 'Atomic settings writer missing.'
 Require ($custom.Contains("Add-HcCustomizationConfigProperty 'ConsoleBrightness' 100")) 'Customization brightness default is missing.'
-Require (-not ($custom -match "persistedBrightness|Get-Content -Raw -LiteralPath \$script:ConfigPath")) 'Customization still contains the old raw-config brightness workaround.'
-Require ($model.Contains('HUYMAIER_V0308_MODEL_SETTINGS_AUTOSAVE_V1')) 'Model editor auto-save marker missing.'
+Require (-not ($custom -match 'persistedBrightness|Get-Content -Raw -LiteralPath \$script:ConfigPath')) 'Customization still contains the old raw-config brightness workaround.'
+Require ($model.Contains('HUYMAIER_V0308_MODEL_SETTINGS_AUTOSAVE_V2')) 'Model editor auto-save marker missing.'
 Require ($model.Contains('Queue-HcModelEditorAutoSave;Update-HcGpuModelViewerItem')) 'Model adjustments are not queued for persistence.'
 Require ($model.Contains('Save-HcModelViewSnapshotToConfig $script:HcModelEditorOriginalView')) 'Model Cancel does not persist the restored original snapshot.'
 Require ($bootstrap.Contains("Label='Central settings persistence store'")) 'Bootstrap does not preflight the settings store.'
 Require ($installer.Contains("'HuymaierSettingsStore.ps1'")) 'Installer startup cache omits the settings store.'
-Require ($installerCore.Contains('HUYMAIER_V0308_SETTINGS_STORE_REQUIRED_V1')) 'Installer required payload omits settings store.'
+Require ($installerCore.Contains('HUYMAIER_V0308_SETTINGS_STORE_REQUIRED_V2')) 'Installer required payload omits settings store.'
 
 foreach($retired in @('HuymaierV0262Hardening.ps1','HuymaierV0262ProviderRuntime.ps1','HuymaierV0262Runtime.ps1')){
     Require (-not(Test-Path -LiteralPath (Join-Path $root $retired))) "Retired production runtime survived cleanup: $retired"
