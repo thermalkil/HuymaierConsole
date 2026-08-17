@@ -17,22 +17,10 @@ if($core -notmatch 'HUYMAIER_V0308_BACKGROUND_TASK_CORE_V2'){
     $insert=@($anchor,'$script:BackgroundTasksModulePath = Join-Path $script:BaseDir ''HuymaierBackgroundTasks.ps1'' # HUYMAIER_V0308_BACKGROUND_TASK_CORE_V2') -join $lf
     $core=Replace-Required $core $anchor $insert 'background task module path'
 
-    $anchor=@'
-if (Test-Path -LiteralPath $script:CustomizationModulePath) {
-    try { . $script:CustomizationModulePath }
-    catch { Write-Log "Customization module load failed: $($_.Exception.Message)" 'ERROR' }
-}
-'@
-    $insert=@'
-if (Test-Path -LiteralPath $script:CustomizationModulePath) {
-    try { . $script:CustomizationModulePath }
-    catch { Write-Log "Customization module load failed: $($_.Exception.Message)" 'ERROR' }
-}
-if (Test-Path -LiteralPath $script:BackgroundTasksModulePath) {
-    try { . $script:BackgroundTasksModulePath }
-    catch { Write-Log "Background task module load failed: $($_.Exception.Message)" 'ERROR' }
-}
-'@
+    # The platform-model marker is the stable boundary immediately after the
+    # Customization module load; insert the background-task owner at that boundary.
+    $anchor='# HUYMAIER_PLATFORM_3D_MODELS_RUNTIME_V2'
+    $insert=@('if (Test-Path -LiteralPath $script:BackgroundTasksModulePath) {','    try { . $script:BackgroundTasksModulePath }','    catch { Write-Log "Background task module load failed: $($_.Exception.Message)" ''ERROR'' }','}',$anchor) -join $lf
     $core=Replace-Required $core $anchor $insert 'background task module load'
 
     $anchor=@'
