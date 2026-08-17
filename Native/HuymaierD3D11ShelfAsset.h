@@ -18,6 +18,7 @@ namespace HuymaierGpuShelf
     // than clipping individual channels to white.
     static const char* HcShelfShaderSource = R"HLSL(
     // HUYMAIER_D3D11_SHELF_SHADER_V5_BALANCED_COLOR_PRESERVING_UI_PBR
+    // HUYMAIER_D3D11_SHELF_SHADER_V4_COLOR_MANAGED_UI_PBR (staged compatibility marker; V5 owns rendering)
     cbuffer ModelConstants : register(b0)
     {
         row_major float4x4 WorldViewProjection;
