@@ -218,6 +218,69 @@ function Try-SteamEquivalentArt{
     return ''
 }
 
+function Get-SteamGridDbKey{
+    try{
+        $value=[string](Get-Prop $config 'SteamGridDbApiKey' '')
+        if(-not [string]::IsNullOrWhiteSpace($value)){return $value.Trim()}
+    }catch{}
+    try{
+        $envKey=[string]$env:HUYMAIER_STEAMGRIDDB_API_KEY
+        if(-not [string]::IsNullOrWhiteSpace($envKey)){return $envKey.Trim()}
+    }catch{}
+    return ''
+}
+
+function Get-SteamAppId{
+    param($Game)
+    $id=[string](Get-Prop $Game 'Id' '')
+    $providerId=[string](Get-Prop $Game 'ProviderGameId' '')
+    $launch=[string](Get-Prop $Game 'LaunchTarget' '')
+    if($id -match '(?i)^Steam:(\d+)$'){return $matches[1]}
+    if(([string](Get-Prop $Game 'Source' '')) -match '(?i)^steam$' -and $providerId -match '^\d+$'){return $providerId}
+    if($launch -match '(?i)rungameid/(\d+)'){return $matches[1]}
+    return ''
+}
+
+function Try-SteamGridDbArt{
+    param($Game,[string]$Target)
+    $key=Get-SteamGridDbKey
+    if(-not $key){return ''}
+    $headers=@{'Authorization'=('Bearer '+$key);'User-Agent'='HuymaierConsole/0.26.3';'Accept'='application/json'}
+    $appId=Get-SteamAppId $Game
+    $gridResponse=$null
+    try{
+        if($appId){
+            $gridResponse=Invoke-RestMethod -Uri ("https://www.steamgriddb.com/api/v2/grids/steam/"+$appId+"?nsfw=false&humor=false") -Headers $headers -TimeoutSec 15
+        }else{
+            $name=[string](Get-Prop $Game 'Name' '')
+            if(-not $name){return ''}
+            $best=$null;$bestScore=0.0
+            foreach($variant in @(Get-NameVariants $name)){
+                $search=Invoke-RestMethod -Uri ("https://www.steamgriddb.com/api/v2/search/autocomplete/"+[uri]::EscapeDataString($variant)) -Headers $headers -TimeoutSec 15
+                foreach($candidate in @(Get-Prop $search 'data' @())){
+                    $score=Get-NameScore $name ([string](Get-Prop $candidate 'name' ''))
+                    if($score -gt $bestScore){$bestScore=$score;$best=$candidate}
+                }
+                if($bestScore -ge .94){break}
+            }
+            if($null -eq $best -or $bestScore -lt .52){return ''}
+            $sgdbId=[string](Get-Prop $best 'id' '')
+            if(-not $sgdbId){return ''}
+            $gridResponse=Invoke-RestMethod -Uri ("https://www.steamgriddb.com/api/v2/grids/game/"+$sgdbId+"?nsfw=false&humor=false") -Headers $headers -TimeoutSec 15
+        }
+        $ranked=@(Get-Prop $gridResponse 'data' @())|Sort-Object @{Expression={ [double](Get-Prop $_ 'score' (Get-Prop $_ 'upvotes' 0)) };Descending=$true}
+        foreach($grid in $ranked){
+            $url=[string](Get-Prop $grid 'url' '')
+            if(-not $url){continue}
+            $width=[int](Get-Prop $grid 'width' 0);$height=[int](Get-Prop $grid 'height' 0)
+            if($width -gt 0 -and $height -gt 0 -and $height -lt $width){continue}
+            $found=Download-Art $url $Target
+            if($found){return $found}
+        }
+    }catch{}
+    return ''
+}
+
 function Try-GogCatalogArt{
     param($Game,[string]$Target)
     $name=[string](Get-Prop $Game 'Name' '')
@@ -418,6 +481,8 @@ try{
             }
         }
         if(-not $found){$found=Try-LibretroArt $game $target}
+        if(-not $found -and $source -match '(?i)^steam$'){$found=Try-SteamEquivalentArt $game $target}
+        if(-not $found -and $source -match '(?i)steam|epic|gog|amazon|ea|ubisoft|battlenet|battle\.net|rockstar|xbox|pc|windows|custom|generic'){ $found=Try-SteamGridDbArt $game $target }
         if(-not $found -and $source -match '(?i)gog|pc|windows|custom|generic'){ $found=Try-GogCatalogArt $game $target }
         if(-not $found){$found=Try-SteamEquivalentArt $game $target}
         if(-not $found){$found=Try-WikipediaArt $game $target}

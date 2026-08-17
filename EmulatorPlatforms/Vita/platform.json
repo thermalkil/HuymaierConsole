@@ -1,0 +1,20 @@
+{
+  "id": "vita",
+  "displayName": "PlayStation Vita",
+  "primaryBackend": "Vita3K",
+  "fallbackBackend": "",
+  "adapter": "vita3k",
+  "interface": "Native PlayStation Vita LiveArea-style interface",
+  "version": "0.26.4-dev",
+  "enabled": true,
+  "gameExtensions": [
+    ".vpk",
+    ".pkg",
+    ".zip"
+  ],
+  "dashboardStyle": "LiveArea",
+  "directoryGameDetection": [
+    "sce_sys/param.sfo",
+    "eboot.bin"
+  ]
+}

@@ -5,7 +5,7 @@
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
-$script:ExpectedConsoleVersion='0.26.2'
+$script:ExpectedConsoleVersion='0.30.6'
 $baseVariable=Get-Variable -Name HuymaierBaseDirectory -ErrorAction SilentlyContinue
 $baseDir=if($null -ne $baseVariable -and -not [string]::IsNullOrWhiteSpace([string]$baseVariable.Value)){[string]$baseVariable.Value}else{Split-Path -Parent $MyInvocation.MyCommand.Path}
 $corePath=Join-Path $baseDir 'HuymaierConsole.ps1'
@@ -15,15 +15,44 @@ $storefrontModulePath=Join-Path $baseDir 'HuymaierStorefronts.ps1'
 $storefrontWorkerPath=Join-Path $baseDir 'HuymaierStorefrontWorker.ps1'
 $providerModulePath=Join-Path $baseDir 'HuymaierGameProviders.ps1'
 $providerWorkerPath=Join-Path $baseDir 'HuymaierGameProviderWorker.ps1'
+$providerTelemetryPath=Join-Path $baseDir 'HuymaierProviderTelemetry.ps1'
+$providerProgressWorkerPath=Join-Path $baseDir 'HuymaierProviderProgressWorker.ps1'
+$providerTelemetryCoordinatorPath=Join-Path $baseDir 'HuymaierProviderTelemetryCoordinator.ps1'
+$providerConcurrencyPath=Join-Path $baseDir 'HuymaierProviderConcurrency.ps1'
+$providerConcurrencyUiPath=Join-Path $baseDir 'HuymaierProviderConcurrencyUi.ps1'
+$providerTransferCoordinatorPath=Join-Path $baseDir 'HuymaierProviderTransferCoordinator.ps1'
 $artworkWorkerPath=Join-Path $baseDir 'HuymaierArtworkWorker.ps1'
 $gameExperiencePath=Join-Path $baseDir 'HuymaierGameExperience.ps1'
 $shellRedesignPath=Join-Path $baseDir 'HuymaierShellRedesign.ps1'
+# HUYMAIER_APP_LIBRARY_PREFLIGHT_V1
+$appLibraryPath=Join-Path $baseDir 'HuymaierAppLibrary.ps1'
+$appInstallWorkerPath=Join-Path $baseDir 'HuymaierAppInstallWorker.ps1'
+# HUYMAIER_STREAMING_CONTROLLER_PREFLIGHT_V1
+$streamingControllerPath=Join-Path $baseDir 'HuymaierStreamingController.ps1'
+# HUYMAIER_UNIFIED_CURSOR_PREFLIGHT_V1
+$unifiedCursorPath=Join-Path $baseDir 'HuymaierUnifiedCursor.ps1'
+# HUYMAIER_PLATFORM_3D_LIVE_PREFLIGHT_V2
+$platformModelsPath=Join-Path $baseDir 'HuymaierPlatformModels.ps1'
+$livePlatformModelsPath=Join-Path $baseDir 'HuymaierLivePlatformModels.ps1'
+# HUYMAIER_USER_3D_MODELS_PREFLIGHT_V1
+$user3DModelsPath=Join-Path $baseDir 'HuymaierUser3DModels.ps1'
+# HUYMAIER_GPU_3D_SHELVES_PREFLIGHT_V1
+$gpuPlatformShelvesPath=Join-Path $baseDir 'HuymaierGpuPlatformShelves.ps1'
+# HUYMAIER_MANUAL_RECOMPS_PREFLIGHT_V1
+$manualRecompsPath=Join-Path $baseDir 'HuymaierRecompsManual.ps1'
+$finalRecompsPath=Join-Path $baseDir 'HuymaierRecompsFinal.ps1'
+# HUYMAIER_V0304_MODEL_DEFAULT_PREFLIGHT_V1
+$modelDefaultsPath=Join-Path $baseDir 'HuymaierModelDefaults.ps1'
 $gameBarPath=Join-Path $baseDir 'HuymaierGameBar.ps1'
 $dataDir=Join-Path $env:LOCALAPPDATA 'Huymaier Console'
 $logDir=Join-Path $dataDir 'Logs'
 $manifestPath=Join-Path $baseDir 'manifest.json'
 $installIncompleteMarker=Join-Path $dataDir 'install-incomplete.json'
 $gameInputBridgePath=Join-Path $baseDir 'HuymaierGameInputBridge.dll'
+$preflightCachePath=Join-Path $dataDir 'startup-preflight-v1.json'
+$script:ProviderTelemetryWatcher=$null
+$script:ProviderTelemetrySubscriptions=@()
+$script:ProviderTelemetryPidPath=Join-Path (Join-Path $dataDir 'GameProviders') 'provider-telemetry-coordinator.pid'
 New-Item -ItemType Directory -Force -Path $dataDir,$logDir|Out-Null
 
 function Write-BootstrapLog {
@@ -32,6 +61,13 @@ function Write-BootstrapLog {
         $path=Join-Path $logDir "$(Get-Date -Format 'yyyy-MM-dd').log"
         "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff') [$Level] $Message"|Add-Content -Path $path -Encoding UTF8
     }catch{}
+}
+
+function Get-ObjectProperty {
+    param($Object,[string]$Name,$Default=$null)
+    if($null -eq $Object){return $Default}
+    try{$property=$Object.PSObject.Properties[$Name];if($null -ne $property -and $null -ne $property.Value){return $property.Value}}catch{}
+    return $Default
 }
 
 function Test-PowerShellFile {
@@ -43,6 +79,104 @@ function Test-PowerShellFile {
     $details=New-Object System.Text.StringBuilder
     foreach($parseError in $parseErrors){[void]$details.AppendLine(("{0} line {1}, column {2}: {3}" -f $Label,$parseError.Extent.StartLineNumber,$parseError.Extent.StartColumnNumber,$parseError.Message))}
     throw $details.ToString().Trim()
+}
+
+function Get-PowerShellPreflightEntries {
+    return @(
+        [pscustomobject]@{Path=$corePath;Label='Main shell'},
+        [pscustomobject]@{Path=$libraryWorkerPath;Label='Library worker'},
+        [pscustomobject]@{Path=$ps1LibraryWorkerPath;Label='PlayStation 1 library worker'},
+        [pscustomobject]@{Path=$storefrontModulePath;Label='Storefront hub'},
+        [pscustomobject]@{Path=$storefrontWorkerPath;Label='Storefront worker'},
+        [pscustomobject]@{Path=$providerModulePath;Label='Game provider hub'},
+        [pscustomobject]@{Path=$providerWorkerPath;Label='Game provider worker'},
+        [pscustomobject]@{Path=$providerTelemetryPath;Label='Provider telemetry helpers'},
+        [pscustomobject]@{Path=$providerProgressWorkerPath;Label='Provider progress worker'},
+        [pscustomobject]@{Path=$providerTelemetryCoordinatorPath;Label='Provider telemetry coordinator'},
+        [pscustomobject]@{Path=$providerConcurrencyPath;Label='Provider concurrency layer'},
+        [pscustomobject]@{Path=$providerConcurrencyUiPath;Label='Provider concurrent Downloads UI'},
+        [pscustomobject]@{Path=$providerTransferCoordinatorPath;Label='Provider transfer coordinator'},
+        [pscustomobject]@{Path=$artworkWorkerPath;Label='Online artwork worker'},
+        [pscustomobject]@{Path=$gameExperiencePath;Label='Unified game experience'},
+        [pscustomobject]@{Path=$shellRedesignPath;Label='Shell redesign'},
+        [pscustomobject]@{Path=$appLibraryPath;Label='Curated app library'},
+        [pscustomobject]@{Path=$appInstallWorkerPath;Label='Native app install worker'},
+        [pscustomobject]@{Path=$streamingControllerPath;Label='Streaming controller runtime'},
+        [pscustomobject]@{Path=$unifiedCursorPath;Label='Unified cursor runtime'},
+        [pscustomobject]@{Path=$platformModelsPath;Label='Platform presentation base runtime'},
+        [pscustomobject]@{Path=$livePlatformModelsPath;Label='Live platform 3D helper runtime'},
+        [pscustomobject]@{Path=$user3DModelsPath;Label='User 3D Models compatibility runtime'},
+        [pscustomobject]@{Path=$gpuPlatformShelvesPath;Label='D3D11 GPU platform shelves runtime'},
+        [pscustomobject]@{Path=$manualRecompsPath;Label='Manual Recomps library runtime'},
+        [pscustomobject]@{Path=$finalRecompsPath;Label='Manual Recomps final ownership runtime'},
+        [pscustomobject]@{Path=$modelDefaultsPath;Label='3D model default-orientation editor runtime'},
+        [pscustomobject]@{Path=$gameBarPath;Label='Huymaier Game Bar'}
+    )
+}
+
+function Get-PowerShellFileSignature {
+    param([string]$Path,[string]$Label)
+    if(-not(Test-Path -LiteralPath $Path -PathType Leaf)){throw "$Label is missing: $Path"}
+    $item=Get-Item -LiteralPath $Path -ErrorAction Stop
+    return [pscustomobject]@{
+        Name=[IO.Path]::GetFileName($item.FullName)
+        Length=[int64]$item.Length
+        LastWriteUtcTicks=[int64]$item.LastWriteTimeUtc.Ticks
+    }
+}
+
+function Test-PowerShellPreflightCache {
+    param([object[]]$Entries)
+    if(-not(Test-Path -LiteralPath $preflightCachePath -PathType Leaf)){return $false}
+    try{
+        $cache=Get-Content -Raw -LiteralPath $preflightCachePath -Encoding UTF8|ConvertFrom-Json
+        if([int](Get-ObjectProperty $cache 'SchemaVersion' 0) -ne 1){return $false}
+        if(-not [string]::Equals([string](Get-ObjectProperty $cache 'ConsoleVersion' ''),$script:ExpectedConsoleVersion,[StringComparison]::OrdinalIgnoreCase)){return $false}
+        $cachedBase=[string](Get-ObjectProperty $cache 'BaseDir' '')
+        $currentBase=[IO.Path]::GetFullPath($baseDir).TrimEnd('\')
+        if(-not [string]::Equals($cachedBase,$currentBase,[StringComparison]::OrdinalIgnoreCase)){return $false}
+        $cachedFiles=@(Get-ObjectProperty $cache 'Files' @())
+        if($cachedFiles.Count -ne $Entries.Count){return $false}
+        for($i=0;$i -lt $Entries.Count;$i++){
+            $entry=$Entries[$i]
+            $signature=Get-PowerShellFileSignature ([string]$entry.Path) ([string]$entry.Label)
+            $cached=$cachedFiles[$i]
+            if(-not [string]::Equals([string](Get-ObjectProperty $cached 'Name' ''),[string]$signature.Name,[StringComparison]::OrdinalIgnoreCase)){return $false}
+            if([int64](Get-ObjectProperty $cached 'Length' -1) -ne [int64]$signature.Length){return $false}
+            if([int64](Get-ObjectProperty $cached 'LastWriteUtcTicks' -1) -ne [int64]$signature.LastWriteUtcTicks){return $false}
+        }
+        return $true
+    }catch{return $false}
+}
+
+function Save-PowerShellPreflightCache {
+    param([object[]]$Entries)
+    $files=New-Object System.Collections.ArrayList
+    foreach($entry in $Entries){[void]$files.Add((Get-PowerShellFileSignature ([string]$entry.Path) ([string]$entry.Label)))}
+    $cache=[pscustomobject]@{
+        SchemaVersion=1
+        ConsoleVersion=$script:ExpectedConsoleVersion
+        BaseDir=[IO.Path]::GetFullPath($baseDir).TrimEnd('\')
+        Files=[object[]]$files.ToArray()
+        ValidatedAtUtc=[DateTime]::UtcNow.ToString('o')
+    }
+    $temp="$preflightCachePath.$PID.tmp"
+    $cache|ConvertTo-Json -Depth 6|Set-Content -LiteralPath $temp -Encoding UTF8
+    Move-Item -LiteralPath $temp -Destination $preflightCachePath -Force
+}
+
+function Invoke-PowerShellSyntaxPreflight {
+    $entries=[object[]](Get-PowerShellPreflightEntries)
+    $timer=[Diagnostics.Stopwatch]::StartNew()
+    if(Test-PowerShellPreflightCache $entries){
+        $timer.Stop()
+        Write-BootstrapLog ("Startup syntax cache hit; skipped reparsing {0} unchanged PowerShell files in {1} ms." -f $entries.Count,$timer.ElapsedMilliseconds)
+        return
+    }
+    foreach($entry in $entries){Test-PowerShellFile ([string]$entry.Path) ([string]$entry.Label)}
+    Save-PowerShellPreflightCache $entries
+    $timer.Stop()
+    Write-BootstrapLog ("Startup syntax cache refreshed after validating {0} PowerShell files in {1} ms." -f $entries.Count,$timer.ElapsedMilliseconds)
 }
 
 function Get-HuymaierNativeAssembly {
@@ -104,37 +238,109 @@ function Exit-HuymaierSingleInstance {
     }catch{}
 }
 
+function Start-ProviderTelemetryWatch {
+    if(-not(Test-Path -LiteralPath $providerTelemetryCoordinatorPath -PathType Leaf)){return}
+    $providerRoot=Join-Path $dataDir 'GameProviders'
+    New-Item -ItemType Directory -Force -Path $providerRoot|Out-Null
+    $statePath=Join-Path $providerRoot 'provider-state.json'
+    try{
+        $watcher=New-Object IO.FileSystemWatcher $providerRoot,'provider-state.json'
+        $watcher.NotifyFilter=[IO.NotifyFilters]::LastWrite -bor [IO.NotifyFilters]::Size -bor [IO.NotifyFilters]::FileName
+        $context=[pscustomobject]@{
+            StatePath=$statePath
+            CoordinatorPath=$providerTelemetryCoordinatorPath
+            BaseDir=$baseDir
+            DataDir=$dataDir
+            ParentPid=$PID
+            PidPath=$script:ProviderTelemetryPidPath
+        }
+        $action={
+            $ctx=$event.MessageData
+            try{
+                if($null -eq $ctx -or -not(Test-Path -LiteralPath $ctx.StatePath -PathType Leaf)){return}
+                $state=$null;try{$state=Get-Content -Raw -LiteralPath $ctx.StatePath -Encoding UTF8|ConvertFrom-Json}catch{return}
+                if($null -eq $state -or -not [bool]$state.Busy){return}
+                $provider=[string]$state.Provider;$mode=[string]$state.Mode;$workerPid=[int]$state.WorkerPid
+                if($provider -notin @('Epic','GOG','Amazon') -or $mode -notin @('Install','Update') -or $workerPid -le 0){return}
+                if(Test-Path -LiteralPath $ctx.PidPath -PathType Leaf){
+                    $existing=0;try{$existing=[int](Get-Content -Raw -LiteralPath $ctx.PidPath)}catch{}
+                    if($existing -gt 0){try{$p=Get-Process -Id $existing -ErrorAction Stop;if(-not $p.HasExited){return}}catch{}}
+                    Remove-Item -LiteralPath $ctx.PidPath -Force -ErrorAction SilentlyContinue
+                }
+                $powershell="$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
+                $quote={param([string]$v);'"'+([string]$v).Replace('"','')+'"'}
+                $args=@(
+                    '-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',(& $quote $ctx.CoordinatorPath),
+                    '-ParentPid',[string]$ctx.ParentPid,'-BaseDir',(& $quote $ctx.BaseDir),'-DataDir',(& $quote $ctx.DataDir)
+                )
+                $process=Start-Process -FilePath $powershell -ArgumentList $args -WindowStyle Hidden -PassThru
+                try{$process.PriorityClass='BelowNormal'}catch{}
+                Set-Content -LiteralPath $ctx.PidPath -Value ([string]$process.Id) -Encoding ASCII
+            }catch{}
+        }
+        $subscriptions=New-Object System.Collections.ArrayList
+        foreach($eventName in @('Changed','Created')){
+            $sourceIdentifier="Huymaier.ProviderTelemetry.$eventName.$PID"
+            $job=Register-ObjectEvent -InputObject $watcher -EventName $eventName -SourceIdentifier $sourceIdentifier -MessageData $context -Action $action
+            [void]$subscriptions.Add([pscustomobject]@{SourceIdentifier=$sourceIdentifier;Job=$job})
+        }
+        $watcher.EnableRaisingEvents=$true
+        $script:ProviderTelemetryWatcher=$watcher
+        $script:ProviderTelemetrySubscriptions=[object[]]$subscriptions.ToArray()
+        Write-BootstrapLog 'Provider telemetry is event-driven; no telemetry PowerShell process is started during normal boot.'
+    }catch{Write-BootstrapLog "Provider telemetry watcher could not start: $($_.Exception.Message)" 'WARN'}
+}
+
+function Stop-ProviderTelemetryWatch {
+    try{if($null -ne $script:ProviderTelemetryWatcher){$script:ProviderTelemetryWatcher.EnableRaisingEvents=$false}}catch{}
+    foreach($subscription in @($script:ProviderTelemetrySubscriptions)){
+        try{Unregister-Event -SourceIdentifier ([string]$subscription.SourceIdentifier) -ErrorAction SilentlyContinue}catch{}
+        try{if($null -ne $subscription.Job){Remove-Job -Id $subscription.Job.Id -Force -ErrorAction SilentlyContinue}}catch{}
+    }
+    $script:ProviderTelemetrySubscriptions=@()
+    try{if($null -ne $script:ProviderTelemetryWatcher){$script:ProviderTelemetryWatcher.Dispose()}}catch{}
+    $script:ProviderTelemetryWatcher=$null
+    try{
+        if(Test-Path -LiteralPath $script:ProviderTelemetryPidPath -PathType Leaf){
+            $coordinatorPid=0;try{$coordinatorPid=[int](Get-Content -Raw -LiteralPath $script:ProviderTelemetryPidPath)}catch{}
+            if($coordinatorPid -gt 0){Stop-Process -Id $coordinatorPid -Force -ErrorAction SilentlyContinue}
+            Remove-Item -LiteralPath $script:ProviderTelemetryPidPath -Force -ErrorAction SilentlyContinue
+        }
+    }catch{}
+}
+
 try{
     Assert-HuymaierInstallIntegrity
-    Test-PowerShellFile $corePath 'Main shell'
-    Test-PowerShellFile $libraryWorkerPath 'Library worker'
-    Test-PowerShellFile $ps1LibraryWorkerPath 'PlayStation 1 library worker'
-    Test-PowerShellFile $storefrontModulePath 'Storefront hub'
-    Test-PowerShellFile $storefrontWorkerPath 'Storefront worker'
-    Test-PowerShellFile $providerModulePath 'Game provider hub'
-    Test-PowerShellFile $providerWorkerPath 'Game provider worker'
-    Test-PowerShellFile $artworkWorkerPath 'Online artwork worker'
-    Test-PowerShellFile $gameExperiencePath 'Unified game experience'
-    Test-PowerShellFile $shellRedesignPath 'Shell redesign'
-    Test-PowerShellFile $gameBarPath 'Huymaier Game Bar'
+    Invoke-PowerShellSyntaxPreflight
 
     if(-not(Enter-HuymaierSingleInstance)){
         Write-BootstrapLog 'Duplicate Huymaier Console launch was blocked by the native single-instance gate.' 'WARN'
         exit 0
     }
 
-    Write-BootstrapLog 'Huymaier Console v0.26.2 integrity preflight and single-instance gate passed.'
+    Write-BootstrapLog "Huymaier Console v$script:ExpectedConsoleVersion integrity preflight and single-instance gate passed."
+    # HUYMAIER_CONCURRENT_PROVIDER_COORDINATOR_V1 - per-transfer coordinator starts on demand.
     try{
         if($Windowed){& $corePath -Windowed}else{& $corePath}
     }finally{
+        Stop-ProviderTelemetryWatch
         Exit-HuymaierSingleInstance
     }
 }catch{
+    Stop-ProviderTelemetryWatch
     $message=$_.Exception.Message
-    Write-BootstrapLog "v0.26.2 preflight/startup failed:`n$message" 'FATAL'
+    Write-BootstrapLog "v$script:ExpectedConsoleVersion preflight/startup failed:`n$message" 'FATAL'
     try{
         Add-Type -AssemblyName PresentationFramework
         [System.Windows.MessageBox]::Show("Huymaier Console could not start safely.`n`n$message`n`nThe error was saved to:`n$logDir",'Huymaier Console','OK','Error')|Out-Null
     }catch{}
     exit 1
 }
+
+
+
+
+
+
+
+

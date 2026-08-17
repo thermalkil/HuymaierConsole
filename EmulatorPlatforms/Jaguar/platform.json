@@ -1,0 +1,20 @@
+{
+  "id": "jaguar",
+  "displayName": "Atari Jaguar",
+  "primaryBackend": "BigPEmu",
+  "fallbackBackend": "Virtual Jaguar libretro",
+  "adapter": "bigpemu",
+  "interface": "Atari Jaguar console and keypad-controller interface",
+  "version": "0.26.4-dev",
+  "enabled": false,
+  "gameExtensions": [
+    ".j64",
+    ".jag",
+    ".rom",
+    ".bin",
+    ".abs",
+    ".cof",
+    ".zip"
+  ],
+  "dashboardStyle": "Jaguar Console"
+}

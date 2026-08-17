@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.IO.MemoryMappedFiles;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -214,6 +215,21 @@ namespace HuymaierConsole.Native
         private const int GIDC_REMOVAL = 2;
 
         private const ushort SONY_VENDOR_ID = 0x054C;
+
+        // HUYMAIER_SONY_POINTER_SHARED_STATE_V1
+        // Publish the proven WM_INPUT Sony controller state for pointer-only
+        // consumers. Normal shell navigation remains in this process and is
+        // still suppressed whenever Huymaier is not foregrounded. The PS/Guide
+        // button is also carried as a dedicated high pointer bit so the global
+        // Game Bar watcher can consume it without touching normal navigation.
+        private const string POINTER_MAP_NAME = "Local\\HuymaierConsole.PointerStateV1";
+        private const int POINTER_MAP_SIZE = 64;
+        private const int POINTER_MAP_MAGIC = 0x31504348; // HCP1
+        private static readonly object PointerSync = new object();
+        private static MemoryMappedFile pointerMap;
+        private static MemoryMappedViewAccessor pointerView;
+        private static int pointerSequence;
+        [DllImport("kernel32.dll")] private static extern ulong GetTickCount64();
         private static readonly object Sync = new object();
         private static readonly Dictionary<long, HidControllerSnapshot> Snapshots = new Dictionary<long, HidControllerSnapshot>();
         private static readonly List<long> StaleNavigationKeys = new List<long>(8);
@@ -696,6 +712,8 @@ namespace HuymaierConsole.Native
 
             byte lx = report[stateBase + 0];
             byte ly = report[stateBase + 1];
+            byte rx = report[stateBase + 2];
+            byte ry = report[stateBase + 3];
             byte buttons1 = report[stateBase + 7];
             byte buttons2 = report[stateBase + 8];
             byte buttons3 = report[stateBase + 9];
@@ -769,6 +787,81 @@ namespace HuymaierConsole.Native
                     PendingDirection = pendingDirection
                 };
             }
+
+            // Keep pointer publication outside the navigation-state lock so map
+            // access can never stall controller edge consumption.
+            PublishPointerState(productId, lx, ly, rx, ry, buttons1, buttons2, buttons3);
+        }
+
+        private static float NormalizePointerAxis(byte raw, bool invert)
+        {
+            float value = invert ? (128.0f - raw) / 127.0f : (raw - 128.0f) / 127.0f;
+            if (value < -1.0f) return -1.0f;
+            if (value > 1.0f) return 1.0f;
+            return value;
+        }
+
+        private static uint BuildPointerButtons(byte buttons1, byte buttons2, byte buttons3)
+        {
+            uint pointerButtons = 0;
+            // PlayStation -> generic pointer contract used by the streaming host:
+            // Cross click, Circle back, Square keyboard, Triangle auxiliary,
+            // L1/R1 large scroll, Options/Menu, Share/View. Bit 0x0100 is
+            // intentionally reserved for the global PS/Guide button and is not
+            // interpreted as a local streaming-app command.
+            if ((buttons1 & 0x20) != 0) pointerButtons |= 0x0001;
+            if ((buttons1 & 0x40) != 0) pointerButtons |= 0x0002;
+            if ((buttons1 & 0x10) != 0) pointerButtons |= 0x0004;
+            if ((buttons1 & 0x80) != 0) pointerButtons |= 0x0008;
+            if ((buttons2 & 0x01) != 0) pointerButtons |= 0x0010;
+            if ((buttons2 & 0x02) != 0) pointerButtons |= 0x0020;
+            if ((buttons2 & 0x20) != 0) pointerButtons |= 0x0040;
+            if ((buttons2 & 0x10) != 0) pointerButtons |= 0x0080;
+            if ((buttons3 & 0x01) != 0) pointerButtons |= 0x0100;
+            return pointerButtons;
+        }
+
+        private static void EnsurePointerMap()
+        {
+            if (pointerMap != null && pointerView != null) return;
+            pointerMap = MemoryMappedFile.CreateOrOpen(POINTER_MAP_NAME, POINTER_MAP_SIZE, MemoryMappedFileAccess.ReadWrite);
+            pointerView = pointerMap.CreateViewAccessor(0, POINTER_MAP_SIZE, MemoryMappedFileAccess.ReadWrite);
+            pointerView.Write(0, POINTER_MAP_MAGIC);
+            pointerView.Write(4, 1);
+            pointerView.Write(8, 0);
+        }
+
+        private static void PublishPointerState(int productId, byte lx, byte ly, byte rx, byte ry, byte buttons1, byte buttons2, byte buttons3)
+        {
+            try
+            {
+                lock (PointerSync)
+                {
+                    EnsurePointerMap();
+                    int odd = pointerSequence + 1;
+                    if ((odd & 1) == 0) odd++;
+                    pointerView.Write(8, odd);
+                    System.Threading.Thread.MemoryBarrier();
+                    pointerView.Write(0, POINTER_MAP_MAGIC);
+                    pointerView.Write(4, 1);
+                    pointerView.Write(12, productId);
+                    pointerView.Write(16, GetTickCount64());
+                    pointerView.Write(24, NormalizePointerAxis(lx, false));
+                    pointerView.Write(28, NormalizePointerAxis(ly, true));
+                    pointerView.Write(32, NormalizePointerAxis(rx, false));
+                    pointerView.Write(36, NormalizePointerAxis(ry, true));
+                    pointerView.Write(40, BuildPointerButtons(buttons1, buttons2, buttons3));
+                    System.Threading.Thread.MemoryBarrier();
+                    pointerSequence = odd + 1;
+                    pointerView.Write(8, pointerSequence);
+                    pointerView.Flush();
+                }
+            }
+            catch
+            {
+                // Pointer/Guide publication is supplemental. Never let it
+                // destabilize the already-proven Raw HID navigation path.
+            }
         }
 
         private static string GetSonyModelName(int productId)
@@ -808,3 +901,4 @@ namespace HuymaierConsole.Native
         }
     }
 }
+

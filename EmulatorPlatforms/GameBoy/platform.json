@@ -1,0 +1,16 @@
+{
+  "id": "gameboy",
+  "displayName": "Nintendo Game Boy",
+  "primaryBackend": "Mesen Community Edition",
+  "fallbackBackend": "",
+  "adapter": "mesence",
+  "interface": "DMG handheld and cartridge interface",
+  "version": "0.26.4-dev",
+  "enabled": true,
+  "gameExtensions": [
+    ".gb",
+    ".sgb",
+    ".zip"
+  ],
+  "dashboardStyle": "DMG-01"
+}

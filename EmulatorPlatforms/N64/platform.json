@@ -1,8 +1,9 @@
-﻿{
+{
   "id": "n64",
   "displayName": "Nintendo 64",
   "primaryBackend": "RMG",
   "fallbackBackend": "ares",
   "version": "0.25.0",
-  "startupAsset": "Assets/Startup.mp4"
+  "startupAsset": "Assets/Startup.mp4",
+  "adapter": "rmg"
 }

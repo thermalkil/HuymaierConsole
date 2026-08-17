@@ -1,18 +1,30 @@
-{
-  "name": "Huymaier Console FSE Shell, Storefront & Artwork Integration",
-  "version": "0.26.2",
-  "baseVersion": "0.26.1",
-  "build": "controller-customization-provider-runtime",
-  "builtFrom": "HC261.zip",
-  "features": [
-    "opens Huymaier Game Bar above external apps and Huymaier-native console surfaces while keeping main-shell Guide mapped to Quick Access",
-    "adds controller-first visual color wheels for interface, focus, accent, and dynamic-theme colors without requiring hex entry",
-    "adds persistent Games layout editing for storefront/console order, visibility, and per-platform tile sizing",
-    "repairs shared Manage/action-card sizing so highlighted titles and descriptions are not clipped",
-    "adds Steam client game management through the unified provider experience with install, verify, update, uninstall, launch, and Steam transfer telemetry",
-    "adds safe indeterminate live activity telemetry for GOG and Amazon when their backends do not expose a trustworthy total",
-    "preserves the v0.26.1 transactional installer, exact-artifact updater, x64 GameInput bridge, and fail-closed mixed-version protection",
-    "preserves the v0.26.1 storefront library import/file-browser repair and strict Xbox versus Original Xbox platform identity"
-  ],
-  "description": "v0.26.2 expands the controller-first console experience with native-surface Game Bar routing, visual color and layout customization, Steam game management, multi-provider download telemetry, and shared card-rendering fixes while retaining the v0.26.1 integrity architecture."
+﻿{
+    "name":  "Huymaier Console FSE Shell, Storefront \u0026 Artwork Integration",
+    "version":  "0.30.6",
+    "baseVersion":  "0.30.4",
+    "build":  "console-model-presentation-editor-rc1",
+    "builtFrom":  "HC262.zip",
+    "features":  [
+                     "rebuilds N64 as an original Huymaier cartridge-console surface inspired by the supplied classic-mini reference without redistributing third-party theme assets",
+                     "renders the GameCube IPL hub as a translucent animated WPF 3D cube whose Game Play, Calendar, Memory Card, and Options faces rotate spatially with navigation",
+                     "reworks Wii and Wii U menus around authentic channel/software presentation and integrates real emulator/data/library settings into those console surfaces",
+                     "removes nonfunctional Wii, Switch, and Xbox service placeholders and keeps only actions that Huymaier Console can actually perform",
+                     "routes emulator executable, data, and game-folder selection through Huymaier Consoles controller-first native file browser and offers latest supported emulator installation when no emulator is attached",
+                     "resolves console cover art from emulator/data caches first, then Huymaier cache and online console artwork fallbacks without renaming or moving user ROMs",
+                     "repairs Steam artwork so installed and owned entries prefer Steam local art, then Steam-hosted portrait art, then a deterministic cached nonblank fallback",
+                     "preserves v0.26.2 Game Bar and Guide ownership, launch-return behavior, storefront/provider fixes, installer integrity, and controller navigation while keeping PS1, PS2, and PS3 visuals frozen except for shared path/install handoff",
+                     "keeps LB/RB out of ordinary page and selection navigation while using LB/RB only as a first-letter library accelerator on N64, GameCube, and Wii",
+                     "adds a prominent Settings \u003e Artwork \u0026 Metadata surface for SteamGridDB, provider artwork, online artwork refresh and platform backgrounds",
+                     "enables the first researched expansion wave: PSP, Nintendo DS, Nintendo DSi, Nintendo 3DS, Dreamcast and Saturn native platform surfaces with native settings, install and storage integration",
+                     "enables researched Wave 2 hardware-native Atari 2600, NES, SNES, Game Boy, Game Boy Color, Game Boy Advance, Genesis, Sega CD, Sega 32X, Game Gear, Master System and TurboGrafx-16 surfaces with native install/settings/storage integration",
+                     "enables Atari Lynx, Neo Geo Pocket Color and PrimeHack native expansion surfaces while keeping Neo Geo and Jaguar staged pending backend-specific readiness audits",
+                     "enables PS4/shadPS4 and PS Vita/Vita3K native installed-application surfaces using upstream-documented direct-launch contracts and native full backend settings",
+                     "graduates PS4/shadPS4, PS Vita/Vita3K and Arcade/MAME after live x64 backend and runtime-contract validation while keeping FinalBurn Neo, Neo Geo and Jaguar staged",
+                     "expands Edit Model into a console-only presentation editor with saved yaw, pitch, roll, 30-300 percent scale, X/Y framing position, X/Y/Z mirroring, face mode, per-model lighting and fan-motion strength",
+                     "adds Normal, Reverse and TwoSided face handling plus mirror-aware D3D11 culling and tangent handedness so backwards or inside-out console assets can be corrected without editing the source GLB",
+                     "applies every saved console presentation setting to both the full-screen viewer and the Consoles shelf while explicitly leaving the top Providers shelf presentation unchanged",
+                     "carries forward adaptive negative-determinant winding correction and automatically refreshes corrected HC3D winding caches without modifying user source models",
+                     "retains v0.30.3 Windows/Xbox FSE updater handoff, overall console brightness, HC3D v4 COLOR_0 rendering, controller routing, Quick Access, Downloads, Recomps, GameCube, streaming and installer integrity"
+                 ],
+    "description":  "v0.30.6 adds a complete per-console 3D presentation editor for orientation, size, position, mirroring, face handling, lighting and fan motion while leaving provider/storefront models unchanged."
 }

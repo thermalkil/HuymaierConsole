@@ -1,0 +1,17 @@
+{
+  "id": "sega32x",
+  "displayName": "Sega 32X",
+  "primaryBackend": "ares",
+  "fallbackBackend": "",
+  "adapter": "ares",
+  "interface": "Genesis + 32X tower and cartridge interface",
+  "version": "0.26.4-dev",
+  "enabled": true,
+  "gameExtensions": [
+    ".32x",
+    ".bin",
+    ".md",
+    ".zip"
+  ],
+  "dashboardStyle": "Genesis + 32X"
+}

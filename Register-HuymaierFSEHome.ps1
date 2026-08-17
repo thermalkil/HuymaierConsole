@@ -1,4 +1,4 @@
-param([switch]$Remove)
+﻿param([switch]$Remove)
 
 Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'

@@ -1,0 +1,30 @@
+{
+  "id": "psp",
+  "displayName": "PlayStation Portable",
+  "primaryBackend": "PPSSPP",
+  "fallbackBackend": "PPSSPP Development",
+  "adapter": "ppsspp",
+  "interface": "Native PSP XMB",
+  "version": "0.26.4-dev",
+  "enabled": true,
+  "gameExtensions": [
+    ".iso",
+    ".cso",
+    ".pbp",
+    ".elf"
+  ],
+  "authenticSurfaces": [
+    "Settings",
+    "Photo",
+    "Music",
+    "Video",
+    "Game",
+    "Saved Data",
+    "System Information"
+  ],
+  "deadServicesOmitted": [
+    "PlayStation Store",
+    "Information Board",
+    "inactive network-service icons"
+  ]
+}

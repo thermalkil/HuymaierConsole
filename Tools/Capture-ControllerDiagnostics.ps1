@@ -33,14 +33,14 @@ try {
     Add-Line "RawGameController count: $($raw.Count)"
     for($i=0;$i -lt $raw.Count;$i++){
         $c=$raw[$i]
-        $name='';$vid='';$pid='';$buttons='';$switches='';$axes=''
+        $name='';$vid='';$productId='';$buttons='';$switches='';$axes=''
         try{$name=[string]$c.DisplayName}catch{}
         try{$vid=('0x{0:X4}' -f [int]$c.HardwareVendorId)}catch{}
-        try{$pid=('0x{0:X4}' -f [int]$c.HardwareProductId)}catch{}
+        try{$productId=('0x{0:X4}' -f [int]$c.HardwareProductId)}catch{}
         try{$buttons=[int]$c.ButtonCount}catch{}
         try{$switches=[int]$c.SwitchCount}catch{}
         try{$axes=[int]$c.AxisCount}catch{}
-        Add-Line "  Raw[$i]: Name='$name' VID=$vid PID=$pid Buttons=$buttons Switches=$switches Axes=$axes"
+        Add-Line "  Raw[$i]: Name='$name' VID=$vid PID=$productId Buttons=$buttons Switches=$switches Axes=$axes"
         try{
             $buttonValues=New-Object 'System.Boolean[]' ([int]$c.ButtonCount)
             $switchType=[Windows.Gaming.Input.GameControllerSwitchPosition,Windows.Gaming.Input,ContentType=WindowsRuntime]

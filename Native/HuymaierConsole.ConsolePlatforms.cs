@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -10,11 +10,13 @@ using System.Text;
 using System.Web.Script.Serialization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
-using Microsoft.Win32;
+using System.Windows.Media.Media3D;
 
 namespace HuymaierConsole.NativeApp
 {
@@ -151,6 +153,7 @@ namespace HuymaierConsole.NativeApp
         public int schemaVersion { get; set; }
         public string emulatorPath { get; set; }
         public string fallbackEmulatorPath { get; set; }
+        public string emulatorDataPath { get; set; }
         public List<string> gameFolders { get; set; }
         public bool startupEnabled { get; set; }
         public double startupVolume { get; set; }
@@ -160,12 +163,14 @@ namespace HuymaierConsole.NativeApp
         public double soundVolume { get; set; }
         public string dashboardStyle { get; set; }
         public bool fullscreen { get; set; }
+        public double gameCubeScale { get; set; }
 
         public ConsolePlatformSettings()
         {
-            schemaVersion = 5;
+            schemaVersion = 7;
             emulatorPath = String.Empty;
             fallbackEmulatorPath = String.Empty;
+            emulatorDataPath = String.Empty;
             gameFolders = new List<string>();
             startupEnabled = true;
             startupVolume = 1.0;
@@ -175,6 +180,7 @@ namespace HuymaierConsole.NativeApp
             soundVolume = 1.0;
             dashboardStyle = String.Empty;
             fullscreen = true;
+            gameCubeScale = 0.66;
         }
 
         public static ConsolePlatformSettings Load(string userPath, string defaultPath, ConsolePlatformDefinition definition)
@@ -191,6 +197,7 @@ namespace HuymaierConsole.NativeApp
             if (definition.Shell == "Xbox360" && String.Equals(result.dashboardStyle, "NXE", StringComparison.OrdinalIgnoreCase)) result.dashboardStyle = "Blades";
             if (loadedSchema < 4 && definition.Shell == "Xbox360" && result.ambienceVolume < 0.90) result.ambienceVolume = 0.90;
             if (result.gameFolders == null) result.gameFolders = new List<string>();
+            if (result.emulatorDataPath == null) result.emulatorDataPath = String.Empty;
             result.gameFolders = result.gameFolders.Where(delegate(string p) { return !String.IsNullOrWhiteSpace(p); })
                 .Select(delegate(string p) { try { return Path.GetFullPath(Environment.ExpandEnvironmentVariables(p)); } catch { return p; } })
                 .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
@@ -200,7 +207,9 @@ namespace HuymaierConsole.NativeApp
             result.startupVolume = Clamp(result.startupVolume);
             result.ambienceVolume = Clamp(result.ambienceVolume);
             result.soundVolume = Clamp(result.soundVolume);
-            result.schemaVersion = 5;
+            if (loadedSchema < 7 || Double.IsNaN(result.gameCubeScale) || result.gameCubeScale < 0.45 || result.gameCubeScale > 1.05) result.gameCubeScale = 0.66;
+            result.gameCubeScale = Math.Max(0.50, Math.Min(1.00, result.gameCubeScale));
+            result.schemaVersion = 7;
             result.Save(userPath);
             return result;
         }
@@ -287,6 +296,140 @@ namespace HuymaierConsole.NativeApp
                 d.GameExtensions = new string[] { ".nsp", ".xci", ".nca", ".nro" };
                 d.ColorA = Color.FromRgb(39, 40, 44); d.ColorB = Color.FromRgb(68, 69, 74); d.Accent = Color.FromRgb(230, 0, 18);
             }
+            else if (key == "ARCADE")
+            {
+                d.DisplayName="Arcade";d.Subtitle="COIN-OPERATED SYSTEM";d.Shell="Arcade";d.PrimaryBackend="MAME";d.FallbackBackend="FinalBurn Neo";d.PrimaryExecutableNames=new string[]{"mame.exe","mame64.exe"};d.FallbackExecutableNames=new string[]{"fbneo.exe","FinalBurnNeo.exe"};d.GameExtensions=new string[]{".zip",".7z",".chd"};d.ColorA=Color.FromRgb(20,10,29);d.ColorB=Color.FromRgb(4,4,7);d.Accent=Color.FromRgb(255,49,171);
+            }
+            else if (key == "FINALBURNNEO")
+            {
+                d.DisplayName="Final Burn Neo";d.Subtitle="ARCADE BOARD";d.Shell="FinalBurnNeo";d.PrimaryBackend="FinalBurn Neo";d.FallbackBackend="MAME";d.PrimaryExecutableNames=new string[]{"fbneo.exe","FinalBurnNeo.exe"};d.FallbackExecutableNames=new string[]{"mame.exe","mame64.exe"};d.GameExtensions=new string[]{".zip",".7z",".chd"};d.ColorA=Color.FromRgb(27,23,15);d.ColorB=Color.FromRgb(5,5,4);d.Accent=Color.FromRgb(255,193,37);
+            }
+            else if (key == "PS4")
+            {
+                d.DisplayName="PlayStation 4";d.Subtitle="Dynamic Menu";d.Shell="PS4";d.PrimaryBackend="shadPS4";d.FallbackBackend="shadPS4 Nightly";d.PrimaryExecutableNames=new string[]{"shadPS4.exe","shadps4.exe"};d.FallbackExecutableNames=new string[]{"shadPS4.exe","shadps4.exe"};d.GameExtensions=new string[]{".pkg",".elf",".bin"};d.ColorA=Color.FromRgb(0,91,179);d.ColorB=Color.FromRgb(0,29,82);d.Accent=Color.FromRgb(75,173,255);
+            }
+            else if (key == "VITA")
+            {
+                d.DisplayName="PlayStation Vita";d.Subtitle="LiveArea";d.Shell="Vita";d.PrimaryBackend="Vita3K";d.FallbackBackend="Vita3K Development";d.PrimaryExecutableNames=new string[]{"Vita3K.exe","vita3k.exe"};d.FallbackExecutableNames=new string[]{"Vita3K.exe","vita3k.exe"};d.GameExtensions=new string[]{".vpk",".pkg",".zip"};d.ColorA=Color.FromRgb(19,112,185);d.ColorB=Color.FromRgb(8,42,97);d.Accent=Color.FromRgb(115,222,255);
+            }
+            else if (key == "ATARILYNX")
+            {
+                d.DisplayName="Atari Lynx";d.Subtitle="HANDHELD COLOR ENTERTAINMENT SYSTEM";d.Shell="AtariLynx";d.PrimaryBackend="Mednafen";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"mednafen.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".lnx",".lyx",".o",".zip"};d.ColorA=Color.FromRgb(22,23,24);d.ColorB=Color.FromRgb(4,5,6);d.Accent=Color.FromRgb(226,82,44);
+            }
+            else if (key == "NEOGEO")
+            {
+                d.DisplayName="Neo Geo";d.Subtitle="ADVANCED ENTERTAINMENT SYSTEM";d.Shell="NeoGeo";d.PrimaryBackend="FinalBurn Neo";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"fbneo.exe","FinalBurnNeo.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".zip",".7z",".neo"};d.ColorA=Color.FromRgb(14,15,16);d.ColorB=Color.FromRgb(3,4,5);d.Accent=Color.FromRgb(215,31,39);
+            }
+            else if (key == "NGPC")
+            {
+                d.DisplayName="Neo Geo Pocket Color";d.Subtitle="COLOR";d.Shell="NGPC";d.PrimaryBackend="Mednafen";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"mednafen.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".ngc",".ngp",".npc",".zip"};d.ColorA=Color.FromRgb(84,87,89);d.ColorB=Color.FromRgb(29,31,32);d.Accent=Color.FromRgb(78,183,182);
+            }
+            else if (key == "JAGUAR")
+            {
+                d.DisplayName="Atari Jaguar";d.Subtitle="64-BIT INTERACTIVE MULTIMEDIA SYSTEM";d.Shell="Jaguar";d.PrimaryBackend="BigPEmu";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"BigPEmu.exe","bigpemu.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".j64",".jag",".rom",".bin",".abs",".cof",".zip"};d.ColorA=Color.FromRgb(17,18,19);d.ColorB=Color.FromRgb(4,5,5);d.Accent=Color.FromRgb(209,35,42);
+            }
+            else if (key == "PRIMEHACK")
+            {
+                d.DisplayName="Metroid PrimeHack";d.Subtitle="PRIME VISOR";d.Shell="PrimeHack";d.PrimaryBackend="PrimeHack";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"PrimeHack.exe","DolphinQt2.exe","Dolphin.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".iso",".rvz",".wbfs",".gcm",".ciso"};d.ColorA=Color.FromRgb(5,29,31);d.ColorB=Color.FromRgb(2,7,9);d.Accent=Color.FromRgb(63,225,211);
+            }
+            else if (key == "ATARI2600")
+            {
+                d.DisplayName="Atari 2600";d.Subtitle="Video Computer System";d.Shell="Atari2600";d.PrimaryBackend="Stella";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"Stella.exe","stella.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".a26",".bin",".rom",".zip"};d.ColorA=Color.FromRgb(25,21,17);d.ColorB=Color.FromRgb(76,45,24);d.Accent=Color.FromRgb(220,149,57);
+            }
+            else if (key == "NES")
+            {
+                d.DisplayName="Nintendo Entertainment System";d.Subtitle="Control Deck";d.Shell="NES";d.PrimaryBackend="Mesen Community Edition";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"Mesen.exe","Mesen2.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".nes",".fds",".unf",".unif",".zip"};d.ColorA=Color.FromRgb(205,204,199);d.ColorB=Color.FromRgb(102,103,100);d.Accent=Color.FromRgb(194,35,42);
+            }
+            else if (key == "SNES")
+            {
+                d.DisplayName="Super Nintendo Entertainment System";d.Subtitle="Super NES Control Deck";d.Shell="SNES";d.PrimaryBackend="Mesen Community Edition";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"Mesen.exe","Mesen2.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".sfc",".smc",".fig",".swc",".zip"};d.ColorA=Color.FromRgb(208,207,205);d.ColorB=Color.FromRgb(116,113,123);d.Accent=Color.FromRgb(103,74,151);
+            }
+            else if (key == "GAMEBOY")
+            {
+                d.DisplayName="Nintendo Game Boy";d.Subtitle="DOT MATRIX WITH STEREO SOUND";d.Shell="GameBoy";d.PrimaryBackend="Mesen Community Edition";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"Mesen.exe","Mesen2.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".gb",".sgb",".zip"};d.ColorA=Color.FromRgb(197,198,189);d.ColorB=Color.FromRgb(145,147,137);d.Accent=Color.FromRgb(117,44,111);
+            }
+            else if (key == "GBC")
+            {
+                d.DisplayName="Nintendo Game Boy Color";d.Subtitle="COLOR";d.Shell="GBC";d.PrimaryBackend="Mesen Community Edition";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"Mesen.exe","Mesen2.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".gbc",".gb",".zip"};d.ColorA=Color.FromRgb(80,36,122);d.ColorB=Color.FromRgb(37,20,66);d.Accent=Color.FromRgb(244,73,142);
+            }
+            else if (key == "GBA")
+            {
+                d.DisplayName="Nintendo Game Boy Advance";d.Subtitle="ADVANCE";d.Shell="GBA";d.PrimaryBackend="mGBA";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"mGBA.exe","mgba.exe","mGBA-qt.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".gba",".agb",".zip"};d.ColorA=Color.FromRgb(79,55,145);d.ColorB=Color.FromRgb(38,26,83);d.Accent=Color.FromRgb(168,145,255);
+            }
+            else if (key == "GENESIS")
+            {
+                d.DisplayName="Sega Genesis";d.Subtitle="16-BIT";d.Shell="Genesis";d.PrimaryBackend="ares";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"ares.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".md",".gen",".bin",".smd",".zip"};d.ColorA=Color.FromRgb(5,7,9);d.ColorB=Color.FromRgb(29,31,34);d.Accent=Color.FromRgb(191,34,45);
+            }
+            else if (key == "SEGACD")
+            {
+                d.DisplayName="Sega CD";d.Subtitle="CD-ROM SYSTEM";d.Shell="SegaCD";d.PrimaryBackend="ares";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"ares.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".cue",".chd",".iso",".bin"};d.ColorA=Color.FromRgb(6,8,11);d.ColorB=Color.FromRgb(31,35,40);d.Accent=Color.FromRgb(80,147,214);
+            }
+            else if (key == "SEGA32X")
+            {
+                d.DisplayName="Sega 32X";d.Subtitle="32X";d.Shell="Sega32X";d.PrimaryBackend="ares";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"ares.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".32x",".bin",".md",".zip"};d.ColorA=Color.FromRgb(4,5,6);d.ColorB=Color.FromRgb(27,29,31);d.Accent=Color.FromRgb(224,60,48);
+            }
+            else if (key == "GAMEGEAR")
+            {
+                d.DisplayName="Sega Game Gear";d.Subtitle="GAME GEAR";d.Shell="GameGear";d.PrimaryBackend="Mesen Community Edition";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"Mesen.exe","Mesen2.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".gg",".zip"};d.ColorA=Color.FromRgb(12,14,17);d.ColorB=Color.FromRgb(34,39,45);d.Accent=Color.FromRgb(47,137,205);
+            }
+            else if (key == "MASTERSYSTEM")
+            {
+                d.DisplayName="Sega Master System";d.Subtitle="MASTER SYSTEM";d.Shell="MasterSystem";d.PrimaryBackend="Mesen Community Edition";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"Mesen.exe","Mesen2.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".sms",".sg",".zip"};d.ColorA=Color.FromRgb(8,9,10);d.ColorB=Color.FromRgb(38,39,40);d.Accent=Color.FromRgb(206,31,39);
+            }
+            else if (key == "TURBOGRAFX16")
+            {
+                d.DisplayName="TurboGrafx-16";d.Subtitle="ENTERTAINMENT SUPER SYSTEM";d.Shell="TurboGrafx16";d.PrimaryBackend="Mednafen";d.FallbackBackend=String.Empty;d.PrimaryExecutableNames=new string[]{"mednafen.exe"};d.FallbackExecutableNames=new string[0];d.GameExtensions=new string[]{".pce",".sgx",".cue",".chd",".zip"};d.ColorA=Color.FromRgb(224,223,218);d.ColorB=Color.FromRgb(178,177,171);d.Accent=Color.FromRgb(193,34,42);
+            }
+            else if (key == "3DS")
+            {
+                d.DisplayName = "Nintendo 3DS"; d.Subtitle = "HOME Menu"; d.Shell = "3DS";
+                d.PrimaryBackend = "Azahar"; d.FallbackBackend = "Azahar Nightly";
+                d.PrimaryExecutableNames = new string[] { "azahar.exe", "Azahar.exe" };
+                d.FallbackExecutableNames = new string[] { "azahar.exe", "Azahar.exe" };
+                d.GameExtensions = new string[] { ".3ds", ".cci", ".cxi", ".app", ".zcci", ".zcxi" };
+                d.ColorA = Color.FromRgb(228, 232, 237); d.ColorB = Color.FromRgb(249, 250, 251); d.Accent = Color.FromRgb(72, 148, 203);
+            }
+            else if (key == "NDS")
+            {
+                d.DisplayName = "Nintendo DS"; d.Subtitle = "DS Menu"; d.Shell = "NDS";
+                d.PrimaryBackend = "melonDS"; d.FallbackBackend = "melonDS Development";
+                d.PrimaryExecutableNames = new string[] { "melonDS.exe" }; d.FallbackExecutableNames = new string[] { "melonDS.exe" };
+                d.GameExtensions = new string[] { ".nds", ".srl", ".zip" };
+                d.ColorA = Color.FromRgb(233, 241, 248); d.ColorB = Color.FromRgb(250, 252, 254); d.Accent = Color.FromRgb(70, 145, 202);
+            }
+            else if (key == "DSI")
+            {
+                d.DisplayName = "Nintendo DSi"; d.Subtitle = "DSi Menu"; d.Shell = "DSI";
+                d.PrimaryBackend = "melonDS"; d.FallbackBackend = "melonDS Development";
+                d.PrimaryExecutableNames = new string[] { "melonDS.exe" }; d.FallbackExecutableNames = new string[] { "melonDS.exe" };
+                d.GameExtensions = new string[] { ".nds", ".srl", ".app" };
+                d.ColorA = Color.FromRgb(243, 245, 247); d.ColorB = Color.FromRgb(255, 255, 255); d.Accent = Color.FromRgb(67, 181, 222);
+            }
+            else if (key == "DREAMCAST")
+            {
+                d.DisplayName = "Sega Dreamcast"; d.Subtitle = "Dreamcast Main Menu"; d.Shell = "Dreamcast";
+                d.PrimaryBackend = "Flycast"; d.FallbackBackend = "Flycast Development";
+                d.PrimaryExecutableNames = new string[] { "flycast.exe", "Flycast.exe" }; d.FallbackExecutableNames = new string[] { "flycast.exe", "Flycast.exe" };
+                d.GameExtensions = new string[] { ".gdi", ".cdi", ".chd", ".cue" };
+                d.ColorA = Color.FromRgb(190, 220, 246); d.ColorB = Color.FromRgb(58, 124, 195); d.Accent = Color.FromRgb(240, 104, 45);
+            }
+            else if (key == "SATURN")
+            {
+                d.DisplayName = "Sega Saturn"; d.Subtitle = "Saturn System"; d.Shell = "Saturn";
+                d.PrimaryBackend = "Mednafen"; d.FallbackBackend = "Kronos";
+                d.PrimaryExecutableNames = new string[] { "mednafen.exe" }; d.FallbackExecutableNames = new string[] { "kronos.exe", "Kronos.exe" };
+                d.GameExtensions = new string[] { ".cue", ".chd", ".ccd", ".mds", ".iso" };
+                d.ColorA = Color.FromRgb(7, 21, 65); d.ColorB = Color.FromRgb(15, 102, 159); d.Accent = Color.FromRgb(249, 64, 120);
+            }
+            else if (key == "PSP")
+            {
+                d.DisplayName = "PlayStation Portable"; d.Subtitle = "XMB"; d.Shell = "PSP";
+                d.PrimaryBackend = "PPSSPP"; d.FallbackBackend = "PPSSPP Development";
+                d.PrimaryExecutableNames = new string[] { "PPSSPPWindows64.exe", "PPSSPPWindows.exe", "PPSSPPQt.exe" };
+                d.FallbackExecutableNames = new string[] { "PPSSPPWindows64.exe", "PPSSPPWindows.exe", "PPSSPPQt.exe" };
+                d.GameExtensions = new string[] { ".iso", ".cso", ".pbp", ".elf" };
+                d.ColorA = Color.FromRgb(20, 91, 166); d.ColorB = Color.FromRgb(1, 28, 79); d.Accent = Color.FromRgb(102, 196, 255);
+            }
             else if (key == "XBOX")
             {
                 d.DisplayName = "Xbox"; d.Subtitle = "Original Xbox Dashboard"; d.Shell = "Xbox";
@@ -296,7 +439,7 @@ namespace HuymaierConsole.NativeApp
                 d.GameExtensions = new string[] { ".iso", ".xiso", ".xbe" };
                 d.ColorA = Color.FromRgb(2, 10, 2); d.ColorB = Color.FromRgb(18, 63, 8); d.Accent = Color.FromRgb(96, 197, 24);
             }
-            else
+            else if (key == "XBOX360")
             {
                 d.Id = "XBOX360"; d.DisplayName = "Xbox 360"; d.Subtitle = "Xbox 360 Dashboard"; d.Shell = "Xbox360";
                 d.PrimaryBackend = "Xenia Canary"; d.FallbackBackend = "Xenia Master";
@@ -356,6 +499,8 @@ namespace HuymaierConsole.NativeApp
         public string Name { get; set; }
         public string Path { get; set; }
         public string Cover { get; set; }
+        public string TitleId { get; set; }
+        public string ContentRoot { get; set; }
         public ConsolePlatformGame() { Name = String.Empty; Path = String.Empty; Cover = String.Empty; }
     }
 
@@ -386,12 +531,72 @@ namespace HuymaierConsole.NativeApp
         internal DateTime Modified;
     }
 
+    internal sealed class GameCubeSaveEntry
+    {
+        internal string Name;
+        internal string GameCode;
+        internal int Blocks;
+        internal DateTime Modified;
+        internal string CardPath;
+    }
+
+    internal sealed class GameCubeMemoryCardInfo
+    {
+        internal string Slot;
+        internal string Path;
+        internal int TotalBlocks;
+        internal int FreeBlocks;
+        internal List<GameCubeSaveEntry> Saves = new List<GameCubeSaveEntry>();
+    }
+
+    internal sealed class WiiSaveEntry
+    {
+        internal string Name;
+        internal string TitleId;
+        internal string GameCode;
+        internal string Path;
+        internal string Cover;
+        internal string Description;
+        internal long Size;
+        internal DateTime Modified;
+    }
+
     internal sealed class XboxXdbfEntry
     {
         internal ushort Namespace;
         internal ulong Id;
         internal uint Offset;
         internal uint Length;
+    }
+
+
+    internal sealed class BackendSettingEntry
+    {
+        public string AdapterId { get; set; }
+        public string Format { get; set; }
+        public string FilePath { get; set; }
+        public string Section { get; set; }
+        public string Key { get; set; }
+        public string Value { get; set; }
+        public int LineIndex { get; set; }
+        public string Category { get; set; }
+        public string Identity { get; set; }
+        public string DisplayName { get; set; }
+    }
+
+    internal sealed class BackendSettingsInventory
+    {
+        public int schemaVersion { get; set; }
+        public string result { get; set; }
+        public string platformId { get; set; }
+        public string displayName { get; set; }
+        public string adapterId { get; set; }
+        public string backend { get; set; }
+        public string[] roots { get; set; }
+        public string[] configFiles { get; set; }
+        public int count { get; set; }
+        public List<BackendSettingEntry> settings { get; set; }
+        public string generatedAtUtc { get; set; }
     }
 
     internal sealed class ConsolePlatformAction
@@ -444,6 +649,7 @@ namespace HuymaierConsole.NativeApp
         private bool xboxAchievementsLoaded;
         private bool xboxAchievementScanRunning;
         private bool xboxArtworkScanRunning;
+        private bool consoleArtworkScanRunning;
         private Dictionary<string, string> sharedArtworkIndex;
         private DateTime sharedArtworkIndexLoadedUtc;
         private bool closing;
@@ -451,6 +657,33 @@ namespace HuymaierConsole.NativeApp
         private TextBlock xboxPreviewTitle;
         private TextBlock xboxPreviewDetail;
         private Image xboxPreviewImage;
+        private int wiiMenuPage;
+        private int wiiUMenuPage;
+        private int switchZone;
+        private int switchSoftwareIndex;
+        private int switchSystemIndex;
+        private int switchSoftwareActionCount;
+        private int switchSystemActionStart;
+        private bool chromeNavigationActive;
+        private ConsolePlatformGame shellSelectedGame;
+        private int n64LibraryIndex;
+        private int n64Zone;
+        private int n64UtilityIndex;
+        private int gameCubePreviousPage;
+        private int pspCategoryIndex;
+        private int pspItemIndex;
+        private BackendSettingsInventory backendSettingsInventory;
+        private List<BackendSettingEntry> backendSettingsEntries;
+        private string backendSettingsCategory;
+        private BackendSettingEntry selectedBackendSetting;
+        private Grid backendValueEditorOverlay;
+        private TextBlock backendValueEditorText;
+        private List<Button> backendValueKeyButtons;
+        private string[] backendValueKeyTokens;
+        private int backendValueKeyIndex;
+        private bool backendValueEditorActive;
+        private bool backendValueShift;
+        private string backendValueBuffer;
 
         public ConsolePlatformWindow(string platformRootValue, string consoleRootValue, string platformId)
         {
@@ -477,6 +710,34 @@ namespace HuymaierConsole.NativeApp
             xboxAchievementsLoaded = false;
             xboxAchievementScanRunning = false;
             xboxArtworkScanRunning = false;
+            consoleArtworkScanRunning = false;
+            wiiMenuPage = 0;
+            wiiUMenuPage = 0;
+            switchZone = 0;
+            switchSoftwareIndex = 0;
+            switchSystemIndex = 0;
+            switchSoftwareActionCount = 0;
+            switchSystemActionStart = 0;
+            chromeNavigationActive = definition.Shell == "Xbox" || (definition.Shell == "Xbox360" && String.Equals(settings.dashboardStyle, "Metro", StringComparison.OrdinalIgnoreCase));
+            shellSelectedGame = null;
+            n64LibraryIndex = 0;
+            n64Zone = 0;
+            n64UtilityIndex = 0;
+            gameCubePreviousPage = -1;
+            pspCategoryIndex = 0;
+            pspItemIndex = 0;
+            backendSettingsInventory = null;
+            backendSettingsEntries = new List<BackendSettingEntry>();
+            backendSettingsCategory = "All Settings";
+            selectedBackendSetting = null;
+            backendValueEditorOverlay = null;
+            backendValueEditorText = null;
+            backendValueKeyButtons = new List<Button>();
+            backendValueKeyTokens = new string[0];
+            backendValueKeyIndex = 0;
+            backendValueEditorActive = false;
+            backendValueShift = false;
+            backendValueBuffer = String.Empty;
             sharedArtworkIndex = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             sharedArtworkIndexLoadedUtc = DateTime.MinValue;
             closing = false;
@@ -497,8 +758,8 @@ namespace HuymaierConsole.NativeApp
 
             root = new Grid();
             root.Background = BuildBackground();
-            bool immersiveDashboard = definition.Shell == "Xbox" || definition.Shell == "Xbox360";
-            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(immersiveDashboard ? 0 : 92) });
+            bool immersiveDashboard = true;
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(0) });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(immersiveDashboard ? 56 : 48) });
 
@@ -516,7 +777,15 @@ namespace HuymaierConsole.NativeApp
             BuildChrome();
 
             Grid footer = new Grid { Margin = new Thickness(28, 0, 28, 0) };
-            string helpText = definition.Shell == "Xbox360" ? "A  Select     X  Fallback emulator     B  Back     GUIDE  Quick Access     LB / RB  Tab" : (definition.Shell == "Xbox" ? "A  Select     X  Fallback emulator     B  Back     LB / RB  Menu" : "A / CROSS  Select     OPTIONS  Fallback emulator     B / CIRCLE  Back     LB / RB  Section");
+            string helpText;
+            if (definition.Shell == "GameCube") helpText = "D-Pad  Menu     LB / RB  Letter     A  Select     B  Back     GUIDE  Game Bar";
+            else if (definition.Shell == "Wii") helpText = "D-Pad  Navigate     LB / RB  Letter     A  Select     B  Back     GUIDE  Game Bar";
+            else if (definition.Shell == "WiiU") helpText = "D-Pad  Navigate     A  Select     B  Back     GUIDE  Game Bar";
+            else if (definition.Shell == "Switch") helpText = "D-Pad  Navigate     A  OK     B  Back     GUIDE  Game Bar";
+            else if (definition.Shell == "Xbox360" && IsBlades()) helpText = "LEFT / RIGHT  Blade     UP / DOWN  Item     A  Select     B  Back     GUIDE  Game Bar";
+            else if (definition.Shell == "Xbox360") helpText = "D-Pad  Navigate     A  Select     B  Back     GUIDE  Game Bar";
+            else if (definition.Shell == "Xbox") helpText = "UP / DOWN  Menu     A  Select     B  Back     X  Alternate     GUIDE  Game Bar";
+            else helpText = "D-Pad  Navigate     A  Select     B  Back     OPTIONS  Alternate emulator     GUIDE  Game Bar";
             TextBlock help = new TextBlock { Text = helpText, FontSize = 13, VerticalAlignment = VerticalAlignment.Center };
             help.Foreground = IsLightShell() ? new SolidColorBrush(Color.FromRgb(54, 69, 75)) : new SolidColorBrush(Color.FromRgb(218, 224, 230));
             noticeText = new TextBlock { HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, FontSize = 13, Foreground = new SolidColorBrush(definition.Accent) };
@@ -550,16 +819,19 @@ namespace HuymaierConsole.NativeApp
 
         private bool IsLightShell()
         {
-            return definition.Shell == "Wii" || definition.Shell == "WiiU";
+            return definition.Shell == "Wii" || definition.Shell == "WiiU" || definition.Shell == "3DS" || definition.Shell == "NDS" || definition.Shell == "DSI" || definition.Shell == "Dreamcast";
         }
 
         private bool IsXboxFamily() { return definition.Shell == "Xbox" || definition.Shell == "Xbox360"; }
         private bool IsBlades() { return definition.Shell == "Xbox360" && String.Equals(settings.dashboardStyle, "Blades", StringComparison.OrdinalIgnoreCase); }
         private bool IsMetro() { return definition.Shell == "Xbox360" && String.Equals(settings.dashboardStyle, "Metro", StringComparison.OrdinalIgnoreCase); }
         private bool IsGamePage() { return definition.Shell == "Xbox360" ? (IsBlades() ? page == 1 : page == 2) : page == 0; }
-        private int GetPageCount() { return definition.Shell == "Xbox" ? 5 : (definition.Shell == "Xbox360" ? (IsBlades() ? 4 : 7) : 3); }
+        private int GetPageCount() { if (definition.Shell == "GameCube") return 4; return definition.Shell == "Xbox" ? 4 : (definition.Shell == "Xbox360" ? (IsBlades() ? 4 : 7) : 3); }
         private int GetDefaultPageIndex() { return definition.Shell == "Xbox360" && String.Equals(settings == null ? definition.DefaultDashboardStyle : settings.dashboardStyle, "Blades", StringComparison.OrdinalIgnoreCase) ? 1 : 0; }
-        private int GetSettingsPageIndex() { return definition.Shell == "Xbox" ? 4 : (definition.Shell == "Xbox360" ? (IsBlades() ? 3 : 6) : 2); }
+        private int GetSettingsPageIndex() { if (definition.Shell == "GameCube") return 3; return definition.Shell == "Xbox" ? 3 : (definition.Shell == "Xbox360" ? (IsBlades() ? 3 : 6) : 2); }
+        private bool IsRootConsoleSurface() { return String.IsNullOrWhiteSpace(dashboardSubpage); }
+        private bool IsXboxRoot() { return definition.Shell == "Xbox" && IsRootConsoleSurface(); }
+        private bool IsGameCubeHub() { return definition.Shell == "GameCube" && IsRootConsoleSurface(); }
 
         private Brush BuildBackground()
         {
@@ -595,6 +867,16 @@ namespace HuymaierConsole.NativeApp
             {
                 LinearGradientBrush s = new LinearGradientBrush(Color.FromRgb(43, 44, 48), Color.FromRgb(66, 67, 72), 90);
                 return s;
+            }
+            if (definition.Shell == "PSP")
+            {
+                LinearGradientBrush psp = new LinearGradientBrush(); psp.StartPoint = new Point(0,0); psp.EndPoint = new Point(1,1);
+                psp.GradientStops.Add(new GradientStop(Color.FromRgb(17,116,205),0)); psp.GradientStops.Add(new GradientStop(Color.FromRgb(2,48,119),0.58)); psp.GradientStops.Add(new GradientStop(Color.FromRgb(0,15,56),1)); return psp;
+            }
+            if (definition.Shell == "Saturn")
+            {
+                RadialGradientBrush saturn = new RadialGradientBrush(); saturn.Center = new Point(0.5,0.48); saturn.GradientOrigin = new Point(0.5,0.48);
+                saturn.GradientStops.Add(new GradientStop(Color.FromRgb(31,126,178),0)); saturn.GradientStops.Add(new GradientStop(Color.FromRgb(7,35,89),0.55)); saturn.GradientStops.Add(new GradientStop(Color.FromRgb(2,8,29),1)); return saturn;
             }
             LinearGradientBrush brush = new LinearGradientBrush();
             brush.StartPoint = new Point(0, 0);
@@ -634,41 +916,32 @@ namespace HuymaierConsole.NativeApp
             Panel oldSubtitleParent = subtitleText.Parent as Panel;
             if (oldSubtitleParent != null) oldSubtitleParent.Children.Remove(subtitleText);
             chrome.Children.Clear();
-            navButtons.Clear();
-            navigation.Children.Clear();
+            chrome.RowDefinitions.Clear(); chrome.ColumnDefinitions.Clear();
+            navButtons.Clear(); navigation.Children.Clear();
             if (definition.Shell == "Xbox") { BuildXboxChrome(); return; }
             if (definition.Shell == "Xbox360") { BuildXbox360Chrome(); return; }
-            bool topNav = definition.Shell == "Wii" || definition.Shell == "WiiU" || definition.Shell == "Switch";
-            if (topNav)
-            {
-                chrome.RowDefinitions.Clear(); chrome.ColumnDefinitions.Clear();
-                chrome.RowDefinitions.Add(new RowDefinition { Height = new GridLength(62) });
-                chrome.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-                navigation.Orientation = Orientation.Horizontal;
-                navigation.HorizontalAlignment = HorizontalAlignment.Center;
-                navigation.Margin = new Thickness(0, 4, 0, 6);
-                chrome.Children.Add(navigation);
-                Border content = BuildContentFrame();
-                Grid.SetRow(content, 1); chrome.Children.Add(content);
-            }
-            else
-            {
-                chrome.RowDefinitions.Clear(); chrome.ColumnDefinitions.Clear();
-                chrome.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(definition.Shell == "Xbox360" ? 310 : 230) });
-                chrome.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                navigation.Orientation = Orientation.Vertical;
-                navigation.Margin = new Thickness(28, 18, 18, 18);
-                chrome.Children.Add(navigation);
-                Border content = BuildContentFrame();
-                Grid.SetColumn(content, 1); chrome.Children.Add(content);
-            }
-            if (definition.Shell == "N64") { AddNav("GAME PAK", 0); AddNav("CONTROLLER PAK", 1); AddNav("OPTIONS", 2); }
-            else if (definition.Shell == "GameCube") { AddNav("GAME PLAY", 0); AddNav("MEMORY CARD", 1); AddNav("OPTIONS", 2); }
-            else if (definition.Shell == "Wii") { AddNav("Wii MENU", 0); AddNav("DATA MANAGEMENT", 1); AddNav("Wii SETTINGS", 2); }
-            else if (definition.Shell == "WiiU") { AddNav("Wii U MENU", 0); AddNav("DATA MANAGEMENT", 1); AddNav("SYSTEM SETTINGS", 2); }
-            else if (definition.Shell == "Switch") { AddNav("ALL SOFTWARE", 0); AddNav("DATA MANAGEMENT", 1); AddNav("SYSTEM SETTINGS", 2); }
-            else { AddNav("Games", 0); AddNav("Saves", 1); AddNav("Settings", 2); }
-            UpdateNavigation();
+
+            // N64, GameCube, Wii, Wii U and Switch no longer inherit a fake common
+            // tab strip. Their real systems used fundamentally different spatial
+            // menus, so the entire center surface belongs to that system renderer.
+            Border content = BuildAuthenticConsoleFrame();
+            chrome.Children.Add(content);
+        }
+
+        private Border BuildAuthenticConsoleFrame()
+        {
+            Border frame = new Border { Margin = new Thickness(18, 16, 18, 8), Padding = new Thickness(20), BorderThickness = new Thickness(0), Background = Brushes.Transparent };
+            Grid inner = new Grid();
+            inner.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            inner.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            StackPanel heading = new StackPanel { Margin = new Thickness(10, 0, 10, 8) };
+            titleText.FontSize = definition.Shell == "GameCube" ? 30 : 28;
+            titleText.FontWeight = FontWeights.Light;
+            titleText.Foreground = IsLightShell() ? new SolidColorBrush(Color.FromRgb(61, 74, 80)) : Brushes.White;
+            subtitleText.FontSize = 12; subtitleText.Margin = new Thickness(1, 2, 0, 8); subtitleText.TextWrapping = TextWrapping.Wrap;
+            subtitleText.Foreground = IsLightShell() ? new SolidColorBrush(Color.FromRgb(100, 115, 121)) : new SolidColorBrush(Color.FromArgb(210, 255, 255, 255));
+            heading.Children.Add(titleText); heading.Children.Add(subtitleText); inner.Children.Add(heading);
+            Grid.SetRow(contentHost, 1); inner.Children.Add(contentHost); frame.Child = inner; return frame;
         }
 
         private void BuildXboxChrome()
@@ -711,7 +984,7 @@ namespace HuymaierConsole.NativeApp
             navigation.Margin = new Thickness(0, 185, 0, 0); scene.Children.Add(navigation); chrome.Children.Add(scene);
 
             Border frame = BuildXboxContentFrame(); Grid.SetColumn(frame, 1); chrome.Children.Add(frame);
-            AddNav("games", 0); AddNav("memory", 1); AddNav("music", 2); AddNav("xbox live", 3); AddNav("settings", 4);
+            AddNav("play game", 0); AddNav("memory", 1); AddNav("music", 2); AddNav("settings", 3);
             UpdateNavigation();
         }
 
@@ -721,7 +994,7 @@ namespace HuymaierConsole.NativeApp
             navButtons.Clear(); navigation.Children.Clear();
             if (IsBlades())
             {
-                string[] labels = new string[] { "xbox live", "games", "media", "system" };
+                string[] labels = new string[] { "home", "games", "media", "system" };
                 Color[] colors = new Color[] { Color.FromRgb(226, 111, 16), Color.FromRgb(83, 156, 44), Color.FromRgb(48, 119, 180), Color.FromRgb(105, 76, 150) };
 
                 // 2005-style Blades: the blade edges stay as a compact silver stack
@@ -765,7 +1038,7 @@ namespace HuymaierConsole.NativeApp
                 profile.Children.Add(gamerWords); Border gamer = new Border { Width = 48, Height = 48, Background = new SolidColorBrush(Color.FromRgb(107, 181, 43)), BorderBrush = Brushes.White, BorderThickness = new Thickness(2) }; gamer.Child = new TextBlock { Text = "X", FontSize = 27, FontWeight = FontWeights.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }; profile.Children.Add(gamer);
                 Grid.SetColumn(profile, 1); top.Children.Add(profile); chrome.Children.Add(top);
                 Border frame = BuildXbox360ContentFrame(); Grid.SetRow(frame, 1); chrome.Children.Add(frame);
-                AddNav("home", 0); AddNav("social", 1); AddNav("games", 2); AddNav("video", 3); AddNav("music", 4); AddNav("apps", 5); AddNav("settings", 6);
+                AddNav("home", 0); AddNav("profile", 1); AddNav("games", 2); AddNav("video", 3); AddNav("music", 4); AddNav("apps", 5); AddNav("settings", 6);
             }
             UpdateNavigation();
         }
@@ -991,7 +1264,7 @@ namespace HuymaierConsole.NativeApp
             // configured game folders on a worker so newly added/removed titles appear
             // without requiring a manual Refresh Library command.
             QueueLibraryRefresh();
-            if (IsXboxFamily()) QueueXboxArtworkRefresh();
+            QueueConsoleArtworkRefresh();
             string startup = Path.Combine(platformRoot, "Assets", "Startup.mp4");
             if (settings.startupEnabled) startupOverlay.Play(startup, settings.startupVolume, StartAmbience);
             else StartAmbience();
@@ -1087,14 +1360,46 @@ namespace HuymaierConsole.NativeApp
                 if (command == XmbInputCommand.Back || command == XmbInputCommand.Confirm) ToggleDashboardGuide();
                 return;
             }
-            if (command == XmbInputCommand.LeftShoulder) { SwitchPage(-1); return; }
-            if (command == XmbInputCommand.RightShoulder) { SwitchPage(1); return; }
+            if (backendValueEditorActive)
+            {
+                ProcessBackendValueEditorCommand(command);
+                return;
+            }
+
+            // Shoulder buttons never change console sections/pages.  The only native-console
+            // exception is a deliberate large-library accelerator requested for N64/GameCube/Wii:
+            // LB/RB jumps to the previous/next populated first-letter group.
+            if (command == XmbInputCommand.LeftShoulder || command == XmbInputCommand.RightShoulder)
+            {
+                if (TryProcessLibraryLetterJump(command)) return;
+                return;
+            }
+
+            if (definition.Shell == "N64" && IsRootConsoleSurface()) { ProcessN64MenuCommand(command); return; }
+            if (definition.Shell == "PSP" && IsRootConsoleSurface()) { ProcessPspXmbCommand(command); return; }
+            if (IsGameCubeHub()) { ProcessGameCubeHubCommand(command); return; }
+            if (IsXboxRoot()) { ProcessXboxRootCommand(command); return; }
+            if (definition.Shell == "Switch" && IsRootConsoleSurface()) { ProcessSwitchHomeCommand(command); return; }
+            if (definition.Shell == "Xbox360" && IsMetro() && IsRootConsoleSurface() && ProcessMetroNavigationCommand(command)) return;
+            if (definition.Shell == "Xbox360" && IsBlades() && IsRootConsoleSurface() && (command == XmbInputCommand.Left || command == XmbInputCommand.Right))
+            {
+                SwitchPage(command == XmbInputCommand.Left ? -1 : 1); return;
+            }
+            if (definition.Shell == "Wii" && IsRootConsoleSurface()) { ProcessWiiMenuCommand(command); return; }
+            if (definition.Shell == "WiiU" && IsRootConsoleSurface() && ProcessWiiUPageEdge(command)) return;
+
             if (command == XmbInputCommand.Back)
             {
                 PlayEffect("Back.wav");
                 if (!String.IsNullOrWhiteSpace(dashboardSubpage))
                 {
-                    dashboardSubpage = String.Empty; selectedXboxSave = null; selected = 0; RenderPage(); return;
+                    if (dashboardSubpage == "backend-setting-detail") { dashboardSubpage = "backend-settings-list"; selected = 0; RenderPage(); return; }
+                    if (dashboardSubpage == "backend-settings-list") { dashboardSubpage = "backend-settings"; selectedBackendSetting = null; selected = 0; RenderPage(); return; }
+                    if (dashboardSubpage == "backend-settings") { dashboardSubpage = "settings"; selectedBackendSetting = null; selected = 0; RenderPage(); return; }
+                    if (dashboardSubpage == "wii-start") { dashboardSubpage = String.Empty; shellSelectedGame = null; selected = 0; RenderPage(); return; }
+                    if (dashboardSubpage == "wii-data" || dashboardSubpage == "wii-settings") { dashboardSubpage = "wii-options"; selected = 0; RenderPage(); return; }
+                    if (dashboardSubpage == "wii-options") { dashboardSubpage = String.Empty; selected = 0; RenderPage(); return; }
+                    dashboardSubpage = String.Empty; selectedXboxSave = null; shellSelectedGame = null; selected = 0; chromeNavigationActive = definition.Shell == "Xbox" || (definition.Shell == "Xbox360" && IsMetro()); RenderPage(); return;
                 }
                 Close(); return;
             }
@@ -1103,13 +1408,12 @@ namespace HuymaierConsole.NativeApp
             {
                 if (IsGamePage() && selected >= 0 && selected < actions.Count && actions[selected].Game != null)
                 {
-                    PlayEffect("Confirm.wav");
-                    LaunchGame(actions[selected].Game, true);
+                    PlayEffect("Confirm.wav"); LaunchGame(actions[selected].Game, true);
                 }
                 return;
             }
             int next = selected;
-            int rowStep = IsGamePage() ? Math.Max(1, columns) : 1;
+            int rowStep = (IsGamePage() && !IsBlades()) ? Math.Max(1, columns) : 1;
             if (command == XmbInputCommand.Left) next--;
             else if (command == XmbInputCommand.Right) next++;
             else if (command == XmbInputCommand.Up) next -= rowStep;
@@ -1123,6 +1427,192 @@ namespace HuymaierConsole.NativeApp
             else return;
             next = Math.Max(0, Math.Min(actions.Count - 1, next));
             if (next != selected) { selected = next; PlayEffect("Navigate.wav"); UpdateActionVisuals(); }
+        }
+
+        private void ProcessGameCubeHubCommand(XmbInputCommand command)
+        {
+            int next = page;
+            if (command == XmbInputCommand.Up) next = 0;          // Game Play
+            else if (command == XmbInputCommand.Right) next = 1; // Calendar
+            else if (command == XmbInputCommand.Down) next = 2;  // Memory Card
+            else if (command == XmbInputCommand.Left) next = 3;  // Options
+            else if (command == XmbInputCommand.Confirm)
+            {
+                dashboardSubpage = "gamecube-section"; selected = 0; PlayEffect("Confirm.wav"); RenderPage(); return;
+            }
+            else if (command == XmbInputCommand.Back) { PlayEffect("Back.wav"); Close(); return; }
+            else return;
+            if (next != page)
+            {
+                gameCubePreviousPage = page;
+                page = next;
+                PlayEffect("Navigate.wav");
+                RenderPage();
+            }
+        }
+
+        private void ProcessN64MenuCommand(XmbInputCommand command)
+        {
+            if (command == XmbInputCommand.Back) { PlayEffect("Back.wav"); Close(); return; }
+            if (n64Zone == 0)
+            {
+                if (command == XmbInputCommand.Left || command == XmbInputCommand.Right)
+                {
+                    if (games.Count > 0)
+                    {
+                        int delta = command == XmbInputCommand.Left ? -1 : 1;
+                        n64LibraryIndex = Math.Max(0, Math.Min(games.Count - 1, n64LibraryIndex + delta));
+                        PlayEffect("Navigate.wav"); RenderPage();
+                    }
+                    return;
+                }
+                if (command == XmbInputCommand.Down) { n64Zone = 1; PlayEffect("Navigate.wav"); RenderPage(); return; }
+                if (command == XmbInputCommand.Confirm)
+                {
+                    PlayEffect("Confirm.wav");
+                    if (games.Count > 0) LaunchGame(games[Math.Max(0, Math.Min(games.Count - 1, n64LibraryIndex))], false);
+                    else { dashboardSubpage = "n64-settings"; page = 2; selected = 0; RenderPage(); }
+                }
+                return;
+            }
+            if (command == XmbInputCommand.Up) { n64Zone = 0; PlayEffect("Navigate.wav"); RenderPage(); return; }
+            if (command == XmbInputCommand.Left || command == XmbInputCommand.Right)
+            {
+                n64UtilityIndex = command == XmbInputCommand.Left ? 0 : 1; PlayEffect("Navigate.wav"); RenderPage(); return;
+            }
+            if (command == XmbInputCommand.Confirm)
+            {
+                PlayEffect("Confirm.wav");
+                if (n64UtilityIndex == 0) { dashboardSubpage = "n64-pak"; page = 1; selected = 0; RenderPage(); }
+                else { dashboardSubpage = "n64-settings"; page = 2; selected = 0; RenderPage(); }
+            }
+        }
+
+        private void ProcessWiiMenuCommand(XmbInputCommand command)
+        {
+            if (command == XmbInputCommand.Back) { PlayEffect("Back.wav"); Close(); return; }
+            int channelCount = Math.Min(12, Math.Max(1, games.Count - wiiMenuPage * 12));
+            int systemStart = Math.Min(actions.Count, channelCount);
+            if (selected < systemStart)
+            {
+                int lastWiiPage = Math.Max(0, GetWiiMenuPageCount() - 1);
+                if (command == XmbInputCommand.Left && selected % 4 == 0 && wiiMenuPage > 0) { wiiMenuPage--; selected = 0; PlayEffect("Tab.wav"); RenderPage(); return; }
+                if (command == XmbInputCommand.Right && selected % 4 == 3 && wiiMenuPage < lastWiiPage) { wiiMenuPage++; selected = 0; PlayEffect("Tab.wav"); RenderPage(); return; }
+                if (command == XmbInputCommand.Down && selected + 4 >= systemStart) { selected = systemStart; PlayEffect("Navigate.wav"); UpdateActionVisuals(); return; }
+                int next = selected;
+                if (command == XmbInputCommand.Left) next--;
+                else if (command == XmbInputCommand.Right) next++;
+                else if (command == XmbInputCommand.Up) next -= 4;
+                else if (command == XmbInputCommand.Down) next += 4;
+                else if (command == XmbInputCommand.Confirm) { if (selected < actions.Count) { PlayEffect("Confirm.wav"); actions[selected].Invoke(); } return; }
+                else return;
+                selected = Math.Max(0, Math.Min(systemStart - 1, next)); PlayEffect("Navigate.wav"); UpdateActionVisuals(); return;
+            }
+            if (command == XmbInputCommand.Up) { selected = Math.Max(0, systemStart - 1); PlayEffect("Navigate.wav"); UpdateActionVisuals(); return; }
+            if (command == XmbInputCommand.Left || command == XmbInputCommand.Right)
+            {
+                int next = selected + (command == XmbInputCommand.Left ? -1 : 1);
+                selected = Math.Max(systemStart, Math.Min(actions.Count - 1, next)); PlayEffect("Navigate.wav"); UpdateActionVisuals(); return;
+            }
+            if (command == XmbInputCommand.Confirm && selected < actions.Count) { PlayEffect("Confirm.wav"); actions[selected].Invoke(); }
+        }
+
+        private void ProcessXboxRootCommand(XmbInputCommand command)
+        {
+            if (command == XmbInputCommand.Up || command == XmbInputCommand.Down)
+            {
+                int next = Math.Max(0, Math.Min(GetPageCount() - 1, page + (command == XmbInputCommand.Up ? -1 : 1)));
+                if (next != page) { page = next; PlayEffect("Navigate.wav"); UpdateNavigation(); RenderPage(); }
+                return;
+            }
+            if (command == XmbInputCommand.Confirm)
+            {
+                dashboardSubpage = "xbox-section"; chromeNavigationActive = false; selected = 0; PlayEffect("Confirm.wav"); RenderPage(); return;
+            }
+            if (command == XmbInputCommand.Back) { PlayEffect("Back.wav"); Close(); }
+        }
+
+        private void ProcessSwitchHomeCommand(XmbInputCommand command)
+        {
+            if (switchSoftwareActionCount <= 0 && actions.Count == 0) { if (command == XmbInputCommand.Back) Close(); return; }
+            int systemCount = Math.Max(0, actions.Count - switchSystemActionStart);
+            if (command == XmbInputCommand.Up) { switchZone = 0; }
+            else if (command == XmbInputCommand.Down && systemCount > 0) { switchZone = 1; }
+            else if (command == XmbInputCommand.Left)
+            {
+                if (switchZone == 0) switchSoftwareIndex = Math.Max(0, switchSoftwareIndex - 1);
+                else switchSystemIndex = Math.Max(0, switchSystemIndex - 1);
+            }
+            else if (command == XmbInputCommand.Right)
+            {
+                if (switchZone == 0) switchSoftwareIndex = Math.Min(Math.Max(0, switchSoftwareActionCount - 1), switchSoftwareIndex + 1);
+                else switchSystemIndex = Math.Min(Math.Max(0, systemCount - 1), switchSystemIndex + 1);
+            }
+            else if (command == XmbInputCommand.Confirm)
+            {
+                int index = switchZone == 0 ? switchSoftwareIndex : switchSystemActionStart + switchSystemIndex;
+                if (index >= 0 && index < actions.Count && actions[index].Invoke != null) { selected = index; PlayEffect("Confirm.wav"); actions[index].Invoke(); }
+                return;
+            }
+            else if (command == XmbInputCommand.Back) { PlayEffect("Back.wav"); Close(); return; }
+            else return;
+            selected = switchZone == 0 ? Math.Min(Math.Max(0, switchSoftwareActionCount - 1), switchSoftwareIndex) : Math.Min(actions.Count - 1, switchSystemActionStart + switchSystemIndex);
+            PlayEffect("Navigate.wav"); UpdateActionVisuals();
+        }
+
+        private bool ProcessMetroNavigationCommand(XmbInputCommand command)
+        {
+            if (chromeNavigationActive)
+            {
+                if (command == XmbInputCommand.Left || command == XmbInputCommand.Right)
+                {
+                    SwitchPage(command == XmbInputCommand.Left ? -1 : 1); chromeNavigationActive = true; return true;
+                }
+                if (command == XmbInputCommand.Down || command == XmbInputCommand.Confirm)
+                {
+                    if (actions.Count > 0) { chromeNavigationActive = false; selected = Math.Max(0, Math.Min(selected, actions.Count - 1)); PlayEffect("Navigate.wav"); UpdateActionVisuals(); }
+                    return true;
+                }
+                if (command == XmbInputCommand.Back) { PlayEffect("Back.wav"); Close(); return true; }
+                return command == XmbInputCommand.Up;
+            }
+            if (command == XmbInputCommand.Up && selected < Math.Max(1, columns))
+            {
+                chromeNavigationActive = true; PlayEffect("Navigate.wav"); return true;
+            }
+            if (command == XmbInputCommand.Back)
+            {
+                chromeNavigationActive = true; PlayEffect("Back.wav"); return true;
+            }
+            return false;
+        }
+
+        private bool ProcessWiiPageEdge(XmbInputCommand command)
+        {
+            int totalPages = 4;
+            if (command == XmbInputCommand.Left && selected >= 0 && selected < 12 && selected % 4 == 0 && wiiMenuPage > 0)
+            {
+                wiiMenuPage--; selected = Math.Min(11, Math.Max(0, games.Count - wiiMenuPage * 12 - 1)); PlayEffect("Tab.wav"); RenderPage(); return true;
+            }
+            if (command == XmbInputCommand.Right && selected >= 0 && selected < 12 && selected % 4 == 3 && wiiMenuPage + 1 < totalPages)
+            {
+                wiiMenuPage++; selected = 0; PlayEffect("Tab.wav"); RenderPage(); return true;
+            }
+            return false;
+        }
+
+        private bool ProcessWiiUPageEdge(XmbInputCommand command)
+        {
+            int totalPages = Math.Max(1, (int)Math.Ceiling(Math.Max(1, games.Count) / 15.0));
+            if (command == XmbInputCommand.Left && selected >= 0 && selected < 15 && selected % 5 == 0 && wiiUMenuPage > 0)
+            {
+                wiiUMenuPage--; selected = Math.Min(14, Math.Max(0, games.Count - wiiUMenuPage * 15 - 1)); PlayEffect("Tab.wav"); RenderPage(); return true;
+            }
+            if (command == XmbInputCommand.Right && selected >= 0 && selected < 15 && selected % 5 == 4 && wiiUMenuPage + 1 < totalPages)
+            {
+                wiiUMenuPage++; selected = 0; PlayEffect("Tab.wav"); RenderPage(); return true;
+            }
+            return false;
         }
 
         private void SwitchPage(int delta)
@@ -1157,23 +1647,54 @@ namespace HuymaierConsole.NativeApp
         private void RenderPage()
         {
             UpdateNavigation(); contentHost.Children.Clear(); actions.Clear(); xboxPreviewTitle = null; xboxPreviewDetail = null; xboxPreviewImage = null;
+            if (definition.Shell == "N64" && !IsRootConsoleSurface()) { if (page == 1) RenderN64ControllerPak(FindSaveRoots()); else RenderN64Options(); UpdateActionVisuals(); return; }
+            if (definition.Shell == "WiiU" && !IsRootConsoleSurface()) { if (page == 1) RenderWiiUDataManagement(FindSaveRoots()); else RenderWiiUSettings(); UpdateActionVisuals(); return; }
+            if (definition.Shell == "Switch" && !IsRootConsoleSurface()) { if (dashboardSubpage == "switch-all") RenderSwitchAllSoftware(); else if (dashboardSubpage == "switch-data") RenderSwitchDataManagement(FindSaveRoots()); else RenderSwitchSettings(); UpdateActionVisuals(); return; }
+            if (definition.Shell == "GameCube")
+            {
+                if (IsRootConsoleSurface()) RenderGameCubeHub();
+                else if (page == 0) RenderGameCubeGamePlay(); else if (page == 1) RenderGameCubeCalendar(); else if (page == 2) RenderGameCubeMemoryCards(FindSaveRoots()); else RenderGameCubeOptions();
+                UpdateActionVisuals(); return;
+            }
+            if (definition.Shell == "Wii")
+            {
+                if (dashboardSubpage == "wii-start") RenderWiiChannelStart();
+                else if (dashboardSubpage == "wii-options") RenderWiiOptions();
+                else if (dashboardSubpage == "wii-data") RenderWiiDataManagement(FindSaveRoots());
+                else if (dashboardSubpage == "wii-settings") RenderWiiSettings();
+                else RenderWiiMenuAuthentic();
+                UpdateActionVisuals(); return;
+            }
+            if (definition.Shell == "WiiU" && IsRootConsoleSurface()) { RenderWiiUMenuAuthentic(); UpdateActionVisuals(); return; }
+            if (definition.Shell == "Switch" && IsRootConsoleSurface()) { RenderSwitchHomeAuthentic(); UpdateActionVisuals(); return; }
+            if (definition.Shell == "N64" && IsRootConsoleSurface()) { RenderN64GamePakLauncher(); return; }
+            if (IsWave2Shell()) { if (IsRootConsoleSurface()) RenderWave2Root(); else RenderWave2Subpage(); UpdateActionVisuals(); return; }
+            if (IsWave3Shell()) { if (IsRootConsoleSurface()) RenderWave3Root(); else RenderWave3Subpage(); UpdateActionVisuals(); return; }
+            if (IsWave45Shell()) { if (IsRootConsoleSurface()) RenderWave45Root(); else RenderWave45Subpage(); UpdateActionVisuals(); return; }
+            if (definition.Shell == "3DS") { if (IsRootConsoleSurface()) Render3dsHome(); else RenderWave1Subpage(); UpdateActionVisuals(); return; }
+            if (definition.Shell == "NDS") { if (IsRootConsoleSurface()) RenderDsMenu(); else RenderWave1Subpage(); UpdateActionVisuals(); return; }
+            if (definition.Shell == "DSI") { if (IsRootConsoleSurface()) RenderDsiMenu(); else RenderWave1Subpage(); UpdateActionVisuals(); return; }
+            if (definition.Shell == "Dreamcast") { if (IsRootConsoleSurface()) RenderDreamcastMenu(); else RenderWave1Subpage(); UpdateActionVisuals(); return; }
+            if (definition.Shell == "Saturn") { if (IsRootConsoleSurface()) RenderSaturnMenu(); else RenderWave1Subpage(); UpdateActionVisuals(); return; }
+            if (definition.Shell == "PSP") { if (IsRootConsoleSurface()) RenderPspXmb(); else RenderWave1Subpage(); UpdateActionVisuals(); return; }
+            if (definition.Shell == "Xbox" && IsRootConsoleSurface()) { RenderXboxRoot(); UpdateActionVisuals(); return; }
             if (definition.Shell == "Xbox360" && String.Equals(dashboardSubpage, "achievements", StringComparison.OrdinalIgnoreCase)) { RenderXbox360Achievements(); UpdateActionVisuals(); return; }
-            if (definition.Shell == "Xbox360" && String.Equals(dashboardSubpage, "settings", StringComparison.OrdinalIgnoreCase)) { RenderSettings(); UpdateActionVisuals(); return; }
+            if (definition.Shell == "Xbox360" && String.Equals(dashboardSubpage, "settings", StringComparison.OrdinalIgnoreCase)) { RenderXbox360Settings(); UpdateActionVisuals(); return; }
             if (IsXboxFamily() && String.Equals(dashboardSubpage, "storage", StringComparison.OrdinalIgnoreCase)) { RenderXboxStorageManager(); UpdateActionVisuals(); return; }
             if (IsXboxFamily() && String.Equals(dashboardSubpage, "save-detail", StringComparison.OrdinalIgnoreCase)) { RenderXboxSaveDetail(); UpdateActionVisuals(); return; }
             if (definition.Shell == "Xbox")
             {
-                if (page == 0) RenderGames(); else if (page == 1) { ScanXboxSaves(); RenderXboxStorageManager(); } else if (page == 2) RenderXboxMusic(); else if (page == 3) RenderXboxLive(); else RenderSettings();
+                if (page == 0) RenderGames(); else if (page == 1) { ScanXboxSaves(); RenderXboxStorageManager(); } else if (page == 2) RenderXboxMusic(); else RenderXboxSettings();
             }
             else if (definition.Shell == "Xbox360")
             {
                 if (IsBlades())
                 {
-                    if (page == 0) RenderXbox360Live(); else if (page == 1) RenderGames(); else if (page == 2) RenderXbox360Media(); else RenderXbox360System();
+                    if (page == 0) RenderXbox360Home(); else if (page == 1) RenderGames(); else if (page == 2) RenderXbox360Media(); else RenderXbox360System();
                 }
                 else
                 {
-                    if (page == 0) RenderMetroHome(); else if (page == 1) RenderXbox360Social(); else if (page == 2) RenderGames(); else if (page == 3) RenderXbox360Video(); else if (page == 4) RenderXbox360Music(); else if (page == 5) RenderXbox360Apps(); else RenderSettings();
+                    if (page == 0) RenderMetroHome(); else if (page == 1) RenderXbox360Profile(); else if (page == 2) RenderGames(); else if (page == 3) RenderXbox360Video(); else if (page == 4) RenderXbox360Music(); else if (page == 5) RenderXbox360Apps(); else RenderXbox360Settings();
                 }
             }
             else
@@ -1189,25 +1710,1335 @@ namespace HuymaierConsole.NativeApp
             if (definition.Shell == "Xbox") { RenderXboxGamesAuthentic(); return; }
             if (IsBlades()) { RenderBladesGamesAuthentic(); return; }
             if (IsMetro()) { RenderMetroGamesAuthentic(); return; }
-            titleText.Text = definition.Shell == "N64" ? "GAME PAK" : (definition.Shell == "GameCube" ? "GAME PLAY" : (definition.Shell == "Wii" ? "Wii Menu" : (definition.Shell == "WiiU" ? "Wii U Menu" : (definition.Shell == "Switch" ? "All Software" : (definition.Shell == "Xbox" ? "games" : (definition.Shell == "Xbox360" ? "games" : "Games"))))));
-            subtitleText.Text = games.Count.ToString(CultureInfo.InvariantCulture) + " detected games  •  " + definition.PrimaryBackend + " primary";
+            if (definition.Shell == "N64") { RenderN64GamePakLauncher(); return; }
+            if (definition.Shell == "GameCube") { RenderGameCubeGamePlay(); return; }
+            if (definition.Shell == "Wii") { RenderWiiMenuAuthentic(); return; }
+            if (definition.Shell == "WiiU") { RenderWiiUMenuAuthentic(); return; }
+            if (definition.Shell == "Switch") { RenderSwitchHomeAuthentic(); return; }
+            if (IsWave2Shell()) { RenderWave2Root(); return; }
+            if (IsWave3Shell()) { RenderWave3Root(); return; }
+            if (IsWave45Shell()) { RenderWave45Root(); return; }
+            if (definition.Shell == "3DS") { Render3dsHome(); return; }
+            if (definition.Shell == "NDS") { RenderDsMenu(); return; }
+            if (definition.Shell == "DSI") { RenderDsiMenu(); return; }
+            if (definition.Shell == "Dreamcast") { RenderDreamcastMenu(); return; }
+            if (definition.Shell == "Saturn") { RenderSaturnMenu(); return; }
+            if (definition.Shell == "PSP") { RenderPspXmb(); return; }
+            titleText.Text = "Games"; subtitleText.Text = games.Count.ToString(CultureInfo.InvariantCulture) + " detected games  •  " + definition.PrimaryBackend + " primary";
             ScrollViewer scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
-            WrapPanel wrap = new WrapPanel { Margin = IsXboxFamily() ? new Thickness(10, 2, 10, 14) : new Thickness(18, 4, 18, 18) };
-            scroll.Content = wrap;
-            contentHost.Children.Add(scroll);
+            WrapPanel wrap = new WrapPanel { Margin = new Thickness(18, 4, 18, 18) }; scroll.Content = wrap; contentHost.Children.Add(scroll);
             foreach (ConsolePlatformGame game in games)
             {
-                ConsolePlatformGame captured = game;
-                Button button = CreateGameButton(game, delegate { LaunchGame(captured, false); });
-                wrap.Children.Add(button);
-                actions.Add(new ConsolePlatformAction { Button = button, Invoke = delegate { LaunchGame(captured, false); }, Name = game.Name, Game = captured });
+                ConsolePlatformGame captured = game; Button button = CreateGameButton(game, delegate { LaunchGame(captured, false); }); wrap.Children.Add(button); actions.Add(new ConsolePlatformAction { Button = button, Invoke = delegate { LaunchGame(captured, false); }, Name = game.Name, Game = captured });
             }
-            if (games.Count == 0)
+        }
+
+        private void RenderN64GamePakLauncher()
+        {
+            titleText.Text = String.Empty; subtitleText.Text = String.Empty;
+            if (games.Count > 0) n64LibraryIndex = Math.Max(0, Math.Min(games.Count - 1, n64LibraryIndex)); else n64LibraryIndex = 0;
+            Grid body = new Grid { Margin = new Thickness(0) };
+            body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(0.18, GridUnitType.Star) });
+            body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(0.60, GridUnitType.Star) });
+            body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(0.22, GridUnitType.Star) });
+            contentHost.Children.Add(body);
+
+            Border top = new Border { Background = new LinearGradientBrush(Color.FromRgb(55,56,59), Color.FromRgb(25,26,29), 90), BorderBrush = new SolidColorBrush(Color.FromRgb(12,12,13)), BorderThickness = new Thickness(0,0,0,5) };
+            Grid topGrid = new Grid();
+            topGrid.Children.Add(new TextBlock { Text = "HUYMAIER 64", FontSize = 34, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(18,18,20)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center });
+            top.Child = topGrid; body.Children.Add(top);
+
+            Border redBand = new Border { Background = new LinearGradientBrush(Color.FromRgb(129,4,4), Color.FromRgb(70,0,0), 90), BorderBrush = new SolidColorBrush(Color.FromRgb(35,0,0)), BorderThickness = new Thickness(0,3,0,3) };
+            Grid carousel = new Grid { Margin = new Thickness(32,20,32,20) };
+            for (int i=0;i<5;i++) carousel.ColumnDefinitions.Add(new ColumnDefinition());
+            int center = 2;
+            for (int slot=0; slot<5; slot++)
             {
-                Button empty = CreateActionButton("No games found", "Add a game folder in Settings", delegate { page = GetSettingsPageIndex(); selected = 0; RenderPage(); });
-                wrap.Children.Add(empty);
-                actions.Add(new ConsolePlatformAction { Button = empty, Invoke = delegate { page = GetSettingsPageIndex(); selected = 0; RenderPage(); }, Name = "Settings" });
+                int idx = n64LibraryIndex + slot - center;
+                bool active = slot == center && games.Count > 0;
+                Border frame = new Border { Margin = new Thickness(active ? 7 : 16, active ? 2 : 18, active ? 7 : 16, active ? 2 : 18), CornerRadius = new CornerRadius(10), Background = new LinearGradientBrush(Color.FromRgb(39,40,44), Color.FromRgb(11,11,13), 90), BorderBrush = new SolidColorBrush(active && n64Zone==0 ? Color.FromRgb(244,244,244) : Color.FromRgb(105,106,111)), BorderThickness = new Thickness(active && n64Zone==0 ? 5 : 2), Padding = new Thickness(6) };
+                Grid card = new Grid(); card.RowDefinitions.Add(new RowDefinition { Height = new GridLength(32) }); card.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1,GridUnitType.Star) }); card.RowDefinitions.Add(new RowDefinition { Height = new GridLength(44) });
+                Border lip = new Border { Background = new SolidColorBrush(Color.FromRgb(8,8,10)), CornerRadius = new CornerRadius(5), Margin = new Thickness(2,2,2,5) }; card.Children.Add(lip);
+                if (idx >= 0 && idx < games.Count)
+                {
+                    ConsolePlatformGame game = games[idx];
+                    Border art = new Border { Margin = new Thickness(5), Background = new SolidColorBrush(Color.FromRgb(238,238,232)), BorderBrush = new SolidColorBrush(Color.FromRgb(13,13,15)), BorderThickness = new Thickness(2) };
+                    if (!String.IsNullOrWhiteSpace(game.Cover) && File.Exists(game.Cover)) { try { art.Child = new Image { Source=LoadBitmap(game.Cover), Stretch=Stretch.UniformToFill }; } catch {} }
+                    if (art.Child == null) art.Child = new TextBlock { Text="N64", FontSize=28, FontWeight=FontWeights.Bold, Foreground=new SolidColorBrush(Color.FromRgb(33,34,38)), HorizontalAlignment=HorizontalAlignment.Center, VerticalAlignment=VerticalAlignment.Center };
+                    Grid.SetRow(art,1); card.Children.Add(art);
+                    TextBlock name = new TextBlock { Text=game.Name, FontSize=active?13:10, FontWeight=active?FontWeights.Bold:FontWeights.SemiBold, Foreground=Brushes.White, TextAlignment=TextAlignment.Center, TextWrapping=TextWrapping.Wrap, TextTrimming=TextTrimming.CharacterEllipsis, Margin=new Thickness(4,5,4,0) }; Grid.SetRow(name,2); card.Children.Add(name);
+                }
+                else
+                {
+                    TextBlock empty = new TextBlock { Text=games.Count==0 && slot==center ? "INSERT GAME PAK" : String.Empty, FontSize=16, FontWeight=FontWeights.Bold, Foreground=new SolidColorBrush(Color.FromRgb(190,190,194)), HorizontalAlignment=HorizontalAlignment.Center, VerticalAlignment=VerticalAlignment.Center }; Grid.SetRow(empty,1); card.Children.Add(empty);
+                }
+                frame.Child = card; Grid.SetColumn(frame,slot); carousel.Children.Add(frame);
             }
+            Grid redContent = new Grid(); redContent.RowDefinitions.Add(new RowDefinition { Height = new GridLength(36) }); redContent.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            Border n64Letters = BuildLibraryAlphabetRail(n64LibraryIndex, false); redContent.Children.Add(n64Letters); Grid.SetRow(carousel, 1); redContent.Children.Add(carousel);
+            redBand.Child=redContent; Grid.SetRow(redBand,1); body.Children.Add(redBand);
+
+            Grid lower = new Grid { Background = new LinearGradientBrush(Color.FromRgb(50,51,54), Color.FromRgb(24,25,28), 90) };
+            lower.ColumnDefinitions.Add(new ColumnDefinition { Width=new GridLength(0.34,GridUnitType.Star) }); lower.ColumnDefinitions.Add(new ColumnDefinition { Width=new GridLength(0.32,GridUnitType.Star) }); lower.ColumnDefinitions.Add(new ColumnDefinition { Width=new GridLength(0.34,GridUnitType.Star) });
+            Button pak = CreateN64ConsoleButton("CONTROLLER PAK", "save data", n64Zone==1 && n64UtilityIndex==0, delegate { dashboardSubpage="n64-pak"; page=1; selected=0; RenderPage(); }); lower.Children.Add(pak);
+            StackPanel jewel = new StackPanel { VerticalAlignment=VerticalAlignment.Center, HorizontalAlignment=HorizontalAlignment.Center };
+            StackPanel blocks = new StackPanel { Orientation=Orientation.Horizontal, HorizontalAlignment=HorizontalAlignment.Center };
+            foreach(Color c in new Color[]{Color.FromRgb(34,170,79),Color.FromRgb(238,59,53),Color.FromRgb(248,205,55),Color.FromRgb(52,91,170)}) blocks.Children.Add(new Border{Width=16,Height=16,Margin=new Thickness(2),Background=new SolidColorBrush(c)});
+            jewel.Children.Add(blocks); jewel.Children.Add(new TextBlock { Text="64",FontSize=28,FontWeight=FontWeights.Black,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Center }); Grid.SetColumn(jewel,1); lower.Children.Add(jewel);
+            Button options = CreateN64ConsoleButton("OPTIONS", String.IsNullOrWhiteSpace(settings.emulatorPath)?"emulator setup":"system", n64Zone==1 && n64UtilityIndex==1, delegate { dashboardSubpage="n64-settings"; page=2; selected=0; RenderPage(); }); Grid.SetColumn(options,2); lower.Children.Add(options);
+            Grid.SetRow(lower,2); body.Children.Add(lower);
+            actions.Add(new ConsolePlatformAction{Button=pak,Invoke=delegate{dashboardSubpage="n64-pak";page=1;selected=0;RenderPage();},Name="Controller Pak"});
+            actions.Add(new ConsolePlatformAction{Button=options,Invoke=delegate{dashboardSubpage="n64-settings";page=2;selected=0;RenderPage();},Name="Options"});
+        }
+
+        private Button CreateN64ConsoleButton(string title, string detail, bool active, Action invoke)
+        {
+            Button b = new Button { Margin=new Thickness(30,18,30,18),Background=new SolidColorBrush(active?Color.FromRgb(129,0,0):Color.FromRgb(20,20,23)),BorderBrush=new SolidColorBrush(active?Color.FromRgb(255,255,255):Color.FromRgb(91,92,96)),BorderThickness=new Thickness(active?4:2),RenderTransformOrigin=new Point(0.5,0.5) };
+            StackPanel s=new StackPanel{VerticalAlignment=VerticalAlignment.Center};s.Children.Add(new TextBlock{Text=title,FontSize=17,FontWeight=FontWeights.Bold,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Center});s.Children.Add(new TextBlock{Text=detail,FontSize=10,Foreground=new SolidColorBrush(Color.FromRgb(180,181,185)),HorizontalAlignment=HorizontalAlignment.Center});b.Content=s;b.Click+=delegate{invoke();};return b;
+        }
+
+        private Button CreateN64CartridgeTile(ConsolePlatformGame game, Action invoke)
+        {
+            Button button = new Button { Width = 228, Height = 270, Margin = new Thickness(12), Padding = new Thickness(10), Background = new LinearGradientBrush(Color.FromRgb(73, 74, 79), Color.FromRgb(31, 32, 38), 90), BorderBrush = new SolidColorBrush(Color.FromRgb(231, 187, 38)), BorderThickness = new Thickness(2), RenderTransformOrigin = new Point(0.5, 0.5) };
+            Grid grid = new Grid(); grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(34) }); grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(58) });
+            Border ridge = new Border { Background = new SolidColorBrush(Color.FromRgb(104, 105, 110)), CornerRadius = new CornerRadius(5), Margin = new Thickness(20, 1, 20, 6) }; grid.Children.Add(ridge);
+            Border label = new Border { Margin = new Thickness(12, 8, 12, 8), Background = new SolidColorBrush(Color.FromRgb(233, 231, 218)), BorderBrush = new SolidColorBrush(Color.FromRgb(29, 29, 31)), BorderThickness = new Thickness(2) };
+            if (!String.IsNullOrWhiteSpace(game.Cover) && File.Exists(game.Cover)) { try { label.Child = new Image { Source = LoadBitmap(game.Cover), Stretch = Stretch.UniformToFill }; } catch { } }
+            if (label.Child == null) label.Child = new TextBlock { Text = "NINTENDO\n64", TextAlignment = TextAlignment.Center, FontSize = 28, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(34, 35, 39)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetRow(label, 1); grid.Children.Add(label);
+            TextBlock name = new TextBlock { Text = game.Name, FontSize = 13, FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(6, 5, 6, 0) }; Grid.SetRow(name, 2); grid.Children.Add(name); button.Content = grid; button.Click += delegate { invoke(); }; return button;
+        }
+
+        private Button CreateN64UtilityButton(string title, string detail, Action invoke)
+        {
+            Button b = new Button { Width = 240, Height = 68, Margin = new Thickness(8), Background = new SolidColorBrush(Color.FromRgb(36, 37, 44)), BorderBrush = new SolidColorBrush(Color.FromRgb(232, 188, 39)), BorderThickness = new Thickness(2), RenderTransformOrigin = new Point(0.5, 0.5) };
+            StackPanel s = new StackPanel { VerticalAlignment = VerticalAlignment.Center }; s.Children.Add(new TextBlock { Text = title, FontSize = 16, FontWeight = FontWeights.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center }); s.Children.Add(new TextBlock { Text = detail, FontSize = 10, Foreground = new SolidColorBrush(Color.FromRgb(197, 198, 205)), HorizontalAlignment = HorizontalAlignment.Center }); b.Content = s; b.Click += delegate { invoke(); }; return b;
+        }
+
+        private void RenderGameCubeHub()
+        {
+            titleText.Text = String.Empty; subtitleText.Text = String.Empty;
+            Grid stage = new Grid { Margin=new Thickness(12,0,12,0) }; contentHost.Children.Add(stage);
+            Viewport3D viewport = new Viewport3D { HorizontalAlignment=HorizontalAlignment.Stretch, VerticalAlignment=VerticalAlignment.Stretch };
+            PerspectiveCamera camera = new PerspectiveCamera { Position=new Point3D(0,0,5.3), LookDirection=new Vector3D(0,0,-5.3), UpDirection=new Vector3D(0,1,0), FieldOfView=44 }; viewport.Camera=camera;
+            Model3DGroup models = new Model3DGroup(); models.Children.Add(new AmbientLight(Color.FromRgb(130,120,180))); models.Children.Add(new DirectionalLight(Color.FromRgb(215,210,255),new Vector3D(-0.5,-0.4,-1)));
+            models.Children.Add(CreateGameCubeFace("GAME PLAY", "Game Disc", "front"));
+            models.Children.Add(CreateGameCubeFace("CALENDAR", DateTime.Now.ToString("MMM d  yyyy",CultureInfo.CurrentCulture), "right"));
+            models.Children.Add(CreateGameCubeFace("MEMORY CARD", "Slot A / Slot B", "bottom"));
+            models.Children.Add(CreateGameCubeFace("OPTIONS", "System / Emulator", "left"));
+            models.Children.Add(CreateGameCubeFace("NINTENDO GAMECUBE", "", "top"));
+            models.Children.Add(CreateGameCubeFace("HUYMAIER", "", "back"));
+            QuaternionRotation3D rotation = new QuaternionRotation3D();
+            Quaternion target = GetGameCubeQuaternion(page);
+            Quaternion start = gameCubePreviousPage >= 0 ? GetGameCubeQuaternion(gameCubePreviousPage) : target;
+            rotation.Quaternion=start;
+            RotateTransform3D rotate = new RotateTransform3D(rotation);
+            Transform3DGroup cubeTransforms = new Transform3DGroup();
+            cubeTransforms.Children.Add(new ScaleTransform3D(settings.gameCubeScale, settings.gameCubeScale, settings.gameCubeScale));
+            cubeTransforms.Children.Add(rotate);
+            models.Transform=cubeTransforms;
+            ModelVisual3D visual = new ModelVisual3D { Content=models }; viewport.Children.Add(visual); stage.Children.Add(viewport);
+            if (gameCubePreviousPage >= 0 && gameCubePreviousPage != page)
+            {
+                QuaternionAnimation animation = new QuaternionAnimation(start,target,new Duration(TimeSpan.FromMilliseconds(430))) { AccelerationRatio=0.28, DecelerationRatio=0.32, FillBehavior=FillBehavior.HoldEnd };
+                rotation.BeginAnimation(QuaternionRotation3D.QuaternionProperty,animation,HandoffBehavior.SnapshotAndReplace);
+            }
+            gameCubePreviousPage=-1;
+            Border legend = new Border { VerticalAlignment=VerticalAlignment.Bottom,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,0,0,20),Padding=new Thickness(22,8,22,8),CornerRadius=new CornerRadius(18),Background=new SolidColorBrush(Color.FromArgb(145,12,9,31)) };
+            legend.Child=new TextBlock{Text="D-Pad / Stick rolls the cube     A  Open     B  Back",FontSize=13,Foreground=new SolidColorBrush(Color.FromRgb(218,214,240))};stage.Children.Add(legend);
+        }
+
+        private Quaternion GetGameCubeQuaternion(int index)
+        {
+            if(index==1) return new Quaternion(new Vector3D(0,1,0),-90);
+            if(index==2) return new Quaternion(new Vector3D(1,0,0),-90); // HUYMAIER_GAMECUBE_MEMORY_FACE_V1: Down/page 2 presents the physical bottom Memory Card face.
+            if(index==3) return new Quaternion(new Vector3D(0,1,0),90);
+            return Quaternion.Identity;
+        }
+
+        private GeometryModel3D CreateGameCubeFace(string title, string detail, string face)
+        {
+            Point3D[] p;
+            if(face=="right") p=new[]{new Point3D(1.35,-1.35,1.35),new Point3D(1.35,-1.35,-1.35),new Point3D(1.35,1.35,-1.35),new Point3D(1.35,1.35,1.35)};
+            else if(face=="left") p=new[]{new Point3D(-1.35,-1.35,-1.35),new Point3D(-1.35,-1.35,1.35),new Point3D(-1.35,1.35,1.35),new Point3D(-1.35,1.35,-1.35)};
+            else if(face=="bottom") p=new[]{new Point3D(-1.35,-1.35,-1.35),new Point3D(1.35,-1.35,-1.35),new Point3D(1.35,-1.35,1.35),new Point3D(-1.35,-1.35,1.35)};
+            else if(face=="top") p=new[]{new Point3D(-1.35,1.35,1.35),new Point3D(1.35,1.35,1.35),new Point3D(1.35,1.35,-1.35),new Point3D(-1.35,1.35,-1.35)};
+            else if(face=="back") p=new[]{new Point3D(1.35,-1.35,-1.35),new Point3D(-1.35,-1.35,-1.35),new Point3D(-1.35,1.35,-1.35),new Point3D(1.35,1.35,-1.35)};
+            else p=new[]{new Point3D(-1.35,-1.35,1.35),new Point3D(1.35,-1.35,1.35),new Point3D(1.35,1.35,1.35),new Point3D(-1.35,1.35,1.35)};
+            MeshGeometry3D mesh=new MeshGeometry3D(); foreach(Point3D point in p) mesh.Positions.Add(point); mesh.TextureCoordinates.Add(new Point(0,1));mesh.TextureCoordinates.Add(new Point(1,1));mesh.TextureCoordinates.Add(new Point(1,0));mesh.TextureCoordinates.Add(new Point(0,0)); mesh.TriangleIndices.Add(0);mesh.TriangleIndices.Add(1);mesh.TriangleIndices.Add(2);mesh.TriangleIndices.Add(0);mesh.TriangleIndices.Add(2);mesh.TriangleIndices.Add(3);
+            Grid visual=new Grid{Width=420,Height=420,Background=new SolidColorBrush(Color.FromArgb(118,43,32,93))}; visual.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});visual.RowDefinitions.Add(new RowDefinition{Height=new GridLength(86)});
+            Border inner=new Border{Margin=new Thickness(20),CornerRadius=new CornerRadius(20),BorderBrush=new SolidColorBrush(Color.FromArgb(210,167,153,255)),BorderThickness=new Thickness(5),Background=new LinearGradientBrush(Color.FromArgb(55,164,151,255),Color.FromArgb(42,30,22,71),45)};inner.Child=new TextBlock{Text=title,FontSize=34,FontWeight=FontWeights.SemiBold,Foreground=new SolidColorBrush(Color.FromArgb(235,238,235,255)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,TextAlignment=TextAlignment.Center};visual.Children.Add(inner);
+            TextBlock sub=new TextBlock{Text=detail,FontSize=16,Foreground=new SolidColorBrush(Color.FromArgb(225,205,201,232)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};Grid.SetRow(sub,1);visual.Children.Add(sub);
+            VisualBrush brush=new VisualBrush(visual){Opacity=0.88,Stretch=Stretch.Fill}; MaterialGroup material=new MaterialGroup();material.Children.Add(new DiffuseMaterial(brush));material.Children.Add(new EmissiveMaterial(new SolidColorBrush(Color.FromArgb(58,100,84,210))));
+            GeometryModel3D model=new GeometryModel3D(mesh,material);model.BackMaterial=material;return model;
+        }
+
+        private void AddGameCubeHubNode(Grid hub, string title, string detail, int index, int row, int column, string arrow)
+        {
+            bool active = page == index; Border node = new Border { Width = 310, Height = 128, CornerRadius = new CornerRadius(54), Background = new SolidColorBrush(active ? Color.FromArgb(235, 112, 88, 211) : Color.FromArgb(175, 51, 39, 106)), BorderBrush = new SolidColorBrush(active ? Color.FromRgb(224, 217, 255) : Color.FromRgb(116, 99, 192)), BorderThickness = new Thickness(active ? 5 : 2), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            StackPanel s = new StackPanel { VerticalAlignment = VerticalAlignment.Center }; s.Children.Add(new TextBlock { Text = arrow + "  " + title, FontSize = 22, FontWeight = FontWeights.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center }); s.Children.Add(new TextBlock { Text = detail, FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(214, 210, 235)), HorizontalAlignment = HorizontalAlignment.Center }); node.Child = s; Grid.SetRow(node, row); Grid.SetColumn(node, column); hub.Children.Add(node);
+        }
+
+        private void RenderGameCubeGamePlay()
+        {
+            titleText.Text = "Game Play"; subtitleText.Text = games.Count == 0 ? "No Game Disc / library title detected" : "Select a Game Disc image • LB / RB jumps by first letter";
+            Grid gamePlayBody = new Grid(); gamePlayBody.RowDefinitions.Add(new RowDefinition { Height = new GridLength(38) }); gamePlayBody.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); contentHost.Children.Add(gamePlayBody);
+            Border gcLetters = BuildLibraryAlphabetRail(Math.Max(0, Math.Min(games.Count - 1, selected)), false); gamePlayBody.Children.Add(gcLetters);
+            ScrollViewer scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; WrapPanel wrap = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(20) }; scroll.Content = wrap; Grid.SetRow(scroll, 1); gamePlayBody.Children.Add(scroll);
+            foreach (ConsolePlatformGame game in games) { ConsolePlatformGame captured = game; Button b = CreateGameCubeDiscTile(game, delegate { LaunchGame(captured, false); }); wrap.Children.Add(b); actions.Add(new ConsolePlatformAction { Button = b, Invoke = delegate { LaunchGame(captured, false); }, Name = game.Name, Game = game }); }
+            if (games.Count == 0) { Button add = CreateActionButton("No Game Disc", "Open Options to configure a Dolphin game folder", delegate { page = 3; selected = 0; RenderPage(); }); wrap.Children.Add(add); actions.Add(new ConsolePlatformAction { Button = add, Invoke = delegate { page = 3; selected = 0; RenderPage(); }, Name = "Options" }); }
+        }
+
+        private Button CreateGameCubeDiscTile(ConsolePlatformGame game, Action invoke)
+        {
+            Button b = new Button { Width = 260, Height = 260, Margin = new Thickness(18), Padding = new Thickness(12), Background = new RadialGradientBrush(Color.FromRgb(91, 72, 172), Color.FromRgb(32, 22, 76)), BorderBrush = new SolidColorBrush(Color.FromRgb(169, 153, 255)), BorderThickness = new Thickness(3), RenderTransformOrigin = new Point(0.5, 0.5) };
+            Grid g = new Grid(); System.Windows.Shapes.Ellipse disc = new System.Windows.Shapes.Ellipse { Width = 180, Height = 180, Fill = new RadialGradientBrush(Color.FromRgb(233, 234, 239), Color.FromRgb(92, 94, 109)), Stroke = new SolidColorBrush(Color.FromRgb(245, 245, 250)), StrokeThickness = 2, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }; g.Children.Add(disc);
+            if (!String.IsNullOrWhiteSpace(game.Cover) && File.Exists(game.Cover)) { try { Image art = new Image { Source = LoadBitmap(game.Cover), Width = 136, Height = 136, Stretch = Stretch.UniformToFill, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }; art.Clip = new EllipseGeometry(new Point(68,68),68,68); g.Children.Add(art); } catch { } }
+            Border label = new Border { Height = 54, VerticalAlignment = VerticalAlignment.Bottom, Background = new SolidColorBrush(Color.FromArgb(220, 26, 19, 61)), Padding = new Thickness(8) }; label.Child = new TextBlock { Text = game.Name, FontSize = 13, FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextAlignment = TextAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }; g.Children.Add(label); b.Content = g; b.Click += delegate { invoke(); }; return b;
+        }
+
+        private void RenderGameCubeCalendar()
+        {
+            titleText.Text = "Calendar"; subtitleText.Text = "Internal Clock";
+            Grid panel = new Grid { Margin = new Thickness(110, 36, 110, 50) }; panel.ColumnDefinitions.Add(new ColumnDefinition()); panel.ColumnDefinitions.Add(new ColumnDefinition()); contentHost.Children.Add(panel);
+            Border date = CreateGameCubeClockPanel("DATE", DateTime.Now.ToString("MM / dd / yyyy", CultureInfo.CurrentCulture), DateTime.Now.ToString("dddd", CultureInfo.CurrentCulture)); panel.Children.Add(date);
+            Border time = CreateGameCubeClockPanel("TIME", DateTime.Now.ToString("HH : mm", CultureInfo.CurrentCulture), DateTime.Now.ToString("h:mm:ss tt", CultureInfo.CurrentCulture)); Grid.SetColumn(time, 1); panel.Children.Add(time);
+        }
+
+        private Border CreateGameCubeClockPanel(string heading, string value, string detail)
+        {
+            Border box = new Border { Margin = new Thickness(26), CornerRadius = new CornerRadius(48), Background = new SolidColorBrush(Color.FromArgb(220, 52, 39, 111)), BorderBrush = new SolidColorBrush(Color.FromRgb(150, 130, 240)), BorderThickness = new Thickness(4), Padding = new Thickness(30) };
+            StackPanel s = new StackPanel { VerticalAlignment = VerticalAlignment.Center }; s.Children.Add(new TextBlock { Text = heading, FontSize = 18, Foreground = new SolidColorBrush(Color.FromRgb(205, 199, 238)), HorizontalAlignment = HorizontalAlignment.Center }); s.Children.Add(new TextBlock { Text = value, FontSize = 42, FontWeight = FontWeights.Light, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 20, 0, 12) }); s.Children.Add(new TextBlock { Text = detail, FontSize = 14, Foreground = new SolidColorBrush(Color.FromRgb(213, 209, 236)), HorizontalAlignment = HorizontalAlignment.Center }); box.Child = s; return box;
+        }
+
+        private void RenderWiiMenuAuthentic()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=4;
+            Grid body=new Grid{Margin=new Thickness(34,12,34,0)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(94)});contentHost.Children.Add(body);
+            Grid menuArea=new Grid();menuArea.RowDefinitions.Add(new RowDefinition{Height=new GridLength(34)});menuArea.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});body.Children.Add(menuArea);
+            Border wiiLetters=BuildLibraryAlphabetRail(Math.Max(0,Math.Min(games.Count-1,wiiMenuPage*12+Math.Min(selected,11))),true);menuArea.Children.Add(wiiLetters);
+            UniformGrid channels=new UniformGrid{Columns=4,Rows=3,Margin=new Thickness(6,0,6,10)};Grid.SetRow(channels,1);menuArea.Children.Add(channels);
+            int start=wiiMenuPage*12;int added=0;
+            for(int slot=0;slot<12;slot++)
+            {
+                int idx=start+slot;
+                if(idx<games.Count)
+                {
+                    ConsolePlatformGame game=games[idx];ConsolePlatformGame captured=game;Button tile=CreateWiiChannelTile(game,false,delegate{shellSelectedGame=captured;dashboardSubpage="wii-start";selected=0;RenderPage();});channels.Children.Add(tile);actions.Add(new ConsolePlatformAction{Button=tile,Invoke=delegate{shellSelectedGame=captured;dashboardSubpage="wii-start";selected=0;RenderPage();},Name=game.Name,Game=game});added++;
+                }
+                else if(slot==0 && games.Count==0)
+                {
+                    Button setup=CreateWiiEmptyChannel("Disc Channel","No disc / library configured",delegate{dashboardSubpage="wii-settings";selected=0;RenderPage();});channels.Children.Add(setup);actions.Add(new ConsolePlatformAction{Button=setup,Invoke=delegate{dashboardSubpage="wii-settings";selected=0;RenderPage();},Name="Disc Channel"});added++;
+                }
+                else channels.Children.Add(new Border{Margin=new Thickness(9),CornerRadius=new CornerRadius(13),Background=new LinearGradientBrush(Color.FromRgb(252,253,253),Color.FromRgb(233,238,240),90),BorderBrush=new SolidColorBrush(Color.FromRgb(194,207,211)),BorderThickness=new Thickness(2)});
+            }
+            Grid bottom=new Grid{Margin=new Thickness(4,0,4,0)};bottom.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(220)});bottom.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star)});bottom.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(220)});
+            Button wii=CreateWiiRoundButton("Wii","",delegate{dashboardSubpage="wii-options";selected=0;RenderPage();});wii.Width=148;wii.HorizontalAlignment=HorizontalAlignment.Left;bottom.Children.Add(wii);
+            StackPanel clock=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};clock.Children.Add(new TextBlock{Text=DateTime.Now.ToString("h:mm tt",CultureInfo.CurrentCulture),FontSize=25,Foreground=new SolidColorBrush(Color.FromRgb(87,99,104)),HorizontalAlignment=HorizontalAlignment.Center});clock.Children.Add(new TextBlock{Text=DateTime.Now.ToString("ddd M/d",CultureInfo.CurrentCulture)+"   "+(wiiMenuPage+1).ToString(CultureInfo.InvariantCulture)+"/"+GetWiiMenuPageCount().ToString(CultureInfo.InvariantCulture),FontSize=12,Foreground=new SolidColorBrush(Color.FromRgb(123,134,139)),HorizontalAlignment=HorizontalAlignment.Center});Grid.SetColumn(clock,1);bottom.Children.Add(clock);
+            Button data=CreateWiiRoundButton("✉","Save Data",delegate{dashboardSubpage="wii-data";selected=0;RenderPage();});data.Width=148;data.HorizontalAlignment=HorizontalAlignment.Right;Grid.SetColumn(data,2);bottom.Children.Add(data);Grid.SetRow(bottom,1);body.Children.Add(bottom);
+            actions.Add(new ConsolePlatformAction{Button=wii,Invoke=delegate{dashboardSubpage="wii-options";selected=0;RenderPage();},Name="Wii Options"});actions.Add(new ConsolePlatformAction{Button=data,Invoke=delegate{dashboardSubpage="wii-data";selected=0;RenderPage();},Name="Save Data"});
+            selected=Math.Max(0,Math.Min(actions.Count-1,selected));
+        }
+
+        private Button CreateWiiEmptyChannel(string title,string detail,Action invoke)
+        {
+            Button b=new Button{Margin=new Thickness(9),Background=Brushes.White,BorderBrush=new SolidColorBrush(Color.FromRgb(154,205,219)),BorderThickness=new Thickness(3),RenderTransformOrigin=new Point(0.5,0.5)};StackPanel s=new StackPanel{VerticalAlignment=VerticalAlignment.Center};s.Children.Add(new TextBlock{Text=title,FontSize=22,Foreground=new SolidColorBrush(Color.FromRgb(94,109,115)),HorizontalAlignment=HorizontalAlignment.Center});s.Children.Add(new TextBlock{Text=detail,FontSize=10,Foreground=new SolidColorBrush(Color.FromRgb(132,143,147)),HorizontalAlignment=HorizontalAlignment.Center});b.Content=s;b.Click+=delegate{invoke();};return b;
+        }
+
+        private Button CreateWiiChannelTile(ConsolePlatformGame game, bool discSlot, Action invoke)
+        {
+            Button b = new Button { Margin = new Thickness(10), Background = Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(156, 207, 221)), BorderThickness = new Thickness(3), RenderTransformOrigin = new Point(0.5, 0.5), Padding = new Thickness(0) }; Grid g = new Grid();
+            if (!String.IsNullOrWhiteSpace(game.Cover) && File.Exists(game.Cover)) { try { g.Children.Add(new Image { Source = LoadBitmap(game.Cover), Stretch = Stretch.UniformToFill, Margin = new Thickness(5) }); } catch { } }
+            if (g.Children.Count == 0) g.Children.Add(new TextBlock { Text = discSlot ? "Disc Channel" : "Wii", FontSize = discSlot ? 22 : 30, Foreground = new SolidColorBrush(Color.FromRgb(107, 126, 133)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center });
+            Border caption = new Border { Height = 42, VerticalAlignment = VerticalAlignment.Bottom, Background = new SolidColorBrush(Color.FromArgb(230, 248, 251, 252)), Padding = new Thickness(6) }; caption.Child = new TextBlock { Text = discSlot ? "Disc Channel" : game.Name, FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(70, 87, 94)), HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }; g.Children.Add(caption); b.Content = g; b.Click += delegate { invoke(); }; return b;
+        }
+
+        private Button CreateWiiRoundButton(string title, string detail, Action invoke)
+        {
+            Button b = new Button { Width = 180, Height = 58, Margin = new Thickness(4), Background = new SolidColorBrush(Color.FromRgb(246, 249, 250)), BorderBrush = new SolidColorBrush(Color.FromRgb(142, 201, 219)), BorderThickness = new Thickness(2), RenderTransformOrigin = new Point(0.5,0.5) }; StackPanel s = new StackPanel { VerticalAlignment = VerticalAlignment.Center }; s.Children.Add(new TextBlock { Text = title, FontSize = 19, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(69, 86, 92)), HorizontalAlignment = HorizontalAlignment.Center }); s.Children.Add(new TextBlock { Text = detail, FontSize = 9, Foreground = new SolidColorBrush(Color.FromRgb(115, 131, 137)), HorizontalAlignment = HorizontalAlignment.Center }); b.Content = s; b.Click += delegate { invoke(); }; return b;
+        }
+
+        private void RenderWiiChannelStart()
+        {
+            titleText.Text = String.Empty; subtitleText.Text = String.Empty; Grid body = new Grid { Margin = new Thickness(90, 22, 90, 24), Background = Brushes.White }; body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(90) }); contentHost.Children.Add(body);
+            Grid preview = new Grid { Margin = new Thickness(40, 18, 40, 18) }; if (shellSelectedGame != null && !String.IsNullOrWhiteSpace(shellSelectedGame.Cover) && File.Exists(shellSelectedGame.Cover)) { try { preview.Children.Add(new Image { Source = LoadBitmap(shellSelectedGame.Cover), Stretch = Stretch.Uniform }); } catch { } } if (preview.Children.Count == 0) preview.Children.Add(new TextBlock { Text = shellSelectedGame == null ? "Wii" : shellSelectedGame.Name, FontSize = 42, Foreground = new SolidColorBrush(Color.FromRgb(86, 102, 108)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }); body.Children.Add(preview);
+            Grid buttons = new Grid { Margin = new Thickness(60, 8, 60, 8) }; buttons.ColumnDefinitions.Add(new ColumnDefinition()); buttons.ColumnDefinitions.Add(new ColumnDefinition()); Button back = CreateWiiRoundButton("Wii Menu", "Back", delegate { dashboardSubpage = String.Empty; shellSelectedGame = null; selected = 0; RenderPage(); }); back.Width = 300; buttons.Children.Add(back); Button start = CreateWiiRoundButton("Start", shellSelectedGame == null ? "No title" : shellSelectedGame.Name, delegate { if (shellSelectedGame != null) LaunchGame(shellSelectedGame, false); }); start.Width = 300; Grid.SetColumn(start, 1); buttons.Children.Add(start); Grid.SetRow(buttons, 1); body.Children.Add(buttons); actions.Add(new ConsolePlatformAction { Button = back, Invoke = delegate { dashboardSubpage = String.Empty; shellSelectedGame = null; selected = 0; RenderPage(); }, Name = "Wii Menu" }); actions.Add(new ConsolePlatformAction { Button = start, Invoke = delegate { if (shellSelectedGame != null) LaunchGame(shellSelectedGame, false); }, Name = "Start", Game = shellSelectedGame });
+        }
+
+        private void RenderWiiOptions()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;
+            Grid shell=new Grid{Margin=new Thickness(0)};shell.RowDefinitions.Add(new RowDefinition{Height=new GridLength(66)});shell.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});shell.RowDefinitions.Add(new RowDefinition{Height=new GridLength(72)});contentHost.Children.Add(shell);
+            Border top=new Border{Background=new LinearGradientBrush(Color.FromRgb(20,20,22),Color.FromRgb(3,3,4),90),BorderBrush=new SolidColorBrush(Color.FromRgb(220,220,220)),BorderThickness=new Thickness(0,0,0,2),Child=new TextBlock{Text="Wii",FontSize=28,FontWeight=FontWeights.Bold,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,32,0)}};shell.Children.Add(top);
+            Border middle=new Border{Background=new LinearGradientBrush(Color.FromRgb(67,67,69),Color.FromRgb(44,44,46),90),BorderBrush=new SolidColorBrush(Color.FromRgb(175,175,177)),BorderThickness=new Thickness(0,1,0,1)};Grid.SetRow(middle,1);shell.Children.Add(middle);
+            Grid choices=new Grid{Margin=new Thickness(120,70,120,70)};choices.ColumnDefinitions.Add(new ColumnDefinition());choices.ColumnDefinitions.Add(new ColumnDefinition());middle.Child=choices;
+            Button data=CreateWiiOptionPanel("▣","Data Management","Save Data",delegate{dashboardSubpage="wii-data";selected=0;RenderPage();});choices.Children.Add(data);actions.Add(new ConsolePlatformAction{Button=data,Invoke=delegate{dashboardSubpage="wii-data";selected=0;RenderPage();},Name="Data Management"});
+            Button settingsButton=CreateWiiOptionPanel("🔧","Wii Settings","Emulator / library / display",delegate{dashboardSubpage="wii-settings";selected=0;RenderPage();});Grid.SetColumn(settingsButton,1);choices.Children.Add(settingsButton);actions.Add(new ConsolePlatformAction{Button=settingsButton,Invoke=delegate{dashboardSubpage="wii-settings";selected=0;RenderPage();},Name="Wii Settings"});
+            Border bottom=new Border{Background=new LinearGradientBrush(Color.FromRgb(13,13,14),Color.FromRgb(2,2,3),90)};Button back=CreateWiiRoundButton("Back","Wii Menu",delegate{dashboardSubpage=String.Empty;selected=0;RenderPage();});back.Width=185;back.HorizontalAlignment=HorizontalAlignment.Left;back.Margin=new Thickness(44,7,0,7);bottom.Child=back;Grid.SetRow(bottom,2);shell.Children.Add(bottom);actions.Add(new ConsolePlatformAction{Button=back,Invoke=delegate{dashboardSubpage=String.Empty;selected=0;RenderPage();},Name="Back"});
+        }
+
+        private Button CreateWiiOptionPanel(string glyph,string title,string detail,Action invoke)
+        {
+            Button b=new Button{Margin=new Thickness(35),Background=new LinearGradientBrush(Color.FromRgb(249,251,252),Color.FromRgb(217,224,228),90),BorderBrush=new SolidColorBrush(Color.FromRgb(74,193,225)),BorderThickness=new Thickness(4),RenderTransformOrigin=new Point(0.5,0.5)};StackPanel s=new StackPanel{VerticalAlignment=VerticalAlignment.Center};s.Children.Add(new TextBlock{Text=glyph,FontSize=62,Foreground=new SolidColorBrush(Color.FromRgb(130,139,144)),HorizontalAlignment=HorizontalAlignment.Center});s.Children.Add(new TextBlock{Text=title,FontSize=24,Foreground=new SolidColorBrush(Color.FromRgb(86,96,101)),HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,14,0,4)});s.Children.Add(new TextBlock{Text=detail,FontSize=11,Foreground=new SolidColorBrush(Color.FromRgb(121,132,137)),HorizontalAlignment=HorizontalAlignment.Center});b.Content=s;b.Click+=delegate{invoke();};return b;
+        }
+
+        private void RenderWiiUMenuAuthentic()
+        {
+            titleText.Text = "Wii U Menu"; subtitleText.Text = "WaraWara Plaza  •  " + games.Count.ToString(CultureInfo.InvariantCulture) + " software titles"; columns = 5;
+            Grid body = new Grid { Margin = new Thickness(42, 2, 42, 8) }; body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(78) }); contentHost.Children.Add(body);
+            Grid plaza = new Grid(); for (int i = 0; i < 18; i++) { System.Windows.Shapes.Ellipse bubble = new System.Windows.Shapes.Ellipse { Width = 74 + (i % 4) * 18, Height = 48 + (i % 3) * 12, Fill = new SolidColorBrush(Color.FromArgb(35, 35, 158, 205)), HorizontalAlignment = (i % 2 == 0) ? HorizontalAlignment.Left : HorizontalAlignment.Right, VerticalAlignment = (i % 3 == 0) ? VerticalAlignment.Top : VerticalAlignment.Bottom, Margin = new Thickness(20 + (i * 71) % 460, 12 + (i * 47) % 210, 20 + (i * 29) % 320, 12 + (i * 31) % 160) }; plaza.Children.Add(bubble); }
+            UniformGrid icons = new UniformGrid { Columns = 5, Rows = 3, Margin = new Thickness(18, 18, 18, 18) }; plaza.Children.Add(icons); body.Children.Add(plaza);
+            int start = wiiUMenuPage * 15;
+            for (int slot = 0; slot < 15; slot++)
+            {
+                int idx = start + slot;
+                if (idx < games.Count) { ConsolePlatformGame game = games[idx]; ConsolePlatformGame captured = game; Button icon = CreateWiiUSoftwareIcon(game, delegate { LaunchGame(captured, false); }); icons.Children.Add(icon); actions.Add(new ConsolePlatformAction { Button = icon, Invoke = delegate { LaunchGame(captured, false); }, Name = game.Name, Game = game }); }
+                else icons.Children.Add(new Border { Margin = new Thickness(11), CornerRadius = new CornerRadius(16), Background = new SolidColorBrush(Color.FromArgb(120, 255, 255, 255)), BorderBrush = new SolidColorBrush(Color.FromArgb(100, 36, 160, 206)), BorderThickness = new Thickness(1) });
+            }
+            StackPanel sys = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }; Button data = CreateWiiURoundSystemButton("Data Management", delegate { dashboardSubpage = "wiiu-data"; page = 1; selected = 0; RenderWiiUDataManagement(FindSaveRoots()); UpdateActionVisuals(); }); Button settingsButton = CreateWiiURoundSystemButton("System Settings", delegate { dashboardSubpage = "wiiu-settings"; page = 2; selected = 0; contentHost.Children.Clear(); actions.Clear(); RenderWiiUSettings(); UpdateActionVisuals(); }); sys.Children.Add(data); sys.Children.Add(settingsButton); Grid.SetRow(sys,1); body.Children.Add(sys); actions.Add(new ConsolePlatformAction { Button=data, Invoke=delegate { dashboardSubpage="wiiu-data"; page=1; selected=0; contentHost.Children.Clear(); actions.Clear(); RenderWiiUDataManagement(FindSaveRoots()); UpdateActionVisuals(); }, Name="Data Management" }); actions.Add(new ConsolePlatformAction { Button=settingsButton, Invoke=delegate { dashboardSubpage="wiiu-settings"; page=2; selected=0; contentHost.Children.Clear(); actions.Clear(); RenderWiiUSettings(); UpdateActionVisuals(); }, Name="System Settings" }); selected=Math.Max(0,Math.Min(actions.Count-1,selected));
+        }
+
+        private Button CreateWiiUSoftwareIcon(ConsolePlatformGame game, Action invoke)
+        {
+            Button b = new Button { Margin = new Thickness(11), Background = new SolidColorBrush(Color.FromArgb(245,255,255,255)), BorderBrush = new SolidColorBrush(Color.FromRgb(79, 183, 217)), BorderThickness = new Thickness(2), RenderTransformOrigin = new Point(0.5,0.5), Padding = new Thickness(0) }; Grid g = new Grid(); if (!String.IsNullOrWhiteSpace(game.Cover) && File.Exists(game.Cover)) { try { g.Children.Add(new Image { Source=LoadBitmap(game.Cover), Stretch=Stretch.UniformToFill, Margin=new Thickness(5) }); } catch {} } if (g.Children.Count==0) g.Children.Add(new TextBlock { Text="Wii U", FontSize=26, Foreground=new SolidColorBrush(Color.FromRgb(28,145,190)), HorizontalAlignment=HorizontalAlignment.Center, VerticalAlignment=VerticalAlignment.Center }); Border cap=new Border { Height=38, VerticalAlignment=VerticalAlignment.Bottom, Background=new SolidColorBrush(Color.FromArgb(235,250,253,255)), Padding=new Thickness(5) }; cap.Child=new TextBlock { Text=game.Name, FontSize=10, FontWeight=FontWeights.SemiBold, Foreground=new SolidColorBrush(Color.FromRgb(57,75,82)), TextTrimming=TextTrimming.CharacterEllipsis, HorizontalAlignment=HorizontalAlignment.Center }; g.Children.Add(cap); b.Content=g; b.Click+=delegate { invoke(); }; return b;
+        }
+
+        private Button CreateWiiURoundSystemButton(string text, Action invoke)
+        {
+            Button b = new Button { MinWidth=230, Height=58, Margin=new Thickness(12,4,12,4), Background=Brushes.White, BorderBrush=new SolidColorBrush(Color.FromRgb(44,163,205)), BorderThickness=new Thickness(2), RenderTransformOrigin=new Point(0.5,0.5), Content=new TextBlock { Text=text, FontSize=16, Foreground=new SolidColorBrush(Color.FromRgb(53,79,88)), HorizontalAlignment=HorizontalAlignment.Center } }; b.Click+=delegate { invoke(); }; return b;
+        }
+
+        private void RenderSwitchHomeAuthentic()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;switchSoftwareActionCount=0;switchSystemActionStart=0;
+            Grid body=new Grid{Margin=new Thickness(48,18,48,12)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(70)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(108)});contentHost.Children.Add(body);
+            Grid status=new Grid();status.ColumnDefinitions.Add(new ColumnDefinition());status.ColumnDefinitions.Add(new ColumnDefinition());StackPanel user=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};Border avatar=new Border{Width=48,Height=48,CornerRadius=new CornerRadius(24),Background=new SolidColorBrush(Color.FromRgb(230,0,18)),Child=new TextBlock{Text=Environment.UserName.Length>0?Environment.UserName.Substring(0,1).ToUpperInvariant():"U",FontSize=23,FontWeight=FontWeights.Bold,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center}};user.Children.Add(avatar);user.Children.Add(new TextBlock{Text=Environment.UserName,FontSize=16,Foreground=Brushes.White,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(12,0,0,0)});status.Children.Add(user);TextBlock clock=new TextBlock{Text=DateTime.Now.ToString("h:mm tt",CultureInfo.CurrentCulture),FontSize=15,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(clock,1);status.Children.Add(clock);body.Children.Add(status);
+            ScrollViewer scroller=new ScrollViewer{HorizontalScrollBarVisibility=ScrollBarVisibility.Hidden,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,Margin=new Thickness(0,8,0,8)};StackPanel software=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};scroller.Content=software;Grid.SetRow(scroller,1);body.Children.Add(scroller);
+            int visible=Math.Min(12,games.Count);for(int i=0;i<visible;i++){ConsolePlatformGame game=games[i];ConsolePlatformGame captured=game;Button tile=CreateSwitchSoftwareTile(game,delegate{LaunchGame(captured,false);});software.Children.Add(tile);actions.Add(new ConsolePlatformAction{Button=tile,Invoke=delegate{LaunchGame(captured,false);},Name=game.Name,Game=game});}
+            if(games.Count>12){Button all=CreateSwitchSystemTile("ALL","All Software",delegate{dashboardSubpage="switch-all";selected=0;RenderPage();},120);software.Children.Add(all);actions.Add(new ConsolePlatformAction{Button=all,Invoke=delegate{dashboardSubpage="switch-all";selected=0;contentHost.Children.Clear();actions.Clear();RenderSwitchAllSoftware();UpdateActionVisuals();},Name="All Software"});}
+            if(actions.Count==0){Button add=CreateSwitchSystemTile("+","Add Software",delegate{dashboardSubpage="switch-settings";selected=0;RenderPage();},180);software.Children.Add(add);actions.Add(new ConsolePlatformAction{Button=add,Invoke=delegate{dashboardSubpage="switch-settings";selected=0;contentHost.Children.Clear();actions.Clear();RenderSwitchSettings();UpdateActionVisuals();},Name="Add Software"});}
+            switchSoftwareActionCount=actions.Count;switchSystemActionStart=actions.Count;
+            StackPanel system=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};
+            AddSwitchSystemAction(system,"▣","Data Management",delegate{dashboardSubpage="switch-data";selected=0;contentHost.Children.Clear();actions.Clear();RenderSwitchDataManagement(FindSaveRoots());UpdateActionVisuals();});
+            AddSwitchSystemAction(system,"◫","Controllers",delegate{RequestHuymaierPicker("OpenControllerSettings");});
+            AddSwitchSystemAction(system,"⚙","System Settings",delegate{dashboardSubpage="switch-settings";selected=0;contentHost.Children.Clear();actions.Clear();RenderSwitchSettings();UpdateActionVisuals();});
+            AddSwitchSystemAction(system,"↩","Huymaier",delegate{Close();});
+            Grid.SetRow(system,2);body.Children.Add(system);
+            int sysCount=Math.Max(0,actions.Count-switchSystemActionStart);switchSoftwareIndex=Math.Min(Math.Max(0,switchSoftwareActionCount-1),switchSoftwareIndex);switchSystemIndex=Math.Min(Math.Max(0,sysCount-1),switchSystemIndex);selected=switchZone==0?switchSoftwareIndex:Math.Min(actions.Count-1,switchSystemActionStart+switchSystemIndex);
+        }
+
+        private Button CreateSwitchSoftwareTile(ConsolePlatformGame game, Action invoke)
+        {
+            Button b=new Button { Width=244,Height=244,Margin=new Thickness(9),Padding=new Thickness(0),Background=new SolidColorBrush(Color.FromRgb(55,56,61)),BorderBrush=new SolidColorBrush(Color.FromRgb(100,101,106)),BorderThickness=new Thickness(2),RenderTransformOrigin=new Point(0.5,0.5) };Grid g=new Grid();if(!String.IsNullOrWhiteSpace(game.Cover)&&File.Exists(game.Cover)){try{g.Children.Add(new Image{Source=LoadBitmap(game.Cover),Stretch=Stretch.UniformToFill});}catch{}}if(g.Children.Count==0)g.Children.Add(new TextBlock{Text="Nintendo\nSwitch",FontSize=28,Foreground=Brushes.White,TextAlignment=TextAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center});Border cap=new Border{Height=54,VerticalAlignment=VerticalAlignment.Bottom,Background=new SolidColorBrush(Color.FromArgb(225,27,28,31)),Padding=new Thickness(8)};cap.Child=new TextBlock{Text=game.Name,FontSize=12,Foreground=Brushes.White,TextTrimming=TextTrimming.CharacterEllipsis,HorizontalAlignment=HorizontalAlignment.Center};g.Children.Add(cap);b.Content=g;b.Click+=delegate{invoke();};return b;
+        }
+
+        private Button CreateSwitchSystemTile(string glyph,string title,Action invoke,double size)
+        {
+            Button b=new Button{Width=size,Height=size,Margin=new Thickness(8),Background=Brushes.Transparent,BorderBrush=new SolidColorBrush(Color.FromRgb(129,130,135)),BorderThickness=new Thickness(2),RenderTransformOrigin=new Point(0.5,0.5)};StackPanel s=new StackPanel{VerticalAlignment=VerticalAlignment.Center};s.Children.Add(new TextBlock{Text=glyph,FontSize=Math.Max(24,size*0.32),Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Center});s.Children.Add(new TextBlock{Text=title,FontSize=10,Foreground=new SolidColorBrush(Color.FromRgb(216,217,221)),HorizontalAlignment=HorizontalAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis,MaxWidth=Math.Max(60,size-12)});b.Content=s;b.Click+=delegate{invoke();};return b;
+        }
+
+        private void AddSwitchSystemAction(Panel panel,string glyph,string title,Action invoke)
+        {
+            Button b=CreateSwitchSystemTile(glyph,title,invoke,78);panel.Children.Add(b);actions.Add(new ConsolePlatformAction{Button=b,Invoke=invoke,Name=title});
+        }
+
+        private void RenderSwitchAllSoftware()
+        {
+            titleText.Text="All Software";subtitleText.Text=games.Count.ToString(CultureInfo.InvariantCulture)+" titles";columns=6;ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};WrapPanel wrap=new WrapPanel{Margin=new Thickness(10)};scroll.Content=wrap;contentHost.Children.Add(scroll);foreach(ConsolePlatformGame game in games){ConsolePlatformGame captured=game;Button b=CreateGameButton(game,delegate{LaunchGame(captured,false);});wrap.Children.Add(b);actions.Add(new ConsolePlatformAction{Button=b,Invoke=delegate{LaunchGame(captured,false);},Name=game.Name,Game=game});}
+        }
+
+
+        private Button CreateWave1Tile(string title, string detail, string glyph, Brush background, Brush foreground, Action invoke, double width, double height)
+        {
+            Button b = new Button { Width=width, Height=height, Margin=new Thickness(10), Padding=new Thickness(10), Background=background, BorderBrush=new SolidColorBrush(Color.FromArgb(130,255,255,255)), BorderThickness=new Thickness(2), RenderTransformOrigin=new Point(0.5,0.5) };
+            StackPanel s = new StackPanel { VerticalAlignment=VerticalAlignment.Center };
+            s.Children.Add(new TextBlock { Text=glyph, FontSize=Math.Max(24,height*0.22), FontWeight=FontWeights.Light, Foreground=foreground, HorizontalAlignment=HorizontalAlignment.Center });
+            s.Children.Add(new TextBlock { Text=title, FontSize=15, FontWeight=FontWeights.SemiBold, Foreground=foreground, HorizontalAlignment=HorizontalAlignment.Center, TextAlignment=TextAlignment.Center, TextWrapping=TextWrapping.Wrap });
+            if(!String.IsNullOrWhiteSpace(detail)) s.Children.Add(new TextBlock { Text=detail, FontSize=10, Foreground=foreground, Opacity=0.75, HorizontalAlignment=HorizontalAlignment.Center, TextAlignment=TextAlignment.Center, TextTrimming=TextTrimming.CharacterEllipsis, MaxWidth=Math.Max(80,width-20) });
+            b.Content=s; b.Click+=delegate{invoke();}; return b;
+        }
+
+        private void AddWave1Action(Panel panel, Button button, string name, Action invoke, ConsolePlatformGame game)
+        {
+            panel.Children.Add(button); actions.Add(new ConsolePlatformAction { Button=button, Name=name, Invoke=invoke, Game=game });
+        }
+
+        private void OpenWave1Subpage(string name)
+        {
+            dashboardSubpage=name; selected=0; shellSelectedGame=null; RenderPage();
+        }
+
+        private void Render3dsHome()
+        {
+            titleText.Text=String.Empty; subtitleText.Text=String.Empty; columns=6;
+            Grid body=new Grid{Margin=new Thickness(28,0,28,8)}; body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(0.38,GridUnitType.Star)}); body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(0.62,GridUnitType.Star)}); contentHost.Children.Add(body);
+            Border top=new Border{CornerRadius=new CornerRadius(12),Margin=new Thickness(90,0,90,8),Background=new LinearGradientBrush(Color.FromRgb(236,240,243),Color.FromRgb(205,215,224),90),BorderBrush=new SolidColorBrush(Color.FromRgb(169,181,191)),BorderThickness=new Thickness(2)};
+            Grid topInner=new Grid(); topInner.Children.Add(new TextBlock{Text=DateTime.Now.ToString("h:mm",CultureInfo.CurrentCulture),FontSize=54,FontWeight=FontWeights.Light,Foreground=new SolidColorBrush(Color.FromRgb(71,80,88)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,0,22)}); topInner.Children.Add(new TextBlock{Text=DateTime.Now.ToString("dddd, MMMM d",CultureInfo.CurrentCulture),FontSize=16,Foreground=new SolidColorBrush(Color.FromRgb(93,106,116)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Bottom,Margin=new Thickness(0,0,0,24)}); top.Child=topInner; body.Children.Add(top);
+            Border bottom=new Border{CornerRadius=new CornerRadius(14),Background=new SolidColorBrush(Color.FromRgb(248,249,250)),BorderBrush=new SolidColorBrush(Color.FromRgb(174,186,194)),BorderThickness=new Thickness(2),Padding=new Thickness(18)}; Grid.SetRow(bottom,1); body.Children.Add(bottom);
+            ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled}; WrapPanel wrap=new WrapPanel(); scroll.Content=wrap; bottom.Child=scroll;
+            int shown=Math.Min(games.Count,18); for(int i=0;i<shown;i++){ConsolePlatformGame game=games[i];ConsolePlatformGame captured=game;Button tile=CreateWave1GameIcon(game,"3DS",Color.FromRgb(72,148,203),145,120,delegate{LaunchGame(captured,false);});AddWave1Action(wrap,tile,game.Name,delegate{LaunchGame(captured,false);},game);}
+            Button library=CreateWave1Tile("Software Library",games.Count+" titles","▦",new SolidColorBrush(Color.FromRgb(91,168,219)),Brushes.White,delegate{OpenWave1Subpage("library");},145,120);AddWave1Action(wrap,library,"Software Library",delegate{OpenWave1Subpage("library");},null);
+            Button data=CreateWave1Tile("Data Management","saves and installed data","▣",new SolidColorBrush(Color.FromRgb(239,157,56)),Brushes.White,delegate{OpenWave1Subpage("saves");},145,120);AddWave1Action(wrap,data,"Data Management",delegate{OpenWave1Subpage("saves");},null);
+            Button system=CreateWave1Tile("System Settings","Azahar + Huymaier","⚙",new SolidColorBrush(Color.FromRgb(91,101,111)),Brushes.White,delegate{OpenWave1Subpage("settings");},145,120);AddWave1Action(wrap,system,"System Settings",delegate{OpenWave1Subpage("settings");},null);
+        }
+
+        private Button CreateWave1GameIcon(ConsolePlatformGame game,string fallbackText,Color accent,double width,double height,Action invoke)
+        {
+            Button b=new Button{Width=width,Height=height,Margin=new Thickness(10),Padding=new Thickness(3),Background=Brushes.White,BorderBrush=new SolidColorBrush(accent),BorderThickness=new Thickness(2),RenderTransformOrigin=new Point(0.5,0.5)};Grid g=new Grid();
+            if(!String.IsNullOrWhiteSpace(game.Cover)&&File.Exists(game.Cover)){try{g.Children.Add(new Image{Source=LoadBitmap(game.Cover),Stretch=Stretch.UniformToFill});}catch{}}
+            if(g.Children.Count==0)g.Children.Add(new TextBlock{Text=fallbackText,FontSize=22,FontWeight=FontWeights.Bold,Foreground=new SolidColorBrush(accent),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center});
+            Border cap=new Border{Height=30,VerticalAlignment=VerticalAlignment.Bottom,Background=new SolidColorBrush(Color.FromArgb(225,250,251,252)),Padding=new Thickness(4)};cap.Child=new TextBlock{Text=game.Name,FontSize=9,Foreground=new SolidColorBrush(Color.FromRgb(50,58,64)),TextTrimming=TextTrimming.CharacterEllipsis,HorizontalAlignment=HorizontalAlignment.Center};g.Children.Add(cap);b.Content=g;b.Click+=delegate{invoke();};return b;
+        }
+
+        private void RenderDsMenu()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=2;Grid body=new Grid{Margin=new Thickness(120,0,120,6)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(0.48,GridUnitType.Star)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(0.52,GridUnitType.Star)});contentHost.Children.Add(body);
+            Border top=new Border{Margin=new Thickness(20,0,20,8),CornerRadius=new CornerRadius(10),Background=Brushes.White,BorderBrush=new SolidColorBrush(Color.FromRgb(158,178,193)),BorderThickness=new Thickness(2)};Grid tg=new Grid();tg.ColumnDefinitions.Add(new ColumnDefinition());tg.ColumnDefinitions.Add(new ColumnDefinition());TextBlock clock=new TextBlock{Text=DateTime.Now.ToString("h:mm tt",CultureInfo.CurrentCulture),FontSize=40,Foreground=new SolidColorBrush(Color.FromRgb(70,85,97)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};tg.Children.Add(clock);TextBlock date=new TextBlock{Text=DateTime.Now.ToString("MMM\ndd",CultureInfo.CurrentCulture).ToUpperInvariant(),FontSize=30,TextAlignment=TextAlignment.Center,Foreground=new SolidColorBrush(Color.FromRgb(73,137,190)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(date,1);tg.Children.Add(date);top.Child=tg;body.Children.Add(top);
+            UniformGrid menu=new UniformGrid{Columns=2,Rows=2,Margin=new Thickness(20,8,20,0)};Grid.SetRow(menu,1);body.Children.Add(menu);
+            Action openLibrary=delegate{OpenWave1Subpage("library");};Action openSaves=delegate{OpenWave1Subpage("saves");};Action openSettings=delegate{OpenWave1Subpage("settings");};Action quickGame=delegate{if(games.Count>0)LaunchGame(games[0],false);else OpenWave1Subpage("settings");};
+            Button game=CreateWave1Tile("DS Game Card",games.Count>0?games[0].Name:"No game card library configured","▣",new SolidColorBrush(Color.FromRgb(224,236,245)),new SolidColorBrush(Color.FromRgb(57,81,99)),quickGame,300,115);AddWave1Action(menu,game,"DS Game Card",quickGame,games.Count>0?games[0]:null);
+            Button library=CreateWave1Tile("Game Library",games.Count+" titles","▦",new SolidColorBrush(Color.FromRgb(224,236,245)),new SolidColorBrush(Color.FromRgb(57,81,99)),openLibrary,300,115);AddWave1Action(menu,library,"Game Library",openLibrary,null);
+            Button saves=CreateWave1Tile("Saved Data","manage DS saves","▤",new SolidColorBrush(Color.FromRgb(224,236,245)),new SolidColorBrush(Color.FromRgb(57,81,99)),openSaves,300,115);AddWave1Action(menu,saves,"Saved Data",openSaves,null);
+            Button settingsButton=CreateWave1Tile("Settings","melonDS and system options","⚙",new SolidColorBrush(Color.FromRgb(224,236,245)),new SolidColorBrush(Color.FromRgb(57,81,99)),openSettings,300,115);AddWave1Action(menu,settingsButton,"Settings",openSettings,null);
+        }
+
+        private void RenderDsiMenu()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=5;Grid body=new Grid{Margin=new Thickness(48,0,48,8)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(0.39,GridUnitType.Star)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(0.61,GridUnitType.Star)});contentHost.Children.Add(body);
+            Border top=new Border{Margin=new Thickness(100,0,100,10),CornerRadius=new CornerRadius(12),Background=new LinearGradientBrush(Color.FromRgb(245,246,248),Color.FromRgb(217,225,230),90),BorderBrush=new SolidColorBrush(Color.FromRgb(175,188,196)),BorderThickness=new Thickness(2)};Grid info=new Grid();info.Children.Add(new TextBlock{Text="Nintendo DSi",FontSize=31,FontWeight=FontWeights.Light,Foreground=new SolidColorBrush(Color.FromRgb(80,89,96)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center});info.Children.Add(new TextBlock{Text=DateTime.Now.ToString("M/d/yyyy   h:mm tt",CultureInfo.CurrentCulture),FontSize=14,Foreground=new SolidColorBrush(Color.FromRgb(93,107,116)),HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Top,Margin=new Thickness(0,16,20,0)});top.Child=info;body.Children.Add(top);
+            Border lower=new Border{CornerRadius=new CornerRadius(12),Background=Brushes.White,BorderBrush=new SolidColorBrush(Color.FromRgb(184,194,201)),BorderThickness=new Thickness(2),Padding=new Thickness(18)};Grid.SetRow(lower,1);body.Children.Add(lower);ScrollViewer sc=new ScrollViewer{HorizontalScrollBarVisibility=ScrollBarVisibility.Hidden,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled};StackPanel ribbon=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};sc.Content=ribbon;lower.Child=sc;
+            foreach(ConsolePlatformGame game in games.Take(16)){ConsolePlatformGame captured=game;Button tile=CreateWave1GameIcon(game,"DSi",Color.FromRgb(67,181,222),155,155,delegate{LaunchGame(captured,false);});AddWave1Action(ribbon,tile,game.Name,delegate{LaunchGame(captured,false);},game);}
+            Action lib=delegate{OpenWave1Subpage("library");};Action saves=delegate{OpenWave1Subpage("saves");};Action set=delegate{OpenWave1Subpage("settings");};
+            Button l=CreateWave1Tile("Software",games.Count+" titles","▦",new SolidColorBrush(Color.FromRgb(224,242,249)),new SolidColorBrush(Color.FromRgb(53,105,129)),lib,155,155);AddWave1Action(ribbon,l,"Software",lib,null);
+            Button d=CreateWave1Tile("Data Management","saves / NAND data","▤",new SolidColorBrush(Color.FromRgb(224,242,249)),new SolidColorBrush(Color.FromRgb(53,105,129)),saves,155,155);AddWave1Action(ribbon,d,"Data Management",saves,null);
+            Button s=CreateWave1Tile("System Settings","melonDS DSi","⚙",new SolidColorBrush(Color.FromRgb(224,242,249)),new SolidColorBrush(Color.FromRgb(53,105,129)),set,155,155);AddWave1Action(ribbon,s,"System Settings",set,null);
+        }
+
+        private void RenderDreamcastMenu()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=2;Grid body=new Grid{Margin=new Thickness(150,18,150,18)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(64)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);
+            TextBlock date=new TextBlock{Text=DateTime.Now.ToString("M/d/yyyy  HH:mm",CultureInfo.CurrentCulture),FontSize=19,Foreground=new SolidColorBrush(Color.FromRgb(57,65,73)),HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center};body.Children.Add(date);
+            UniformGrid grid=new UniformGrid{Columns=2,Rows=2};Grid.SetRow(grid,1);body.Children.Add(grid);
+            Action play=delegate{OpenWave1Subpage("library");};Action file=delegate{OpenWave1Subpage("saves");};Action music=delegate{OpenWave1Subpage("music");};Action settingsAction=delegate{OpenWave1Subpage("settings");};
+            Button p=CreateDreamcastMenuTile("Play",games.Count+" games","◉",Color.FromRgb(230,151,92),play);AddWave1Action(grid,p,"Play",play,null);
+            Button f=CreateDreamcastMenuTile("File","VMU / saved data","▯",Color.FromRgb(74,190,148),file);AddWave1Action(grid,f,"File",file,null);
+            Button m=CreateDreamcastMenuTile("Music","dashboard audio","♪",Color.FromRgb(67,174,224),music);AddWave1Action(grid,m,"Music",music,null);
+            Button s=CreateDreamcastMenuTile("Settings",definition.PrimaryBackend,"◷",Color.FromRgb(222,105,184),settingsAction);AddWave1Action(grid,s,"Settings",settingsAction,null);
+        }
+
+        private Button CreateDreamcastMenuTile(string title,string detail,string glyph,Color color,Action invoke)
+        {
+            Button b=new Button{Margin=new Thickness(24),Background=Brushes.Transparent,BorderThickness=new Thickness(0),RenderTransformOrigin=new Point(0.5,0.5)};StackPanel panel=new StackPanel{VerticalAlignment=VerticalAlignment.Center};Border icon=new Border{Width=150,Height=118,CornerRadius=new CornerRadius(60),Background=new SolidColorBrush(Color.FromArgb(150,color.R,color.G,color.B)),BorderBrush=new SolidColorBrush(color),BorderThickness=new Thickness(5),HorizontalAlignment=HorizontalAlignment.Center,Child=new TextBlock{Text=glyph,FontSize=58,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center}};panel.Children.Add(icon);Border label=new Border{MinWidth=180,Height=44,CornerRadius=new CornerRadius(22),Background=new SolidColorBrush(color),Margin=new Thickness(0,-4,0,0),HorizontalAlignment=HorizontalAlignment.Center,Child=new TextBlock{Text=title,FontSize=25,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center}};panel.Children.Add(label);panel.Children.Add(new TextBlock{Text=detail,FontSize=10,Foreground=new SolidColorBrush(Color.FromRgb(55,72,86)),HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,5,0,0)});b.Content=panel;b.Click+=delegate{invoke();};return b;
+        }
+
+        private void RenderSaturnMenu()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=2;Grid body=new Grid{Margin=new Thickness(140,24,140,20)};contentHost.Children.Add(body);System.Windows.Shapes.Ellipse orbit=new System.Windows.Shapes.Ellipse{Stroke=new SolidColorBrush(Color.FromArgb(90,92,202,255)),StrokeThickness=5,Margin=new Thickness(50)};body.Children.Add(orbit);UniformGrid grid=new UniformGrid{Columns=2,Rows=2,Margin=new Thickness(90,50,90,50)};body.Children.Add(grid);
+            Action app=delegate{OpenWave1Subpage("library");};Action cd=delegate{OpenWave1Subpage("music");};Action memory=delegate{OpenWave1Subpage("saves");};Action settingsAction=delegate{OpenWave1Subpage("settings");};
+            Button a=CreateSaturnOrb("Start Application",games.Count+" discs","▶",Color.FromRgb(34,162,225),app);AddWave1Action(grid,a,"Start Application",app,null);
+            Button c=CreateSaturnOrb("CD Player","audio controls","♪",Color.FromRgb(89,200,198),cd);AddWave1Action(grid,c,"CD Player",cd,null);
+            Button m=CreateSaturnOrb("Memory Manager","backup memory","▣",Color.FromRgb(239,67,129),memory);AddWave1Action(grid,m,"Memory Manager",memory,null);
+            Button s=CreateSaturnOrb("System Settings",definition.PrimaryBackend,"⚙",Color.FromRgb(243,169,61),settingsAction);AddWave1Action(grid,s,"System Settings",settingsAction,null);
+        }
+
+        private Button CreateSaturnOrb(string title,string detail,string glyph,Color color,Action invoke)
+        {
+            Button b=new Button{Margin=new Thickness(24),Background=Brushes.Transparent,BorderThickness=new Thickness(0),RenderTransformOrigin=new Point(0.5,0.5)};StackPanel s=new StackPanel{VerticalAlignment=VerticalAlignment.Center};Border orb=new Border{Width=132,Height=132,CornerRadius=new CornerRadius(66),Background=new RadialGradientBrush(Color.FromArgb(245,(byte)Math.Min(255,color.R+30),(byte)Math.Min(255,color.G+30),(byte)Math.Min(255,color.B+30)),Color.FromArgb(225,(byte)(color.R/2),(byte)(color.G/2),(byte)(color.B/2))),BorderBrush=Brushes.White,BorderThickness=new Thickness(2),HorizontalAlignment=HorizontalAlignment.Center,Child=new TextBlock{Text=glyph,FontSize=48,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center}};s.Children.Add(orb);s.Children.Add(new TextBlock{Text=title,FontSize=18,FontWeight=FontWeights.SemiBold,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,6,0,0)});s.Children.Add(new TextBlock{Text=detail,FontSize=10,Foreground=new SolidColorBrush(Color.FromRgb(188,218,235)),HorizontalAlignment=HorizontalAlignment.Center});b.Content=s;b.Click+=delegate{invoke();};return b;
+        }
+
+        private void ProcessPspXmbCommand(XmbInputCommand command)
+        {
+            string[] categories=new string[]{"Settings","Photo","Music","Video","Game"};
+            if(command==XmbInputCommand.Back){PlayEffect("Back.wav");Close();return;}
+            if(command==XmbInputCommand.Left||command==XmbInputCommand.Right){int next=Math.Max(0,Math.Min(categories.Length-1,pspCategoryIndex+(command==XmbInputCommand.Left?-1:1)));if(next!=pspCategoryIndex){pspCategoryIndex=next;pspItemIndex=0;PlayEffect("Navigate.wav");RenderPage();}return;}
+            List<ConsolePlatformAction> visible=actions;
+            if(command==XmbInputCommand.Up||command==XmbInputCommand.Down){int next=Math.Max(0,Math.Min(Math.Max(0,visible.Count-1),pspItemIndex+(command==XmbInputCommand.Up?-1:1)));if(next!=pspItemIndex){pspItemIndex=next;selected=next;PlayEffect("Navigate.wav");UpdateActionVisuals();}return;}
+            if(command==XmbInputCommand.Confirm&&visible.Count>0){selected=Math.Max(0,Math.Min(visible.Count-1,pspItemIndex));PlayEffect("Confirm.wav");if(visible[selected].Invoke!=null)visible[selected].Invoke();}
+        }
+
+        private void RenderPspXmb()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=1;string[] cats=new string[]{"Settings","Photo","Music","Video","Game"};string[] glyphs=new string[]{"⚙","▧","♪","▶","◉"};pspCategoryIndex=Math.Max(0,Math.Min(cats.Length-1,pspCategoryIndex));
+            Grid body=new Grid{Margin=new Thickness(60,36,60,20)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(180)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);StackPanel categoryRow=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};body.Children.Add(categoryRow);
+            for(int i=0;i<cats.Length;i++){bool active=i==pspCategoryIndex;StackPanel c=new StackPanel{Width=150,Opacity=active?1.0:0.42};c.Children.Add(new TextBlock{Text=glyphs[i],FontSize=active?58:42,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Center});c.Children.Add(new TextBlock{Text=cats[i],FontSize=active?18:13,FontWeight=active?FontWeights.SemiBold:FontWeights.Normal,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Center});categoryRow.Children.Add(c);}
+            StackPanel list=new StackPanel{Margin=new Thickness(310,8,190,0)};Grid.SetRow(list,1);body.Children.Add(list);
+            if(pspCategoryIndex==4){foreach(ConsolePlatformGame game in games){ConsolePlatformGame captured=game;Button b=CreatePspXmbRow(game.Name,"Memory Stick / UMD image",delegate{LaunchGame(captured,false);});list.Children.Add(b);actions.Add(new ConsolePlatformAction{Button=b,Name=game.Name,Game=game,Invoke=delegate{LaunchGame(captured,false);}});}if(games.Count==0)AddPspAction(list,"Game Library","Choose a PSP game folder",delegate{OpenWave1Subpage("settings");});}
+            else if(pspCategoryIndex==0){AddPspAction(list,"PPSSPP Settings","Graphics, audio, controls, networking, system and advanced",delegate{OpenWave1Subpage("settings");});AddPspAction(list,"Saved Data Utility","PSP saved data",delegate{OpenWave1Subpage("saves");});AddPspAction(list,"System Information",definition.PrimaryBackend,delegate{OpenWave1Subpage("info");});}
+            else if(pspCategoryIndex==1){AddPspAction(list,"Photo","No photo folder configured",delegate{OpenWave1Subpage("media");});}
+            else if(pspCategoryIndex==2){AddPspAction(list,"Music",String.IsNullOrWhiteSpace(settings.ambiencePath)?"No music configured":Path.GetFileName(settings.ambiencePath),delegate{OpenWave1Subpage("music");});}
+            else if(pspCategoryIndex==3){AddPspAction(list,"Video","No video folder configured",delegate{OpenWave1Subpage("media");});}
+            pspItemIndex=Math.Max(0,Math.Min(Math.Max(0,actions.Count-1),pspItemIndex));selected=pspItemIndex;
+        }
+
+        private Button CreatePspXmbRow(string title,string detail,Action invoke)
+        {
+            Button b=new Button{Height=72,Margin=new Thickness(0,3,0,3),Padding=new Thickness(18,5,18,5),HorizontalContentAlignment=HorizontalAlignment.Left,Background=new SolidColorBrush(Color.FromArgb(55,255,255,255)),BorderBrush=new SolidColorBrush(Color.FromArgb(90,255,255,255)),BorderThickness=new Thickness(0,0,0,1),RenderTransformOrigin=new Point(0.5,0.5)};StackPanel s=new StackPanel();s.Children.Add(new TextBlock{Text=title,FontSize=19,Foreground=Brushes.White});s.Children.Add(new TextBlock{Text=detail,FontSize=10,Foreground=new SolidColorBrush(Color.FromArgb(190,255,255,255)),TextTrimming=TextTrimming.CharacterEllipsis});b.Content=s;b.Click+=delegate{invoke();};return b;
+        }
+
+        private void AddPspAction(Panel panel,string title,string detail,Action invoke)
+        {
+            Button b=CreatePspXmbRow(title,detail,invoke);panel.Children.Add(b);actions.Add(new ConsolePlatformAction{Button=b,Name=title,Invoke=invoke});
+        }
+
+        private void RenderWave1Subpage()
+        {
+            if(dashboardSubpage=="backend-settings"){RenderBackendSettingsCategories();return;}
+            if(dashboardSubpage=="backend-settings-list"){RenderBackendSettingsList();return;}
+            if(dashboardSubpage=="backend-setting-detail"){RenderBackendSettingDetail();return;}
+            if(dashboardSubpage=="library"){RenderWave1Library();return;}
+            if(dashboardSubpage=="saves"){RenderWave1Storage();return;}
+            if(dashboardSubpage=="music"){RenderWave1Music();return;}
+            if(dashboardSubpage=="media"){RenderWave1Media();return;}
+            if(dashboardSubpage=="info"){RenderWave1Info();return;}
+            RenderWave1Settings();
+        }
+
+        private void RenderWave1Library()
+        {
+            titleText.Text=definition.Shell=="PSP"?"Game":"Software Library";subtitleText.Text=games.Count.ToString(CultureInfo.InvariantCulture)+" titles";columns=6;ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};WrapPanel wrap=new WrapPanel{Margin=new Thickness(12)};scroll.Content=wrap;contentHost.Children.Add(scroll);foreach(ConsolePlatformGame game in games){ConsolePlatformGame captured=game;Button b=CreateGameButton(game,delegate{LaunchGame(captured,false);});wrap.Children.Add(b);actions.Add(new ConsolePlatformAction{Button=b,Invoke=delegate{LaunchGame(captured,false);},Name=game.Name,Game=game});}if(games.Count==0)AddRoundedStorage(wrap,"No software found","Add a game folder from this console's system settings",definition.Accent,delegate{dashboardSubpage="settings";selected=0;RenderPage();});
+        }
+
+        private void RenderWave1Storage()
+        {
+            if (definition.Shell == "PSP") { RenderPspSavedDataUtility(); return; }
+            if (definition.Shell == "Dreamcast") { RenderDreamcastVmuManager(); return; }
+            if (definition.Shell == "Saturn") { RenderSaturnMemoryManager(); return; }
+            if (definition.Shell == "NDS") { RenderDsSavedData(false); return; }
+            if (definition.Shell == "DSI") { RenderDsSavedData(true); return; }
+            if (definition.Shell == "3DS") { Render3dsDataManagement(); return; }
+            titleText.Text="Saved Data"; subtitleText.Text="Native storage view for "+definition.DisplayName;
+            StackPanel panel=new StackPanel{Margin=new Thickness(36,8,36,24)};contentHost.Children.Add(new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=panel});
+            List<string> roots=FindSaveRoots();if(roots.Count==0)AddRoundedStorage(panel,"No saved data detected","Configure the emulator data path in system settings",definition.Accent,delegate{dashboardSubpage="settings";selected=0;RenderPage();});else foreach(string rootPath in roots){string captured=rootPath;AddRoundedStorage(panel,Path.GetFileName(rootPath.TrimEnd(Path.DirectorySeparatorChar)),rootPath,definition.Accent,delegate{BackupNativeSavePath(captured,definition.Id+"-SavedData");});}
+        }
+
+
+        private List<string> GetUniqueExistingPaths(IEnumerable<string> paths)
+        {
+            List<string> result = new List<string>();
+            foreach (string value in paths ?? Enumerable.Empty<string>())
+            {
+                if (String.IsNullOrWhiteSpace(value)) continue;
+                string pathValue = value;
+                try { pathValue = Path.GetFullPath(Environment.ExpandEnvironmentVariables(value)); } catch { }
+                if ((!File.Exists(pathValue) && !Directory.Exists(pathValue)) || result.Contains(pathValue, StringComparer.OrdinalIgnoreCase)) continue;
+                result.Add(pathValue);
+            }
+            return result;
+        }
+
+        private static DateTime GetPathModifiedUtcSafe(string pathValue)
+        {
+            try { return File.Exists(pathValue) ? File.GetLastWriteTime(pathValue) : Directory.GetLastWriteTime(pathValue); } catch { return DateTime.MinValue; }
+        }
+
+        private static string ReadPspSfoString(string sfoPath, string wantedKey)
+        {
+            if (String.IsNullOrWhiteSpace(sfoPath) || !File.Exists(sfoPath) || String.IsNullOrWhiteSpace(wantedKey)) return String.Empty;
+            try
+            {
+                byte[] data = File.ReadAllBytes(sfoPath); if (data.Length < 20) return String.Empty;
+                Func<int, ushort> u16 = delegate(int offset) { return (ushort)(data[offset] | (data[offset + 1] << 8)); };
+                Func<int, uint> u32 = delegate(int offset) { return (uint)(data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24)); };
+                if (u32(0) != 0x46535000) return String.Empty;
+                int keyTable = (int)u32(8); int valueTable = (int)u32(12); int count = (int)u32(16);
+                if (keyTable < 20 || valueTable < keyTable || count < 0 || count > 512) return String.Empty;
+                for (int i = 0; i < count; i++)
+                {
+                    int entry = 20 + i * 16; if (entry + 16 > data.Length) break;
+                    int keyOffset = keyTable + u16(entry); int length = (int)u32(entry + 4); int valueOffset = valueTable + (int)u32(entry + 12);
+                    if (keyOffset < 0 || keyOffset >= data.Length || valueOffset < 0 || valueOffset >= data.Length) continue;
+                    int keyEnd = keyOffset; while (keyEnd < data.Length && data[keyEnd] != 0) keyEnd++;
+                    string key = Encoding.UTF8.GetString(data, keyOffset, Math.Max(0, keyEnd - keyOffset));
+                    if (!String.Equals(key, wantedKey, StringComparison.Ordinal)) continue;
+                    int available = Math.Min(Math.Max(0, length), data.Length - valueOffset); if (available <= 0) return String.Empty;
+                    int end = valueOffset; int limit = valueOffset + available; while (end < limit && data[end] != 0) end++;
+                    return Encoding.UTF8.GetString(data, valueOffset, Math.Max(0, end - valueOffset)).Trim();
+                }
+            }
+            catch { }
+            return String.Empty;
+        }
+
+        private Button CreatePspSaveTile(string title, string subtitle, string iconPath, string detail, Action invoke)
+        {
+            Button button = new Button { Width = 245, Height = 150, Margin = new Thickness(9), Padding = new Thickness(0), Background = new SolidColorBrush(Color.FromArgb(86, 255, 255, 255)), BorderBrush = new SolidColorBrush(Color.FromArgb(170, 145, 218, 255)), BorderThickness = new Thickness(2), RenderTransformOrigin = new Point(0.5, 0.5) };
+            Grid layout = new Grid(); layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(96) }); layout.ColumnDefinitions.Add(new ColumnDefinition());
+            Border imageFrame = new Border { Width = 82, Height = 82, Margin = new Thickness(9), CornerRadius = new CornerRadius(6), Background = new SolidColorBrush(Color.FromArgb(70, 0, 20, 50)), VerticalAlignment = VerticalAlignment.Top };
+            if (!String.IsNullOrWhiteSpace(iconPath) && File.Exists(iconPath)) { try { imageFrame.Child = new Image { Source = LoadBitmap(iconPath), Stretch = Stretch.UniformToFill }; } catch { } }
+            if (imageFrame.Child == null) imageFrame.Child = new TextBlock { Text = "SAVE", FontSize = 15, FontWeight = FontWeights.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            layout.Children.Add(imageFrame);
+            StackPanel info = new StackPanel { Margin = new Thickness(8, 12, 10, 8) }; Grid.SetColumn(info, 1);
+            info.Children.Add(new TextBlock { Text = title, FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap, MaxHeight = 42 });
+            if (!String.IsNullOrWhiteSpace(subtitle)) info.Children.Add(new TextBlock { Text = subtitle, FontSize = 10, Foreground = new SolidColorBrush(Color.FromArgb(205, 255, 255, 255)), TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 4, 0, 0) });
+            info.Children.Add(new TextBlock { Text = detail, FontSize = 9, Foreground = new SolidColorBrush(Color.FromArgb(165, 255, 255, 255)), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0) });
+            layout.Children.Add(info); button.Content = layout; button.Click += delegate { invoke(); }; return button;
+        }
+
+        private void RenderPspSavedDataUtility()
+        {
+            titleText.Text = "Saved Data Utility"; subtitleText.Text = "Memory Stick™  •  PSP saved data"; columns = 3;
+            ScrollViewer scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; WrapPanel panel = new WrapPanel { Margin = new Thickness(28, 5, 28, 24) }; scroll.Content = panel; contentHost.Children.Add(scroll);
+            List<string> roots = FindSaveRoots(); List<string> saveFolders = new List<string>();
+            foreach (string rootPath in roots)
+            {
+                string candidate = rootPath;
+                if (!String.Equals(Path.GetFileName(candidate.TrimEnd(Path.DirectorySeparatorChar)), "SAVEDATA", StringComparison.OrdinalIgnoreCase))
+                {
+                    string nested = Path.Combine(candidate, "PSP", "SAVEDATA"); if (Directory.Exists(nested)) candidate = nested;
+                }
+                if (!Directory.Exists(candidate)) continue;
+                try { foreach (string dir in Directory.GetDirectories(candidate)) if (!saveFolders.Contains(dir, StringComparer.OrdinalIgnoreCase)) saveFolders.Add(dir); } catch { }
+            }
+            saveFolders = saveFolders.OrderBy(delegate(string p) { return GetPathModifiedUtcSafe(p); }).Reverse().ToList();
+            foreach (string savePath in saveFolders.Take(300))
+            {
+                string captured = savePath; string id = Path.GetFileName(savePath); string title = ReadPspSfoString(Path.Combine(savePath, "PARAM.SFO"), "TITLE"); string savedTitle = ReadPspSfoString(Path.Combine(savePath, "PARAM.SFO"), "SAVEDATA_TITLE");
+                if (String.IsNullOrWhiteSpace(title)) title = id; string detail = FormatBytes(GetPathSize(savePath)) + "  •  " + GetPathModifiedUtcSafe(savePath).ToString("g", CultureInfo.CurrentCulture);
+                Button tile = CreatePspSaveTile(title, savedTitle, Path.Combine(savePath, "ICON0.PNG"), detail, delegate { BackupNativeSavePath(captured, "PSP-" + Path.GetFileName(captured)); });
+                panel.Children.Add(tile); actions.Add(new ConsolePlatformAction { Button = tile, Name = title, Invoke = delegate { BackupNativeSavePath(captured, "PSP-" + Path.GetFileName(captured)); } });
+            }
+            if (saveFolders.Count == 0) AddRoundedStorage(panel, "No Saved Data", "PPSSPP Memory Stick / PSP / SAVEDATA was not found. Set the PPSSPP data path in System Settings.", definition.Accent, delegate { dashboardSubpage = "settings"; selected = 0; RenderPage(); });
+            else AddRoundedStorage(panel, "Back Up All Saved Data", saveFolders.Count.ToString(CultureInfo.InvariantCulture) + " save folder(s)", definition.Accent, BackupSaves);
+        }
+
+        private List<string> FindDreamcastVmuImages()
+        {
+            List<string> found = new List<string>();
+            foreach (string rootPath in FindSaveRoots())
+            {
+                if (!Directory.Exists(rootPath)) continue;
+                try
+                {
+                    foreach (string file in Directory.EnumerateFiles(rootPath, "vmu_save_*.bin", SearchOption.AllDirectories).Take(64)) if (!found.Contains(file, StringComparer.OrdinalIgnoreCase)) found.Add(file);
+                }
+                catch { }
+            }
+            return found.OrderBy(delegate(string pathValue) { return Path.GetFileName(pathValue); }, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        private Button CreateDreamcastVmuCard(string pathValue, Action invoke)
+        {
+            string name = Path.GetFileNameWithoutExtension(pathValue); string slot = name.StartsWith("vmu_save_", StringComparison.OrdinalIgnoreCase) ? name.Substring("vmu_save_".Length).ToUpperInvariant() : name.ToUpperInvariant();
+            Button button = new Button { Width = 220, Height = 260, Margin = new Thickness(18), Padding = new Thickness(8), Background = Brushes.Transparent, BorderThickness = new Thickness(0), RenderTransformOrigin = new Point(0.5, 0.5) };
+            Grid shell = new Grid { Background = Brushes.Transparent }; Border body = new Border { Width = 174, Height = 218, CornerRadius = new CornerRadius(18, 18, 30, 30), Background = new LinearGradientBrush(Color.FromRgb(239, 242, 244), Color.FromRgb(183, 195, 203), 90), BorderBrush = new SolidColorBrush(Color.FromRgb(93, 120, 138)), BorderThickness = new Thickness(3), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top };
+            StackPanel stack = new StackPanel { Margin = new Thickness(14) }; stack.Children.Add(new TextBlock { Text = "VISUAL MEMORY", FontSize = 9, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(64, 83, 94)), HorizontalAlignment = HorizontalAlignment.Center });
+            Border screen = new Border { Width = 112, Height = 72, Margin = new Thickness(0, 12, 0, 8), Background = new SolidColorBrush(Color.FromRgb(121, 153, 145)), BorderBrush = new SolidColorBrush(Color.FromRgb(44, 63, 61)), BorderThickness = new Thickness(5), Child = new TextBlock { Text = slot, FontFamily = new FontFamily("Consolas"), FontSize = 28, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(24, 47, 41)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } }; stack.Children.Add(screen);
+            stack.Children.Add(new TextBlock { Text = FormatBytes(GetPathSize(pathValue)), FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(64, 83, 94)), HorizontalAlignment = HorizontalAlignment.Center }); stack.Children.Add(new TextBlock { Text = GetPathModifiedUtcSafe(pathValue).ToString("g", CultureInfo.CurrentCulture), FontSize = 9, Foreground = new SolidColorBrush(Color.FromRgb(83, 101, 112)), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 3, 0, 0) });
+            body.Child = stack; shell.Children.Add(body); TextBlock hint = new TextBlock { Text = "A  Back Up VMU", FontSize = 10, Foreground = new SolidColorBrush(Color.FromRgb(55, 72, 86)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom }; shell.Children.Add(hint); button.Content = shell; button.Click += delegate { invoke(); }; return button;
+        }
+
+        private void RenderDreamcastVmuManager()
+        {
+            titleText.Text = "File"; subtitleText.Text = "Visual Memory Unit manager"; columns = 4;
+            ScrollViewer scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; WrapPanel panel = new WrapPanel { Margin = new Thickness(45, 8, 45, 24) }; scroll.Content = panel; contentHost.Children.Add(scroll);
+            List<string> vmus = FindDreamcastVmuImages(); foreach (string pathValue in vmus) { string captured = pathValue; Button card = CreateDreamcastVmuCard(pathValue, delegate { BackupNativeSavePath(captured, "Dreamcast-" + Path.GetFileNameWithoutExtension(captured)); }); panel.Children.Add(card); actions.Add(new ConsolePlatformAction { Button = card, Name = Path.GetFileNameWithoutExtension(pathValue), Invoke = delegate { BackupNativeSavePath(captured, "Dreamcast-" + Path.GetFileNameWithoutExtension(captured)); } }); }
+            if (vmus.Count == 0) AddRoundedStorage(panel, "No VMUs Detected", "Flycast VMU images (vmu_save_*.bin) were not found. Set the Flycast data path in Settings or run a Dreamcast game once.", Color.FromRgb(74,190,148), delegate { dashboardSubpage = "settings"; selected = 0; RenderPage(); });
+            else AddRoundedStorage(panel, "Back Up All VMUs", vmus.Count.ToString(CultureInfo.InvariantCulture) + " VMU image(s)", Color.FromRgb(74,190,148), BackupSaves);
+        }
+
+        private void RenderSaturnMemoryManager()
+        {
+            titleText.Text = "Memory Manager"; subtitleText.Text = "Internal backup memory and cartridge save files"; columns = 2;
+            StackPanel panel = new StackPanel { Margin = new Thickness(100, 8, 100, 28) }; contentHost.Children.Add(new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, Content = panel });
+            List<string> saves = new List<string>(); foreach (string rootPath in FindSaveRoots()) { if (!Directory.Exists(rootPath)) continue; try { foreach (string file in Directory.EnumerateFiles(rootPath, "*", SearchOption.TopDirectoryOnly)) { string ext = Path.GetExtension(file).ToLowerInvariant(); if (ext == ".bkr" || ext == ".bcr" || ext == ".sav" || ext == ".srm" || ext == ".nv" || ext == ".ram") if (!saves.Contains(file, StringComparer.OrdinalIgnoreCase)) saves.Add(file); } } catch { } }
+            saves = saves.OrderBy(delegate(string pathValue) { return Path.GetFileName(pathValue); }, StringComparer.OrdinalIgnoreCase).ToList();
+            foreach (string file in saves) { string captured = file; string ext = Path.GetExtension(file).TrimStart('.').ToUpperInvariant(); string title = Path.GetFileNameWithoutExtension(file); string detail = ext + " BACKUP MEMORY  •  " + FormatBytes(GetPathSize(file)) + "  •  " + GetPathModifiedUtcSafe(file).ToString("g", CultureInfo.CurrentCulture); AddRoundedStorage(panel, title, detail, Color.FromRgb(239,67,129), delegate { BackupNativeSavePath(captured, "Saturn-" + Path.GetFileNameWithoutExtension(captured)); }); }
+            if (saves.Count == 0) AddRoundedStorage(panel, "No Backup Memory Found", "Mednafen's sav directory has no Saturn nonvolatile save files yet. Configure Mednafen and start a game once.", Color.FromRgb(239,67,129), delegate { dashboardSubpage = "settings"; selected = 0; RenderPage(); });
+            else AddRoundedStorage(panel, "Back Up All Memory", saves.Count.ToString(CultureInfo.InvariantCulture) + " nonvolatile file(s)", Color.FromRgb(34,162,225), BackupSaves);
+        }
+
+        private List<KeyValuePair<ConsolePlatformGame, string>> FindDsSidecarSaves()
+        {
+            List<KeyValuePair<ConsolePlatformGame, string>> result = new List<KeyValuePair<ConsolePlatformGame, string>>(); HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (ConsolePlatformGame game in games)
+            {
+                if (game == null || String.IsNullOrWhiteSpace(game.Path)) continue;
+                foreach (string ext in new string[] { ".sav", ".dsv" })
+                {
+                    string candidate; try { candidate = Path.ChangeExtension(game.Path, ext); } catch { continue; }
+                    if (File.Exists(candidate) && seen.Add(candidate)) { result.Add(new KeyValuePair<ConsolePlatformGame, string>(game, candidate)); break; }
+                }
+            }
+            foreach (string rootPath in FindSaveRoots())
+            {
+                if (!Directory.Exists(rootPath)) continue;
+                try { foreach (string file in Directory.EnumerateFiles(rootPath, "*.sav", SearchOption.TopDirectoryOnly).Take(500)) if (seen.Add(file)) result.Add(new KeyValuePair<ConsolePlatformGame, string>(null, file)); } catch { }
+            }
+            return result.OrderBy(delegate(KeyValuePair<ConsolePlatformGame,string> pair) { return pair.Key == null ? Path.GetFileNameWithoutExtension(pair.Value) : pair.Key.Name; }, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        private void RenderDsSavedData(bool dsi)
+        {
+            titleText.Text = dsi ? "Data Management" : "Saved Data"; subtitleText.Text = dsi ? "Nintendo DSi system memory and DS software saves" : "Nintendo DS game-card save data"; columns = 2;
+            Grid body = new Grid { Margin = new Thickness(90, 4, 90, 22) }; body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(dsi ? 120 : 84) }); body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); contentHost.Children.Add(body);
+            Border header = new Border { CornerRadius = new CornerRadius(12), Background = new SolidColorBrush(dsi ? Color.FromRgb(232,247,252) : Color.FromRgb(228,239,247)), BorderBrush = new SolidColorBrush(dsi ? Color.FromRgb(67,181,222) : Color.FromRgb(70,145,202)), BorderThickness = new Thickness(2), Padding = new Thickness(18) };
+            header.Child = new TextBlock { Text = dsi ? "SYSTEM MEMORY\nManage locally emulated DSi data without exposing dead DSi Shop services." : "GAME CARD SAVE MEMORY\nSaved data remains paired with its DS software image.", FontSize = 15, Foreground = new SolidColorBrush(Color.FromRgb(61,84,99)), TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }; body.Children.Add(header);
+            StackPanel list = new StackPanel { Margin = new Thickness(0, 10, 0, 0) }; ScrollViewer scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, Content = list }; Grid.SetRow(scroll, 1); body.Children.Add(scroll);
+            List<KeyValuePair<ConsolePlatformGame,string>> saves = FindDsSidecarSaves(); foreach (KeyValuePair<ConsolePlatformGame,string> pair in saves) { string captured = pair.Value; string name = pair.Key == null ? Path.GetFileNameWithoutExtension(pair.Value) : pair.Key.Name; AddRoundedStorage(list, name, FormatBytes(GetPathSize(pair.Value)) + "  •  " + Path.GetFileName(pair.Value) + "  •  " + GetPathModifiedUtcSafe(pair.Value).ToString("g", CultureInfo.CurrentCulture), dsi ? Color.FromRgb(67,181,222) : Color.FromRgb(70,145,202), delegate { BackupNativeSavePath(captured, (dsi ? "DSi-" : "DS-") + Path.GetFileNameWithoutExtension(captured)); }); }
+            if (dsi) { foreach (string rootPath in FindSaveRoots().Where(delegate(string p) { return p.IndexOf("NAND", StringComparison.OrdinalIgnoreCase) >= 0; })) { string captured = rootPath; AddRoundedStorage(list, "Nintendo DSi System Memory", FormatBytes(GetPathSize(rootPath)) + "  •  NAND data", Color.FromRgb(239,157,56), delegate { BackupNativeSavePath(captured, "DSi-SystemMemory"); }); } }
+            if (saves.Count == 0 && (!dsi || !FindSaveRoots().Any(delegate(string p) { return p.IndexOf("NAND", StringComparison.OrdinalIgnoreCase) >= 0; }))) AddRoundedStorage(list, "No Saved Data Detected", "Choose the melonDS data path or launch software once to create save data.", dsi ? Color.FromRgb(67,181,222) : Color.FromRgb(70,145,202), delegate { dashboardSubpage = "settings"; selected = 0; RenderPage(); });
+        }
+
+        private void Render3dsDataManagement()
+        {
+            titleText.Text = "Data Management"; subtitleText.Text = "Nintendo 3DS emulated system storage"; columns = 2;
+            Grid body = new Grid { Margin = new Thickness(75, 0, 75, 20) }; body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(145) }); body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); contentHost.Children.Add(body);
+            Border top = new Border { Margin = new Thickness(80, 0, 80, 10), CornerRadius = new CornerRadius(12), Background = new LinearGradientBrush(Color.FromRgb(239,243,246), Color.FromRgb(211,220,227), 90), BorderBrush = new SolidColorBrush(Color.FromRgb(164,177,187)), BorderThickness = new Thickness(2) };
+            top.Child = new TextBlock { Text = "DATA MANAGEMENT", FontSize = 25, FontWeight = FontWeights.Light, Foreground = new SolidColorBrush(Color.FromRgb(66,80,91)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }; body.Children.Add(top);
+            UniformGrid cards = new UniformGrid { Columns = 2, Rows = 2, Margin = new Thickness(40, 5, 40, 0) }; Grid.SetRow(cards, 1); body.Children.Add(cards);
+            List<string> roots = FindSaveRoots(); List<string> sdmc = roots.Where(delegate(string p) { return String.Equals(Path.GetFileName(p.TrimEnd(Path.DirectorySeparatorChar)), "sdmc", StringComparison.OrdinalIgnoreCase); }).ToList(); List<string> nand = roots.Where(delegate(string p) { return p.IndexOf("nand", StringComparison.OrdinalIgnoreCase) >= 0; }).ToList();
+            Action backupSd = delegate { foreach (string value in sdmc) BackupNativeSavePath(value, "3DS-SDMC"); }; Action backupNand = delegate { foreach (string value in nand) BackupNativeSavePath(value, "3DS-NAND"); };
+            Button sd = CreateWave1Tile("SD Card", sdmc.Count == 0 ? "Not detected" : FormatBytes(sdmc.Sum(delegate(string p) { return GetPathSize(p); })), "SD", new SolidColorBrush(Color.FromRgb(91,168,219)), Brushes.White, backupSd, 330, 150); AddWave1Action(cards, sd, "SD Card", backupSd, null);
+            Button system = CreateWave1Tile("System Memory", nand.Count == 0 ? "Not detected" : FormatBytes(nand.Sum(delegate(string p) { return GetPathSize(p); })), "▣", new SolidColorBrush(Color.FromRgb(239,157,56)), Brushes.White, backupNand, 330, 150); AddWave1Action(cards, system, "System Memory", backupNand, null);
+            Action refresh = delegate { RenderPage(); }; Button refreshButton = CreateWave1Tile("Refresh Data", "Rescan Azahar storage", "↻", new SolidColorBrush(Color.FromRgb(91,101,111)), Brushes.White, refresh, 330, 150); AddWave1Action(cards, refreshButton, "Refresh Data", refresh, null);
+            Action settingsAction = delegate { dashboardSubpage = "settings"; selected = 0; RenderPage(); }; Button settingsButton = CreateWave1Tile("Storage Settings", "Azahar data path", "⚙", new SolidColorBrush(Color.FromRgb(103,146,106)), Brushes.White, settingsAction, 330, 150); AddWave1Action(cards, settingsButton, "Storage Settings", settingsAction, null);
+        }
+
+        private void RenderWave1Music()
+        {
+            titleText.Text=definition.Shell=="Dreamcast"?"Music":(definition.Shell=="Saturn"?"CD Player":"Music");subtitleText.Text="Local audio controls";WrapPanel panel=new WrapPanel{Margin=new Thickness(36,20,36,20)};contentHost.Children.Add(panel);AddRoundedStorage(panel,"Audio Source",String.IsNullOrWhiteSpace(settings.ambiencePath)?"Choose local audio":Path.GetFileName(settings.ambiencePath),definition.Accent,ChooseAmbience);AddRoundedStorage(panel,settings.ambienceEnabled?"Pause":"Play",Math.Round(settings.ambienceVolume*100).ToString(CultureInfo.InvariantCulture)+"% volume",definition.Accent,delegate{settings.ambienceEnabled=!settings.ambienceEnabled;settings.Save(settingsPath);StartAmbience();RenderPage();});AddRoundedStorage(panel,"Volume",Math.Round(settings.ambienceVolume*100).ToString(CultureInfo.InvariantCulture)+"%",definition.Accent,CycleAmbienceVolume);
+        }
+
+        private void RenderWave1Media()
+        {
+            titleText.Text=pspCategoryIndex==1?"Photo":"Video";subtitleText.Text="Media folders will use the Huymaier file browser";StackPanel panel=new StackPanel{Margin=new Thickness(80,30,80,30)};contentHost.Children.Add(panel);AddRoundedStorage(panel,"Media folder","Not configured in this development scaffold",definition.Accent,delegate{ShowNotice("Media-folder routing is not enabled until the PSP adapter owns the path safely");});
+        }
+
+        private void RenderWave1Info()
+        {
+            titleText.Text="System Information";subtitleText.Text=definition.DisplayName;StackPanel panel=new StackPanel{Margin=new Thickness(80,24,80,24)};contentHost.Children.Add(panel);AddRoundedStorage(panel,"Primary Emulator",DisplayPath(settings.emulatorPath),definition.Accent,ChoosePrimaryEmulator);AddRoundedStorage(panel,"Data Path",DisplayPath(settings.emulatorDataPath),definition.Accent,ChooseEmulatorDataRoot);AddRoundedStorage(panel,"Library",games.Count.ToString(CultureInfo.InvariantCulture)+" titles",definition.Accent,delegate{dashboardSubpage="library";selected=0;RenderPage();});
+        }
+
+        private void RenderWave1Settings()
+        {
+            titleText.Text=definition.Shell=="Dreamcast"?"Settings":(definition.Shell=="Saturn"?"System Settings":(definition.Shell=="PSP"?"PPSSPP Settings":"System Settings"));subtitleText.Text=definition.PrimaryBackend+"  •  Huymaier native configuration";StackPanel panel=new StackPanel{Margin=new Thickness(44,6,44,24)};contentHost.Children.Add(new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=panel});
+            if(String.IsNullOrWhiteSpace(settings.emulatorPath)||!File.Exists(settings.emulatorPath)){AddRoundedStorage(panel,"Locate Emulator","Point Huymaier Console to "+definition.PrimaryBackend,definition.Accent,ChoosePrimaryEmulator);AddRoundedStorage(panel,"Install Latest Emulator","Resolve the latest supported official release",definition.Accent,InstallPrimaryEmulator);}else AddRoundedStorage(panel,definition.PrimaryBackend,settings.emulatorPath,definition.Accent,ChoosePrimaryEmulator);
+            AddRoundedStorage(panel,"Emulator Data",DisplayPath(settings.emulatorDataPath),definition.Accent,ChooseEmulatorDataRoot);AddRoundedStorage(panel,"Game Folders",settings.gameFolders.Count.ToString(CultureInfo.InvariantCulture)+" configured",definition.Accent,AddGameFolder);AddRoundedStorage(panel,"Full Emulator Settings","Every discovered backend setting; unknown keys are preserved",definition.Accent,OpenNativeBackendSettings);AddRoundedStorage(panel,"Refresh Library",games.Count.ToString(CultureInfo.InvariantCulture)+" titles",definition.Accent,delegate{RefreshLibrary(true);});
+        }
+
+
+        private string BackendSettingsOutputPath { get { return Path.Combine(dataRoot, "backend-settings.json"); } }
+        private string BackendSettingsEditRequestPath { get { return Path.Combine(dataRoot, "backend-settings-edit.json"); } }
+
+        private static string QuoteProcessArgument(string value)
+        {
+            if (value == null) value = String.Empty;
+            if (value.Length == 0) return "\"\"";
+            bool needsQuotes = value.Any(delegate(char c) { return Char.IsWhiteSpace(c) || c == '\"'; });
+            if (!needsQuotes) return value;
+            StringBuilder result = new StringBuilder(); result.Append('\"'); int slashCount = 0;
+            foreach (char c in value)
+            {
+                if (c == '\\') { slashCount++; continue; }
+                if (c == '\"') { result.Append('\\', slashCount * 2 + 1); result.Append('\"'); slashCount = 0; continue; }
+                if (slashCount > 0) { result.Append('\\', slashCount); slashCount = 0; }
+                result.Append(c);
+            }
+            if (slashCount > 0) result.Append('\\', slashCount * 2);
+            result.Append('\"'); return result.ToString();
+        }
+
+        private bool RunBackendSettingsWorker(string mode, string editRequestPath)
+        {
+            string worker = Path.Combine(consoleRoot, "HuymaierEmulatorSettingsWorker.ps1");
+            if (!File.Exists(worker)) { ShowNotice("The native emulator settings worker is missing"); return false; }
+            try
+            {
+                Directory.CreateDirectory(dataRoot);
+                if (File.Exists(BackendSettingsOutputPath)) File.Delete(BackendSettingsOutputPath);
+                string powershell = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
+                if (!File.Exists(powershell)) powershell = "powershell.exe";
+                StringBuilder arguments = new StringBuilder();
+                arguments.Append("-NoProfile -ExecutionPolicy Bypass -File ").Append(QuoteProcessArgument(worker));
+                arguments.Append(" -Mode ").Append(QuoteProcessArgument(mode));
+                arguments.Append(" -PlatformId ").Append(QuoteProcessArgument(definition.Id));
+                arguments.Append(" -ConsoleRoot ").Append(QuoteProcessArgument(consoleRoot));
+                arguments.Append(" -PlatformSettingsPath ").Append(QuoteProcessArgument(settingsPath));
+                arguments.Append(" -OutputPath ").Append(QuoteProcessArgument(BackendSettingsOutputPath));
+                if (!String.IsNullOrWhiteSpace(editRequestPath)) arguments.Append(" -EditRequestPath ").Append(QuoteProcessArgument(editRequestPath));
+                ProcessStartInfo start = new ProcessStartInfo { FileName = powershell, Arguments = arguments.ToString(), UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden };
+                using (Process process = Process.Start(start))
+                {
+                    if (process == null) throw new InvalidOperationException("The settings worker did not start.");
+                    if (!process.WaitForExit(12000)) { try { process.Kill(); } catch { } throw new TimeoutException("The emulator settings scan took too long."); }
+                    if (process.ExitCode != 0) throw new InvalidOperationException("The emulator settings worker exited with code " + process.ExitCode.ToString(CultureInfo.InvariantCulture) + ".");
+                }
+                if (!File.Exists(BackendSettingsOutputPath)) throw new InvalidOperationException("The emulator settings worker did not return an inventory.");
+                BackendSettingsInventory inventory = new JavaScriptSerializer().Deserialize<BackendSettingsInventory>(File.ReadAllText(BackendSettingsOutputPath, Encoding.UTF8));
+                if (inventory == null || !String.Equals(inventory.result, "success", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("The emulator settings inventory was invalid.");
+                backendSettingsInventory = inventory;
+                backendSettingsEntries = inventory.settings == null ? new List<BackendSettingEntry>() : inventory.settings.Where(delegate(BackendSettingEntry item) { return item != null && !String.IsNullOrWhiteSpace(item.Identity); }).ToList();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                WritePlatformLog("Native emulator settings worker failed for " + definition.DisplayName + ": " + ex, "ERROR");
+                ShowNotice("Emulator settings could not be loaded: " + ex.Message);
+                return false;
+            }
+        }
+
+        private void OpenNativeBackendSettings()
+        {
+            backendSettingsCategory = "All Settings"; selectedBackendSetting = null; selected = 0;
+            RunBackendSettingsWorker("Inventory", String.Empty);
+            dashboardSubpage = "backend-settings"; RenderPage();
+        }
+
+        private void AddBackendSettingsAction(Panel panel, string title, string detail, Action invoke)
+        {
+            Button button = CreateActionButton(title, detail, invoke); panel.Children.Add(button); actions.Add(new ConsolePlatformAction { Button = button, Invoke = invoke, Name = title });
+        }
+
+        private string[] GetBackendSettingsCategoryOrder()
+        {
+            return new string[] { "System", "Graphics", "Audio", "Input", "Paths & Storage", "Network", "Enhancements & Advanced", "Other" };
+        }
+
+        private void RenderBackendSettingsCategories()
+        {
+            titleText.Text = definition.PrimaryBackend + " Settings";
+            string files = backendSettingsInventory == null || backendSettingsInventory.configFiles == null ? "0" : backendSettingsInventory.configFiles.Length.ToString(CultureInfo.InvariantCulture);
+            subtitleText.Text = backendSettingsEntries.Count.ToString(CultureInfo.InvariantCulture) + " setting(s) discovered across " + files + " config file(s) — changes are backed up before write";
+            StackPanel panel = new StackPanel { Margin = new Thickness(44, 4, 44, 24) }; contentHost.Children.Add(new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, Content = panel });
+            if (backendSettingsEntries.Count == 0)
+            {
+                AddBackendSettingsAction(panel, "No emulator settings detected", "Run " + definition.PrimaryBackend + " once or choose its emulator-data folder, then refresh.", delegate { RunBackendSettingsWorker("Inventory", String.Empty); RenderPage(); });
+                AddBackendSettingsAction(panel, "Refresh Settings", "Rescan emulator configuration files", delegate { RunBackendSettingsWorker("Inventory", String.Empty); RenderPage(); });
+                AddBackendSettingsAction(panel, "Emulator Data", DisplayPath(settings.emulatorDataPath), ChooseEmulatorDataRoot);
+                return;
+            }
+            string all = "All Settings"; AddBackendSettingsAction(panel, all, backendSettingsEntries.Count.ToString(CultureInfo.InvariantCulture) + " discovered settings", delegate { backendSettingsCategory = all; dashboardSubpage = "backend-settings-list"; selected = 0; RenderPage(); });
+            foreach (string categoryName in GetBackendSettingsCategoryOrder())
+            {
+                string captured = categoryName; int count = backendSettingsEntries.Count(delegate(BackendSettingEntry item) { return String.Equals(item.Category, captured, StringComparison.OrdinalIgnoreCase); });
+                if (count == 0) continue;
+                AddBackendSettingsAction(panel, categoryName, count.ToString(CultureInfo.InvariantCulture) + " settings", delegate { backendSettingsCategory = captured; dashboardSubpage = "backend-settings-list"; selected = 0; RenderPage(); });
+            }
+            AddBackendSettingsAction(panel, "Refresh Settings", "Rescan files in case the emulator changed them", delegate { RunBackendSettingsWorker("Inventory", String.Empty); RenderPage(); });
+        }
+
+        private void RenderBackendSettingsList()
+        {
+            titleText.Text = String.IsNullOrWhiteSpace(backendSettingsCategory) ? "All Settings" : backendSettingsCategory;
+            List<BackendSettingEntry> list = backendSettingsEntries.Where(delegate(BackendSettingEntry item) { return String.Equals(backendSettingsCategory, "All Settings", StringComparison.OrdinalIgnoreCase) || String.Equals(item.Category, backendSettingsCategory, StringComparison.OrdinalIgnoreCase); }).OrderBy(delegate(BackendSettingEntry item) { return item.DisplayName; }, StringComparer.CurrentCultureIgnoreCase).ToList();
+            subtitleText.Text = definition.PrimaryBackend + "  •  " + list.Count.ToString(CultureInfo.InvariantCulture) + " setting(s)";
+            StackPanel panel = new StackPanel { Margin = new Thickness(30, 0, 30, 24) }; contentHost.Children.Add(new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, Content = panel });
+            foreach (BackendSettingEntry item in list)
+            {
+                BackendSettingEntry captured = item; string fileName = String.IsNullOrWhiteSpace(item.FilePath) ? String.Empty : Path.GetFileName(item.FilePath); string detail = (item.Value ?? String.Empty) + (String.IsNullOrWhiteSpace(fileName) ? String.Empty : "   •   " + fileName);
+                AddBackendSettingsAction(panel, String.IsNullOrWhiteSpace(item.DisplayName) ? item.Key : item.DisplayName, detail, delegate { selectedBackendSetting = captured; dashboardSubpage = "backend-setting-detail"; selected = 0; RenderPage(); });
+            }
+        }
+
+        private static bool TryGetBackendBooleanValue(string value, out bool state)
+        {
+            state = false; string raw = (value ?? String.Empty).Trim().Trim('\"', '\'').ToLowerInvariant();
+            if (raw == "true" || raw == "yes" || raw == "on" || raw == "enabled" || raw == "1") { state = true; return true; }
+            if (raw == "false" || raw == "no" || raw == "off" || raw == "disabled" || raw == "0") { state = false; return true; }
+            return false;
+        }
+
+        private static string ToggleBackendBooleanText(string original, bool newState)
+        {
+            string value = original ?? String.Empty; string raw = value.Trim(); bool quoted = raw.Length >= 2 && ((raw[0] == '\"' && raw[raw.Length - 1] == '\"') || (raw[0] == '\'' && raw[raw.Length - 1] == '\'')); char quote = quoted ? raw[0] : '\0'; string core = quoted ? raw.Substring(1, raw.Length - 2) : raw; string lower = core.ToLowerInvariant(); string next;
+            if (lower == "yes" || lower == "no") next = newState ? "yes" : "no";
+            else if (lower == "on" || lower == "off") next = newState ? "on" : "off";
+            else if (lower == "enabled" || lower == "disabled") next = newState ? "enabled" : "disabled";
+            else if (lower == "1" || lower == "0") next = newState ? "1" : "0";
+            else next = newState ? "true" : "false";
+            if (core.Length > 0 && Char.IsUpper(core[0])) next = Char.ToUpperInvariant(next[0]) + next.Substring(1);
+            return quoted ? quote + next + quote : next;
+        }
+
+        private void RenderBackendSettingDetail()
+        {
+            if (selectedBackendSetting == null) { dashboardSubpage = "backend-settings-list"; RenderBackendSettingsList(); return; }
+            BackendSettingEntry item = selectedBackendSetting; titleText.Text = String.IsNullOrWhiteSpace(item.DisplayName) ? item.Key : item.DisplayName; subtitleText.Text = (item.Category ?? "Other") + "  •  " + (String.IsNullOrWhiteSpace(item.FilePath) ? definition.PrimaryBackend : item.FilePath);
+            StackPanel panel = new StackPanel { Margin = new Thickness(55, 8, 55, 24) }; contentHost.Children.Add(new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, Content = panel });
+            AddBackendSettingsAction(panel, "Current Value", item.Value ?? String.Empty, delegate { OpenBackendValueEditor(item); });
+            bool booleanValue; if (TryGetBackendBooleanValue(item.Value, out booleanValue)) { bool next = !booleanValue; AddBackendSettingsAction(panel, next ? "Turn On" : "Turn Off", "Apply immediately with a recoverable config backup", delegate { ApplyBackendSettingValue(item, ToggleBackendBooleanText(item.Value, next)); }); }
+            AddBackendSettingsAction(panel, "Edit Value", "Controller-native editor for numeric, enum and text values", delegate { OpenBackendValueEditor(item); });
+            AddBackendSettingsAction(panel, "Source", (item.Format ?? "config") + "  •  line " + (item.LineIndex + 1).ToString(CultureInfo.InvariantCulture), delegate { });
+            AddBackendSettingsAction(panel, "Back to " + backendSettingsCategory, "Return without changing this setting", delegate { dashboardSubpage = "backend-settings-list"; selected = 0; RenderPage(); });
+        }
+
+        private void ApplyBackendSettingValue(BackendSettingEntry item, string value)
+        {
+            if (item == null) return;
+            try
+            {
+                Dictionary<string, object> request = new Dictionary<string, object>(); request["identity"] = item.Identity; request["value"] = value ?? String.Empty;
+                File.WriteAllText(BackendSettingsEditRequestPath, new JavaScriptSerializer().Serialize(request), Encoding.UTF8);
+                string identity = item.Identity;
+                if (!RunBackendSettingsWorker("Set", BackendSettingsEditRequestPath)) return;
+                selectedBackendSetting = backendSettingsEntries.FirstOrDefault(delegate(BackendSettingEntry entry) { return String.Equals(entry.Identity, identity, StringComparison.Ordinal); });
+                if (selectedBackendSetting == null) { dashboardSubpage = "backend-settings-list"; }
+                ShowNotice("Emulator setting saved — previous config backed up"); RenderPage();
+            }
+            catch (Exception ex) { WritePlatformLog("Could not apply native emulator setting: " + ex, "ERROR"); ShowNotice("Setting could not be saved: " + ex.Message); }
+            finally { try { if (File.Exists(BackendSettingsEditRequestPath)) File.Delete(BackendSettingsEditRequestPath); } catch { } }
+        }
+
+        private void OpenBackendValueEditor(BackendSettingEntry item)
+        {
+            if (item == null) return; selectedBackendSetting = item; backendValueBuffer = item.Value ?? String.Empty; backendValueShift = false; backendValueKeyIndex = 0;
+            EnsureBackendValueEditor(); backendValueEditorActive = true; backendValueEditorOverlay.Visibility = Visibility.Visible; UpdateBackendValueEditorText(); UpdateBackendValueEditorVisuals();
+        }
+
+        private void EnsureBackendValueEditor()
+        {
+            if (backendValueEditorOverlay != null) return;
+            backendValueKeyTokens = new string[] { "a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","0","1","2","3","4","5","6","7","8","9",".","-","_","+",":","/","\\","[","]","(",")","{","}","'","\"",",",";","=","SPACE","SHIFT","BACKSPACE","CLEAR","OK" };
+            Grid overlay = new Grid { Background = new SolidColorBrush(Color.FromArgb(225, 0, 0, 0)), Visibility = Visibility.Collapsed }; Panel.SetZIndex(overlay, 6000); Grid.SetRowSpan(overlay, 3);
+            Border card = new Border { Width = 920, MaxHeight = 690, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, CornerRadius = new CornerRadius(18), Background = new SolidColorBrush(IsLightShell() ? Color.FromRgb(246,248,249) : Color.FromRgb(18,25,36)), BorderBrush = new SolidColorBrush(definition.Accent), BorderThickness = new Thickness(3), Padding = new Thickness(24) };
+            Grid layout = new Grid(); layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            TextBlock heading = new TextBlock { Text = "EDIT EMULATOR VALUE", FontSize = 22, FontWeight = FontWeights.SemiBold, Foreground = IsLightShell() ? new SolidColorBrush(Color.FromRgb(49,61,67)) : Brushes.White, Margin = new Thickness(0,0,0,10) }; layout.Children.Add(heading);
+            backendValueEditorText = new TextBlock { FontSize = 17, TextWrapping = TextWrapping.Wrap, MinHeight = 68, MaxHeight = 126, Padding = new Thickness(14), Background = new SolidColorBrush(IsLightShell() ? Color.FromRgb(225,231,235) : Color.FromRgb(6,11,19)), Foreground = IsLightShell() ? new SolidColorBrush(Color.FromRgb(35,45,51)) : Brushes.White, Margin = new Thickness(0,0,0,15) }; Grid.SetRow(backendValueEditorText,1); layout.Children.Add(backendValueEditorText);
+            UniformGrid keys = new UniformGrid { Columns = 10 }; Grid.SetRow(keys,2); layout.Children.Add(keys);
+            foreach (string token in backendValueKeyTokens) { string captured = token; Button button = new Button { Height = 52, Margin = new Thickness(3), FontSize = token.Length == 1 ? 16 : 10, Background = new SolidColorBrush(IsLightShell() ? Color.FromRgb(232,237,240) : Color.FromRgb(33,43,57)), Foreground = IsLightShell() ? new SolidColorBrush(Color.FromRgb(41,51,58)) : Brushes.White, BorderBrush = new SolidColorBrush(Color.FromArgb(90,definition.Accent.R,definition.Accent.G,definition.Accent.B)), BorderThickness = new Thickness(1), Tag = token }; button.Content = GetBackendEditorKeyLabel(token); button.Click += delegate { ApplyBackendEditorToken(captured); }; keys.Children.Add(button); backendValueKeyButtons.Add(button); }
+            card.Child = layout; overlay.Children.Add(card); backendValueEditorOverlay = overlay; root.Children.Add(overlay);
+        }
+
+        private string GetBackendEditorKeyLabel(string token)
+        {
+            if (token == "SPACE") return "SPACE"; if (token == "SHIFT") return backendValueShift ? "SHIFT ↑" : "SHIFT"; if (token == "BACKSPACE") return "⌫"; if (token == "CLEAR") return "CLEAR"; if (token == "OK") return "OK";
+            if (token.Length == 1 && Char.IsLetter(token[0])) return backendValueShift ? token.ToUpperInvariant() : token; return token;
+        }
+
+        private void UpdateBackendValueEditorText()
+        {
+            if (backendValueEditorText != null) backendValueEditorText.Text = backendValueBuffer + "\n\nA  Type     B  Cancel     D-Pad  Move";
+        }
+
+        private void UpdateBackendValueEditorVisuals()
+        {
+            for (int i = 0; i < backendValueKeyButtons.Count; i++) { Button button = backendValueKeyButtons[i]; button.Content = GetBackendEditorKeyLabel((string)button.Tag); bool active = i == backendValueKeyIndex; button.BorderBrush = new SolidColorBrush(active ? definition.Accent : Color.FromArgb(90,definition.Accent.R,definition.Accent.G,definition.Accent.B)); button.BorderThickness = active ? new Thickness(3) : new Thickness(1); button.RenderTransform = active ? new ScaleTransform(1.08,1.08) : Transform.Identity; }
+        }
+
+        private void ProcessBackendValueEditorCommand(XmbInputCommand command)
+        {
+            if (command == XmbInputCommand.Back) { CloseBackendValueEditor(false); PlayEffect("Back.wav"); return; }
+            if (backendValueKeyButtons.Count == 0) return; int next = backendValueKeyIndex; int row = 10;
+            if (command == XmbInputCommand.Left) next--; else if (command == XmbInputCommand.Right) next++; else if (command == XmbInputCommand.Up) next -= row; else if (command == XmbInputCommand.Down) next += row; else if (command == XmbInputCommand.Confirm) { ApplyBackendEditorToken(backendValueKeyTokens[backendValueKeyIndex]); return; } else return;
+            next = Math.Max(0, Math.Min(backendValueKeyButtons.Count - 1, next)); if (next != backendValueKeyIndex) { backendValueKeyIndex = next; PlayEffect("Navigate.wav"); UpdateBackendValueEditorVisuals(); }
+        }
+
+        private void ApplyBackendEditorToken(string token)
+        {
+            if (token == "OK") { CloseBackendValueEditor(true); return; }
+            if (token == "CLEAR") backendValueBuffer = String.Empty;
+            else if (token == "BACKSPACE") { if (backendValueBuffer.Length > 0) backendValueBuffer = backendValueBuffer.Substring(0, backendValueBuffer.Length - 1); }
+            else if (token == "SPACE") backendValueBuffer += " ";
+            else if (token == "SHIFT") backendValueShift = !backendValueShift;
+            else backendValueBuffer += (backendValueShift && token.Length == 1 && Char.IsLetter(token[0])) ? token.ToUpperInvariant() : token;
+            PlayEffect("Confirm.wav"); UpdateBackendValueEditorText(); UpdateBackendValueEditorVisuals();
+        }
+
+        private void CloseBackendValueEditor(bool commit)
+        {
+            string value = backendValueBuffer; backendValueEditorActive = false; if (backendValueEditorOverlay != null) backendValueEditorOverlay.Visibility = Visibility.Collapsed;
+            if (commit && selectedBackendSetting != null) { PlayEffect("Confirm.wav"); ApplyBackendSettingValue(selectedBackendSetting, value); }
+        }
+
+
+
+
+        private bool IsWave45Shell() { return definition.Shell == "Arcade" || definition.Shell == "FinalBurnNeo" || definition.Shell == "PS4" || definition.Shell == "Vita"; }
+        private void RenderWave45Root() { if(definition.Shell=="Arcade")RenderArcadeCabinet();else if(definition.Shell=="FinalBurnNeo")RenderFbNeoBoard();else if(definition.Shell=="PS4")RenderPs4DynamicMenu();else RenderVitaLiveArea(); }
+        private void RenderWave45Subpage() { if(dashboardSubpage=="library"){RenderWave1Library();return;}if(dashboardSubpage=="backend-settings"||dashboardSubpage=="backend-settings-list"||dashboardSubpage=="backend-setting-detail"){RenderWave1Subpage();return;}if((definition.Shell=="Arcade"||definition.Shell=="FinalBurnNeo")&&dashboardSubpage=="settings"){RenderArcadeOperatorSettings();return;}if((definition.Shell=="Arcade"||definition.Shell=="FinalBurnNeo")&&dashboardSubpage=="saves"){RenderArcadeStorage();return;}if((definition.Shell=="PS4"||definition.Shell=="Vita")&&dashboardSubpage=="settings"){RenderModernPlayStationSettings();return;}if(dashboardSubpage=="settings"){RenderWave1Settings();return;}if((definition.Shell=="PS4"||definition.Shell=="Vita")&&dashboardSubpage=="saves"){RenderModernPlayStationStorage();return;}if(dashboardSubpage=="saves"){RenderWave1Storage();return;}RenderWave1Settings(); }
+
+
+        private List<string> FindArcadeStorageItems()
+        {
+            List<string> roots=new List<string>();Action<string> add=delegate(string value){if(String.IsNullOrWhiteSpace(value))return;try{if(File.Exists(value))value=Path.GetDirectoryName(value);if(Directory.Exists(value)&&!roots.Contains(value,StringComparer.OrdinalIgnoreCase))roots.Add(value);}catch{}};add(settings.emulatorDataPath);add(settings.emulatorPath);add(settings.fallbackEmulatorPath);foreach(string root in roots.ToArray())foreach(string name in new[]{"nvram","memcard","hi","sta","cfg","config"}){try{add(Path.Combine(root,name));}catch{}}
+            HashSet<string> items=new HashSet<string>(StringComparer.OrdinalIgnoreCase);int visited=0;foreach(string root in roots){try{foreach(string file in Directory.EnumerateFiles(root,"*",SearchOption.AllDirectories)){if(++visited>14000)break;string lower=file.ToLowerInvariant();if(lower.Contains("\\nvram\\")||lower.Contains("\\memcard\\")||lower.Contains("\\hi\\")||lower.Contains("\\sta\\")||lower.EndsWith(".nv")||lower.EndsWith(".nvram")||lower.EndsWith(".hi")||lower.EndsWith(".sta")||lower.EndsWith(".mem"))items.Add(file);}}catch{}if(visited>14000)break;}return items.OrderBy(delegate(string p){return Path.GetFileName(p);},StringComparer.CurrentCultureIgnoreCase).ToList();
+        }
+        private void RenderArcadeStorage()
+        {
+            Color accent=definition.Shell=="Arcade"?Color.FromRgb(255,49,171):Color.FromRgb(255,193,37);titleText.Text="Operator Storage";subtitleText.Text="NVRAM  •  memory cards  •  high scores  •  save states";columns=3;WrapPanel panel=new WrapPanel{Margin=new Thickness(38,10,38,24)};contentHost.Children.Add(new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=panel});List<string> items=FindArcadeStorageItems();foreach(string value in items.Take(800)){string captured=value;AddHardwareUtility(panel,Path.GetFileNameWithoutExtension(value),FormatBytes(GetPathSize(value))+"  •  "+Path.GetExtension(value).TrimStart('.').ToUpperInvariant(),"MEM",accent,delegate{BackupNativeSavePath(captured,"Arcade-"+Path.GetFileNameWithoutExtension(captured));},310,120);}if(items.Count==0)AddHardwareUtility(panel,"No Operator Storage","Launch games to create NVRAM/high-score/state data.","MEM",accent,delegate{dashboardSubpage="settings";selected=0;RenderPage();},310,120);else AddHardwareUtility(panel,"Back Up All",items.Count+" storage item(s)","⇧",accent,delegate{foreach(string value in items)BackupNativeSavePath(value,"Arcade-"+Path.GetFileNameWithoutExtension(value));},310,120);
+        }
+        private void RenderArcadeOperatorSettings()
+        {
+            Color accent=definition.Shell=="Arcade"?Color.FromRgb(255,49,171):Color.FromRgb(255,193,37);titleText.Text="OPERATOR MENU";subtitleText.Text=definition.PrimaryBackend+"  •  service controls stay inside Huymaier Console";columns=3;Grid body=new Grid{Margin=new Thickness(45,8,45,24)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(110)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);Border header=new Border{Background=new SolidColorBrush(Color.FromRgb(14,14,16)),BorderBrush=new SolidColorBrush(accent),BorderThickness=new Thickness(3),Padding=new Thickness(20)};header.Child=new TextBlock{Text=(definition.Shell=="Arcade"?"MAME MACHINE CONFIGURATION":"FINALBURN NEO BOARD CONFIGURATION"),FontFamily=new FontFamily("Consolas"),FontSize=22,Foreground=new SolidColorBrush(accent),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};body.Children.Add(header);WrapPanel controls=new WrapPanel{Margin=new Thickness(0,12,0,0)};ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=controls};Grid.SetRow(scroll,1);body.Children.Add(scroll);if(String.IsNullOrWhiteSpace(settings.emulatorPath)||!File.Exists(settings.emulatorPath)){AddHardwareUtility(controls,"LOCATE EMULATOR",definition.PrimaryBackend,"SERVICE",accent,ChoosePrimaryEmulator,310,125);AddHardwareUtility(controls,"INSTALL LATEST",definition.PrimaryBackend,"↓",accent,InstallPrimaryEmulator,310,125);}else AddHardwareUtility(controls,"EMULATOR",settings.emulatorPath,"OK",accent,ChoosePrimaryEmulator,310,125);AddHardwareUtility(controls,"FULL MACHINE SETTINGS","Every installed-version backend option","DIP",accent,OpenNativeBackendSettings,310,125);AddHardwareUtility(controls,"ROM PATHS",settings.gameFolders.Count+" configured","ROM",accent,AddGameFolder,310,125);AddHardwareUtility(controls,"EMULATOR DATA",DisplayPath(settings.emulatorDataPath),"DATA",accent,ChooseEmulatorDataRoot,310,125);AddHardwareUtility(controls,"OPERATOR STORAGE","NVRAM / memory cards / high scores","MEM",accent,delegate{dashboardSubpage="saves";selected=0;RenderPage();},310,125);AddHardwareUtility(controls,"REFRESH SETS",games.Count+" detected sets","↻",accent,delegate{RefreshLibrary(true);},310,125);
+        }
+
+        private void RenderArcadeCabinet()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=5;Grid body=new Grid{Margin=new Thickness(24,0,24,16)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(112)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(72)});contentHost.Children.Add(body);
+            Border marquee=new Border{CornerRadius=new CornerRadius(12,12,3,3),Background=new LinearGradientBrush(Color.FromRgb(255,48,169),Color.FromRgb(77,23,151),0),BorderBrush=new SolidColorBrush(Color.FromRgb(255,208,249)),BorderThickness=new Thickness(4),Margin=new Thickness(120,0,120,8),Child=new TextBlock{Text="HUYMAIER ARCADE",FontSize=34,FontWeight=FontWeights.Black,FontFamily=new FontFamily("Arial Black"),Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center}};body.Children.Add(marquee);
+            Border screenFrame=new Border{CornerRadius=new CornerRadius(22),Background=new LinearGradientBrush(Color.FromRgb(38,38,43),Color.FromRgb(4,4,6),90),BorderBrush=new SolidColorBrush(Color.FromRgb(95,95,104)),BorderThickness=new Thickness(8),Padding=new Thickness(18),Margin=new Thickness(55,0,55,0)};WrapPanel cards=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Center};ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=cards};screenFrame.Child=scroll;Grid.SetRow(screenFrame,1);body.Children.Add(screenFrame);foreach(ConsolePlatformGame game in games)AddHardwareGame(cards,game,Color.FromRgb(255,49,171),142,184,"ARCADE");AddHardwareUtility(cards,"Operator Menu","MAME settings and DIP switches","SERVICE",Color.FromRgb(170,35,120),delegate{OpenWave1Subpage("settings");},160,184);
+            Grid panel=new Grid{Background=new SolidColorBrush(Color.FromRgb(22,22,24)),Margin=new Thickness(95,4,95,0)};panel.ColumnDefinitions.Add(new ColumnDefinition());panel.ColumnDefinitions.Add(new ColumnDefinition());panel.Children.Add(new TextBlock{Text="●  1 PLAYER    ●  2 PLAYER",FontSize=15,Foreground=new SolidColorBrush(Color.FromRgb(232,232,235)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center});TextBlock coin=new TextBlock{Text="COIN  00   •   CREDIT",FontFamily=new FontFamily("Consolas"),FontSize=14,Foreground=new SolidColorBrush(Color.FromRgb(255,205,75)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(coin,1);panel.Children.Add(coin);Grid.SetRow(panel,2);body.Children.Add(panel);
+        }
+
+        private void RenderFbNeoBoard()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=6;Grid body=new Grid{Margin=new Thickness(35,0,35,18)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(135)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);
+            Border board=new Border{CornerRadius=new CornerRadius(8),Background=new LinearGradientBrush(Color.FromRgb(46,42,25),Color.FromRgb(9,9,7),90),BorderBrush=new SolidColorBrush(Color.FromRgb(255,193,37)),BorderThickness=new Thickness(3),Padding=new Thickness(20),Margin=new Thickness(110,0,110,8)};Grid pcb=new Grid();pcb.Children.Add(new TextBlock{Text="FINALBURN NEO\nARCADE SYSTEM BOARD",FontSize=24,FontWeight=FontWeights.SemiBold,Foreground=new SolidColorBrush(Color.FromRgb(255,220,101)),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(35,0,0,0),TextAlignment=TextAlignment.Center});pcb.Children.Add(new TextBlock{Text="TEST   SERVICE   DIP SWITCH",FontFamily=new FontFamily("Consolas"),FontSize=12,Foreground=new SolidColorBrush(Color.FromRgb(202,183,113)),HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,38,0)});board.Child=pcb;body.Children.Add(board);WrapPanel cards=new WrapPanel();ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=cards};Grid.SetRow(scroll,1);body.Children.Add(scroll);foreach(ConsolePlatformGame game in games)AddHardwareGame(cards,game,Color.FromRgb(255,193,37),132,170,"ROM SET");AddHardwareUtility(cards,"Operator / DIP","FBNeo board options","DIP",Color.FromRgb(185,136,26),delegate{OpenWave1Subpage("settings");},150,170);
+        }
+
+        private Color GetModernPlayStationAccent(){return definition.Shell=="PS4"?Color.FromRgb(75,173,255):Color.FromRgb(115,222,255);}
+        private List<string> GetModernPlayStationSaveRoots()
+        {
+            List<string> roots=new List<string>();
+            Action<string> add=delegate(string value){if(String.IsNullOrWhiteSpace(value))return;try{if(File.Exists(value))value=Path.GetDirectoryName(value);if(Directory.Exists(value)&&!roots.Contains(value,StringComparer.OrdinalIgnoreCase))roots.Add(value);}catch{}};
+            add(settings.emulatorDataPath);
+            string exeRoot=!String.IsNullOrWhiteSpace(settings.emulatorPath)&&File.Exists(settings.emulatorPath)?Path.GetDirectoryName(settings.emulatorPath):String.Empty;add(exeRoot);
+            foreach(string root in roots.ToArray())
+            {
+                try
+                {
+                    if(definition.Shell=="Vita")
+                    {
+                        add(Path.Combine(root,"ux0","user","00","savedata"));
+                        add(Path.Combine(root,"Vita3K","ux0","user","00","savedata"));
+                    }
+                    else
+                    {
+                        add(Path.Combine(root,"user","savedata"));
+                        add(Path.Combine(root,"savedata"));
+                        add(Path.Combine(root,"user","home"));
+                        add(Path.Combine(root,"save"));
+                    }
+                }catch{}
+            }
+            return roots;
+        }
+        private List<string> FindModernPlayStationSaveItems()
+        {
+            HashSet<string> items=new HashSet<string>(StringComparer.OrdinalIgnoreCase);int visited=0;
+            foreach(string root in GetModernPlayStationSaveRoots())
+            {
+                if(!Directory.Exists(root))continue;
+                try{foreach(string dir in Directory.GetDirectories(root)){if(++visited>4000)break;items.Add(dir);}}catch{}
+                if(visited>4000)break;
+            }
+            return items.OrderBy(delegate(string value){return Path.GetFileName(value);},StringComparer.CurrentCultureIgnoreCase).ToList();
+        }
+        private void RenderModernPlayStationStorage()
+        {
+            Color accent=GetModernPlayStationAccent();bool vita=definition.Shell=="Vita";
+            titleText.Text=vita?"Content Manager":"Saved Data Management";
+            subtitleText.Text=vita?"PS Vita saved data inside the Vita3K user environment":"PS4 saved data inside the shadPS4 user environment";
+            columns=3;WrapPanel panel=new WrapPanel{Margin=new Thickness(42,10,42,24)};
+            contentHost.Children.Add(new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=panel});
+            List<string> items=FindModernPlayStationSaveItems();
+            foreach(string value in items.Take(500))
+            {
+                string captured=value;string title=Path.GetFileName(value);string sfo=Path.Combine(value,"param.sfo");
+                if(File.Exists(sfo)){string parsed=ReadPspSfoString(sfo,"TITLE");if(!String.IsNullOrWhiteSpace(parsed))title=parsed;}
+                AddHardwareUtility(panel,title,FormatBytes(GetPathSize(value))+"  •  "+Path.GetFileName(value),vita?"◉":"▣",accent,delegate{BackupNativeSavePath(captured,definition.Id+"-"+Path.GetFileName(captured));},300,130);
+            }
+            if(items.Count==0)AddHardwareUtility(panel,"No Saved Data","No emulator save directories have been detected yet.",vita?"◉":"▣",accent,delegate{dashboardSubpage="settings";selected=0;RenderPage();},300,130);
+            else AddHardwareUtility(panel,"Back Up All",items.Count+" save item(s)","⇧",accent,delegate{foreach(string value in items)BackupNativeSavePath(value,definition.Id+"-"+Path.GetFileName(value));},300,130);
+        }
+        private void RenderModernPlayStationSettings()
+        {
+            Color accent=GetModernPlayStationAccent();bool vita=definition.Shell=="Vita";
+            titleText.Text="Settings";subtitleText.Text=definition.PrimaryBackend+"  •  Huymaier native system integration";columns=3;
+            Grid body=new Grid{Margin=new Thickness(45,6,45,24)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(vita?95:74)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);
+            Border header=new Border{CornerRadius=new CornerRadius(vita?38:4),Background=new LinearGradientBrush(Color.FromArgb(220,accent.R,accent.G,accent.B),Color.FromArgb(150,13,66,135),0),BorderBrush=new SolidColorBrush(Color.FromArgb(210,255,255,255)),BorderThickness=new Thickness(2),Padding=new Thickness(20),Child=new TextBlock{Text=vita?"LIVEAREA SYSTEM SETTINGS":"PS4 SYSTEM SETTINGS",FontSize=20,FontWeight=FontWeights.SemiBold,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center}};body.Children.Add(header);
+            WrapPanel panel=new WrapPanel{Margin=new Thickness(0,12,0,0)};ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=panel};Grid.SetRow(scroll,1);body.Children.Add(scroll);
+            if(String.IsNullOrWhiteSpace(settings.emulatorPath)||!File.Exists(settings.emulatorPath))
+            {
+                AddHardwareUtility(panel,"Locate Emulator",definition.PrimaryBackend,"⌕",accent,ChoosePrimaryEmulator,300,132);
+                AddHardwareUtility(panel,"Install Latest",definition.PrimaryBackend+" current supported build","↓",accent,InstallPrimaryEmulator,300,132);
+            }
+            else AddHardwareUtility(panel,definition.PrimaryBackend,settings.emulatorPath,"✓",accent,ChoosePrimaryEmulator,300,132);
+            AddHardwareUtility(panel,"Full Emulator Settings","Every discovered backend setting","⚙",accent,OpenNativeBackendSettings,300,132);
+            AddHardwareUtility(panel,"Emulator Data",DisplayPath(settings.emulatorDataPath),"▣",accent,ChooseEmulatorDataRoot,300,132);
+            AddHardwareUtility(panel,"Application Folders",settings.gameFolders.Count+" configured","▦",accent,AddGameFolder,300,132);
+            AddHardwareUtility(panel,vita?"Content Manager":"Saved Data Management","Native save storage","◫",accent,delegate{dashboardSubpage="saves";selected=0;RenderPage();},300,132);
+            AddHardwareUtility(panel,"Refresh Installed Apps",games.Count+" installed applications","↻",accent,delegate{RefreshLibrary(true);},300,132);
+        }
+
+
+        private void RenderPs4DynamicMenu()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=1;Grid body=new Grid{Margin=new Thickness(55,15,55,20)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(84)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);StackPanel functions=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};foreach(string glyph in new[]{"☺","▣","◉","⚙","◷"})functions.Children.Add(new TextBlock{Text=glyph,FontSize=25,Foreground=Brushes.White,Margin=new Thickness(18,0,18,0),VerticalAlignment=VerticalAlignment.Center});body.Children.Add(functions);StackPanel row=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};ScrollViewer scroll=new ScrollViewer{HorizontalScrollBarVisibility=ScrollBarVisibility.Hidden,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,Content=row};Grid.SetRow(scroll,1);body.Children.Add(scroll);foreach(ConsolePlatformGame game in games){ConsolePlatformGame captured=game;Button tile=CreateWave1GameIcon(game,"PS4",Color.FromRgb(75,173,255),220,290,delegate{LaunchGame(captured,false);});row.Children.Add(tile);actions.Add(new ConsolePlatformAction{Button=tile,Name=game.Name,Game=game,Invoke=delegate{LaunchGame(captured,false);}});}AddHardwareUtility(row,"Library",games.Count+" titles","▦",Color.FromRgb(31,124,207),delegate{OpenWave1Subpage("library");},180,290);AddHardwareUtility(row,"Settings",definition.PrimaryBackend,"⚙",Color.FromRgb(20,99,181),delegate{OpenWave1Subpage("settings");},180,290);
+        }
+
+        private void RenderVitaLiveArea()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=5;Grid body=new Grid{Margin=new Thickness(45,5,45,18)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(72)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);TextBlock status=new TextBlock{Text=DateTime.Now.ToString("HH:mm",CultureInfo.CurrentCulture)+"     HUYMAIER VITA",FontSize=17,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center};body.Children.Add(status);WrapPanel bubbles=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(15)};ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=bubbles};Grid.SetRow(scroll,1);body.Children.Add(scroll);int index=0;foreach(ConsolePlatformGame game in games){ConsolePlatformGame captured=game;Color accent=Color.FromRgb((byte)(80+(index*37)%150),(byte)(125+(index*53)%110),(byte)(165+(index*31)%90));Button bubble=new Button{Width=175,Height=175,Margin=new Thickness(16),Padding=new Thickness(8),Background=new RadialGradientBrush(Color.FromArgb(230,(byte)Math.Min(255,accent.R+40),(byte)Math.Min(255,accent.G+40),(byte)Math.Min(255,accent.B+40)),accent),BorderBrush=new SolidColorBrush(Color.FromArgb(210,255,255,255)),BorderThickness=new Thickness(3),RenderTransformOrigin=new Point(0.5,0.5)};bubble.Template=null;Grid icon=new Grid();if(!String.IsNullOrWhiteSpace(game.Cover)&&File.Exists(game.Cover)){try{icon.Children.Add(new Image{Source=LoadBitmap(game.Cover),Stretch=Stretch.UniformToFill});}catch{}}icon.Children.Add(new TextBlock{Text=game.Name,FontSize=12,FontWeight=FontWeights.SemiBold,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Bottom,Margin=new Thickness(8),TextAlignment=TextAlignment.Center,TextWrapping=TextWrapping.Wrap});bubble.Content=icon;bubble.Click+=delegate{LaunchGame(captured,false);};bubbles.Children.Add(bubble);actions.Add(new ConsolePlatformAction{Button=bubble,Name=game.Name,Game=game,Invoke=delegate{LaunchGame(captured,false);}});index++;}AddHardwareUtility(bubbles,"Content Manager","saved data","▣",Color.FromRgb(56,160,214),delegate{OpenWave1Subpage("saves");},175,175);AddHardwareUtility(bubbles,"Settings",definition.PrimaryBackend,"⚙",Color.FromRgb(42,111,188),delegate{OpenWave1Subpage("settings");},175,175);
+        }
+
+        private bool IsWave3Shell()
+        {
+            return definition.Shell == "AtariLynx" || definition.Shell == "NeoGeo" || definition.Shell == "NGPC" || definition.Shell == "Jaguar" || definition.Shell == "PrimeHack";
+        }
+
+        private void RenderWave3Root()
+        {
+            if (definition.Shell == "AtariLynx") { RenderAtariLynxHandheld(); return; }
+            if (definition.Shell == "NeoGeo") { RenderNeoGeoDeck(); return; }
+            if (definition.Shell == "NGPC") { RenderNgpcHandheld(); return; }
+            if (definition.Shell == "Jaguar") { RenderJaguarDeck(); return; }
+            RenderPrimeHackVisor();
+        }
+
+        private void RenderWave3Subpage()
+        {
+            if (dashboardSubpage == "library") { RenderWave1Library(); return; }
+            if (dashboardSubpage == "backend-settings" || dashboardSubpage == "backend-settings-list" || dashboardSubpage == "backend-setting-detail") { RenderWave1Subpage(); return; }
+            if (dashboardSubpage == "settings") { RenderWave3Settings(); return; }
+            if (dashboardSubpage == "saves") { RenderWave3Storage(); return; }
+            RenderWave3Settings();
+        }
+
+
+        private Color GetWave3Accent(){if(definition.Shell=="AtariLynx")return Color.FromRgb(226,82,44);if(definition.Shell=="NeoGeo")return Color.FromRgb(215,31,39);if(definition.Shell=="NGPC")return Color.FromRgb(78,183,182);if(definition.Shell=="Jaguar")return Color.FromRgb(209,35,42);return Color.FromRgb(63,225,211);}
+        private string[] GetWave3SaveExtensions(){if(definition.Shell=="NeoGeo")return new[]{".mem",".nv",".nvram",".sav",".srm",".fs"};if(definition.Shell=="Jaguar")return new[]{".sav",".nv",".nvram",".eeprom",".eep",".ram"};return new[]{".sav",".srm",".ram",".rtc",".gci",".raw",".bin"};}
+        private List<string> FindWave3SaveFiles(){HashSet<string> found=new HashSet<string>(StringComparer.OrdinalIgnoreCase);List<string> roots=FindSaveRoots();Action<string> addRoot=delegate(string value){if(String.IsNullOrWhiteSpace(value))return;try{if(File.Exists(value))value=Path.GetDirectoryName(value);if(Directory.Exists(value)&&!roots.Contains(value,StringComparer.OrdinalIgnoreCase))roots.Add(value);}catch{}};addRoot(settings.emulatorDataPath);addRoot(settings.emulatorPath);addRoot(settings.fallbackEmulatorPath);foreach(string root in roots.ToArray())foreach(string name in new[]{"sav","Save","Saves","memcard","Memcard","nvram","NVRAM","GC","Wii"}){try{addRoot(Path.Combine(root,name));}catch{}};string[] exts=GetWave3SaveExtensions();int visited=0;foreach(string root in roots){if(!Directory.Exists(root))continue;try{foreach(string file in Directory.EnumerateFiles(root,"*",SearchOption.AllDirectories)){if(++visited>10000)break;if(exts.Contains(Path.GetExtension(file),StringComparer.OrdinalIgnoreCase))found.Add(file);}}catch{}if(visited>10000)break;}return found.OrderBy(delegate(string p){return Path.GetFileName(p);},StringComparer.CurrentCultureIgnoreCase).ToList();}
+        private void RenderWave3Storage(){Color accent=GetWave3Accent();titleText.Text=definition.Shell=="NeoGeo"?"Memory Card":(definition.Shell=="PrimeHack"?"Prime Save Data":"Saved Data");subtitleText.Text=definition.DisplayName+" native save storage";columns=3;WrapPanel panel=new WrapPanel{Margin=new Thickness(35,8,35,24)};contentHost.Children.Add(new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=panel});List<string>saves=FindWave3SaveFiles();foreach(string value in saves.Take(700)){string captured=value;AddHardwareUtility(panel,Path.GetFileNameWithoutExtension(value),FormatBytes(GetPathSize(value))+"  •  "+Path.GetExtension(value).TrimStart('.').ToUpperInvariant(),"▣",accent,delegate{BackupNativeSavePath(captured,definition.Id+"-"+Path.GetFileNameWithoutExtension(captured));},300,120);}if(saves.Count==0)AddHardwareUtility(panel,"No Saved Data",definition.PrimaryBackend+" has no detected save data yet.","▣",accent,delegate{dashboardSubpage="settings";selected=0;RenderPage();},300,120);else AddHardwareUtility(panel,"Back Up All",saves.Count+" save item(s)","⇧",accent,delegate{foreach(string value in saves)BackupNativeSavePath(value,definition.Id+"-"+Path.GetFileNameWithoutExtension(value));},300,120);}
+        private void RenderWave3Settings(){Color accent=GetWave3Accent();titleText.Text=definition.DisplayName+" System";subtitleText.Text=definition.PrimaryBackend+"  •  native emulator integration";columns=3;WrapPanel panel=new WrapPanel{Margin=new Thickness(45,20,45,24)};contentHost.Children.Add(new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=panel});if(String.IsNullOrWhiteSpace(settings.emulatorPath)||!File.Exists(settings.emulatorPath)){AddHardwareUtility(panel,"Locate Emulator",definition.PrimaryBackend,"⌕",accent,ChoosePrimaryEmulator,300,135);AddHardwareUtility(panel,"Install Latest",definition.PrimaryBackend+" official/current supported build","↓",accent,InstallPrimaryEmulator,300,135);}else AddHardwareUtility(panel,definition.PrimaryBackend,settings.emulatorPath,"✓",accent,ChoosePrimaryEmulator,300,135);AddHardwareUtility(panel,"Full Emulator Settings","Every discovered backend setting","⚙",accent,OpenNativeBackendSettings,300,135);AddHardwareUtility(panel,"Emulator Data",DisplayPath(settings.emulatorDataPath),"▣",accent,ChooseEmulatorDataRoot,300,135);AddHardwareUtility(panel,"Game Folders",settings.gameFolders.Count+" configured","▦",accent,AddGameFolder,300,135);AddHardwareUtility(panel,"Saved Data","Native storage manager","◫",accent,delegate{dashboardSubpage="saves";selected=0;RenderPage();},300,135);AddHardwareUtility(panel,"Refresh Library",games.Count+" titles","↻",accent,delegate{RefreshLibrary(true);},300,135);}
+
+        private void RenderAtariLynxHandheld()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=5;Grid body=new Grid{Margin=new Thickness(35,5,35,18)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(330)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);
+            Border unit=new Border{CornerRadius=new CornerRadius(55),Background=new LinearGradientBrush(Color.FromRgb(40,41,42),Color.FromRgb(6,7,8),90),BorderBrush=new SolidColorBrush(Color.FromRgb(72,73,74)),BorderThickness=new Thickness(5),Padding=new Thickness(28),Margin=new Thickness(75,0,75,12)};Grid h=new Grid();h.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(185)});h.ColumnDefinitions.Add(new ColumnDefinition());h.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(185)});h.Children.Add(new TextBlock{Text="✚",FontSize=68,Foreground=new SolidColorBrush(Color.FromRgb(85,87,88)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center});Border screen=new Border{CornerRadius=new CornerRadius(5),Background=new SolidColorBrush(Color.FromRgb(34,45,42)),BorderBrush=new SolidColorBrush(Color.FromRgb(7,8,9)),BorderThickness=new Thickness(14),Margin=new Thickness(8),Child=new TextBlock{Text="LYNX",FontSize=34,FontWeight=FontWeights.Bold,Foreground=new SolidColorBrush(Color.FromRgb(226,82,44)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center}};Grid.SetColumn(screen,1);h.Children.Add(screen);TextBlock ab=new TextBlock{Text="A      B",FontSize=30,Foreground=new SolidColorBrush(Color.FromRgb(226,82,44)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(ab,2);h.Children.Add(ab);unit.Child=h;body.Children.Add(unit);WrapPanel cards=new WrapPanel();ScrollViewer sc=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=cards};Grid.SetRow(sc,1);body.Children.Add(sc);foreach(ConsolePlatformGame game in games)AddHardwareGame(cards,game,Color.FromRgb(226,82,44),126,158,"LYNX");AddHardwareUtility(cards,"System",definition.PrimaryBackend,"⚙",Color.FromRgb(226,82,44),delegate{OpenWave1Subpage("settings");},140,158);
+        }
+
+        private void RenderNeoGeoDeck()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=6;Grid body=new Grid{Margin=new Thickness(50,0,50,18)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(190)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);Border deck=new Border{CornerRadius=new CornerRadius(14),Background=new LinearGradientBrush(Color.FromRgb(29,30,31),Color.FromRgb(3,4,5),90),BorderBrush=new SolidColorBrush(Color.FromRgb(87,88,89)),BorderThickness=new Thickness(4),Padding=new Thickness(22),Margin=new Thickness(135,0,135,10)};Grid g=new Grid();g.Children.Add(new Border{Width=380,Height=64,Background=new SolidColorBrush(Color.FromRgb(5,6,7)),BorderBrush=new SolidColorBrush(Color.FromRgb(215,31,39)),BorderThickness=new Thickness(0,5,0,0),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center});g.Children.Add(new TextBlock{Text="NEO•GEO\nADVANCED ENTERTAINMENT SYSTEM",FontSize=21,FontWeight=FontWeights.Bold,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(35,0,0,0),TextAlignment=TextAlignment.Center});g.Children.Add(new TextBlock{Text="MAX 330 MEGA\nPRO-GEAR SPEC",FontSize=9,Foreground=new SolidColorBrush(Color.FromRgb(215,31,39)),HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,35,0),TextAlignment=TextAlignment.Center});deck.Child=g;body.Children.Add(deck);WrapPanel cards=new WrapPanel();ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=cards};Grid.SetRow(scroll,1);body.Children.Add(scroll);foreach(ConsolePlatformGame game in games)AddHardwareGame(cards,game,Color.FromRgb(215,31,39),126,158,"NEO GEO");AddHardwareUtility(cards,"Memory Card","saved data","▣",Color.FromRgb(215,31,39),delegate{OpenWave1Subpage("saves");},140,158);AddHardwareUtility(cards,"System",definition.PrimaryBackend,"⚙",Color.FromRgb(122,25,30),delegate{OpenWave1Subpage("settings");},140,158);
+        }
+
+        private void RenderNgpcHandheld()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=5;Grid body=new Grid{Margin=new Thickness(40,5,40,18)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(335)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);Border handheld=new Border{Width=620,CornerRadius=new CornerRadius(70),HorizontalAlignment=HorizontalAlignment.Center,Background=new LinearGradientBrush(Color.FromRgb(89,93,95),Color.FromRgb(35,38,39),90),BorderBrush=new SolidColorBrush(Color.FromRgb(117,121,122)),BorderThickness=new Thickness(4),Padding=new Thickness(30)};Grid h=new Grid();h.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(160)});h.ColumnDefinitions.Add(new ColumnDefinition());h.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(160)});Border stick=new Border{Width=74,Height=74,CornerRadius=new CornerRadius(37),Background=new RadialGradientBrush(Color.FromRgb(88,91,92),Color.FromRgb(21,23,24)),BorderBrush=new SolidColorBrush(Color.FromRgb(135,138,139)),BorderThickness=new Thickness(3),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text="●",FontSize=34,Foreground=new SolidColorBrush(Color.FromRgb(32,34,35)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center}};h.Children.Add(stick);Border screen=new Border{Background=new SolidColorBrush(Color.FromRgb(45,61,54)),BorderBrush=new SolidColorBrush(Color.FromRgb(12,14,15)),BorderThickness=new Thickness(12),CornerRadius=new CornerRadius(8),Child=new TextBlock{Text="NEO GEO\nPOCKET COLOR",FontSize=22,FontWeight=FontWeights.SemiBold,Foreground=new SolidColorBrush(Color.FromRgb(78,183,182)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,TextAlignment=TextAlignment.Center}};Grid.SetColumn(screen,1);h.Children.Add(screen);TextBlock ab=new TextBlock{Text="A    B",FontSize=28,Foreground=new SolidColorBrush(Color.FromRgb(78,183,182)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(ab,2);h.Children.Add(ab);handheld.Child=h;body.Children.Add(handheld);WrapPanel cards=new WrapPanel();ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=cards};Grid.SetRow(scroll,1);body.Children.Add(scroll);foreach(ConsolePlatformGame game in games)AddHardwareGame(cards,game,Color.FromRgb(78,183,182),126,158,"NGPC");AddHardwareUtility(cards,"System",definition.PrimaryBackend,"⚙",Color.FromRgb(78,183,182),delegate{OpenWave1Subpage("settings");},140,158);
+        }
+
+        private void RenderJaguarDeck()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=6;Grid body=new Grid{Margin=new Thickness(45,0,45,18)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(220)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);Border deck=new Border{CornerRadius=new CornerRadius(80,80,18,18),Background=new LinearGradientBrush(Color.FromRgb(38,39,40),Color.FromRgb(4,5,6),90),BorderBrush=new SolidColorBrush(Color.FromRgb(73,74,75)),BorderThickness=new Thickness(5),Padding=new Thickness(22),Margin=new Thickness(150,0,150,10)};Grid g=new Grid();g.Children.Add(new Border{Width=330,Height=52,CornerRadius=new CornerRadius(8),Background=new SolidColorBrush(Color.FromRgb(9,10,11)),BorderBrush=new SolidColorBrush(Color.FromRgb(209,35,42)),BorderThickness=new Thickness(3),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center});g.Children.Add(new TextBlock{Text="JAGUAR",FontSize=32,FontWeight=FontWeights.Black,Foreground=new SolidColorBrush(Color.FromRgb(209,35,42)),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(38,0,0,0)});g.Children.Add(new TextBlock{Text="64\nBIT",FontSize=21,FontWeight=FontWeights.Bold,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,42,0),TextAlignment=TextAlignment.Center});deck.Child=g;body.Children.Add(deck);WrapPanel cards=new WrapPanel();ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=cards};Grid.SetRow(scroll,1);body.Children.Add(scroll);foreach(ConsolePlatformGame game in games)AddHardwareGame(cards,game,Color.FromRgb(209,35,42),126,158,"JAGUAR");AddHardwareUtility(cards,"Keypad & Input","Jaguar controller mappings","#",Color.FromRgb(209,35,42),delegate{OpenWave1Subpage("settings");},140,158);AddHardwareUtility(cards,"System",definition.PrimaryBackend,"⚙",Color.FromRgb(128,27,32),delegate{OpenWave1Subpage("settings");},140,158);
+        }
+
+        private void RenderPrimeHackVisor()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=5;Grid body=new Grid{Margin=new Thickness(34,10,34,18)};contentHost.Children.Add(body);Border visor=new Border{CornerRadius=new CornerRadius(90,90,45,45),BorderBrush=new SolidColorBrush(Color.FromArgb(220,63,225,211)),BorderThickness=new Thickness(4),Background=new RadialGradientBrush(Color.FromArgb(115,15,91,91),Color.FromArgb(245,1,9,12)),Padding=new Thickness(58)};Grid inner=new Grid();inner.RowDefinitions.Add(new RowDefinition{Height=new GridLength(65)});inner.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});inner.Children.Add(new TextBlock{Text="PRIME VISOR  //  PRIMEHACK",FontFamily=new FontFamily("Consolas"),FontSize=21,FontWeight=FontWeights.SemiBold,Foreground=new SolidColorBrush(Color.FromRgb(111,255,233)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center});WrapPanel cards=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Center};ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=cards};Grid.SetRow(scroll,1);inner.Children.Add(scroll);foreach(ConsolePlatformGame game in games)AddHardwareGame(cards,game,Color.FromRgb(63,225,211),150,190,"PRIME");AddHardwareUtility(cards,"PrimeHack Controls","mouse-look, camera, reticle and visor controls","⊕",Color.FromRgb(29,151,148),delegate{OpenWave1Subpage("settings");},170,190);AddHardwareUtility(cards,"System",definition.PrimaryBackend,"⚙",Color.FromRgb(23,105,107),delegate{OpenWave1Subpage("settings");},150,190);visor.Child=inner;body.Children.Add(visor);
+        }
+
+        private bool IsWave2Shell()
+        {
+            return definition.Shell == "Atari2600" || definition.Shell == "NES" || definition.Shell == "SNES" || definition.Shell == "GameBoy" || definition.Shell == "GBC" || definition.Shell == "GBA" || definition.Shell == "Genesis" || definition.Shell == "SegaCD" || definition.Shell == "Sega32X" || definition.Shell == "GameGear" || definition.Shell == "MasterSystem" || definition.Shell == "TurboGrafx16";
+        }
+
+        private void RenderWave2Root()
+        {
+            if (definition.Shell == "Atari2600") { RenderAtari2600Deck(); return; }
+            if (definition.Shell == "NES") { RenderNesDeck(); return; }
+            if (definition.Shell == "SNES") { RenderSnesDeck(); return; }
+            if (definition.Shell == "GameBoy") { RenderGameBoyHandheld(false); return; }
+            if (definition.Shell == "GBC") { RenderGameBoyHandheld(true); return; }
+            if (definition.Shell == "GBA") { RenderGbaHandheld(); return; }
+            if (definition.Shell == "Genesis") { RenderGenesisDeck(false); return; }
+            if (definition.Shell == "Sega32X") { RenderGenesisDeck(true); return; }
+            if (definition.Shell == "SegaCD") { RenderSegaCdDeck(); return; }
+            if (definition.Shell == "GameGear") { RenderGameGearHandheld(); return; }
+            if (definition.Shell == "MasterSystem") { RenderMasterSystemDeck(); return; }
+            RenderTurboGrafxDeck();
+        }
+
+        private void RenderWave2Subpage()
+        {
+            if (dashboardSubpage == "library") { RenderWave1Library(); return; }
+            if (dashboardSubpage == "backend-settings" || dashboardSubpage == "backend-settings-list" || dashboardSubpage == "backend-setting-detail") { RenderWave1Subpage(); return; }
+            if (dashboardSubpage == "settings") { RenderWave2Settings(); return; }
+            if (dashboardSubpage == "saves") { RenderWave2Storage(); return; }
+            if (dashboardSubpage == "music") { RenderWave1Music(); return; }
+            RenderWave2Settings();
+        }
+
+        private Border CreateHardwareGameCard(ConsolePlatformGame game, Color accent, double width, double height, string mediaLabel, Action invoke)
+        {
+            Border frame = new Border { Width=width, Height=height, Margin=new Thickness(9), CornerRadius=new CornerRadius(7), Background=new SolidColorBrush(Color.FromRgb(27,29,31)), BorderBrush=new SolidColorBrush(accent), BorderThickness=new Thickness(2) };
+            Grid body = new Grid(); body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)}); body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(44)});
+            if (!String.IsNullOrWhiteSpace(game.Cover) && File.Exists(game.Cover)) { try { body.Children.Add(new Image{Source=LoadBitmap(game.Cover),Stretch=Stretch.UniformToFill,Margin=new Thickness(5)}); } catch { } }
+            if (body.Children.Count==0) body.Children.Add(new TextBlock{Text=mediaLabel,FontSize=22,FontWeight=FontWeights.Bold,Foreground=new SolidColorBrush(accent),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center});
+            Border label = new Border{Background=new SolidColorBrush(Color.FromArgb(235,10,11,12)),Padding=new Thickness(6)}; Grid.SetRow(label,1); label.Child=new TextBlock{Text=game.Name,FontSize=10,Foreground=Brushes.White,TextTrimming=TextTrimming.CharacterEllipsis,HorizontalAlignment=HorizontalAlignment.Center};body.Children.Add(label);frame.Child=body;
+            Button button=new Button{Width=width+6,Height=height+6,Margin=new Thickness(7),Padding=new Thickness(0),Background=Brushes.Transparent,BorderThickness=new Thickness(0),Content=frame,RenderTransformOrigin=new Point(0.5,0.5)};button.Click+=delegate{invoke();};return new Border{Child=button,Background=Brushes.Transparent};
+        }
+
+        private void AddHardwareGame(Panel panel, ConsolePlatformGame game, Color accent, double width, double height, string mediaLabel)
+        {
+            ConsolePlatformGame captured=game; Border wrapper=CreateHardwareGameCard(game,accent,width,height,mediaLabel,delegate{LaunchGame(captured,false);});panel.Children.Add(wrapper);Button button=wrapper.Child as Button;if(button!=null)actions.Add(new ConsolePlatformAction{Button=button,Name=game.Name,Game=game,Invoke=delegate{LaunchGame(captured,false);}});
+        }
+
+        private void AddHardwareUtility(Panel panel,string title,string detail,string glyph,Color accent,Action invoke,double width,double height)
+        {
+            Button button=CreateWave1Tile(title,detail,glyph,new SolidColorBrush(Color.FromArgb(225,accent.R,accent.G,accent.B)),Brushes.White,invoke,width,height);panel.Children.Add(button);actions.Add(new ConsolePlatformAction{Button=button,Name=title,Invoke=invoke});
+        }
+
+
+        private Color GetWave2Accent()
+        {
+            if (definition.Shell == "Atari2600") return Color.FromRgb(220,149,57);
+            if (definition.Shell == "NES") return Color.FromRgb(194,35,42);
+            if (definition.Shell == "SNES") return Color.FromRgb(103,74,151);
+            if (definition.Shell == "GameBoy") return Color.FromRgb(117,44,111);
+            if (definition.Shell == "GBC") return Color.FromRgb(244,73,142);
+            if (definition.Shell == "GBA") return Color.FromRgb(168,145,255);
+            if (definition.Shell == "Genesis") return Color.FromRgb(191,34,45);
+            if (definition.Shell == "SegaCD") return Color.FromRgb(80,147,214);
+            if (definition.Shell == "Sega32X") return Color.FromRgb(224,60,48);
+            if (definition.Shell == "GameGear") return Color.FromRgb(47,137,205);
+            if (definition.Shell == "MasterSystem") return Color.FromRgb(206,31,39);
+            return Color.FromRgb(193,34,42);
+        }
+
+        private string GetWave2SaveMediaLabel()
+        {
+            if (definition.Shell == "Atari2600") return "CARTRIDGE NVRAM / SAVEKEY";
+            if (definition.Shell == "SegaCD") return "BACKUP RAM";
+            if (definition.Shell == "TurboGrafx16") return "HUCARD / CD BACKUP";
+            if (definition.Shell == "GameBoy" || definition.Shell == "GBC" || definition.Shell == "GBA" || definition.Shell == "GameGear") return "BATTERY SAVE";
+            return "CARTRIDGE SAVE MEMORY";
+        }
+
+        private string[] GetWave2SaveExtensions()
+        {
+            if (definition.Shell == "Atari2600") return new string[] { ".sav", ".dat", ".eep", ".eeprom", ".nv", ".nvram", ".ram" };
+            if (definition.Shell == "SegaCD") return new string[] { ".brm", ".bkr", ".bcr", ".sav", ".srm", ".ram" };
+            if (definition.Shell == "GameBoy" || definition.Shell == "GBC" || definition.Shell == "GBA") return new string[] { ".sav", ".srm", ".rtc", ".ram" };
+            return new string[] { ".sav", ".srm", ".ram", ".brm", ".eep", ".eeprom", ".nv", ".nvram" };
+        }
+
+        private List<string> GetWave2SaveSearchRoots()
+        {
+            List<string> roots = new List<string>();
+            Action<string> add = delegate(string value) { if (String.IsNullOrWhiteSpace(value)) return; try { if (File.Exists(value)) value = Path.GetDirectoryName(value); if (Directory.Exists(value) && !roots.Contains(value, StringComparer.OrdinalIgnoreCase)) roots.Add(value); } catch { } };
+            add(settings.emulatorDataPath); add(settings.emulatorPath); add(settings.fallbackEmulatorPath);
+            string app = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData); string local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData); string docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            if (definition.PrimaryBackend.IndexOf("Mesen", StringComparison.OrdinalIgnoreCase) >= 0) { add(Path.Combine(app,"Mesen")); add(Path.Combine(app,"Mesen2")); add(Path.Combine(local,"Mesen")); add(Path.Combine(local,"Mesen2")); }
+            if (definition.PrimaryBackend.IndexOf("SameBoy", StringComparison.OrdinalIgnoreCase) >= 0) { add(Path.Combine(app,"SameBoy")); add(Path.Combine(local,"SameBoy")); }
+            if (definition.PrimaryBackend.IndexOf("mGBA", StringComparison.OrdinalIgnoreCase) >= 0) { add(Path.Combine(app,"mGBA")); add(Path.Combine(local,"mGBA")); }
+            if (definition.PrimaryBackend.IndexOf("Stella", StringComparison.OrdinalIgnoreCase) >= 0) add(Path.Combine(app,"Stella"));
+            if (definition.PrimaryBackend.IndexOf("ares", StringComparison.OrdinalIgnoreCase) >= 0) { add(Path.Combine(app,"ares")); add(Path.Combine(local,"ares")); }
+            if (definition.PrimaryBackend.IndexOf("Mednafen", StringComparison.OrdinalIgnoreCase) >= 0) { add(Path.Combine(docs,"Mednafen")); add(Path.Combine(app,"Mednafen")); }
+            List<string> baseRoots = roots.ToList(); foreach (string rootPath in baseRoots) foreach (string name in new string[] { "Save", "Saves", "Battery", "SRAM", "NVRAM", "Backup", "sav" }) { try { add(Path.Combine(rootPath,name)); } catch { } }
+            return roots;
+        }
+
+        private List<string> FindWave2SaveFiles()
+        {
+            HashSet<string> found = new HashSet<string>(StringComparer.OrdinalIgnoreCase); string[] extensions = GetWave2SaveExtensions();
+            foreach (ConsolePlatformGame game in games)
+            {
+                if (game == null || String.IsNullOrWhiteSpace(game.Path)) continue;
+                string basePath; try { basePath = Path.Combine(Path.GetDirectoryName(game.Path), Path.GetFileNameWithoutExtension(game.Path)); } catch { continue; }
+                foreach (string ext in extensions) { string candidate = basePath + ext; if (File.Exists(candidate)) found.Add(candidate); }
+            }
+            int visited = 0;
+            foreach (string rootPath in GetWave2SaveSearchRoots())
+            {
+                if (!Directory.Exists(rootPath)) continue;
+                try
+                {
+                    foreach (string file in Directory.EnumerateFiles(rootPath,"*",SearchOption.AllDirectories))
+                    {
+                        if (++visited > 7000) break; string ext = Path.GetExtension(file); if (extensions.Contains(ext,StringComparer.OrdinalIgnoreCase)) found.Add(file);
+                    }
+                }
+                catch { }
+                if (visited > 7000) break;
+            }
+            return found.OrderBy(delegate(string p) { return Path.GetFileName(p); }, StringComparer.CurrentCultureIgnoreCase).ToList();
+        }
+
+        private string GetWave2SaveDisplayName(string pathValue)
+        {
+            string baseName = Path.GetFileNameWithoutExtension(pathValue); string normalized = NormalizeArtworkTitle(baseName); ConsolePlatformGame best = null; double bestScore = 0;
+            foreach (ConsolePlatformGame game in games) { string candidate = NormalizeArtworkTitle(game.Name); if (candidate == normalized) return game.Name; double score = candidate.Contains(normalized) || normalized.Contains(candidate) ? 0.8 : 0; if (score > bestScore) { bestScore = score; best = game; } }
+            return best != null && bestScore >= 0.8 ? best.Name : baseName;
+        }
+
+        private Button CreateWave2SaveChip(string pathValue, Action invoke)
+        {
+            Color accent = GetWave2Accent(); string title = GetWave2SaveDisplayName(pathValue); string media = GetWave2SaveMediaLabel();
+            Button button = new Button { Width=315, Height=126, Margin=new Thickness(9), Padding=new Thickness(0), Background=Brushes.Transparent, BorderThickness=new Thickness(0), RenderTransformOrigin=new Point(0.5,0.5) };
+            Border chip = new Border { CornerRadius=new CornerRadius(8), Background=new LinearGradientBrush(Color.FromRgb(30,31,32),Color.FromRgb(8,9,10),90), BorderBrush=new SolidColorBrush(accent), BorderThickness=new Thickness(2), Padding=new Thickness(14) };
+            Grid layout = new Grid(); layout.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(76)}); layout.ColumnDefinitions.Add(new ColumnDefinition());
+            Border die = new Border { Width=54, Height=72, CornerRadius=new CornerRadius(5), Background=new SolidColorBrush(Color.FromRgb(14,15,16)), BorderBrush=new SolidColorBrush(Color.FromArgb(180,accent.R,accent.G,accent.B)), BorderThickness=new Thickness(2), VerticalAlignment=VerticalAlignment.Center, Child=new TextBlock{Text="SAVE\nRAM",FontSize=10,FontWeight=FontWeights.Bold,Foreground=new SolidColorBrush(accent),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,TextAlignment=TextAlignment.Center} }; layout.Children.Add(die);
+            StackPanel info = new StackPanel { Margin=new Thickness(8,2,0,0) }; Grid.SetColumn(info,1); info.Children.Add(new TextBlock{Text=title,FontSize=15,FontWeight=FontWeights.SemiBold,Foreground=Brushes.White,TextTrimming=TextTrimming.CharacterEllipsis}); info.Children.Add(new TextBlock{Text=media,FontSize=9,Foreground=new SolidColorBrush(accent),Margin=new Thickness(0,3,0,0)}); info.Children.Add(new TextBlock{Text=FormatBytes(GetPathSize(pathValue))+"  •  "+GetPathModifiedUtcSafe(pathValue).ToString("g",CultureInfo.CurrentCulture),FontSize=9,Foreground=new SolidColorBrush(Color.FromArgb(185,255,255,255)),Margin=new Thickness(0,5,0,0)}); info.Children.Add(new TextBlock{Text=Path.GetFileName(pathValue),FontSize=8,Foreground=new SolidColorBrush(Color.FromArgb(135,255,255,255)),TextTrimming=TextTrimming.CharacterEllipsis}); layout.Children.Add(info); chip.Child=layout; button.Content=chip; button.Click+=delegate{invoke();}; return button;
+        }
+
+        private void RenderWave2Storage()
+        {
+            Color accent = GetWave2Accent(); string media = GetWave2SaveMediaLabel(); titleText.Text = definition.Shell == "SegaCD" ? "Backup RAM" : "Saved Data"; subtitleText.Text = media + "  •  " + definition.DisplayName; columns = 3;
+            ScrollViewer scroll = new ScrollViewer { VerticalScrollBarVisibility=ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled }; WrapPanel panel = new WrapPanel { Margin=new Thickness(34,8,34,24) }; scroll.Content=panel; contentHost.Children.Add(scroll);
+            List<string> saves = FindWave2SaveFiles(); foreach (string pathValue in saves.Take(600)) { string captured=pathValue; Button chip=CreateWave2SaveChip(pathValue,delegate{BackupNativeSavePath(captured,definition.Id+"-"+Path.GetFileNameWithoutExtension(captured));}); panel.Children.Add(chip); actions.Add(new ConsolePlatformAction{Button=chip,Name=GetWave2SaveDisplayName(pathValue),Invoke=delegate{BackupNativeSavePath(captured,definition.Id+"-"+Path.GetFileNameWithoutExtension(captured));}}); }
+            if (saves.Count == 0) AddHardwareUtility(panel,"No Saved Data",definition.PrimaryBackend+" has not produced detected "+media.ToLowerInvariant()+" yet.","▣",accent,delegate{dashboardSubpage="settings";selected=0;RenderPage();},310,126);
+            else AddHardwareUtility(panel,"Back Up All",saves.Count.ToString(CultureInfo.InvariantCulture)+" save file(s)","⇧",accent,delegate{foreach(string value in saves)BackupNativeSavePath(value,definition.Id+"-"+Path.GetFileNameWithoutExtension(value));},310,126);
+        }
+
+        private void RenderWave2Settings()
+        {
+            Color accent=GetWave2Accent(); titleText.Text=definition.DisplayName+" System"; subtitleText.Text=definition.PrimaryBackend+"  •  every setting remains inside Huymaier Console"; columns=3;
+            Grid body=new Grid{Margin=new Thickness(42,4,42,22)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(115)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);
+            Border plaque=new Border{CornerRadius=new CornerRadius(10),Background=new LinearGradientBrush(Color.FromRgb(35,36,38),Color.FromRgb(9,10,11),90),BorderBrush=new SolidColorBrush(accent),BorderThickness=new Thickness(2),Padding=new Thickness(20)};Grid header=new Grid();header.Children.Add(new TextBlock{Text=definition.DisplayName.ToUpperInvariant(),FontSize=24,FontWeight=FontWeights.SemiBold,Foreground=Brushes.White,VerticalAlignment=VerticalAlignment.Center});header.Children.Add(new TextBlock{Text=String.IsNullOrWhiteSpace(settings.emulatorPath)?"EMULATOR NOT ATTACHED":Path.GetFileName(settings.emulatorPath),FontSize=11,Foreground=new SolidColorBrush(accent),HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center});plaque.Child=header;body.Children.Add(plaque);
+            WrapPanel controls=new WrapPanel{Margin=new Thickness(0,12,0,0)};ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=controls};Grid.SetRow(scroll,1);body.Children.Add(scroll);
+            if(String.IsNullOrWhiteSpace(settings.emulatorPath)||!File.Exists(settings.emulatorPath)){AddHardwareUtility(controls,"Locate Emulator","Point Huymaier Console to "+definition.PrimaryBackend,"⌕",accent,ChoosePrimaryEmulator,300,130);AddHardwareUtility(controls,"Install Latest",definition.PrimaryBackend+" official release","↓",accent,InstallPrimaryEmulator,300,130);}else AddHardwareUtility(controls,definition.PrimaryBackend,settings.emulatorPath,"✓",accent,ChoosePrimaryEmulator,300,130);
+            AddHardwareUtility(controls,"Full Emulator Settings","Every discovered setting; unknown keys preserved","⚙",accent,OpenNativeBackendSettings,300,130);AddHardwareUtility(controls,"Emulator Data",DisplayPath(settings.emulatorDataPath),"▣",accent,ChooseEmulatorDataRoot,300,130);AddHardwareUtility(controls,"Game Folders",settings.gameFolders.Count.ToString(CultureInfo.InvariantCulture)+" configured","▦",accent,AddGameFolder,300,130);AddHardwareUtility(controls,"Saved Data",GetWave2SaveMediaLabel(),"◫",accent,delegate{dashboardSubpage="saves";selected=0;RenderPage();},300,130);AddHardwareUtility(controls,"Refresh Library",games.Count.ToString(CultureInfo.InvariantCulture)+" titles","↻",accent,delegate{RefreshLibrary(true);},300,130);
+        }
+
+        private void RenderAtari2600Deck()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=5;Grid body=new Grid{Margin=new Thickness(45,5,45,18)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(185)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);
+            Border deck=new Border{CornerRadius=new CornerRadius(8),Background=new LinearGradientBrush(Color.FromRgb(60,33,17),Color.FromRgb(126,74,36),0),BorderBrush=new SolidColorBrush(Color.FromRgb(17,16,15)),BorderThickness=new Thickness(8),Padding=new Thickness(20)};Grid d=new Grid();d.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star)});d.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(350)});TextBlock brand=new TextBlock{Text="ATARI\nVIDEO COMPUTER SYSTEM",FontSize=22,FontWeight=FontWeights.Light,Foreground=new SolidColorBrush(Color.FromRgb(239,213,170)),VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(35,0,0,0)};d.Children.Add(brand);StackPanel switches=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};foreach(string name in new[]{"POWER","TV TYPE","GAME SELECT","GAME RESET"}){StackPanel sw=new StackPanel{Width=76};sw.Children.Add(new Border{Width=12,Height=52,Background=new SolidColorBrush(Color.FromRgb(215,215,207)),BorderBrush=Brushes.Black,BorderThickness=new Thickness(2),HorizontalAlignment=HorizontalAlignment.Center});sw.Children.Add(new TextBlock{Text=name,FontSize=7,Foreground=new SolidColorBrush(Color.FromRgb(238,215,179)),TextAlignment=TextAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,5,0,0)});switches.Children.Add(sw);}Grid.SetColumn(switches,1);d.Children.Add(switches);deck.Child=d;body.Children.Add(deck);
+            ScrollViewer sc=new ScrollViewer{HorizontalScrollBarVisibility=ScrollBarVisibility.Hidden,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled};StackPanel row=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};sc.Content=row;Grid.SetRow(sc,1);body.Children.Add(sc);foreach(ConsolePlatformGame game in games)AddHardwareGame(row,game,Color.FromRgb(220,149,57),136,178,"CARTRIDGE");AddHardwareUtility(row,"Console Setup",definition.PrimaryBackend,"⚙",Color.FromRgb(143,76,34),delegate{OpenWave1Subpage("settings");},150,178);
+        }
+
+        private void RenderNesDeck()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=6;Grid body=new Grid{Margin=new Thickness(55,0,55,16)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(155)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);Border console=new Border{CornerRadius=new CornerRadius(4),Background=new LinearGradientBrush(Color.FromRgb(204,203,198),Color.FromRgb(128,128,125),90),BorderBrush=new SolidColorBrush(Color.FromRgb(54,54,53)),BorderThickness=new Thickness(3),Padding=new Thickness(20)};Grid c=new Grid();c.ColumnDefinitions.Add(new ColumnDefinition());c.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(320)});Border slot=new Border{Height=45,Background=new SolidColorBrush(Color.FromRgb(36,37,37)),BorderBrush=new SolidColorBrush(Color.FromRgb(81,81,79)),BorderThickness=new Thickness(4),VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(30,0,45,0)};c.Children.Add(slot);StackPanel right=new StackPanel{VerticalAlignment=VerticalAlignment.Center};right.Children.Add(new TextBlock{Text="Nintendo\nENTERTAINMENT SYSTEM",FontSize=20,FontWeight=FontWeights.Bold,Foreground=new SolidColorBrush(Color.FromRgb(186,34,41)),HorizontalAlignment=HorizontalAlignment.Center,TextAlignment=TextAlignment.Center});right.Children.Add(new TextBlock{Text="POWER     RESET",FontSize=9,Foreground=new SolidColorBrush(Color.FromRgb(55,55,54)),HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,15,0,0)});Grid.SetColumn(right,1);c.Children.Add(right);console.Child=c;body.Children.Add(console);WrapPanel cards=new WrapPanel{Margin=new Thickness(0,12,0,0)};ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=cards};Grid.SetRow(scroll,1);body.Children.Add(scroll);foreach(ConsolePlatformGame game in games)AddHardwareGame(cards,game,Color.FromRgb(194,35,42),132,170,"GAME PAK");AddHardwareUtility(cards,"Control Deck",definition.PrimaryBackend,"⚙",Color.FromRgb(194,35,42),delegate{OpenWave1Subpage("settings");},145,170);
+        }
+
+        private void RenderSnesDeck()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=6;Grid body=new Grid{Margin=new Thickness(55,0,55,16)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(160)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);Border console=new Border{CornerRadius=new CornerRadius(30),Background=new LinearGradientBrush(Color.FromRgb(216,215,212),Color.FromRgb(153,151,154),90),BorderBrush=new SolidColorBrush(Color.FromRgb(98,95,105)),BorderThickness=new Thickness(3),Padding=new Thickness(22)};Grid c=new Grid();Border slot=new Border{Width=420,Height=44,Background=new SolidColorBrush(Color.FromRgb(77,75,84)),BorderBrush=new SolidColorBrush(Color.FromRgb(130,127,137)),BorderThickness=new Thickness(3),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};c.Children.Add(slot);c.Children.Add(new TextBlock{Text="SUPER NINTENDO\nENTERTAINMENT SYSTEM",FontSize=16,FontWeight=FontWeights.SemiBold,Foreground=new SolidColorBrush(Color.FromRgb(78,75,87)),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(25,0,0,0),TextAlignment=TextAlignment.Center});c.Children.Add(new TextBlock{Text="●  ●  ●  ●",FontSize=23,Foreground=new SolidColorBrush(Color.FromRgb(103,74,151)),HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,35,0)});console.Child=c;body.Children.Add(console);WrapPanel cards=new WrapPanel{Margin=new Thickness(0,10,0,0)};ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=cards};Grid.SetRow(scroll,1);body.Children.Add(scroll);foreach(ConsolePlatformGame game in games)AddHardwareGame(cards,game,Color.FromRgb(103,74,151),132,170,"GAME PAK");AddHardwareUtility(cards,"Console Setup",definition.PrimaryBackend,"⚙",Color.FromRgb(103,74,151),delegate{OpenWave1Subpage("settings");},145,170);
+        }
+
+        private void RenderGameBoyHandheld(bool colorModel)
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=4;Grid body=new Grid{Margin=new Thickness(70,0,70,20)};body.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(410)});body.ColumnDefinitions.Add(new ColumnDefinition());contentHost.Children.Add(body);Color shell=colorModel?Color.FromRgb(86,38,131):Color.FromRgb(190,191,181);Border handheld=new Border{Width=330,Height=520,CornerRadius=new CornerRadius(18,18,55,18),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,Background=new LinearGradientBrush(shell,Color.FromRgb((byte)Math.Max(0,shell.R-35),(byte)Math.Max(0,shell.G-35),(byte)Math.Max(0,shell.B-35)),90),BorderBrush=new SolidColorBrush(Color.FromRgb(69,69,67)),BorderThickness=new Thickness(3),Padding=new Thickness(25)};StackPanel h=new StackPanel();h.Children.Add(new TextBlock{Text=colorModel?"GAME BOY COLOR":"DOT MATRIX WITH STEREO SOUND",FontSize=colorModel?22:9,FontWeight=FontWeights.SemiBold,Foreground=colorModel?Brushes.White:new SolidColorBrush(Color.FromRgb(56,65,100)),HorizontalAlignment=HorizontalAlignment.Center});Border screen=new Border{Height=230,Margin=new Thickness(0,18,0,20),CornerRadius=new CornerRadius(8),Background=new SolidColorBrush(colorModel?Color.FromRgb(82,91,78):Color.FromRgb(119,137,84)),BorderBrush=new SolidColorBrush(Color.FromRgb(55,55,55)),BorderThickness=new Thickness(12)};ConsolePlatformGame selectedGame=games.Count>0?games[Math.Max(0,Math.Min(games.Count-1,selected))]:null;if(selectedGame!=null&&!String.IsNullOrWhiteSpace(selectedGame.Cover)&&File.Exists(selectedGame.Cover)){try{screen.Child=new Image{Source=LoadBitmap(selectedGame.Cover),Stretch=Stretch.Uniform};}catch{}}if(screen.Child==null)screen.Child=new TextBlock{Text=games.Count+"\nGAMES",FontFamily=new FontFamily("Consolas"),FontSize=28,FontWeight=FontWeights.Bold,Foreground=new SolidColorBrush(Color.FromRgb(30,53,30)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,TextAlignment=TextAlignment.Center};h.Children.Add(screen);h.Children.Add(new TextBlock{Text="✚                       A     B",FontSize=25,Foreground=colorModel?Brushes.White:new SolidColorBrush(Color.FromRgb(73,65,88)),HorizontalAlignment=HorizontalAlignment.Center});h.Children.Add(new TextBlock{Text="SELECT     START",FontSize=10,Foreground=colorModel?Brushes.White:new SolidColorBrush(Color.FromRgb(73,65,88)),HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,26,0,0)});handheld.Child=h;body.Children.Add(handheld);WrapPanel list=new WrapPanel{Margin=new Thickness(15)};ScrollViewer sc=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=list};Grid.SetColumn(sc,1);body.Children.Add(sc);Color accent=colorModel?Color.FromRgb(244,73,142):Color.FromRgb(117,44,111);foreach(ConsolePlatformGame game in games)AddHardwareGame(list,game,accent,120,155,"PAK");AddHardwareUtility(list,"System",definition.PrimaryBackend,"⚙",accent,delegate{OpenWave1Subpage("settings");},132,155);
+        }
+
+        private void RenderGbaHandheld()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=5;Grid body=new Grid{Margin=new Thickness(38,8,38,18)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(330)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);Border handheld=new Border{CornerRadius=new CornerRadius(110),Background=new LinearGradientBrush(Color.FromRgb(91,65,159),Color.FromRgb(53,36,103),90),BorderBrush=new SolidColorBrush(Color.FromRgb(33,24,65)),BorderThickness=new Thickness(4),Padding=new Thickness(36),Margin=new Thickness(45,0,45,8)};Grid h=new Grid();h.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(150)});h.ColumnDefinitions.Add(new ColumnDefinition());h.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(150)});h.Children.Add(new TextBlock{Text="✚",FontSize=64,Foreground=new SolidColorBrush(Color.FromRgb(39,31,70)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center});Border screen=new Border{CornerRadius=new CornerRadius(10),Background=new SolidColorBrush(Color.FromRgb(39,55,58)),BorderBrush=new SolidColorBrush(Color.FromRgb(24,26,33)),BorderThickness=new Thickness(11),Margin=new Thickness(10)};Grid.SetColumn(screen,1);screen.Child=new TextBlock{Text="GAME BOY\nADVANCE",FontSize=26,FontStyle=FontStyles.Italic,Foreground=new SolidColorBrush(Color.FromRgb(169,185,182)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,TextAlignment=TextAlignment.Center};h.Children.Add(screen);TextBlock ab=new TextBlock{Text="A    B",FontSize=30,FontWeight=FontWeights.Bold,Foreground=new SolidColorBrush(Color.FromRgb(183,156,241)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(ab,2);h.Children.Add(ab);handheld.Child=h;body.Children.Add(handheld);WrapPanel cards=new WrapPanel();ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=cards};Grid.SetRow(scroll,1);body.Children.Add(scroll);foreach(ConsolePlatformGame game in games)AddHardwareGame(cards,game,Color.FromRgb(168,145,255),126,158,"GBA");AddHardwareUtility(cards,"System",definition.PrimaryBackend,"⚙",Color.FromRgb(92,66,157),delegate{OpenWave1Subpage("settings");},140,158);
+        }
+
+        private void RenderGenesisDeck(bool thirtyTwoX)
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=6;Grid body=new Grid{Margin=new Thickness(50,0,50,18)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(210)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);Border deck=new Border{CornerRadius=new CornerRadius(105),Background=new RadialGradientBrush(Color.FromRgb(47,49,51),Color.FromRgb(4,5,6)),BorderBrush=new SolidColorBrush(Color.FromRgb(72,74,76)),BorderThickness=new Thickness(5),Margin=new Thickness(160,0,160,10)};Grid g=new Grid();g.Children.Add(new Border{Width=thirtyTwoX?220:330,Height=thirtyTwoX?130:55,CornerRadius=new CornerRadius(thirtyTwoX?18:5),Background=new SolidColorBrush(Color.FromRgb(15,16,17)),BorderBrush=new SolidColorBrush(Color.FromRgb(78,80,82)),BorderThickness=new Thickness(4),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center});g.Children.Add(new TextBlock{Text=thirtyTwoX?"SEGA 32X\n32-BIT ENHANCEMENT":"16-BIT\nSEGA GENESIS",FontSize=thirtyTwoX?22:18,FontWeight=FontWeights.Bold,Foreground=new SolidColorBrush(thirtyTwoX?Color.FromRgb(224,60,48):Color.FromRgb(210,210,211)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,TextAlignment=TextAlignment.Center});deck.Child=g;body.Children.Add(deck);WrapPanel cards=new WrapPanel();ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=cards};Grid.SetRow(scroll,1);body.Children.Add(scroll);Color accent=thirtyTwoX?Color.FromRgb(224,60,48):Color.FromRgb(191,34,45);foreach(ConsolePlatformGame game in games)AddHardwareGame(cards,game,accent,126,158,thirtyTwoX?"32X":"GENESIS");AddHardwareUtility(cards,"System",definition.PrimaryBackend,"⚙",accent,delegate{OpenWave1Subpage("settings");},140,158);
+        }
+
+        private void RenderSegaCdDeck()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=4;Grid body=new Grid{Margin=new Thickness(65,0,65,18)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(250)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);Border system=new Border{CornerRadius=new CornerRadius(12),Background=new LinearGradientBrush(Color.FromRgb(38,41,45),Color.FromRgb(5,7,9),90),BorderBrush=new SolidColorBrush(Color.FromRgb(76,82,88)),BorderThickness=new Thickness(4),Padding=new Thickness(22),Margin=new Thickness(145,0,145,10)};Grid s=new Grid();System.Windows.Shapes.Ellipse tray=new System.Windows.Shapes.Ellipse{Width=210,Height=210,Fill=new RadialGradientBrush(Color.FromRgb(37,39,42),Color.FromRgb(6,7,8)),Stroke=new SolidColorBrush(Color.FromRgb(100,105,109)),StrokeThickness=4,HorizontalAlignment=HorizontalAlignment.Left};s.Children.Add(tray);TextBlock label=new TextBlock{Text="SEGA CD\nCD-ROM SYSTEM",FontSize=24,FontWeight=FontWeights.Light,Foreground=new SolidColorBrush(Color.FromRgb(157,195,228)),HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,65,0),TextAlignment=TextAlignment.Center};s.Children.Add(label);system.Child=s;body.Children.Add(system);WrapPanel cards=new WrapPanel();ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=cards};Grid.SetRow(scroll,1);body.Children.Add(scroll);foreach(ConsolePlatformGame game in games)AddHardwareGame(cards,game,Color.FromRgb(80,147,214),132,166,"COMPACT DISC");AddHardwareUtility(cards,"CD Player","local disc audio","♪",Color.FromRgb(80,147,214),delegate{OpenWave1Subpage("music");},145,166);AddHardwareUtility(cards,"Backup RAM","saved games","▣",Color.FromRgb(56,112,167),delegate{OpenWave1Subpage("saves");},145,166);AddHardwareUtility(cards,"System",definition.PrimaryBackend,"⚙",Color.FromRgb(45,88,130),delegate{OpenWave1Subpage("settings");},145,166);
+        }
+
+        private void RenderGameGearHandheld()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=5;Grid body=new Grid{Margin=new Thickness(35,5,35,18)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(335)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);Border handheld=new Border{CornerRadius=new CornerRadius(95),Background=new LinearGradientBrush(Color.FromRgb(34,39,45),Color.FromRgb(8,10,12),90),BorderBrush=new SolidColorBrush(Color.FromRgb(58,65,72)),BorderThickness=new Thickness(4),Padding=new Thickness(32),Margin=new Thickness(100,0,100,10)};Grid h=new Grid();h.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(170)});h.ColumnDefinitions.Add(new ColumnDefinition());h.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(170)});h.Children.Add(new TextBlock{Text="✚",FontSize=58,Foreground=new SolidColorBrush(Color.FromRgb(52,60,68)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center});Border screen=new Border{Background=new SolidColorBrush(Color.FromRgb(29,43,50)),BorderBrush=new SolidColorBrush(Color.FromRgb(5,7,9)),BorderThickness=new Thickness(12),CornerRadius=new CornerRadius(7),Margin=new Thickness(5),Child=new TextBlock{Text="GAME GEAR",FontSize=29,FontWeight=FontWeights.Bold,Foreground=new SolidColorBrush(Color.FromRgb(47,137,205)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center}};Grid.SetColumn(screen,1);h.Children.Add(screen);TextBlock buttons=new TextBlock{Text="1    2",FontSize=30,Foreground=new SolidColorBrush(Color.FromRgb(198,49,55)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(buttons,2);h.Children.Add(buttons);handheld.Child=h;body.Children.Add(handheld);WrapPanel cards=new WrapPanel();ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=cards};Grid.SetRow(scroll,1);body.Children.Add(scroll);foreach(ConsolePlatformGame game in games)AddHardwareGame(cards,game,Color.FromRgb(47,137,205),126,158,"GAME GEAR");AddHardwareUtility(cards,"System",definition.PrimaryBackend,"⚙",Color.FromRgb(47,137,205),delegate{OpenWave1Subpage("settings");},140,158);
+        }
+
+        private void RenderMasterSystemDeck()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=6;Grid body=new Grid{Margin=new Thickness(55,0,55,18)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(160)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);Border deck=new Border{Background=new LinearGradientBrush(Color.FromRgb(44,45,46),Color.FromRgb(7,8,9),90),BorderBrush=new SolidColorBrush(Color.FromRgb(93,94,95)),BorderThickness=new Thickness(3),Padding=new Thickness(24)};Grid g=new Grid();g.Children.Add(new TextBlock{Text="SEGA\nMASTER SYSTEM",FontSize=24,FontWeight=FontWeights.Bold,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(35,0,0,0),TextAlignment=TextAlignment.Center});g.Children.Add(new Border{Width=400,Height=45,Background=new SolidColorBrush(Color.FromRgb(14,15,16)),BorderBrush=new SolidColorBrush(Color.FromRgb(206,31,39)),BorderThickness=new Thickness(0,5,0,0),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center});g.Children.Add(new TextBlock{Text="POWER  ●     RESET  ○",FontSize=11,Foreground=new SolidColorBrush(Color.FromRgb(206,31,39)),HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,40,0)});deck.Child=g;body.Children.Add(deck);WrapPanel cards=new WrapPanel{Margin=new Thickness(0,10,0,0)};ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=cards};Grid.SetRow(scroll,1);body.Children.Add(scroll);foreach(ConsolePlatformGame game in games)AddHardwareGame(cards,game,Color.FromRgb(206,31,39),126,158,"CARTRIDGE");AddHardwareUtility(cards,"System",definition.PrimaryBackend,"⚙",Color.FromRgb(206,31,39),delegate{OpenWave1Subpage("settings");},140,158);
+        }
+
+        private void RenderTurboGrafxDeck()
+        {
+            titleText.Text=String.Empty;subtitleText.Text=String.Empty;columns=6;Grid body=new Grid{Margin=new Thickness(55,0,55,18)};body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(155)});body.RowDefinitions.Add(new RowDefinition{Height=new GridLength(1,GridUnitType.Star)});contentHost.Children.Add(body);Border deck=new Border{CornerRadius=new CornerRadius(5),Background=new LinearGradientBrush(Color.FromRgb(235,234,230),Color.FromRgb(184,183,178),90),BorderBrush=new SolidColorBrush(Color.FromRgb(103,103,100)),BorderThickness=new Thickness(3),Padding=new Thickness(22)};Grid g=new Grid();g.Children.Add(new TextBlock{Text="TurboGrafx-16\nENTERTAINMENT SUPER SYSTEM",FontSize=21,FontWeight=FontWeights.SemiBold,Foreground=new SolidColorBrush(Color.FromRgb(67,67,65)),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(35,0,0,0),TextAlignment=TextAlignment.Center});g.Children.Add(new Border{Width=290,Height=12,Background=new SolidColorBrush(Color.FromRgb(55,55,53)),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center});g.Children.Add(new TextBlock{Text="POWER",FontSize=10,Foreground=new SolidColorBrush(Color.FromRgb(193,34,42)),HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,55,0)});deck.Child=g;body.Children.Add(deck);WrapPanel cards=new WrapPanel{Margin=new Thickness(0,10,0,0)};ScrollViewer scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=cards};Grid.SetRow(scroll,1);body.Children.Add(scroll);foreach(ConsolePlatformGame game in games)AddHardwareGame(cards,game,Color.FromRgb(193,34,42),126,158,Path.GetExtension(game.Path).Equals(".cue",StringComparison.OrdinalIgnoreCase)||Path.GetExtension(game.Path).Equals(".chd",StringComparison.OrdinalIgnoreCase)?"CD-ROM²":"HUCARD");AddHardwareUtility(cards,"System",definition.PrimaryBackend,"⚙",Color.FromRgb(193,34,42),delegate{OpenWave1Subpage("settings");},140,158);
+        }
+
+        private void RenderXboxRoot()
+        {
+            string[] names=new string[]{"play game","memory","music","settings"};string[] detail=new string[]{games.Count.ToString(CultureInfo.InvariantCulture)+" titles ready to launch","saved games and storage","soundtracks and dashboard ambience","console and emulator options"};page=Math.Max(0,Math.Min(page,names.Length-1));titleText.Text=names[page];subtitleText.Text=detail[page];
+            Grid scene=new Grid{Margin=new Thickness(24,8,24,18)};contentHost.Children.Add(scene);Border glow=new Border{Width=460,Height=260,CornerRadius=new CornerRadius(150,18,150,18),Background=new RadialGradientBrush(Color.FromArgb(225,76,196,28),Color.FromArgb(240,0,16,0)),BorderBrush=new SolidColorBrush(Color.FromRgb(113,238,61)),BorderThickness=new Thickness(3),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};StackPanel s=new StackPanel{VerticalAlignment=VerticalAlignment.Center};s.Children.Add(new TextBlock{Text=names[page].ToUpperInvariant(),FontSize=44,FontWeight=FontWeights.Bold,FontStyle=FontStyles.Italic,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Center});s.Children.Add(new TextBlock{Text="A  select",FontSize=14,Foreground=new SolidColorBrush(Color.FromRgb(173,231,145)),HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,16,0,0)});glow.Child=s;scene.Children.Add(glow);
+            System.Windows.Shapes.Ellipse ring=new System.Windows.Shapes.Ellipse{Width=720,Height=390,Stroke=new SolidColorBrush(Color.FromArgb(100,130,255,77)),StrokeThickness=8,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};scene.Children.Insert(0,ring);
         }
 
         private void RenderXboxGamesAuthentic()
@@ -1260,25 +3091,20 @@ namespace HuymaierConsole.NativeApp
 
         private void RenderBladesGamesAuthentic()
         {
-            titleText.Text = "Games"; subtitleText.Text = games.Count.ToString(CultureInfo.InvariantCulture) + " games  •  " + GetXboxGamerscore().ToString(CultureInfo.InvariantCulture) + " Gamerscore";
-            Grid body = new Grid { Margin = new Thickness(0, 0, 0, 5) }; body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(250) }); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); contentHost.Children.Add(body);
-
-            StackPanel left = new StackPanel { Margin = new Thickness(0, 4, 16, 0) }; body.Children.Add(left);
-            Border profile = new Border { Padding = new Thickness(10), Margin = new Thickness(0, 0, 0, 10), Background = new LinearGradientBrush(Color.FromArgb(224, 247, 248, 247), Color.FromArgb(224, 187, 192, 189), 90), BorderBrush = Brushes.White, BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(5) };
-            Grid pg = new Grid(); pg.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(58) }); pg.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); Border pic = new Border { Width = 50, Height = 50, Background = new SolidColorBrush(Color.FromRgb(83, 156, 44)), BorderBrush = Brushes.White, BorderThickness = new Thickness(2) }; pic.Child = new TextBlock { Text = "X", FontSize = 27, FontWeight = FontWeights.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }; pg.Children.Add(pic); StackPanel pw = new StackPanel { Margin = new Thickness(8, 1, 0, 0) }; pw.Children.Add(new TextBlock { Text = Environment.UserName, FontSize = 17, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(43, 48, 45)) }); pw.Children.Add(new TextBlock { Text = games.Count.ToString(CultureInfo.InvariantCulture) + " Games", FontSize = 12, Foreground = new SolidColorBrush(Color.FromRgb(73, 80, 76)) }); pw.Children.Add(new TextBlock { Text = GetXboxGamerscore().ToString(CultureInfo.InvariantCulture) + " Gamerscore", FontSize = 12, Foreground = new SolidColorBrush(Color.FromRgb(73, 80, 76)) }); Grid.SetColumn(pw, 1); pg.Children.Add(pw); profile.Child = pg; left.Children.Add(profile);
-            foreach (string item in new string[] { "Achievements", "Played Games", "Xbox Live Arcade", "Demos", "Trailers" })
-            {
-                Border menu = new Border { Height = 46, Padding = new Thickness(13, 8, 10, 7), Background = new SolidColorBrush(Color.FromArgb(item == "Played Games" ? (byte)205 : (byte)120, 244, 246, 245)), BorderBrush = new SolidColorBrush(Color.FromArgb(120, 96, 103, 99)), BorderThickness = new Thickness(0, 0, 0, 1) }; menu.Child = new TextBlock { Text = item, FontSize = 17, Foreground = new SolidColorBrush(Color.FromRgb(49, 55, 52)), VerticalAlignment = VerticalAlignment.Center }; left.Children.Add(menu);
-            }
-            Border playBar = new Border { Height = 52, Margin = new Thickness(0, 12, 0, 0), Padding = new Thickness(12, 9, 10, 8), Background = new SolidColorBrush(Color.FromArgb(120, 239, 241, 240)), BorderBrush = new SolidColorBrush(Color.FromArgb(150, 100, 107, 103)), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(24) }; playBar.Child = new TextBlock { Text = "A   Play Selected Game", FontSize = 16, Foreground = new SolidColorBrush(Color.FromRgb(54, 60, 57)), VerticalAlignment = VerticalAlignment.Center }; left.Children.Add(playBar);
-
-            Border galleryFrame = new Border { Background = new SolidColorBrush(Color.FromArgb(168, 238, 241, 239)), BorderBrush = new SolidColorBrush(Color.FromArgb(180, 255, 255, 255)), BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(7), Padding = new Thickness(12) }; Grid.SetColumn(galleryFrame, 1); body.Children.Add(galleryFrame);
-            ScrollViewer scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; WrapPanel gallery = new WrapPanel(); scroll.Content = gallery; galleryFrame.Child = scroll;
+            titleText.Text = "games"; subtitleText.Text = games.Count.ToString(CultureInfo.InvariantCulture) + " titles  •  LEFT / RIGHT changes blade";
+            StackPanel list = new StackPanel { Margin = new Thickness(2, 0, 6, 18) };
+            ScrollViewer scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Content = list }; contentHost.Children.Add(scroll);
             foreach (ConsolePlatformGame game in games)
             {
-                ConsolePlatformGame captured = game; Button tile = CreateBladeCoverTile(game, delegate { LaunchGame(captured, false); }); gallery.Children.Add(tile); actions.Add(new ConsolePlatformAction { Button = tile, Invoke = delegate { LaunchGame(captured, false); }, Name = game.Name, Game = game });
+                ConsolePlatformGame captured = game;
+                Button row = CreateBladePanelButton(game.Name, "A  play     X  alternate emulator", delegate { LaunchGame(captured, false); }, Color.FromRgb(83, 156, 44));
+                list.Children.Add(row); actions.Add(new ConsolePlatformAction { Button = row, Invoke = delegate { LaunchGame(captured, false); }, Name = game.Name, Game = game });
             }
-            if (games.Count == 0) { Button empty = CreateBladePanelButton("No games found", "Open System and add a game folder", delegate { page = 3; selected = 0; BuildChrome(); RenderPage(); }, Color.FromRgb(82, 157, 46)); gallery.Children.Add(empty); actions.Add(new ConsolePlatformAction { Button = empty, Invoke = delegate { page = 3; selected = 0; BuildChrome(); RenderPage(); }, Name = "System" }); }
+            if (games.Count == 0)
+            {
+                Button empty = CreateBladePanelButton("no games found", "configure a game folder in System", delegate { page = 3; selected = 0; BuildChrome(); RenderPage(); }, Color.FromRgb(83, 156, 44));
+                list.Children.Add(empty); actions.Add(new ConsolePlatformAction { Button = empty, Invoke = delegate { page = 3; selected = 0; BuildChrome(); RenderPage(); }, Name = "System" });
+            }
         }
 
         private Button CreateBladeCoverTile(ConsolePlatformGame game, Action invoke)
@@ -1366,15 +3192,15 @@ namespace HuymaierConsole.NativeApp
 
         private void RenderXboxLive()
         {
-            titleText.Text = "xbox live"; subtitleText.Text = "Original Xbox network and dashboard runtime";
+            titleText.Text = "settings"; subtitleText.Text = "console and emulator configuration";
             WrapPanel panel = new WrapPanel { Margin = new Thickness(14) }; contentHost.Children.Add(panel);
             AddDashboardTile(panel, "network settings", "open xemu configuration", delegate { OpenFolderForExecutable(settings.emulatorPath); }, Color.FromRgb(37, 103, 19), 300, 190, "●");
             AddDashboardTile(panel, "games", games.Count.ToString(CultureInfo.InvariantCulture) + " titles", delegate { page = 0; selected = 0; RenderPage(); }, Color.FromRgb(29, 80, 13), 300, 190, "▶");
         }
 
-        private void RenderXbox360Live()
+        private void RenderXbox360Home()
         {
-            titleText.Text = "xbox live"; subtitleText.Text = Environment.UserName + "  •  " + GetXboxGamerscore().ToString(CultureInfo.InvariantCulture) + " G"; StackPanel panel = new StackPanel { Margin = new Thickness(4, 0, 4, 16) }; contentHost.Children.Add(new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, Content = panel });
+            titleText.Text = "home"; subtitleText.Text = Environment.UserName + "  •  " + GetXboxGamerscore().ToString(CultureInfo.InvariantCulture) + " G"; StackPanel panel = new StackPanel { Margin = new Thickness(4, 0, 4, 16) }; contentHost.Children.Add(new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, Content = panel });
             AddDashboardTile(panel, Environment.UserName, GetXboxGamerscore().ToString(CultureInfo.InvariantCulture) + " Gamerscore", OpenXboxAchievements, Color.FromRgb(226, 111, 16), 620, 142, "★"); AddDashboardTile(panel, "achievements", xboxAchievementsLoaded ? xboxAchievements.Count(delegate(XboxAchievementEntry a) { return a.Earned; }).ToString(CultureInfo.InvariantCulture) + " unlocked" : "view profile achievements", OpenXboxAchievements, Color.FromRgb(206, 92, 8), 620, 142, "G"); AddDashboardTile(panel, "recent games", games.Count.ToString(CultureInfo.InvariantCulture) + " games", delegate { page = 1; selected = 0; BuildChrome(); RenderPage(); }, Color.FromRgb(188, 78, 6), 620, 142, "▶");
         }
 
@@ -1420,9 +3246,9 @@ namespace HuymaierConsole.NativeApp
             AddDashboardTile(panel, "video library", "open startup assets", delegate { Process.Start("explorer.exe", "\"" + Path.Combine(platformRoot, "Assets") + "\""); }, Color.FromRgb(56, 126, 183), 340, 220, "▣");
         }
 
-        private void RenderXbox360Social()
+        private void RenderXbox360Profile()
         {
-            titleText.Text = "social"; subtitleText.Text = Environment.UserName + "  •  local Xenia profile"; WrapPanel panel = new WrapPanel { Margin = new Thickness(0, 4, 0, 14) }; contentHost.Children.Add(new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, Content = panel }); AddDashboardTile(panel, Environment.UserName, GetXboxGamerscore().ToString(CultureInfo.InvariantCulture) + " G", OpenXboxAchievements, Color.FromRgb(20, 151, 35), 440, 220, "☺"); AddDashboardTile(panel, "achievements", xboxAchievementsLoaded ? xboxAchievements.Count(delegate(XboxAchievementEntry a) { return a.Earned; }).ToString(CultureInfo.InvariantCulture) + " unlocked" : "read Xenia profile", OpenXboxAchievements, Color.FromRgb(20, 137, 34), 215, 220, "★"); AddDashboardTile(panel, "storage", "saved games", OpenXboxStorageManager, Color.FromRgb(53, 91, 51), 215, 220, "▣");
+            titleText.Text = "profile"; subtitleText.Text = Environment.UserName + "  •  local Xenia profile"; WrapPanel panel = new WrapPanel { Margin = new Thickness(0, 4, 0, 14) }; contentHost.Children.Add(new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, Content = panel }); AddDashboardTile(panel, Environment.UserName, GetXboxGamerscore().ToString(CultureInfo.InvariantCulture) + " G", OpenXboxAchievements, Color.FromRgb(20, 151, 35), 440, 220, "☺"); AddDashboardTile(panel, "achievements", xboxAchievementsLoaded ? xboxAchievements.Count(delegate(XboxAchievementEntry a) { return a.Earned; }).ToString(CultureInfo.InvariantCulture) + " unlocked" : "read Xenia profile", OpenXboxAchievements, Color.FromRgb(20, 137, 34), 215, 220, "★"); AddDashboardTile(panel, "storage", "saved games", OpenXboxStorageManager, Color.FromRgb(53, 91, 51), 215, 220, "▣");
         }
 
 
@@ -1444,14 +3270,82 @@ namespace HuymaierConsole.NativeApp
             contentHost.Children.Clear(); actions.Clear(); RenderSettings(); UpdateActionVisuals();
         }
 
+        private static char GetLibraryInitial(ConsolePlatformGame game)
+        {
+            if (game == null || String.IsNullOrWhiteSpace(game.Name)) return '#';
+            char value = Char.ToUpperInvariant(game.Name.Trim()[0]);
+            return Char.IsLetter(value) ? value : '#';
+        }
+
+        private List<char> GetAvailableLibraryLetters()
+        {
+            List<char> result = new List<char>();
+            foreach (char letter in "#ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+            {
+                if (games.Any(delegate(ConsolePlatformGame game) { return GetLibraryInitial(game) == letter; })) result.Add(letter);
+            }
+            return result;
+        }
+
         private int FindFirstGameIndex(char letter)
         {
-            for (int i = 0; i < games.Count; i++)
-            {
-                char first = String.IsNullOrWhiteSpace(games[i].Name) ? '#' : Char.ToUpperInvariant(games[i].Name[0]);
-                if (letter == '#' ? !Char.IsLetter(first) : first == letter) return i;
-            }
+            for (int i = 0; i < games.Count; i++) if (GetLibraryInitial(games[i]) == letter) return i;
             return 0;
+        }
+
+        private int GetWiiMenuPageCount() { return Math.Max(1, (games.Count + 11) / 12); }
+
+        private bool TryProcessLibraryLetterJump(XmbInputCommand command)
+        {
+            if (games == null || games.Count == 0) return false;
+            bool n64 = definition.Shell == "N64" && IsRootConsoleSurface() && n64Zone == 0;
+            bool gameCube = definition.Shell == "GameCube" && !IsRootConsoleSurface() && page == 0;
+            bool wii = definition.Shell == "Wii" && IsRootConsoleSurface();
+            bool wave2 = IsWave2Shell() && IsRootConsoleSurface() && selected >= 0 && selected < games.Count;
+            bool arcadeLibrary = (definition.Shell == "Arcade" || definition.Shell == "FinalBurnNeo") && IsRootConsoleSurface() && selected >= 0 && selected < games.Count;
+            if (!n64 && !gameCube && !wii && !wave2 && !arcadeLibrary) return false;
+
+            int currentIndex = n64 ? n64LibraryIndex : (gameCube ? Math.Max(0, Math.Min(games.Count - 1, selected)) : ((wave2 || arcadeLibrary) ? Math.Max(0, Math.Min(games.Count - 1, selected)) : Math.Max(0, Math.Min(games.Count - 1, wiiMenuPage * 12 + Math.Min(selected, 11)))));
+            List<char> letters = GetAvailableLibraryLetters();
+            if (letters.Count == 0) return false;
+            char current = GetLibraryInitial(games[currentIndex]);
+            int letterIndex = letters.IndexOf(current);
+            if (letterIndex < 0) letterIndex = 0;
+            int delta = command == XmbInputCommand.LeftShoulder ? -1 : 1;
+            letterIndex = (letterIndex + delta + letters.Count) % letters.Count;
+            int target = FindFirstGameIndex(letters[letterIndex]);
+
+            if (n64) n64LibraryIndex = target;
+            else if (gameCube || wave2 || arcadeLibrary) selected = target;
+            else
+            {
+                wiiMenuPage = target / 12;
+                selected = target % 12;
+            }
+            PlayEffect("Tab.wav");
+            RenderPage();
+            return true;
+        }
+
+        private Border BuildLibraryAlphabetRail(int currentGameIndex, bool light)
+        {
+            StackPanel lettersPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            char current = games.Count == 0 ? '#' : GetLibraryInitial(games[Math.Max(0, Math.Min(games.Count - 1, currentGameIndex))]);
+            foreach (char letter in "#ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+            {
+                bool available = games.Any(delegate(ConsolePlatformGame game) { return GetLibraryInitial(game) == letter; });
+                TextBlock text = new TextBlock
+                {
+                    Text = letter.ToString(),
+                    FontSize = letter == current ? 16 : 11,
+                    FontWeight = letter == current ? FontWeights.Bold : FontWeights.Normal,
+                    Foreground = new SolidColorBrush(letter == current ? (light ? Color.FromRgb(30, 155, 197) : definition.Accent) : (available ? (light ? Color.FromRgb(91, 108, 114) : Color.FromRgb(205, 205, 214)) : (light ? Color.FromRgb(188, 198, 202) : Color.FromRgb(82, 82, 92)))),
+                    Margin = new Thickness(5, 0, 5, 0),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                lettersPanel.Children.Add(text);
+            }
+            return new Border { Height = 32, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top, Padding = new Thickness(12, 4, 12, 4), CornerRadius = new CornerRadius(12), Background = new SolidColorBrush(light ? Color.FromArgb(225, 248, 251, 252) : Color.FromArgb(160, 12, 12, 18)), Child = lettersPanel };
         }
 
         private void AddDashboardTile(Panel panel, string title, string subtitle, Action invoke, Color color, double width, double height, string glyph)
@@ -1498,27 +3392,226 @@ namespace HuymaierConsole.NativeApp
 
         private void RenderGameCubeMemoryCards(List<string> roots)
         {
-            titleText.Text = "Memory Card"; subtitleText.Text = "Slot A and Slot B";
-            Grid body = new Grid { Margin = new Thickness(26, 6, 26, 20) }; body.ColumnDefinitions.Add(new ColumnDefinition()); body.ColumnDefinitions.Add(new ColumnDefinition()); contentHost.Children.Add(body);
-            for (int i = 0; i < 2; i++)
+            titleText.Text = "Memory Card"; subtitleText.Text = "Native Slot A / Slot B save browser";
+            List<GameCubeMemoryCardInfo> cards = ScanGameCubeMemoryCards(roots);
+            Grid body = new Grid { Margin = new Thickness(30, 6, 30, 20) }; body.ColumnDefinitions.Add(new ColumnDefinition()); body.ColumnDefinitions.Add(new ColumnDefinition()); contentHost.Children.Add(body);
+            for (int slotIndex = 0; slotIndex < 2; slotIndex++)
             {
-                string path = i < roots.Count ? roots[i] : String.Empty; Border slot = new Border { Margin = new Thickness(18), CornerRadius = new CornerRadius(32), Background = new SolidColorBrush(Color.FromArgb(225, 47, 34, 101)), BorderBrush = new SolidColorBrush(i == 0 ? Color.FromRgb(110, 224, 255) : Color.FromRgb(255, 172, 89)), BorderThickness = new Thickness(4), Padding = new Thickness(26) };
-                StackPanel panel = new StackPanel(); panel.Children.Add(new TextBlock { Text = "MEMORY CARD SLOT " + (i == 0 ? "A" : "B"), FontSize = 25, FontWeight = FontWeights.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center });
-                panel.Children.Add(new Border { Width = 180, Height = 112, Margin = new Thickness(0, 30, 0, 24), CornerRadius = new CornerRadius(18), Background = new SolidColorBrush(Color.FromRgb(52, 53, 62)), BorderBrush = new SolidColorBrush(Color.FromRgb(169, 166, 184)), BorderThickness = new Thickness(3), Child = new TextBlock { Text = String.IsNullOrWhiteSpace(path) ? "EMPTY" : "CARD", FontSize = 28, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } });
-                string captured = path; Button open = CreateShellAction(String.IsNullOrWhiteSpace(path) ? "No card detected" : "Open Card", String.IsNullOrWhiteSpace(path) ? "Configure Dolphin memory cards" : path, delegate { if (!String.IsNullOrWhiteSpace(captured)) Process.Start("explorer.exe", "\"" + captured + "\""); }, Color.FromRgb(91, 70, 176)); panel.Children.Add(open); actions.Add(new ConsolePlatformAction { Button = open, Invoke = delegate { if (!String.IsNullOrWhiteSpace(captured)) Process.Start("explorer.exe", "\"" + captured + "\""); }, Name = "Slot" }); slot.Child = panel; Grid.SetColumn(slot, i); body.Children.Add(slot);
+                GameCubeMemoryCardInfo card = slotIndex < cards.Count ? cards[slotIndex] : null;
+                Color accent = slotIndex == 0 ? Color.FromRgb(101, 217, 255) : Color.FromRgb(121, 255, 172);
+                Border slot = new Border { Margin = new Thickness(14), CornerRadius = new CornerRadius(38), Background = new SolidColorBrush(Color.FromArgb(220, 35, 27, 82)), BorderBrush = new SolidColorBrush(accent), BorderThickness = new Thickness(4), Padding = new Thickness(20) };
+                Grid panel = new Grid(); panel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(78) }); panel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); panel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(74) });
+                StackPanel heading = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center }; heading.Children.Add(new TextBlock { Text = "MEMORY CARD  " + (slotIndex == 0 ? "A" : "B"), FontSize = 24, FontWeight = FontWeights.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center }); heading.Children.Add(new TextBlock { Text = card == null ? "No card detected" : card.Saves.Count.ToString(CultureInfo.InvariantCulture) + " save(s)  •  " + Math.Max(0, card.TotalBlocks - card.FreeBlocks).ToString(CultureInfo.InvariantCulture) + " / " + card.TotalBlocks.ToString(CultureInfo.InvariantCulture) + " blocks", FontSize = 12, Foreground = new SolidColorBrush(Color.FromRgb(207, 202, 232)), HorizontalAlignment = HorizontalAlignment.Center }); panel.Children.Add(heading);
+                WrapPanel saveGrid = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center };
+                if (card != null)
+                {
+                    foreach (GameCubeSaveEntry save in card.Saves.Take(18))
+                    {
+                        GameCubeSaveEntry capturedSave = save;
+                        Button saveTile = CreateGameCubeNativeSaveTile(save, accent, delegate { ShowNotice(capturedSave.Name + "  •  " + capturedSave.GameCode + "  •  " + capturedSave.Blocks.ToString(CultureInfo.InvariantCulture) + " blocks"); });
+                        saveGrid.Children.Add(saveTile); actions.Add(new ConsolePlatformAction { Button = saveTile, Invoke = delegate { ShowNotice(capturedSave.Name + "  •  " + capturedSave.GameCode + "  •  " + capturedSave.Blocks.ToString(CultureInfo.InvariantCulture) + " blocks"); }, Name = save.Name });
+                    }
+                }
+                if (saveGrid.Children.Count == 0) saveGrid.Children.Add(new TextBlock { Text = "EMPTY", FontSize = 34, Foreground = new SolidColorBrush(Color.FromArgb(180, 255, 255, 255)), Margin = new Thickness(20), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center });
+                ScrollViewer scroller = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, Content = saveGrid }; Grid.SetRow(scroller, 1); panel.Children.Add(scroller);
+                GameCubeMemoryCardInfo capturedCard = card; Button backup = CreateShellAction("BACK UP CARD " + (slotIndex == 0 ? "A" : "B"), card == null ? "No card detected" : Path.GetFileName(card.Path), delegate { if (capturedCard != null) BackupNativeSavePath(capturedCard.Path, "GameCube-Card-" + capturedCard.Slot); }, Color.FromRgb(78, 59, 151)); backup.Margin = new Thickness(30, 8, 30, 0); Grid.SetRow(backup, 2); panel.Children.Add(backup); actions.Add(new ConsolePlatformAction { Button = backup, Invoke = delegate { if (capturedCard != null) BackupNativeSavePath(capturedCard.Path, "GameCube-Card-" + capturedCard.Slot); }, Name = "Back Up Card " + (slotIndex == 0 ? "A" : "B") });
+                slot.Child = panel; Grid.SetColumn(slot, slotIndex); body.Children.Add(slot);
             }
-            AddFloatingBackup(body, BackupSaves);
+        }
+
+        private Button CreateGameCubeNativeSaveTile(GameCubeSaveEntry save, Color accent, Action invoke)
+        {
+            Button button = new Button { Width = 190, Height = 108, Margin = new Thickness(7), Padding = new Thickness(10), Background = new SolidColorBrush(Color.FromRgb(42, 38, 67)), BorderBrush = new SolidColorBrush(accent), BorderThickness = new Thickness(2), RenderTransformOrigin = new Point(0.5, 0.5) };
+            Grid grid = new Grid(); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(48) }); grid.ColumnDefinitions.Add(new ColumnDefinition());
+            Border icon = new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(accent), VerticalAlignment = VerticalAlignment.Center, Child = new TextBlock { Text = save.GameCode.Length > 0 ? save.GameCode.Substring(0, 1) : "G", FontSize = 20, FontWeight = FontWeights.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } }; grid.Children.Add(icon);
+            StackPanel text = new StackPanel { Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center }; text.Children.Add(new TextBlock { Text = save.Name, FontSize = 12, FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis }); text.Children.Add(new TextBlock { Text = save.GameCode + "  •  " + save.Blocks.ToString(CultureInfo.InvariantCulture) + " blocks", FontSize = 9, Foreground = new SolidColorBrush(Color.FromRgb(204, 198, 226)) }); Grid.SetColumn(text, 1); grid.Children.Add(text); button.Content = grid; button.Click += delegate { invoke(); }; return button;
+        }
+
+        private static string ReadUtf16BeFixed(byte[] data, int offset, int charCount)
+        {
+            try
+            {
+                if (data == null || offset < 0 || charCount <= 0 || offset + charCount * 2 > data.Length) return String.Empty;
+                StringBuilder builder = new StringBuilder();
+                for (int i = 0; i < charCount; i++)
+                {
+                    ushort value = (ushort)((data[offset + i * 2] << 8) | data[offset + i * 2 + 1]);
+                    if (value == 0) break;
+                    if (value >= 0x20 && value != 0xFFFF) builder.Append((char)value);
+                }
+                return builder.ToString().Trim();
+            }
+            catch { return String.Empty; }
+        }
+
+        private static string[] ReadWiiSaveBannerMetadata(string dataPath)
+        {
+            string[] result = new string[] { String.Empty, String.Empty };
+            try
+            {
+                string path = Path.Combine(dataPath, "banner.bin");
+                if (!File.Exists(path)) return result;
+                byte[] data = File.ReadAllBytes(path);
+                if (data.Length < 0xA0 || data[0] != (byte)'W' || data[1] != (byte)'I' || data[2] != (byte)'B' || data[3] != (byte)'N') return result;
+                result[0] = ReadUtf16BeFixed(data, 0x20, 32);
+                result[1] = ReadUtf16BeFixed(data, 0x60, 32);
+            }
+            catch { }
+            return result;
+        }
+
+        private ConsolePlatformGame FindWiiLibraryGame(string saveCode)
+        {
+            if (String.IsNullOrWhiteSpace(saveCode)) return null;
+            string prefix = saveCode.ToUpperInvariant();
+            foreach (ConsolePlatformGame game in games)
+            {
+                string gameId = ReadNintendoGameId(game.Path);
+                if (!String.IsNullOrWhiteSpace(gameId) && gameId.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return game;
+            }
+            return null;
+        }
+
+        private Button CreateWiiSaveCard(WiiSaveEntry save, Action invoke)
+        {
+            Button button = new Button { Width = 350, Height = 156, Margin = new Thickness(10), Padding = new Thickness(10), Background = Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(112, 197, 221)), BorderThickness = new Thickness(3), RenderTransformOrigin = new Point(0.5, 0.5) };
+            Grid grid = new Grid(); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(118) }); grid.ColumnDefinitions.Add(new ColumnDefinition());
+            Border art = new Border { Width = 104, Height = 104, CornerRadius = new CornerRadius(12), Margin = new Thickness(2), Background = new SolidColorBrush(Color.FromRgb(225, 241, 246)), BorderBrush = new SolidColorBrush(Color.FromRgb(166, 214, 227)), BorderThickness = new Thickness(1), VerticalAlignment = VerticalAlignment.Center };
+            if (!String.IsNullOrWhiteSpace(save.Cover) && File.Exists(save.Cover)) { try { art.Child = new Image { Source = LoadBitmap(save.Cover), Stretch = Stretch.UniformToFill }; } catch { } }
+            if (art.Child == null) art.Child = new TextBlock { Text = String.IsNullOrWhiteSpace(save.GameCode) ? "Wii" : save.GameCode, FontSize = 19, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(56, 149, 184)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, TextAlignment = TextAlignment.Center };
+            grid.Children.Add(art);
+            StackPanel info = new StackPanel { Margin = new Thickness(10, 8, 4, 4), VerticalAlignment = VerticalAlignment.Center }; Grid.SetColumn(info, 1);
+            info.Children.Add(new TextBlock { Text = save.Name, FontSize = 17, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(55, 72, 80)), TextWrapping = TextWrapping.Wrap, MaxHeight = 45 });
+            if (!String.IsNullOrWhiteSpace(save.Description)) info.Children.Add(new TextBlock { Text = save.Description, FontSize = 10, Foreground = new SolidColorBrush(Color.FromRgb(96, 112, 119)), TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 3, 0, 0) });
+            info.Children.Add(new TextBlock { Text = (String.IsNullOrWhiteSpace(save.GameCode) ? save.TitleId : save.GameCode + "  â€¢  " + save.TitleId) + "  â€¢  " + FormatBytes(save.Size), FontSize = 10, Foreground = new SolidColorBrush(Color.FromRgb(70, 151, 178)), Margin = new Thickness(0, 5, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis });
+            info.Children.Add(new TextBlock { Text = "Modified " + save.Modified.ToString("g", CultureInfo.CurrentCulture) + "  â€¢  A  Back Up", FontSize = 9, Foreground = new SolidColorBrush(Color.FromRgb(113, 125, 130)), Margin = new Thickness(0, 4, 0, 0) });
+            grid.Children.Add(info); button.Content = grid; button.Click += delegate { invoke(); }; return button;
         }
 
         private void RenderWiiDataManagement(List<string> roots)
         {
-            titleText.Text = "Save Data"; subtitleText.Text = "Wii Console and SD Card";
-            StackPanel panel = new StackPanel { Margin = new Thickness(26, 4, 26, 20) }; contentHost.Children.Add(new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, Content = panel });
-            Grid tabs = new Grid { Height = 64, Margin = new Thickness(0, 0, 0, 20) }; tabs.ColumnDefinitions.Add(new ColumnDefinition()); tabs.ColumnDefinitions.Add(new ColumnDefinition());
-            tabs.Children.Add(CreateWiiTab("Wii", true)); Button sd = CreateWiiTab("SD Card", false); Grid.SetColumn(sd, 1); tabs.Children.Add(sd); panel.Children.Add(tabs);
-            WrapPanel channels = new WrapPanel(); panel.Children.Add(channels);
-            foreach (string rootPath in roots) { string captured = rootPath; Button tile = CreateChannelTile(Path.GetFileName(rootPath.TrimEnd(Path.DirectorySeparatorChar)), captured, delegate { Process.Start("explorer.exe", "\"" + captured + "\""); }); channels.Children.Add(tile); actions.Add(new ConsolePlatformAction { Button = tile, Invoke = delegate { Process.Start("explorer.exe", "\"" + captured + "\""); }, Name = captured }); }
-            Button backup = CreateChannelTile("Back Up", "Copy save data", BackupSaves); channels.Children.Add(backup); actions.Add(new ConsolePlatformAction { Button = backup, Invoke = BackupSaves, Name = "Back Up" });
+            titleText.Text = "Save Data"; subtitleText.Text = "Wii System Memory  â€¢  game-by-game save manager";
+            List<WiiSaveEntry> saves = ScanWiiSaves(roots);
+            long totalSize = 0; foreach (WiiSaveEntry entry in saves) totalSize += Math.Max(0, entry.Size);
+            Grid body = new Grid { Margin = new Thickness(54, 6, 54, 24) }; body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(72) }); body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); contentHost.Children.Add(body);
+            Border heading = new Border { Background = new SolidColorBrush(Color.FromRgb(241, 247, 249)), BorderBrush = new SolidColorBrush(Color.FromRgb(96, 194, 220)), BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(18), Padding = new Thickness(20, 10, 20, 10), Child = new TextBlock { Text = saves.Count.ToString(CultureInfo.InvariantCulture) + " saved title(s)  â€¢  " + FormatBytes(totalSize) + " used", FontSize = 21, Foreground = new SolidColorBrush(Color.FromRgb(72, 91, 98)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } }; body.Children.Add(heading);
+            WrapPanel cards = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 12, 0, 0) };
+            foreach (WiiSaveEntry save in saves)
+            {
+                WiiSaveEntry captured = save; Button tile = CreateWiiSaveCard(save, delegate { BackupNativeSavePath(captured.Path, "Wii-" + captured.TitleId); }); cards.Children.Add(tile); actions.Add(new ConsolePlatformAction { Button = tile, Invoke = delegate { BackupNativeSavePath(captured.Path, "Wii-" + captured.TitleId); }, Name = save.Name });
+            }
+            if (saves.Count == 0) cards.Children.Add(new Border { Width = 350, Height = 156, Margin = new Thickness(12), Background = Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(135, 203, 221)), BorderThickness = new Thickness(3), Child = new TextBlock { Text = "No Wii save data detected", FontSize = 18, Foreground = new SolidColorBrush(Color.FromRgb(82, 101, 109)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } });
+            Button backupAll = CreateChannelTile("Back Up All", "Create a recoverable copy of Wii system-memory saves", BackupSaves); cards.Children.Add(backupAll); actions.Add(new ConsolePlatformAction { Button = backupAll, Invoke = BackupSaves, Name = "Back Up All" });
+            ScrollViewer scroller = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Content = cards }; Grid.SetRow(scroller, 1); body.Children.Add(scroller);
+        }
+        private static ushort ReadBe16(byte[] data, int offset) { return (ushort)((data[offset] << 8) | data[offset + 1]); }
+        private static short ReadBeS16(byte[] data, int offset) { return unchecked((short)ReadBe16(data, offset)); }
+        private static uint ReadBe32(byte[] data, int offset) { return ((uint)data[offset] << 24) | ((uint)data[offset + 1] << 16) | ((uint)data[offset + 2] << 8) | data[offset + 3]; }
+
+        private List<GameCubeMemoryCardInfo> ScanGameCubeMemoryCards(List<string> roots)
+        {
+            List<GameCubeMemoryCardInfo> cards = new List<GameCubeMemoryCardInfo>();
+            List<string> candidates = new List<string>();
+            foreach (string rootPath in roots)
+            {
+                try { foreach (string file in Directory.EnumerateFiles(rootPath, "*.raw", SearchOption.AllDirectories).Take(12)) if (!candidates.Contains(file, StringComparer.OrdinalIgnoreCase)) candidates.Add(file); } catch { }
+            }
+            candidates = candidates.OrderBy(delegate(string path) { return Path.GetFileName(path); }, StringComparer.CurrentCultureIgnoreCase).ToList();
+            for (int i = 0; i < candidates.Count && cards.Count < 2; i++)
+            {
+                GameCubeMemoryCardInfo card = ParseGameCubeRawCard(candidates[i], cards.Count == 0 ? "A" : "B");
+                if (card != null) cards.Add(card);
+            }
+            return cards;
+        }
+
+        private GameCubeMemoryCardInfo ParseGameCubeRawCard(string path, string slot)
+        {
+            try
+            {
+                const int blockSize = 0x2000;
+                FileInfo info = new FileInfo(path);
+                if (!info.Exists || info.Length < blockSize * 6 || info.Length % blockSize != 0) return null;
+                byte[] metadata = new byte[blockSize * 5];
+                using (FileStream stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    if (stream.Read(metadata, 0, metadata.Length) != metadata.Length) return null;
+                }
+                int dir0 = blockSize, dir1 = blockSize * 2, bat0 = blockSize * 3, bat1 = blockSize * 4;
+                int activeDir = ReadBeS16(metadata, dir0 + 0x1FFA) >= ReadBeS16(metadata, dir1 + 0x1FFA) ? dir0 : dir1;
+                int activeBat = ReadBeS16(metadata, bat0 + 0x0004) >= ReadBeS16(metadata, bat1 + 0x0004) ? bat0 : bat1;
+                GameCubeMemoryCardInfo card = new GameCubeMemoryCardInfo { Slot = slot, Path = path, TotalBlocks = Math.Max(0, (int)(info.Length / blockSize) - 5), FreeBlocks = ReadBe16(metadata, activeBat + 0x0006) };
+                for (int index = 0; index < 127; index++)
+                {
+                    int entry = activeDir + index * 0x40;
+                    if (metadata[entry] == 0xFF && metadata[entry + 1] == 0xFF && metadata[entry + 2] == 0xFF && metadata[entry + 3] == 0xFF) continue;
+                    string gameCode = Encoding.ASCII.GetString(metadata, entry, 4).Trim('\0', ' ', '\u00ff');
+                    int nameLength = 0; while (nameLength < 0x20 && metadata[entry + 0x08 + nameLength] != 0 && metadata[entry + 0x08 + nameLength] != 0xFF) nameLength++;
+                    string fileName = nameLength > 0 ? Encoding.ASCII.GetString(metadata, entry + 0x08, nameLength).Trim() : gameCode;
+                    uint seconds = ReadBe32(metadata, entry + 0x28);
+                    double safeSeconds = Math.Min((double)seconds, 3155760000.0); DateTime modified = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Local).AddSeconds(safeSeconds);
+                    card.Saves.Add(new GameCubeSaveEntry { Name = String.IsNullOrWhiteSpace(fileName) ? gameCode : fileName, GameCode = gameCode, Blocks = ReadBe16(metadata, entry + 0x38), Modified = modified, CardPath = path });
+                }
+                return card;
+            }
+            catch (Exception ex) { WritePlatformLog("GameCube memory-card parser skipped " + path + ": " + ex.Message, "WARN"); return null; }
+        }
+
+        private List<WiiSaveEntry> ScanWiiSaves(List<string> roots)
+        {
+            List<WiiSaveEntry> result = new List<WiiSaveEntry>();
+            HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string rootPath in roots)
+            {
+                string titleRoot = Path.Combine(rootPath, "title");
+                if (!Directory.Exists(titleRoot)) continue;
+                string[] highDirs; try { highDirs = Directory.GetDirectories(titleRoot); } catch { continue; }
+                foreach (string high in highDirs)
+                {
+                    string[] lowDirs; try { lowDirs = Directory.GetDirectories(high); } catch { continue; }
+                    foreach (string low in lowDirs)
+                    {
+                        string data = Path.Combine(low, "data"); if (!Directory.Exists(data) || !seen.Add(data)) continue;
+                        long size = GetPathSize(data); if (size <= 0) continue;
+                        string lowName = Path.GetFileName(low); string titleId = (Path.GetFileName(high) + lowName).ToUpperInvariant();
+                        string code = DecodeWiiTitleCode(lowName).ToUpperInvariant();
+                        string[] banner = ReadWiiSaveBannerMetadata(data);
+                        ConsolePlatformGame game = FindWiiLibraryGame(code);
+                        string display = !String.IsNullOrWhiteSpace(banner[0]) ? banner[0] : (game != null && !String.IsNullOrWhiteSpace(game.Name) ? game.Name : (String.IsNullOrWhiteSpace(code) ? "Wii Save " + lowName.ToUpperInvariant() : "Wii Save (" + code + ")"));
+                        string cover = game != null && !String.IsNullOrWhiteSpace(game.Cover) && File.Exists(game.Cover) ? game.Cover : FindDolphinArtworkBySaveCode(code);
+                        DateTime modified = Directory.GetLastWriteTime(data);
+                        result.Add(new WiiSaveEntry { Name = display, TitleId = titleId, GameCode = code, Path = data, Cover = cover, Description = banner[1], Size = size, Modified = modified });
+                    }
+                }
+            }
+            return result.OrderBy(delegate(WiiSaveEntry entry) { return entry.Name; }, StringComparer.CurrentCultureIgnoreCase).ToList();
+        }
+        private static string DecodeWiiTitleCode(string lowHex)
+        {
+            try
+            {
+                if (String.IsNullOrWhiteSpace(lowHex) || lowHex.Length != 8) return String.Empty;
+                byte[] raw = new byte[4];
+                for (int i = 0; i < 4; i++) raw[i] = Convert.ToByte(lowHex.Substring(i * 2, 2), 16);
+                string code = Encoding.ASCII.GetString(raw);
+                return code.All(delegate(char c) { return c >= 0x20 && c <= 0x7E; }) ? code : String.Empty;
+            }
+            catch { return String.Empty; }
+        }
+
+        private void BackupNativeSavePath(string source, string label)
+        {
+            if (String.IsNullOrWhiteSpace(source) || (!File.Exists(source) && !Directory.Exists(source))) { ShowNotice("Save data is not available"); return; }
+            try
+            {
+                string targetRoot = Path.Combine(dataRoot, "Backups", "Native", DateTime.Now.ToString("yyyyMMdd-HHmmss-fff", CultureInfo.InvariantCulture));
+                Directory.CreateDirectory(targetRoot);
+                string safe = Sanitize(label);
+                if (File.Exists(source)) File.Copy(source, Path.Combine(targetRoot, safe + Path.GetExtension(source)), true);
+                else CopyDirectory(source, Path.Combine(targetRoot, safe), 20000);
+                ShowNotice("Save data backed up safely");
+            }
+            catch (Exception ex) { ShowNotice("Backup failed: " + ex.Message); }
         }
 
         private void RenderWiiUDataManagement(List<string> roots)
@@ -1794,7 +3887,15 @@ namespace HuymaierConsole.NativeApp
         }
 
         private void BackupXboxSave(XboxSaveEntry entry) { if (entry == null) return; string targetRoot = Path.Combine(dataRoot, "Backups", "Saves", DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture)); Directory.CreateDirectory(targetRoot); string target = Path.Combine(targetRoot, Sanitize(entry.Name)); try { CopySavePath(entry.Path, target); ShowNotice("Save backed up"); } catch (Exception ex) { ShowNotice("Backup failed: " + ex.Message); } }
-        private void ExportXboxSave(XboxSaveEntry entry) { if (entry == null) return; using (System.Windows.Forms.FolderBrowserDialog dialog = new System.Windows.Forms.FolderBrowserDialog()) { dialog.Description = "Export " + entry.Name; if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK) return; string target = Path.Combine(dialog.SelectedPath, Sanitize(entry.Name)); try { CopySavePath(entry.Path, target); ShowNotice("Save exported"); } catch (Exception ex) { ShowNotice("Export failed: " + ex.Message); } } }
+        private void ExportXboxSave(XboxSaveEntry entry){ExportSave(entry);}
+        private void ExportSave(XboxSaveEntry entry)
+        {
+            if(entry==null||String.IsNullOrWhiteSpace(entry.Path))return;
+            try
+            {
+                string requestPath=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Huymaier Console","EmulatorPlatforms","picker-request.json");Directory.CreateDirectory(Path.GetDirectoryName(requestPath));Dictionary<string,object> request=new Dictionary<string,object>();request["platformId"]=definition.Id;request["displayName"]=definition.DisplayName;request["action"]="ExportSave";request["sourcePath"]=entry.Path;request["suggestedName"]=Sanitize(entry.Name);request["startPath"]=Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);File.WriteAllText(requestPath,new JavaScriptSerializer().Serialize(request),Encoding.UTF8);Close();
+            }catch(Exception ex){ShowNotice("Export request failed: "+ex.Message);}
+        }
         private void OpenSaveLocation(XboxSaveEntry entry) { try { string folder = entry.IsDirectory ? entry.Path : Path.GetDirectoryName(entry.Path); Process.Start("explorer.exe", "\"" + folder + "\""); } catch { } }
         private void DeleteXboxSave(XboxSaveEntry entry) { if (entry == null) return; string targetRoot = Path.Combine(dataRoot, "Backups", "Deleted", DateTime.Now.ToString("yyyyMMdd-HHmmss-fff", CultureInfo.InvariantCulture)); Directory.CreateDirectory(targetRoot); string target = Path.Combine(targetRoot, "item" + (entry.IsDirectory ? String.Empty : Path.GetExtension(entry.Path))); try { File.WriteAllText(Path.Combine(targetRoot, "restore-path.txt"), entry.Path, Encoding.UTF8); if (entry.IsDirectory) Directory.Move(entry.Path, target); else File.Move(entry.Path, target); ShowNotice("Moved to recoverable backup"); dashboardSubpage = "storage"; selectedXboxSave = null; ScanXboxSaves(); RenderPage(); } catch (Exception ex) { ShowNotice("Remove failed: " + ex.Message); } }
         private void RestoreLatestDeletedSave() { string deletedRoot = Path.Combine(dataRoot, "Backups", "Deleted"); if (!Directory.Exists(deletedRoot)) { ShowNotice("No removed saves are available"); return; } try { DirectoryInfo latest = new DirectoryInfo(deletedRoot).GetDirectories().OrderByDescending(delegate(DirectoryInfo d) { return d.CreationTimeUtc; }).FirstOrDefault(); if (latest == null) { ShowNotice("No removed saves are available"); return; } string metadata = Path.Combine(latest.FullName, "restore-path.txt"); if (!File.Exists(metadata)) { ShowNotice("The latest backup has no restore metadata"); return; } string original = File.ReadAllText(metadata, Encoding.UTF8).Trim(); FileSystemInfo item = latest.GetFileSystemInfos().FirstOrDefault(delegate(FileSystemInfo f) { return !String.Equals(f.Name, "restore-path.txt", StringComparison.OrdinalIgnoreCase); }); if (item == null || String.IsNullOrWhiteSpace(original)) { ShowNotice("The latest backup is incomplete"); return; } if (File.Exists(original) || Directory.Exists(original)) { ShowNotice("The original save location is already occupied"); return; } Directory.CreateDirectory(Path.GetDirectoryName(original)); DirectoryInfo dir = item as DirectoryInfo; if (dir != null) Directory.Move(dir.FullName, original); else File.Move(item.FullName, original); try { File.Delete(metadata); Directory.Delete(latest.FullName, false); } catch { } ScanXboxSaves(); RenderPage(); ShowNotice("Latest removed save restored"); } catch (Exception ex) { ShowNotice("Restore failed: " + ex.Message); } }
@@ -1823,24 +3924,57 @@ namespace HuymaierConsole.NativeApp
 
         private void RenderSettings()
         {
-            titleText.Text = definition.Shell == "Xbox360" ? (IsBlades() ? "system" : "settings") : definition.DisplayName + " Settings";
-            subtitleText.Text = definition.PrimaryBackend + " with " + definition.FallbackBackend + " fallback";
-            StackPanel panel = new StackPanel { Margin = IsXboxFamily() ? new Thickness(8, 0, 8, 24) : new Thickness(22, 0, 22, 24), MaxWidth = 1320, HorizontalAlignment = HorizontalAlignment.Stretch }; contentHost.Children.Add(new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, Content = panel });
-            if (definition.Shell == "Xbox360")
-            {
-                AddSetting(panel, "Storage", "Manage Xenia save containers and profile backups", OpenXboxStorageManager);
-                AddSetting(panel, "Achievements", GetXboxGamerscore().ToString(CultureInfo.InvariantCulture) + " G earned from Xenia profiles", OpenXboxAchievements);
-                AddSetting(panel, "Dashboard Style", settings.dashboardStyle, CycleDashboardStyle);
-            }
-            else if (definition.Shell == "Xbox") AddSetting(panel, "Memory", "Back up, export, and restore Xbox storage images", OpenXboxStorageManager);
-            AddSetting(panel, "Primary Emulator", DisplayPath(settings.emulatorPath), ChoosePrimaryEmulator); AddSetting(panel, "Fallback Emulator", DisplayPath(settings.fallbackEmulatorPath), ChooseFallbackEmulator);
-            AddSetting(panel, "Add Game Folder", settings.gameFolders.Count.ToString(CultureInfo.InvariantCulture) + " configured", AddGameFolder); AddSetting(panel, "Refresh Library", "Rescan configured folders and reuse cached covers", delegate { RefreshLibrary(true); });
-            if (IsXboxFamily()) AddSetting(panel, "Refresh Online Cover Art", "Download missing Xbox box art and keep it in the local dashboard cache", QueueXboxArtworkRefresh);
-            AddSetting(panel, "Startup Video", settings.startupEnabled ? "Enabled" : "Disabled", delegate { settings.startupEnabled = !settings.startupEnabled; settings.Save(settingsPath); RenderSettingsPage(); });
-            AddSetting(panel, "Navigation Sound Volume", Math.Round(settings.soundVolume * 100).ToString(CultureInfo.InvariantCulture) + "%", CycleSoundVolume); AddSetting(panel, "Import Ambience", String.IsNullOrWhiteSpace(settings.ambiencePath) ? "Not configured" : Path.GetFileName(settings.ambiencePath), ChooseAmbience);
-            AddSetting(panel, "Dashboard Music Volume", Math.Round(settings.ambienceVolume * 100).ToString(CultureInfo.InvariantCulture) + "%", CycleAmbienceVolume); AddSetting(panel, "Ambience", settings.ambienceEnabled ? "Enabled" : "Disabled", delegate { settings.ambienceEnabled = !settings.ambienceEnabled; settings.Save(settingsPath); StartAmbience(); RenderSettingsPage(); });
-            AddSetting(panel, "Open Platform Data", dataRoot, delegate { Process.Start("explorer.exe", "\"" + dataRoot + "\""); }); AddSetting(panel, "Return to Huymaier Console", "Close the " + definition.DisplayName + " shell", delegate { Close(); });
+            if(definition.Shell=="N64"){RenderN64Options();return;}
+            if(definition.Shell=="GameCube"){RenderGameCubeOptions();return;}
+            if(definition.Shell=="Wii"){RenderWiiSettings();return;}
+            if(definition.Shell=="WiiU"){RenderWiiUSettings();return;}
+            if(definition.Shell=="Switch"){RenderSwitchSettings();return;}
+            if(definition.Shell=="Xbox"){RenderXboxSettings();return;}
+            RenderXbox360Settings();
         }
+
+        private string EmulatorStatusText()
+        {
+            if(!String.IsNullOrWhiteSpace(settings.emulatorPath)&&File.Exists(settings.emulatorPath))return Path.GetFileName(settings.emulatorPath);
+            return "Not detected — locate or install";
+        }
+
+        private void AddCorePlatformActions(Panel panel, Func<string,string,Action,Button> factory)
+        {
+            Action<string,string,Action> add=delegate(string name,string detail,Action invoke){Button b=factory(name,detail,invoke);panel.Children.Add(b);actions.Add(new ConsolePlatformAction{Button=b,Invoke=invoke,Name=name});};
+            add("Locate "+definition.PrimaryBackend,EmulatorStatusText(),ChoosePrimaryEmulator);
+            add("Install Latest "+definition.PrimaryBackend,"Download from the emulator project's current supported release",InstallPrimaryEmulator);
+            if(!String.IsNullOrWhiteSpace(definition.FallbackBackend))add("Alternate Emulator",String.IsNullOrWhiteSpace(settings.fallbackEmulatorPath)?definition.FallbackBackend:DisplayPath(settings.fallbackEmulatorPath),ChooseFallbackEmulator);
+            add("Emulator Data",String.IsNullOrWhiteSpace(settings.emulatorDataPath)?"Auto-detect or choose data / cache folder":DisplayPath(settings.emulatorDataPath),ChooseEmulatorDataRoot);
+            add("Game Folders",settings.gameFolders.Count.ToString(CultureInfo.InvariantCulture)+" configured — add another",AddGameFolder);
+            add("Refresh Library",games.Count.ToString(CultureInfo.InvariantCulture)+" titles",delegate{RefreshLibrary(true);});
+            add("Refresh Cover Art","Emulator artwork first, Huymaier cache and online sources second",QueueConsoleArtworkRefresh);
+        }
+
+        private Button CreateN64SettingsRow(string title,string detail,Action invoke)
+        {
+            Button b=new Button{Height=66,Margin=new Thickness(16,5,16,5),Background=new LinearGradientBrush(Color.FromRgb(45,46,50),Color.FromRgb(22,23,26),90),BorderBrush=new SolidColorBrush(Color.FromRgb(137,0,0)),BorderThickness=new Thickness(3),HorizontalContentAlignment=HorizontalAlignment.Stretch,RenderTransformOrigin=new Point(0.5,0.5)};Grid g=new Grid();g.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(310)});g.ColumnDefinitions.Add(new ColumnDefinition());g.Children.Add(new TextBlock{Text=title.ToUpperInvariant(),FontSize=16,FontWeight=FontWeights.Bold,Foreground=Brushes.White,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(16,0,0,0)});TextBlock d=new TextBlock{Text=detail,FontSize=11,Foreground=new SolidColorBrush(Color.FromRgb(194,195,199)),VerticalAlignment=VerticalAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis};Grid.SetColumn(d,1);g.Children.Add(d);b.Content=g;b.Click+=delegate{invoke();};return b;
+        }
+        private void RenderN64Options(){titleText.Text="OPTIONS";subtitleText.Text="Nintendo 64 / emulator configuration";StackPanel p=new StackPanel{Margin=new Thickness(70,6,70,20)};contentHost.Children.Add(new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=p});AddCorePlatformActions(p,CreateN64SettingsRow);}
+
+        private Button CreateGameCubeSettingsRow(string title,string detail,Action invoke){Button b=new Button{Height=72,Margin=new Thickness(28,7,28,7),Background=new SolidColorBrush(Color.FromArgb(155,56,43,117)),BorderBrush=new SolidColorBrush(Color.FromRgb(155,137,245)),BorderThickness=new Thickness(3),HorizontalContentAlignment=HorizontalAlignment.Stretch,RenderTransformOrigin=new Point(0.5,0.5)};Grid g=new Grid();g.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(330)});g.ColumnDefinitions.Add(new ColumnDefinition());g.Children.Add(new TextBlock{Text=title,FontSize=19,FontWeight=FontWeights.SemiBold,Foreground=Brushes.White,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(18,0,0,0)});TextBlock d=new TextBlock{Text=detail,FontSize=11,Foreground=new SolidColorBrush(Color.FromRgb(213,208,235)),VerticalAlignment=VerticalAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis};Grid.SetColumn(d,1);g.Children.Add(d);b.Content=g;b.Click+=delegate{invoke();};return b;}
+        private void RenderGameCubeOptions(){titleText.Text="Options";subtitleText.Text="Nintendo GameCube IPL options";Border cubePanel=new Border{Margin=new Thickness(110,12,110,26),CornerRadius=new CornerRadius(46),Background=new LinearGradientBrush(Color.FromArgb(180,38,28,84),Color.FromArgb(160,73,56,142),45),BorderBrush=new SolidColorBrush(Color.FromRgb(155,137,245)),BorderThickness=new Thickness(5),Padding=new Thickness(18)};StackPanel p=new StackPanel();cubePanel.Child=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=p};contentHost.Children.Add(cubePanel);Button scale=CreateGameCubeSettingsRow("Cube Size",Math.Round(settings.gameCubeScale*100).ToString(CultureInfo.InvariantCulture)+"%  •  A cycles size",CycleGameCubeScale);p.Children.Add(scale);actions.Add(new ConsolePlatformAction{Button=scale,Invoke=CycleGameCubeScale,Name="Cube Size"});AddCorePlatformActions(p,CreateGameCubeSettingsRow);}
+
+        private Button CreateWiiSettingsRow(string title,string detail,Action invoke){Button b=new Button{Height=70,Margin=new Thickness(32,5,32,5),Background=new LinearGradientBrush(Color.FromRgb(250,252,253),Color.FromRgb(224,231,234),90),BorderBrush=new SolidColorBrush(Color.FromRgb(80,190,220)),BorderThickness=new Thickness(3),HorizontalContentAlignment=HorizontalAlignment.Stretch,RenderTransformOrigin=new Point(0.5,0.5)};Grid g=new Grid();g.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(340)});g.ColumnDefinitions.Add(new ColumnDefinition());g.Children.Add(new TextBlock{Text=title,FontSize=18,Foreground=new SolidColorBrush(Color.FromRgb(77,89,94)),VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(18,0,0,0)});TextBlock d=new TextBlock{Text=detail,FontSize=11,Foreground=new SolidColorBrush(Color.FromRgb(118,130,135)),VerticalAlignment=VerticalAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis};Grid.SetColumn(d,1);g.Children.Add(d);b.Content=g;b.Click+=delegate{invoke();};return b;}
+        private void RenderWiiSettings(){titleText.Text="Wii Settings";subtitleText.Text=String.Empty;StackPanel p=new StackPanel{Margin=new Thickness(100,16,100,28)};contentHost.Children.Add(new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=p});AddCorePlatformActions(p,CreateWiiSettingsRow);}
+
+        private Button CreateWiiUSettingsRow(string title,string detail,Action invoke){Button b=new Button{Height=72,Margin=new Thickness(22,6,22,6),Background=Brushes.White,BorderBrush=new SolidColorBrush(Color.FromRgb(43,165,208)),BorderThickness=new Thickness(2),HorizontalContentAlignment=HorizontalAlignment.Stretch,RenderTransformOrigin=new Point(0.5,0.5)};Grid g=new Grid();g.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(350)});g.ColumnDefinitions.Add(new ColumnDefinition());g.Children.Add(new TextBlock{Text=title,FontSize=18,FontWeight=FontWeights.SemiBold,Foreground=new SolidColorBrush(Color.FromRgb(44,80,92)),VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(20,0,0,0)});TextBlock d=new TextBlock{Text=detail,FontSize=11,Foreground=new SolidColorBrush(Color.FromRgb(99,122,130)),VerticalAlignment=VerticalAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis};Grid.SetColumn(d,1);g.Children.Add(d);b.Content=g;b.Click+=delegate{invoke();};return b;}
+        private void RenderWiiUSettings(){titleText.Text="System Settings";subtitleText.Text="Wii U / Cemu";StackPanel p=new StackPanel{Margin=new Thickness(110,12,110,28)};contentHost.Children.Add(new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=p});AddCorePlatformActions(p,CreateWiiUSettingsRow);}
+
+        private Button CreateSwitchSettingsRow(string title,string detail,Action invoke){Button b=new Button{Height=70,Margin=new Thickness(0,0,0,2),Background=new SolidColorBrush(Color.FromRgb(48,49,54)),BorderBrush=new SolidColorBrush(Color.FromRgb(74,75,80)),BorderThickness=new Thickness(0,0,0,1),HorizontalContentAlignment=HorizontalAlignment.Stretch,RenderTransformOrigin=new Point(0.5,0.5)};Grid g=new Grid();g.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(360)});g.ColumnDefinitions.Add(new ColumnDefinition());g.Children.Add(new TextBlock{Text=title,FontSize=18,Foreground=Brushes.White,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(22,0,0,0)});TextBlock d=new TextBlock{Text=detail,FontSize=11,Foreground=new SolidColorBrush(Color.FromRgb(184,185,190)),VerticalAlignment=VerticalAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis};Grid.SetColumn(d,1);g.Children.Add(d);b.Content=g;b.Click+=delegate{invoke();};return b;}
+        private void RenderSwitchSettings(){titleText.Text="System Settings";subtitleText.Text=String.Empty;Grid body=new Grid{Margin=new Thickness(90,8,90,24)};body.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(280)});body.ColumnDefinitions.Add(new ColumnDefinition());contentHost.Children.Add(body);Border side=new Border{Background=new SolidColorBrush(Color.FromRgb(37,38,42)),Child=new TextBlock{Text="SYSTEM\nSETTINGS",FontSize=28,FontWeight=FontWeights.Light,Foreground=Brushes.White,Margin=new Thickness(28),VerticalAlignment=VerticalAlignment.Top}};body.Children.Add(side);StackPanel p=new StackPanel{Margin=new Thickness(18,0,0,0)};ScrollViewer sc=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=p};Grid.SetColumn(sc,1);body.Children.Add(sc);AddCorePlatformActions(p,CreateSwitchSettingsRow);}
+
+        private Button CreateXboxSettingsRow(string title,string detail,Action invoke){return CreateXboxPanelRow(title,detail,invoke,"X");}
+        private void RenderXboxSettings(){titleText.Text="settings";subtitleText.Text="system / emulator";StackPanel p=new StackPanel{Margin=new Thickness(26,8,26,24)};contentHost.Children.Add(new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=p});AddCorePlatformActions(p,CreateXboxSettingsRow);AddXboxSettingAction(p,"Memory","Manage save storage",OpenXboxStorageManager);}
+        private void AddXboxSettingAction(Panel panel,string title,string detail,Action invoke){Button b=CreateXboxSettingsRow(title,detail,invoke);panel.Children.Add(b);actions.Add(new ConsolePlatformAction{Button=b,Invoke=invoke,Name=title});}
+
+        private Button CreateXbox360SettingsRow(string title,string detail,Action invoke){return IsBlades()?CreateBladePanelButton(title,detail,invoke,Color.FromRgb(103,76,151)):CreateShellAction(title,detail,invoke,Color.FromRgb(83,156,44));}
+        private void RenderXbox360Settings(){titleText.Text=IsBlades()?"system":"settings";subtitleText.Text="Xbox 360 / Xenia";StackPanel p=new StackPanel{Margin=new Thickness(22,4,22,24)};contentHost.Children.Add(new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,Content=p});AddCorePlatformActions(p,CreateXbox360SettingsRow);Button storage=CreateXbox360SettingsRow("Storage","Manage Xenia saves",OpenXboxStorageManager);p.Children.Insert(0,storage);actions.Insert(0,new ConsolePlatformAction{Button=storage,Invoke=OpenXboxStorageManager,Name="Storage"});Button achievements=CreateXbox360SettingsRow("Achievements",GetXboxGamerscore().ToString(CultureInfo.InvariantCulture)+" G earned",OpenXboxAchievements);p.Children.Insert(1,achievements);actions.Insert(1,new ConsolePlatformAction{Button=achievements,Invoke=OpenXboxAchievements,Name="Achievements"});Button style=CreateXbox360SettingsRow("Dashboard Style",settings.dashboardStyle,CycleDashboardStyle);p.Children.Insert(2,style);actions.Insert(2,new ConsolePlatformAction{Button=style,Invoke=CycleDashboardStyle,Name="Dashboard Style"});}
 
 
         private void RenderSettingsPage() { selected = Math.Max(0, Math.Min(selected, actions.Count - 1)); RenderPage(); }
@@ -1899,43 +4033,47 @@ namespace HuymaierConsole.NativeApp
 
         private void CalculateColumns()
         {
-            double reserved = definition.Shell == "Xbox" ? 760 : (IsBlades() ? 620 : (IsMetro() ? 360 : 340));
+            if (definition.Shell == "Wii") { columns = 4; return; }
+            if (definition.Shell == "WiiU") { columns = 5; return; }
+            if (definition.Shell == "Switch") { columns = 6; return; }
+            if (IsBlades()) { columns = 1; return; }
+            double reserved = definition.Shell == "Xbox" ? 760 : (IsMetro() ? 360 : 340);
             double available = Math.Max(420, ActualWidth - reserved);
-            double cardWidth = IsMetro() ? 224 : (IsBlades() ? 166 : (definition.Shell == "Xbox" ? 184 : 205));
+            double cardWidth = IsMetro() ? 224 : (definition.Shell == "Xbox" ? 184 : 205);
             columns = Math.Max(1, (int)(available / cardWidth));
         }
 
-        private void ChoosePrimaryEmulator()
-        {
-            string path = ChooseExecutable(definition.PrimaryBackend);
-            if (!String.IsNullOrWhiteSpace(path)) { settings.emulatorPath = path; settings.Save(settingsPath); RenderPage(); }
-        }
+        private void ChoosePrimaryEmulator(){RequestHuymaierPicker("PrimaryEmulator");}
+        private void ChooseFallbackEmulator(){RequestHuymaierPicker("FallbackEmulator");}
+        private void ChooseEmulatorDataRoot(){RequestHuymaierPicker("DataRoot");}
+        private void AddGameFolder(){RequestHuymaierPicker("GameFolder");}
+        private void ChooseAmbience(){RequestHuymaierPicker("Ambience");}
+        private void InstallPrimaryEmulator(){RequestHuymaierPicker("InstallPrimaryEmulator");}
 
-        private void ChooseFallbackEmulator()
+        private void RequestHuymaierPicker(string action)
         {
-            string path = ChooseExecutable(definition.FallbackBackend);
-            if (!String.IsNullOrWhiteSpace(path)) { settings.fallbackEmulatorPath = path; settings.Save(settingsPath); RenderPage(); }
-        }
-
-        private string ChooseExecutable(string title)
-        {
-            OpenFileDialog dialog = new OpenFileDialog();
-            dialog.Title = "Select " + title;
-            dialog.Filter = "Windows applications (*.exe)|*.exe|All files (*.*)|*.*";
-            return dialog.ShowDialog(this) == true ? dialog.FileName : String.Empty;
-        }
-
-        private void AddGameFolder()
-        {
-            using (System.Windows.Forms.FolderBrowserDialog dialog = new System.Windows.Forms.FolderBrowserDialog())
+            try
             {
-                dialog.Description = "Select a " + definition.DisplayName + " game folder";
-                if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
-                if (!settings.gameFolders.Contains(dialog.SelectedPath, StringComparer.OrdinalIgnoreCase)) settings.gameFolders.Add(dialog.SelectedPath);
-                settings.Save(settingsPath);
-                RefreshLibrary(true);
+                string requestPath=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Huymaier Console","EmulatorPlatforms","picker-request.json");
+                Directory.CreateDirectory(Path.GetDirectoryName(requestPath));
+                Dictionary<string,object> request=new Dictionary<string,object>();request["platformId"]=definition.Id;request["displayName"]=definition.DisplayName;request["action"]=action;request["primaryBackend"]=definition.PrimaryBackend;request["fallbackBackend"]=definition.FallbackBackend;request["startPath"]=GetPickerStartPath(action);request["requestedAtUtc"]=DateTime.UtcNow.ToString("o",CultureInfo.InvariantCulture);
+                File.WriteAllText(requestPath,new JavaScriptSerializer().Serialize(request),Encoding.UTF8);
+                WritePlatformLog("Requested Huymaier picker action "+action+" for "+definition.Id,"INFO");
+                Close();
             }
+            catch(Exception ex){WritePlatformLog("Could not request Huymaier picker: "+ex,"ERROR");ShowNotice("Huymaier file browser could not be opened");}
         }
+        private string GetPickerStartPath(string action)
+        {
+            string value=String.Empty;if(action=="PrimaryEmulator")value=settings.emulatorPath;else if(action=="FallbackEmulator")value=settings.fallbackEmulatorPath;else if(action=="DataRoot")value=settings.emulatorDataPath;else if(action=="GameFolder"&&settings.gameFolders.Count>0)value=settings.gameFolders[settings.gameFolders.Count-1];else if(action=="Ambience")value=settings.ambiencePath;
+            try{if(File.Exists(value))return Path.GetDirectoryName(value);if(Directory.Exists(value))return value;}catch{}return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        }
+
+
+
+
+
+
 
 
 
@@ -1951,18 +4089,7 @@ namespace HuymaierConsole.NativeApp
             List<string> roots = FindSaveRoots(); if (roots.Count > 0) Process.Start("explorer.exe", "\"" + roots[0] + "\""); else ShowNotice("No storage folder detected");
         }
 
-        private void ChooseAmbience()
-        {
-            OpenFileDialog dialog = new OpenFileDialog();
-            dialog.Title = "Choose " + definition.DisplayName + " ambience";
-            dialog.Filter = "Audio files|*.mp3;*.wav;*.wma;*.m4a;*.aac|All files|*.*";
-            if (dialog.ShowDialog(this) != true) return;
-            settings.ambiencePath = dialog.FileName;
-            settings.ambienceEnabled = true;
-            settings.Save(settingsPath);
-            StartAmbience();
-            RenderPage();
-        }
+
 
         private void CycleDashboardStyle()
         {
@@ -1984,6 +4111,17 @@ namespace HuymaierConsole.NativeApp
         }
 
 
+        private void CycleGameCubeScale()
+        {
+            double[] levels = new double[] { 0.52, 0.60, 0.66, 0.74, 0.82, 0.90 };
+            int index = 0; double best = Double.MaxValue;
+            for (int i = 0; i < levels.Length; i++) { double delta = Math.Abs(levels[i] - settings.gameCubeScale); if (delta < best) { best = delta; index = i; } }
+            settings.gameCubeScale = levels[(index + 1) % levels.Length];
+            settings.Save(settingsPath);
+            ShowNotice("Cube size " + Math.Round(settings.gameCubeScale * 100).ToString(CultureInfo.InvariantCulture) + "%");
+            RenderPage();
+        }
+
         private void CycleSoundVolume()
         {
             double[] levels = new double[] { 0.5, 0.7, 0.85, 1.0 };
@@ -2003,6 +4141,152 @@ namespace HuymaierConsole.NativeApp
             settings.ambienceVolume = levels[(index + 1) % levels.Length]; settings.Save(settingsPath); StartAmbience(); RenderPage();
         }
 
+        private bool IsNintendoLibraryOwnedPath(string path)
+        {
+            if (definition.Shell != "Wii" && definition.Shell != "GameCube") return true;
+            if (String.IsNullOrWhiteSpace(path)) return false;
+            try
+            {
+                string full = Path.GetFullPath(path);
+                string[] segments = full.Split(new char[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (string raw in segments)
+                {
+                    string segment = (raw ?? String.Empty).Trim();
+                    if (definition.Shell == "Wii" &&
+                        (String.Equals(segment, "GameCube", StringComparison.OrdinalIgnoreCase) ||
+                         String.Equals(segment, "Nintendo GameCube", StringComparison.OrdinalIgnoreCase) ||
+                         String.Equals(segment, "GCN", StringComparison.OrdinalIgnoreCase))) return false;
+                    if (definition.Shell == "GameCube" &&
+                        (String.Equals(segment, "Wii", StringComparison.OrdinalIgnoreCase) ||
+                         String.Equals(segment, "Nintendo Wii", StringComparison.OrdinalIgnoreCase))) return false;
+                }
+
+                string extension = Path.GetExtension(full);
+                if (!String.Equals(extension, ".iso", StringComparison.OrdinalIgnoreCase)) return true;
+                return IsNintendoRawDiscForCurrentShell(full);
+            }
+            catch { return false; }
+        }
+
+        private bool IsNintendoRawDiscForCurrentShell(string path)
+        {
+            if (definition.Shell != "Wii" && definition.Shell != "GameCube") return true;
+            try
+            {
+                using (FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                {
+                    if (stream.Length < 0x20) return false;
+                    byte[] header = new byte[0x20];
+                    int offset = 0;
+                    while (offset < header.Length)
+                    {
+                        int read = stream.Read(header, offset, header.Length - offset);
+                        if (read <= 0) break;
+                        offset += read;
+                    }
+                    if (offset < header.Length) return false;
+                    bool wii = header[0x18] == 0x5D && header[0x19] == 0x1C && header[0x1A] == 0x9E && header[0x1B] == 0xA3;
+                    bool gameCube = header[0x1C] == 0xC2 && header[0x1D] == 0x33 && header[0x1E] == 0x9F && header[0x1F] == 0x3D;
+                    return definition.Shell == "Wii" ? wii : gameCube;
+                }
+            }
+            catch { return false; }
+        }
+
+        // HUYMAIER_NINTENDO_DISPLAY_NAME_V1
+        private static bool LooksLikeNintendoDiscId(string value)
+        {
+            return !string.IsNullOrWhiteSpace(value) && System.Text.RegularExpressions.Regex.IsMatch(value.Trim(), "^[A-Za-z0-9]{6}$");
+        }
+
+        private static string CleanNintendoContainerName(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+            string cleaned = System.Text.RegularExpressions.Regex.Replace(value.Trim(), @"\s*[\[\(][A-Za-z0-9]{6}[\]\)]\s*$", string.Empty).Trim();
+            return cleaned;
+        }
+
+        private static string ReadNintendoAsciiTitle(Stream stream, long discOffset)
+        {
+            try
+            {
+                if (stream == null || !stream.CanRead || discOffset < 0 || stream.Length < discOffset + 0x80) return string.Empty;
+                stream.Position = discOffset + 0x20;
+                byte[] titleBytes = new byte[0x60];
+                int read = stream.Read(titleBytes, 0, titleBytes.Length);
+                if (read <= 0) return string.Empty;
+                string title = Encoding.ASCII.GetString(titleBytes, 0, read).Trim('\0', ' ', '\t', '\r', '\n');
+                title = System.Text.RegularExpressions.Regex.Replace(title, @"[\x00-\x1F\x7F]+", " ");
+                title = System.Text.RegularExpressions.Regex.Replace(title, @"\s{2,}", " ").Trim();
+                if (title.Length < 2 || LooksLikeNintendoDiscId(title)) return string.Empty;
+                return title;
+            }
+            catch { return string.Empty; }
+        }
+
+        private static string ReadNintendoDiscTitle(string path)
+        {
+            try
+            {
+                string extension = Path.GetExtension(path) ?? string.Empty;
+                using (FileStream stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                {
+                    if (extension.Equals(".iso", StringComparison.OrdinalIgnoreCase) || extension.Equals(".gcm", StringComparison.OrdinalIgnoreCase))
+                        return ReadNintendoAsciiTitle(stream, 0);
+
+                    if (extension.Equals(".wbfs", StringComparison.OrdinalIgnoreCase) && stream.Length >= 32)
+                    {
+                        byte[] header = new byte[12];
+                        if (stream.Read(header, 0, header.Length) != header.Length) return string.Empty;
+                        if (header[0] != (byte)'W' || header[1] != (byte)'B' || header[2] != (byte)'F' || header[3] != (byte)'S') return string.Empty;
+                        int wbfsSectorShift = header[9];
+                        if (wbfsSectorShift < 15 || wbfsSectorShift > 31) return string.Empty;
+                        long wbfsSectorSize = 1L << wbfsSectorShift;
+                        // The WBFS disc table begins at byte 12.  The entry stores
+                        // the WBFS-sector index containing the Wii disc header.
+                        for (int i = 0; i < 512 && stream.Position < stream.Length; i++)
+                        {
+                            int sectorIndex = stream.ReadByte();
+                            if (sectorIndex <= 0) continue;
+                            long discOffset = (long)sectorIndex * wbfsSectorSize;
+                            string title = ReadNintendoAsciiTitle(stream, discOffset);
+                            if (!string.IsNullOrWhiteSpace(title)) return title;
+                        }
+                    }
+                }
+            }
+            catch { }
+            return string.Empty;
+        }
+
+        private string ResolveLibraryDisplayName(string path)
+        {
+            string fileName = CleanName(Path.GetFileNameWithoutExtension(path));
+            bool nintendoDisc = definition.Shell.Equals("Wii", StringComparison.OrdinalIgnoreCase) ||
+                                definition.Shell.Equals("GameCube", StringComparison.OrdinalIgnoreCase);
+            if (!nintendoDisc || !LooksLikeNintendoDiscId(fileName)) return fileName;
+
+            try
+            {
+                DirectoryInfo parent = Directory.GetParent(path);
+                if (parent != null)
+                {
+                    string folderName = CleanNintendoContainerName(parent.Name);
+                    if (!string.IsNullOrWhiteSpace(folderName) && !LooksLikeNintendoDiscId(folderName) &&
+                        !folderName.Equals("Wii", StringComparison.OrdinalIgnoreCase) &&
+                        !folderName.Equals("GameCube", StringComparison.OrdinalIgnoreCase) &&
+                        !folderName.Equals("ROMs", StringComparison.OrdinalIgnoreCase))
+                        return CleanName(folderName);
+                }
+            }
+            catch { }
+
+            string embedded = ReadNintendoDiscTitle(path);
+            if (!string.IsNullOrWhiteSpace(embedded)) return embedded;
+
+            string platform = definition.Shell.Equals("GameCube", StringComparison.OrdinalIgnoreCase) ? "GameCube" : "Wii";
+            return platform + " Game (" + fileName + ")";
+        }
         private void QueueLibraryRefresh()
         {
             if (closing) return;
@@ -2021,8 +4305,8 @@ namespace HuymaierConsole.NativeApp
                         foreach (string path in Directory.EnumerateFiles(folder, "*.*", SearchOption.AllDirectories))
                         {
                             string extension = Path.GetExtension(path);
-                            if (!extensions.Contains(extension, StringComparer.OrdinalIgnoreCase) || !seen.Add(path)) continue;
-                            found.Add(new ConsolePlatformGame { Name = CleanName(Path.GetFileNameWithoutExtension(path)), Path = path, Cover = FindCover(path) });
+                            if (!extensions.Contains(extension, StringComparer.OrdinalIgnoreCase) || !IsNintendoLibraryOwnedPath(path) || !seen.Add(path)) continue;
+                            found.Add(new ConsolePlatformGame { Name = ResolveLibraryDisplayName(path), Path = path, Cover = FindCover(path) });
                         }
                     }
                     catch { }
@@ -2048,13 +4332,14 @@ namespace HuymaierConsole.NativeApp
                     selected = 0;
                     RenderPage();
                     ShowNotice("Library updated — " + games.Count.ToString(CultureInfo.InvariantCulture) + " games");
-                    if (IsXboxFamily()) QueueXboxArtworkRefresh();
+                    QueueConsoleArtworkRefresh();
                 })); } catch (Exception ex) { WritePlatformLog(definition.DisplayName + " library UI callback was cancelled safely: " + ex.Message, "WARN"); }
             });
         }
 
         private void RefreshLibrary(bool showNotice)
         {
+            if (definition.Shell == "PS4" || definition.Shell == "Vita") { RefreshModernPlayStationLibrary(showNotice); return; }
             List<ConsolePlatformGame> found = new List<ConsolePlatformGame>();
             HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (string folder in settings.gameFolders.ToArray())
@@ -2066,8 +4351,9 @@ namespace HuymaierConsole.NativeApp
                     {
                         string extension = Path.GetExtension(path);
                         if (!definition.GameExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase)) continue;
+                        if (!IsNintendoLibraryOwnedPath(path)) continue;
                         if (!seen.Add(path)) continue;
-                        found.Add(new ConsolePlatformGame { Name = CleanName(Path.GetFileNameWithoutExtension(path)), Path = path, Cover = FindCover(path) });
+                        found.Add(new ConsolePlatformGame { Name = ResolveLibraryDisplayName(path), Path = path, Cover = FindCover(path) });
                     }
                 }
                 catch { }
@@ -2077,7 +4363,71 @@ namespace HuymaierConsole.NativeApp
             selected = 0;
             if (showNotice) ShowNotice("Library refreshed — " + games.Count.ToString(CultureInfo.InvariantCulture) + " games");
             RenderPage();
-            if (IsXboxFamily()) QueueXboxArtworkRefresh();
+            QueueConsoleArtworkRefresh();
+        }
+
+
+        private List<string> GetModernPlayStationContentRoots()
+        {
+            List<string> roots=new List<string>();
+            Action<string> add=delegate(string value){if(String.IsNullOrWhiteSpace(value))return;try{if(File.Exists(value))value=Path.GetDirectoryName(value);if(Directory.Exists(value)&&!roots.Contains(value,StringComparer.OrdinalIgnoreCase))roots.Add(value);}catch{}};
+            foreach(string folder in settings.gameFolders) add(folder); add(settings.emulatorDataPath);
+            string exeRoot=!String.IsNullOrWhiteSpace(settings.emulatorPath)&&File.Exists(settings.emulatorPath)?Path.GetDirectoryName(settings.emulatorPath):String.Empty; add(exeRoot);
+            if(definition.Shell=="Vita")
+            {
+                foreach(string root in roots.ToArray()) { try { add(Path.Combine(root,"ux0","app")); add(Path.Combine(root,"Vita3K","ux0","app")); } catch{} }
+                string app=Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData); string local=Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                add(Path.Combine(app,"Vita3K","Vita3K","ux0","app")); add(Path.Combine(app,"Vita3K","ux0","app")); add(Path.Combine(local,"Vita3K","ux0","app"));
+            }
+            return roots;
+        }
+
+        private ConsolePlatformGame CreateModernPlayStationGame(string ebootPath)
+        {
+            try
+            {
+                string appRoot=Path.GetDirectoryName(ebootPath); if(String.IsNullOrWhiteSpace(appRoot))return null;
+                string sfo=Path.Combine(appRoot,"sce_sys","param.sfo"); if(!File.Exists(sfo))return null;
+                string title=ReadPspSfoString(sfo,"TITLE"); string titleId=ReadPspSfoString(sfo,"TITLE_ID");
+                if(String.IsNullOrWhiteSpace(titleId)) titleId=ReadPspSfoString(sfo,"TITLEID");
+                if(String.IsNullOrWhiteSpace(title)) title=!String.IsNullOrWhiteSpace(titleId)?titleId:Path.GetFileName(appRoot);
+                string icon=Path.Combine(appRoot,"sce_sys","icon0.png"); if(!File.Exists(icon)) icon=Path.Combine(appRoot,"sce_sys","icon0.PNG");
+                string cover=File.Exists(icon)?icon:FindCover(ebootPath);
+                ConsolePlatformGame game=new ConsolePlatformGame { Name=title, Path=ebootPath, Cover=cover };
+                try
+                {
+                    System.Reflection.PropertyInfo idProperty=game.GetType().GetProperty("TitleId"); if(idProperty!=null&&idProperty.CanWrite)idProperty.SetValue(game,titleId,null);
+                    System.Reflection.PropertyInfo rootProperty=game.GetType().GetProperty("ContentRoot"); if(rootProperty!=null&&rootProperty.CanWrite)rootProperty.SetValue(game,appRoot,null);
+                }catch{}
+                return game;
+            }catch{return null;}
+        }
+
+        private void RefreshModernPlayStationLibrary(bool showNotice)
+        {
+            List<ConsolePlatformGame> found=new List<ConsolePlatformGame>(); HashSet<string> seen=new HashSet<string>(StringComparer.OrdinalIgnoreCase); int visited=0;
+            foreach(string rootPath in GetModernPlayStationContentRoots())
+            {
+                if(!Directory.Exists(rootPath))continue;
+                try
+                {
+                    if(definition.Shell=="Vita" && String.Equals(Path.GetFileName(rootPath.TrimEnd(Path.DirectorySeparatorChar)),"app",StringComparison.OrdinalIgnoreCase))
+                    {
+                        foreach(string appRoot in Directory.GetDirectories(rootPath))
+                        {
+                            string eboot=Path.Combine(appRoot,"eboot.bin"); if(!File.Exists(eboot)||!seen.Add(eboot))continue; ConsolePlatformGame game=CreateModernPlayStationGame(eboot); if(game!=null)found.Add(game);
+                        }
+                        continue;
+                    }
+                    foreach(string eboot in Directory.EnumerateFiles(rootPath,"eboot.bin",SearchOption.AllDirectories))
+                    {
+                        if(++visited>12000)break; if(!seen.Add(eboot))continue; ConsolePlatformGame game=CreateModernPlayStationGame(eboot); if(game!=null)found.Add(game);
+                    }
+                }catch{}
+                if(visited>12000)break;
+            }
+            games=found.GroupBy(delegate(ConsolePlatformGame game){return game.Path;},StringComparer.OrdinalIgnoreCase).Select(delegate(IGrouping<string,ConsolePlatformGame> group){return group.First();}).OrderBy(delegate(ConsolePlatformGame game){return game.Name;},StringComparer.CurrentCultureIgnoreCase).ToList();
+            selected=0;SaveCachedGames();if(showNotice)ShowNotice("Installed library refreshed — "+games.Count.ToString(CultureInfo.InvariantCulture)+" applications");RenderPage();QueueConsoleArtworkRefresh();
         }
 
         private static string CleanName(string value)
@@ -2089,25 +4439,184 @@ namespace HuymaierConsole.NativeApp
             return name;
         }
 
-        private string FindCover(string gamePath)
+        // HUYMAIER_DOLPHIN_INTEGRATION_V1
+        private static void AddDolphinRoot(List<string> roots, string value)
         {
-            string folder = Path.GetDirectoryName(gamePath);
-            string baseName = Path.GetFileNameWithoutExtension(gamePath);
-            foreach (string extension in new string[] { ".png", ".jpg", ".jpeg", ".webp" })
+            if (String.IsNullOrWhiteSpace(value)) return;
+            try
             {
-                string sidecar = Path.Combine(folder, baseName + extension);
-                if (File.Exists(sidecar)) return sidecar;
-                string cover = Path.Combine(folder, "covers", baseName + extension);
-                if (File.Exists(cover)) return cover;
+                string candidate = value;
+                if (File.Exists(candidate)) candidate = Path.GetDirectoryName(candidate);
+                if (!Directory.Exists(candidate)) return;
+                string leaf = Path.GetFileName(candidate.TrimEnd(Path.DirectorySeparatorChar));
+                if (leaf.Equals("Wii", StringComparison.OrdinalIgnoreCase) || leaf.Equals("GC", StringComparison.OrdinalIgnoreCase) || leaf.Equals("Config", StringComparison.OrdinalIgnoreCase) || leaf.Equals("Cache", StringComparison.OrdinalIgnoreCase))
+                {
+                    DirectoryInfo parent = Directory.GetParent(candidate);
+                    if (parent != null && Directory.Exists(parent.FullName)) candidate = parent.FullName;
+                }
+                if (!roots.Contains(candidate, StringComparer.OrdinalIgnoreCase)) roots.Add(candidate);
             }
-            if (IsXboxFamily())
+            catch { }
+        }
+
+        private List<string> GetDolphinUserRoots()
+        {
+            List<string> roots = new List<string>();
+            AddDolphinRoot(roots, settings.emulatorDataPath);
+            List<string> exeRoots = new List<string>();
+            foreach (string executable in new string[] { settings.emulatorPath, settings.fallbackEmulatorPath })
             {
-                string shared = FindSharedArtwork(CleanName(baseName));
-                if (!String.IsNullOrWhiteSpace(shared)) return shared;
-                string cached = GetXboxArtworkCachePath(CleanName(baseName));
-                if (File.Exists(cached)) return cached;
+                try
+                {
+                    if (String.IsNullOrWhiteSpace(executable) || !File.Exists(executable)) continue;
+                    string exeRoot = Path.GetDirectoryName(executable);
+                    if (!exeRoots.Contains(exeRoot, StringComparer.OrdinalIgnoreCase)) exeRoots.Add(exeRoot);
+                    if (File.Exists(Path.Combine(exeRoot, "portable.txt"))) AddDolphinRoot(roots, Path.Combine(exeRoot, "User"));
+                }
+                catch { }
+            }
+            try
+            {
+                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Dolphin Emulator"))
+                {
+                    if (key != null)
+                    {
+                        object custom = key.GetValue("UserConfigPath");
+                        if (custom != null) AddDolphinRoot(roots, Convert.ToString(custom, CultureInfo.InvariantCulture));
+                        bool local = false;
+                        object localValue = key.GetValue("LocalUserConfig");
+                        if (localValue != null) { try { local = Convert.ToInt32(localValue, CultureInfo.InvariantCulture) != 0; } catch { } }
+                        if (local) foreach (string exeRoot in exeRoots) AddDolphinRoot(roots, Path.Combine(exeRoot, "User"));
+                    }
+                }
+            }
+            catch { }
+            try { AddDolphinRoot(roots, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Dolphin Emulator")); } catch { }
+            try { AddDolphinRoot(roots, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Dolphin Emulator")); } catch { }
+            foreach (string exeRoot in exeRoots) AddDolphinRoot(roots, Path.Combine(exeRoot, "User"));
+            return roots;
+        }
+
+        private static string FindNintendoIdInText(string value)
+        {
+            if (String.IsNullOrWhiteSpace(value)) return String.Empty;
+            System.Text.RegularExpressions.Match match = System.Text.RegularExpressions.Regex.Match(value, @"(?i)(?<![A-Z0-9])([A-Z0-9]{6})(?![A-Z0-9])");
+            return match.Success ? match.Groups[1].Value.ToUpperInvariant() : String.Empty;
+        }
+
+        private static string ReadNintendoGameId(string path)
+        {
+            try
+            {
+                string id = FindNintendoIdInText(Path.GetFileNameWithoutExtension(path));
+                if (!String.IsNullOrWhiteSpace(id)) return id;
+                DirectoryInfo parent = Directory.GetParent(path);
+                if (parent != null) { id = FindNintendoIdInText(parent.Name); if (!String.IsNullOrWhiteSpace(id)) return id; }
+                string extension = Path.GetExtension(path) ?? String.Empty;
+                using (FileStream stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                {
+                    if (extension.Equals(".iso", StringComparison.OrdinalIgnoreCase) || extension.Equals(".gcm", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (stream.Length < 6) return String.Empty;
+                        byte[] raw = new byte[6]; if (stream.Read(raw, 0, raw.Length) != raw.Length) return String.Empty;
+                        string gameId = Encoding.ASCII.GetString(raw).Trim(); return LooksLikeNintendoDiscId(gameId) ? gameId.ToUpperInvariant() : String.Empty;
+                    }
+                    if (extension.Equals(".wbfs", StringComparison.OrdinalIgnoreCase) && stream.Length >= 32)
+                    {
+                        byte[] header = new byte[12]; if (stream.Read(header, 0, header.Length) != header.Length) return String.Empty;
+                        if (header[0] != (byte)'W' || header[1] != (byte)'B' || header[2] != (byte)'F' || header[3] != (byte)'S') return String.Empty;
+                        int shift = header[9]; if (shift < 15 || shift > 31) return String.Empty;
+                        long sectorSize = 1L << shift;
+                        for (int i = 0; i < 512 && stream.Position < stream.Length; i++)
+                        {
+                            int sector = stream.ReadByte(); if (sector <= 0) continue;
+                            long offset = (long)sector * sectorSize; if (offset < 0 || offset + 6 > stream.Length) continue;
+                            stream.Position = offset; byte[] raw = new byte[6]; if (stream.Read(raw, 0, raw.Length) != raw.Length) continue;
+                            string gameId = Encoding.ASCII.GetString(raw).Trim(); if (LooksLikeNintendoDiscId(gameId)) return gameId.ToUpperInvariant();
+                        }
+                    }
+                }
+            }
+            catch { }
+            return String.Empty;
+        }
+
+        private string FindDolphinArtwork(string gamePath, string title)
+        {
+            if (!definition.Shell.Equals("Wii", StringComparison.OrdinalIgnoreCase) && !definition.Shell.Equals("GameCube", StringComparison.OrdinalIgnoreCase)) return String.Empty;
+            try
+            {
+                string folder = Path.GetDirectoryName(gamePath);
+                string stem = Path.GetFileNameWithoutExtension(gamePath);
+                foreach (string local in new string[] { Path.Combine(folder, stem + ".cover.png"), Path.Combine(folder, "cover.png") }) if (File.Exists(local)) return local;
+            }
+            catch { }
+            string gameId = ReadNintendoGameId(gamePath);
+            if (String.IsNullOrWhiteSpace(gameId)) return String.Empty;
+            foreach (string root in GetDolphinUserRoots())
+            {
+                foreach (string candidate in new string[] { Path.Combine(root, "GameCovers", gameId + ".png"), Path.Combine(root, "Cache", "GameCovers", gameId + ".png") })
+                {
+                    try { if (File.Exists(candidate)) return candidate; } catch { }
+                }
             }
             return String.Empty;
+        }
+
+        private string FindDolphinArtworkBySaveCode(string code)
+        {
+            if (String.IsNullOrWhiteSpace(code)) return String.Empty;
+            string prefix = code.ToUpperInvariant();
+            foreach (string root in GetDolphinUserRoots())
+            {
+                foreach (string folder in new string[] { Path.Combine(root, "GameCovers"), Path.Combine(root, "Cache", "GameCovers") })
+                {
+                    if (!Directory.Exists(folder)) continue;
+                    try
+                    {
+                        string match = Directory.EnumerateFiles(folder, prefix + "*.png", SearchOption.TopDirectoryOnly).FirstOrDefault();
+                        if (!String.IsNullOrWhiteSpace(match)) return match;
+                    }
+                    catch { }
+                }
+            }
+            return String.Empty;
+        }
+        private string FindCover(string gamePath)
+        {
+            string title=CleanName(Path.GetFileNameWithoutExtension(gamePath));
+            string dolphin=FindDolphinArtwork(gamePath,title);if(!String.IsNullOrWhiteSpace(dolphin))return dolphin;
+            string emulator=FindEmulatorArtwork(gamePath,title);if(!String.IsNullOrWhiteSpace(emulator))return emulator;
+            string shared=FindSharedArtwork(title);if(!String.IsNullOrWhiteSpace(shared))return shared;
+            string cached=GetConsoleArtworkCachePath(title);if(File.Exists(cached))return cached;
+            return String.Empty;
+        }
+
+        private string FindEmulatorArtwork(string gamePath,string title)
+        {
+            List<string> roots=new List<string>();Action<string> add=delegate(string value){if(String.IsNullOrWhiteSpace(value))return;try{if(File.Exists(value))value=Path.GetDirectoryName(value);if(Directory.Exists(value)&&!roots.Contains(value,StringComparer.OrdinalIgnoreCase))roots.Add(value);}catch{}};
+            string gameFolder=String.Empty;try{gameFolder=Path.GetDirectoryName(gamePath);}catch{}add(gameFolder);add(settings.emulatorDataPath);add(settings.emulatorPath);add(settings.fallbackEmulatorPath);
+            foreach(string root in roots.ToArray())
+            {
+                foreach(string name in new[]{"covers","cover","GameCovers","boxart","thumbnails","artwork","images","icons","cache","screenshots","textures"}){try{string nested=Path.Combine(root,name);if(Directory.Exists(nested))add(nested);}catch{}}
+            }
+            string normalized=NormalizeArtworkTitle(title);string best=String.Empty;double bestScore=0;
+            foreach(string root in roots)
+            {
+                try
+                {
+                    foreach(string file in Directory.EnumerateFiles(root,"*.*",SearchOption.TopDirectoryOnly).Take(1200))
+                    {
+                        string ext=Path.GetExtension(file);if(!new[]{".png",".jpg",".jpeg",".webp"}.Contains(ext,StringComparer.OrdinalIgnoreCase))continue;string candidate=NormalizeArtworkTitle(Path.GetFileNameWithoutExtension(file));double score=candidate==normalized?1.0:(candidate.Contains(normalized)||normalized.Contains(candidate)?0.82:0.0);if(score>bestScore){bestScore=score;best=file;if(score>=1.0)return best;}
+                    }
+                }catch{}
+            }
+            return bestScore>=0.8?best:String.Empty;
+        }
+
+        private string GetConsoleArtworkCachePath(string title)
+        {
+            string safe=title??"game";foreach(char invalid in Path.GetInvalidFileNameChars())safe=safe.Replace(invalid,'_');if(safe.Length>110)safe=safe.Substring(0,110);if(String.IsNullOrWhiteSpace(safe))safe="game";string folder=Path.Combine(dataRoot,"Artwork","BoxArt");try{Directory.CreateDirectory(folder);}catch{}return Path.Combine(folder,safe+".png");
         }
 
         private static string NormalizeArtworkTitle(string value)
@@ -2158,17 +4667,7 @@ namespace HuymaierConsole.NativeApp
             return String.Empty;
         }
 
-        private string GetXboxArtworkCachePath(string title)
-        {
-            string safe = title ?? "game";
-            foreach (char invalid in Path.GetInvalidFileNameChars()) safe = safe.Replace(invalid, '_');
-            safe = new string(safe.Select(delegate(char c) { return Char.IsLetterOrDigit(c) || c == ' ' || c == '-' || c == '_' || c == '.' ? c : '_'; }).ToArray()).Trim();
-            if (safe.Length > 110) safe = safe.Substring(0, 110);
-            if (String.IsNullOrWhiteSpace(safe)) safe = "game";
-            string folder = Path.Combine(dataRoot, "Artwork", "BoxArt");
-            try { Directory.CreateDirectory(folder); } catch { }
-            return Path.Combine(folder, safe + ".png");
-        }
+        private string GetXboxArtworkCachePath(string title){return GetConsoleArtworkCachePath(title);}
 
         private static List<string> GetXboxArtworkNameVariants(string title)
         {
@@ -2195,45 +4694,21 @@ namespace HuymaierConsole.NativeApp
             return values;
         }
 
-        private string TryDownloadXboxCover(ConsolePlatformGame game)
+        private string TryDownloadXboxCover(ConsolePlatformGame game){return TryDownloadConsoleCover(game);}
+        private string TryDownloadConsoleCover(ConsolePlatformGame game)
         {
-            if (game == null || String.IsNullOrWhiteSpace(game.Name)) return String.Empty;
-            string shared = FindSharedArtwork(game.Name);
-            if (!String.IsNullOrWhiteSpace(shared)) return shared;
-            string target = GetXboxArtworkCachePath(game.Name);
-            if (File.Exists(target)) return target;
-            string repo = definition.Shell == "Xbox360" ? "Microsoft_-_Xbox_360" : "Microsoft_-_Xbox";
-            string libretroSystem = definition.Shell == "Xbox360" ? "Microsoft - Xbox 360" : "Microsoft - Xbox";
-            string libretroSystemEncoded = Uri.EscapeDataString(libretroSystem);
-            string temp = target + ".download";
-            foreach (string variant in GetXboxArtworkNameVariants(game.Name))
+            if(game==null||String.IsNullOrWhiteSpace(game.Name))return String.Empty;
+            string emulator=FindEmulatorArtwork(game.Path,game.Name);if(!String.IsNullOrWhiteSpace(emulator))return emulator;
+            string shared=FindSharedArtwork(game.Name);if(!String.IsNullOrWhiteSpace(shared))return shared;
+            string target=GetConsoleArtworkCachePath(game.Name);if(File.Exists(target))return target;
+            string system=definition.Shell=="N64"?"Nintendo - Nintendo 64":definition.Shell=="GameCube"?"Nintendo - GameCube":definition.Shell=="Wii"?"Nintendo - Wii":definition.Shell=="WiiU"?"Nintendo - Wii U":definition.Shell=="Switch"?"Nintendo - Nintendo Switch":definition.Shell=="Xbox360"?"Microsoft - Xbox 360":"Microsoft - Xbox";
+            string repo=system.Replace(" ","_");string temp=target+".download";
+            foreach(string variant in GetXboxArtworkNameVariants(game.Name))
             {
-                string encoded = Uri.EscapeDataString(variant);
-                string[] urls = new string[]
+                string encoded=Uri.EscapeDataString(variant);string[] urls=new[]{"https://thumbnails.libretro.com/"+Uri.EscapeDataString(system)+"/Named_Boxarts/"+encoded+".png","https://raw.githubusercontent.com/libretro-thumbnails/"+repo+"/master/Named_Boxarts/"+encoded+".png"};
+                foreach(string url in urls)
                 {
-                    "https://thumbnails.libretro.com/" + libretroSystemEncoded + "/Named_Boxarts/" + encoded + ".png",
-                    "https://raw.githubusercontent.com/libretro-thumbnails/" + repo + "/master/Named_Boxarts/" + encoded + ".png"
-                };
-                foreach (string url in urls)
-                {
-                    try
-                    {
-                        HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-                        request.UserAgent = "HuymaierConsole/0.25.6";
-                        request.Timeout = 4500; request.ReadWriteTimeout = 6500;
-                        request.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
-                        using (WebResponse response = request.GetResponse())
-                        using (Stream input = response.GetResponseStream())
-                        using (FileStream output = File.Create(temp)) input.CopyTo(output);
-                        if (IsDownloadedPng(temp))
-                        {
-                            if (File.Exists(target)) File.Delete(target);
-                            File.Move(temp, target);
-                            return target;
-                        }
-                    }
-                    catch { }
-                    try { if (File.Exists(temp)) File.Delete(temp); } catch { }
+                    try{HttpWebRequest request=(HttpWebRequest)WebRequest.Create(url);request.UserAgent="HuymaierConsole/0.26.3";request.Timeout=4500;request.ReadWriteTimeout=6500;request.AutomaticDecompression=DecompressionMethods.GZip|DecompressionMethods.Deflate;using(WebResponse response=request.GetResponse())using(Stream input=response.GetResponseStream())using(FileStream output=File.Create(temp))input.CopyTo(output);if(IsDownloadedPng(temp)){if(File.Exists(target))File.Delete(target);File.Move(temp,target);return target;}}catch{}try{if(File.Exists(temp))File.Delete(temp);}catch{}
                 }
             }
             return String.Empty;
@@ -2254,60 +4729,11 @@ namespace HuymaierConsole.NativeApp
             catch { return false; }
         }
 
-        private void QueueXboxArtworkRefresh()
+        private void QueueXboxArtworkRefresh(){QueueConsoleArtworkRefresh();}
+        private void QueueConsoleArtworkRefresh()
         {
-            if (closing || !IsXboxFamily() || xboxArtworkScanRunning || games == null || games.Count == 0) return;
-            List<ConsolePlatformGame> missing = games.Where(delegate(ConsolePlatformGame game)
-            {
-                return game != null && !String.IsNullOrWhiteSpace(game.Path) && (String.IsNullOrWhiteSpace(game.Cover) || !File.Exists(game.Cover));
-            }).Select(delegate(ConsolePlatformGame game)
-            {
-                return new ConsolePlatformGame { Name = game.Name, Path = game.Path, Cover = game.Cover };
-            }).ToList();
-            if (missing.Count == 0) return;
-            xboxArtworkScanRunning = true;
-            int generation = asyncGeneration;
-            System.Threading.ThreadPool.QueueUserWorkItem(delegate
-            {
-                try
-                {
-                    Dictionary<string, string> found = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                    foreach (ConsolePlatformGame game in missing)
-                    {
-                        if (closing || generation != asyncGeneration) break;
-                        if (game == null || String.IsNullOrWhiteSpace(game.Path)) continue;
-                        string cover = TryDownloadXboxCover(game);
-                        if (!String.IsNullOrWhiteSpace(cover)) found[game.Path] = cover;
-                    }
-                    try
-                    {
-                        if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished) return;
-                        Dispatcher.BeginInvoke(new Action(delegate
-                        {
-                            if (!CanApplyAsync(generation)) return;
-                            xboxArtworkScanRunning = false;
-                            int added = 0;
-                            foreach (ConsolePlatformGame game in games)
-                            {
-                                string cover;
-                                if (game != null && !String.IsNullOrWhiteSpace(game.Path) && found.TryGetValue(game.Path, out cover) && File.Exists(cover)) { game.Cover = cover; added++; }
-                            }
-                            if (added > 0)
-                            {
-                                SaveCachedGames();
-                                RenderPage();
-                                ShowNotice(added.ToString(CultureInfo.InvariantCulture) + " online game cover" + (added == 1 ? "" : "s") + " added");
-                            }
-                        }));
-                    }
-                    catch (Exception ex) { WritePlatformLog(definition.DisplayName + " artwork UI callback was cancelled safely: " + ex.Message, "WARN"); }
-                }
-                catch (Exception ex)
-                {
-                    xboxArtworkScanRunning = false;
-                    WritePlatformLog(definition.DisplayName + " artwork worker recovered from an unexpected error: " + ex, "ERROR");
-                }
-            });
+            if(closing||consoleArtworkScanRunning||games==null||games.Count==0)return;List<ConsolePlatformGame> missing=games.Where(delegate(ConsolePlatformGame game){return game!=null&&!String.IsNullOrWhiteSpace(game.Path)&&(String.IsNullOrWhiteSpace(game.Cover)||!File.Exists(game.Cover));}).Select(delegate(ConsolePlatformGame game){return new ConsolePlatformGame{Name=game.Name,Path=game.Path,Cover=game.Cover};}).ToList();if(missing.Count==0)return;consoleArtworkScanRunning=true;int generation=asyncGeneration;
+            System.Threading.ThreadPool.QueueUserWorkItem(delegate{try{Dictionary<string,string> found=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);foreach(ConsolePlatformGame game in missing){if(closing||generation!=asyncGeneration)break;/* HUYMAIER_WII_ARTWORK_ALIAS_V1 */ string artworkTitle=game.Name;if(definition.Shell.Equals("Wii",StringComparison.OrdinalIgnoreCase)||definition.Shell.Equals("GameCube",StringComparison.OrdinalIgnoreCase)){string legacyKey=CleanName(Path.GetFileNameWithoutExtension(game.Path));if(!String.IsNullOrWhiteSpace(legacyKey))artworkTitle=legacyKey;}string cover=FindDolphinArtwork(game.Path,artworkTitle);if(String.IsNullOrWhiteSpace(cover))cover=FindEmulatorArtwork(game.Path,artworkTitle);if(String.IsNullOrWhiteSpace(cover))cover=TryDownloadConsoleCover(game);if(!String.IsNullOrWhiteSpace(cover)&&File.Exists(cover))found[game.Path]=cover;}try{if(Dispatcher.HasShutdownStarted||Dispatcher.HasShutdownFinished)return;Dispatcher.BeginInvoke(new Action(delegate{if(!CanApplyAsync(generation))return;consoleArtworkScanRunning=false;int added=0;foreach(ConsolePlatformGame game in games){string cover;if(game!=null&&found.TryGetValue(game.Path,out cover)&&File.Exists(cover)){game.Cover=cover;added++;}}if(added>0){SaveCachedGames();RenderPage();ShowNotice(added.ToString(CultureInfo.InvariantCulture)+" game cover"+(added==1?"":"s")+" refreshed");}}));}catch{}}catch(Exception ex){consoleArtworkScanRunning=false;WritePlatformLog(definition.DisplayName+" artwork worker recovered: "+ex,"ERROR");}});
         }
 
         private void LaunchGame(ConsolePlatformGame game, bool useFallback)
@@ -2368,11 +4794,62 @@ namespace HuymaierConsole.NativeApp
             }
         }
 
+
+
+        private string BuildMameOverrideArguments()
+        {
+            string path=Path.Combine(dataRoot,"mame-command-line-overrides.json");if(!File.Exists(path))return String.Empty;
+            try{Dictionary<string,object> values=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(path,Encoding.UTF8));if(values==null)return String.Empty;StringBuilder result=new StringBuilder();foreach(KeyValuePair<string,object> pair in values.OrderBy(delegate(KeyValuePair<string,object> item){return item.Key;},StringComparer.OrdinalIgnoreCase)){string key=pair.Key??String.Empty;if(!System.Text.RegularExpressions.Regex.IsMatch(key,"^[A-Za-z0-9_.-]+$"))continue;string value=pair.Value==null?String.Empty:Convert.ToString(pair.Value,CultureInfo.InvariantCulture);if(String.IsNullOrWhiteSpace(value))continue;if(result.Length>0)result.Append(' ');result.Append('-').Append(key).Append(' ').Append(QuoteProcessArgument(value));}return result.ToString();}catch(Exception ex){WritePlatformLog("Could not read MAME launch overrides: "+ex.Message,"WARN");return String.Empty;}
+        }
+
+        private string BuildStellaOverrideArguments()
+        {
+            string path = Path.Combine(dataRoot, "stella-command-line-overrides.json");
+            if (!File.Exists(path)) return String.Empty;
+            try
+            {
+                Dictionary<string, object> values = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(File.ReadAllText(path, Encoding.UTF8));
+                if (values == null || values.Count == 0) return String.Empty;
+                StringBuilder result = new StringBuilder();
+                foreach (KeyValuePair<string, object> pair in values.OrderBy(delegate(KeyValuePair<string, object> item) { return item.Key; }, StringComparer.OrdinalIgnoreCase))
+                {
+                    string key = pair.Key ?? String.Empty; if (!System.Text.RegularExpressions.Regex.IsMatch(key, "^[A-Za-z0-9_.-]+$")) continue;
+                    string value = pair.Value == null ? String.Empty : Convert.ToString(pair.Value, CultureInfo.InvariantCulture); if (String.IsNullOrWhiteSpace(value)) continue;
+                    if (result.Length > 0) result.Append(' '); result.Append('-').Append(key).Append(' ').Append(QuoteProcessArgument(value));
+                }
+                return result.ToString();
+            }
+            catch (Exception ex) { WritePlatformLog("Could not read Stella launch overrides: " + ex.Message, "WARN"); return String.Empty; }
+        }
+
         private string BuildLaunchArguments(string executable, string gamePath)
         {
             string exe = Path.GetFileName(executable).ToLowerInvariant();
             string quoted = "\"" + gamePath.Replace("\"", String.Empty) + "\"";
+            if (definition.Shell == "Arcade" && exe.IndexOf("mame", StringComparison.OrdinalIgnoreCase) >= 0) { string driver=Path.GetFileNameWithoutExtension(gamePath); string romDir=Path.GetDirectoryName(gamePath); string overrides=BuildMameOverrideArguments(); StringBuilder mame=new StringBuilder(); if(!String.IsNullOrWhiteSpace(overrides))mame.Append(overrides).Append(' '); if(!String.IsNullOrWhiteSpace(romDir))mame.Append("-rompath ").Append(QuoteProcessArgument(romDir)).Append(' '); mame.Append(driver); return mame.ToString(); }
+            if (definition.Shell == "Atari2600" && exe.IndexOf("stella", StringComparison.OrdinalIgnoreCase) >= 0) { string overrides = BuildStellaOverrideArguments(); return (String.IsNullOrWhiteSpace(overrides) ? String.Empty : overrides + " ") + quoted; }
+            if (definition.Shell == "PS4")
+            {
+                string appRoot=Path.GetDirectoryName(gamePath); string titleId=String.Empty;
+                try { string sfo=Path.Combine(appRoot ?? String.Empty,"sce_sys","param.sfo"); if(File.Exists(sfo)) titleId=ReadPspSfoString(sfo,"TITLE_ID"); } catch { }
+                if(String.IsNullOrWhiteSpace(titleId) && !String.IsNullOrWhiteSpace(appRoot)) titleId=Path.GetFileName(appRoot.TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar));
+                string target=!String.IsNullOrWhiteSpace(titleId)?titleId:gamePath;
+                StringBuilder shad=new StringBuilder(); if(settings.fullscreen) shad.Append("--fullscreen true "); shad.Append("-g ").Append(QuoteProcessArgument(target)); return shad.ToString();
+            }
+            if (definition.Shell == "Vita")
+            {
+                string appRoot=Path.GetDirectoryName(gamePath); string titleId=String.Empty;
+                try { string sfo=Path.Combine(appRoot ?? String.Empty,"sce_sys","param.sfo"); if(File.Exists(sfo)) titleId=ReadPspSfoString(sfo,"TITLE_ID"); } catch { }
+                if(String.IsNullOrWhiteSpace(titleId) && !String.IsNullOrWhiteSpace(appRoot)) titleId=Path.GetFileName(appRoot.TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar));
+                if(String.IsNullOrWhiteSpace(titleId)) return quoted;
+                return (settings.fullscreen ? "-F " : String.Empty) + "-r " + QuoteProcessArgument(titleId);
+            }
             if (definition.Shell == "GameCube" || definition.Shell == "Wii") return "-b -e " + quoted;
+            if (definition.Shell == "3DS") return quoted;
+            if (definition.Shell == "NDS" || definition.Shell == "DSI") return quoted;
+            if (definition.Shell == "Dreamcast") return quoted;
+            if (definition.Shell == "Saturn") return quoted;
+            if (definition.Shell == "PSP") return quoted;
             if (definition.Shell == "WiiU") return "-g " + quoted + " -f";
             if (definition.Shell == "N64" && exe.IndexOf("ares", StringComparison.OrdinalIgnoreCase) >= 0) return "--fullscreen --no-file-prompt " + quoted;
             if (definition.Shell == "Switch" && exe.IndexOf("ryujinx", StringComparison.OrdinalIgnoreCase) >= 0) return "--fullscreen " + quoted;
@@ -2388,14 +4865,43 @@ namespace HuymaierConsole.NativeApp
             string local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             string exeRoot = !String.IsNullOrWhiteSpace(settings.emulatorPath) && File.Exists(settings.emulatorPath) ? Path.GetDirectoryName(settings.emulatorPath) : String.Empty;
-            if (definition.Shell == "GameCube" || definition.Shell == "Wii")
+            if (definition.Shell == "GameCube")
             {
-                AddExisting(roots, Path.Combine(docs, "Dolphin Emulator", "GC"));
-                AddExisting(roots, Path.Combine(docs, "Dolphin Emulator", "Wii"));
+                string dolphinData = settings.emulatorDataPath;
+                AddExisting(roots, Path.Combine(dolphinData, "GC"));
                 AddExisting(roots, Path.Combine(exeRoot, "User", "GC"));
+            }
+            else if (definition.Shell == "Wii")
+            {
+                string dolphinData = settings.emulatorDataPath;
+                AddExisting(roots, Path.Combine(dolphinData, "Wii"));
                 AddExisting(roots, Path.Combine(exeRoot, "User", "Wii"));
             }
             else if (definition.Shell == "WiiU") { AddExisting(roots, Path.Combine(exeRoot, "mlc01", "usr", "save")); AddExisting(roots, Path.Combine(local, "Cemu", "mlc01", "usr", "save")); }
+            else if (definition.Shell == "3DS")
+            {
+                string azaharData=settings.emulatorDataPath; AddExisting(roots, Path.Combine(azaharData,"sdmc")); AddExisting(roots, Path.Combine(azaharData,"nand")); AddExisting(roots,Path.Combine(app,"Azahar","sdmc")); AddExisting(roots,Path.Combine(app,"azahar","sdmc"));
+            }
+            else if (definition.Shell == "NDS")
+            {
+                AddExisting(roots, settings.emulatorDataPath); AddExisting(roots, Path.Combine(app,"melonDS")); AddExisting(roots, Path.Combine(local,"melonDS"));
+            }
+            else if (definition.Shell == "DSI")
+            {
+                AddExisting(roots, settings.emulatorDataPath); AddExisting(roots, Path.Combine(settings.emulatorDataPath,"NAND")); AddExisting(roots, Path.Combine(app,"melonDS")); AddExisting(roots, Path.Combine(local,"melonDS"));
+            }
+            else if (definition.Shell == "Dreamcast")
+            {
+                AddExisting(roots, settings.emulatorDataPath); AddExisting(roots, Path.Combine(exeRoot,"data")); AddExisting(roots, exeRoot); AddExisting(roots, Path.Combine(app,"flycast")); AddExisting(roots, Path.Combine(local,"flycast"));
+            }
+            else if (definition.Shell == "Saturn")
+            {
+                AddExisting(roots, Path.Combine(settings.emulatorDataPath,"sav")); AddExisting(roots, Path.Combine(exeRoot,"sav")); AddExisting(roots, Path.Combine(docs,"Mednafen","sav")); AddExisting(roots, Path.Combine(app,"Mednafen","sav"));
+            }
+            else if (definition.Shell == "PSP")
+            {
+                AddExisting(roots, Path.Combine(settings.emulatorDataPath,"PSP","SAVEDATA")); AddExisting(roots, Path.Combine(settings.emulatorDataPath,"memstick","PSP","SAVEDATA")); AddExisting(roots, Path.Combine(exeRoot,"memstick","PSP","SAVEDATA")); AddExisting(roots, Path.Combine(docs,"PPSSPP","PSP","SAVEDATA"));
+            }
             else if (definition.Shell == "Switch") { AddExisting(roots, Path.Combine(app, "Ryujinx", "bis", "user", "save")); AddExisting(roots, Path.Combine(app, "Eden", "nand", "user", "save")); }
             else if (definition.Shell == "Xbox") { AddExisting(roots, Path.Combine(app, "xemu")); AddExisting(roots, Path.Combine(local, "xemu")); }
             else if (definition.Shell == "Xbox360") { AddExisting(roots, Path.Combine(exeRoot, "content")); AddExisting(roots, Path.Combine(docs, "Xenia", "content")); }
@@ -2527,3 +5033,7 @@ namespace HuymaierConsole.NativeApp
         }
     }
 }
+
+
+
+

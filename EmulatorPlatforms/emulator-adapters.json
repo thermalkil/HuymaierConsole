@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "policy": {
+    "preserveUnknownSettings": true,
+    "nativeSettingsRequired": true,
+    "perGameOverridesRequiredWhenBackendSupportsThem": true,
+    "desktopSettingsWindowIsNotPrimaryUi": true
+  },
+  "adapters": [
+    {
+      "id": "mame",
+      "displayName": "MAME",
+      "configFormats": ["ini", "command-line"],
+      "configFiles": ["mame.ini", "ui.ini", "plugin.ini"],
+      "dynamicDiscovery": ["-showconfig", "-showusage"],
+      "perGameMode": "machine/system INI and command-line overrides",
+      "settingsGroups": ["System", "Video", "Audio", "Input", "Artwork", "Plugins", "Network", "Paths", "Advanced", "Per-Game"],
+      "releaseSource": {"kind": "github", "repository": "mamedev/mame", "channel": "stable"}
+    },
+    {
+      "id": "stella",
+      "displayName": "Stella",
+      "configFormats": ["native-properties", "command-line"],
+      "dynamicDiscovery": ["documented command-line options"],
+      "perGameMode": "ROM properties database/profile",
+      "settingsGroups": ["Console", "Video", "CRT/Phosphor", "Audio", "Input", "High Scores", "SaveKey/AtariVox", "Developer-safe Advanced", "Per-Game"],
+      "releaseSource": {"kind": "official-site", "project": "Stella", "channel": "stable"}
+    },
+    {
+      "id": "mednafen",
+      "displayName": "Mednafen",
+      "configFormats": ["key-value"],
+      "configFiles": ["mednafen.cfg", "<system>.cfg", "pgconfig/<game>.<system>.cfg"],
+      "dynamicDiscovery": ["primary configuration", "documented global and module setting references"],
+      "perGameMode": "pgconfig override file",
+      "settingsGroups": ["System", "Video", "Shaders/Scaling", "Audio", "Input", "Firmware", "CD", "Network", "Paths", "Advanced", "Per-Game"],
+      "releaseSource": {"kind": "official-site", "project": "Mednafen", "channel": "stable"}
+    },
+    {
+      "id": "fbneo",
+      "displayName": "FinalBurn Neo",
+      "configFormats": ["native-config"],
+      "configFiles": ["config/*"],
+      "dynamicDiscovery": ["current standalone configuration", "game DIP/input metadata"],
+      "perGameMode": "game-specific config",
+      "settingsGroups": ["Video", "Audio", "Input", "DIP Switches", "Cheats", "Netplay", "ROM Paths", "Advanced", "Per-Game"],
+      "releaseSource": {"kind": "github", "repository": "finalburnneo/FBNeo", "channel": "stable-or-latest"}
+    },
+    {
+      "id": "primehack",
+      "displayName": "PrimeHack",
+      "configFormats": ["ini"],
+      "configFiles": ["Dolphin.ini", "GFX.ini", "PrimeHack.ini", "GCPadNew.ini", "WiimoteNew.ini", "Profiles/*"],
+      "perGameMode": "Dolphin game INI plus PrimeHack profiles",
+      "settingsGroups": ["PrimeHack", "Camera/FOV", "Reticle/Visor", "Graphics", "Audio", "Input", "GameCube/Wii System", "Paths", "Advanced", "Per-Game"],
+      "releaseSource": {"kind": "github", "repository": "shiiion/dolphin", "channel": "stable"}
+    },
+    {
+      "id": "azahar",
+      "displayName": "Azahar",
+      "configFormats": ["ini"],
+      "configFiles": ["qt-config.ini", "config.ini"],
+      "dynamicDiscovery": ["current desktop setting keys"],
+      "perGameMode": "desktop per-game configuration",
+      "settingsGroups": ["System", "Graphics", "Screen Layout", "Audio", "Controls", "Camera", "Network", "System Files", "Paths", "Advanced", "Per-Game"],
+      "releaseSource": {"kind": "github", "repository": "azahar-emu/azahar", "channel": "stable"}
+    },
+    {
+      "id": "melonds",
+      "displayName": "melonDS",
+      "configFormats": ["current-native-config"],
+      "dynamicDiscovery": ["current DS/DSi setting keys"],
+      "perGameMode": "title-specific override when supported",
+      "settingsGroups": ["DS/DSi System", "Graphics", "3D Renderer", "Audio", "Input", "Screen Layout", "BIOS/Firmware/NAND", "Slot-2", "Camera", "Network", "Paths", "Advanced", "Per-Game"],
+      "releaseSource": {"kind": "github", "repository": "melonDS-emu/melonDS", "channel": "stable"}
+    },
+    {
+      "id": "mesence",
+      "displayName": "Mesen Community Edition",
+      "configFormats": ["current-native-config"],
+      "dynamicDiscovery": ["current system-specific setting keys"],
+      "perGameMode": "game configuration/profile",
+      "settingsGroups": ["System", "Video", "Shaders/Filters", "Audio", "Input", "Firmware", "Overclock/Timing", "Cheats", "Paths", "Advanced", "Per-Game"],
+      "releaseSource": {"kind": "github", "repository": "nesdev-org/MesenCE", "channel": "stable"}
+    },
+    {
+      "id": "sameboy",
+      "displayName": "SameBoy",
+      "configFormats": ["native-config", "command-line"],
+      "dynamicDiscovery": ["hardware model/revision and frontend settings"],
+      "perGameMode": "per-title options where supported",
+      "settingsGroups": ["Hardware Model", "Palette/Color", "Video", "Audio", "Input", "RTC", "Link/Infrared", "Printer/Camera", "Rumble", "Advanced", "Per-Game"],
+      "releaseSource": {"kind": "official-site", "project": "SameBoy", "channel": "stable"}
+    },
+    {
+      "id": "mgba",
+      "displayName": "mGBA",
+      "configFormats": ["ini"],
+      "dynamicDiscovery": ["current frontend configuration"],
+      "perGameMode": "game overrides",
+      "settingsGroups": ["System", "Video/Color", "Audio", "Input", "BIOS", "Link", "Peripherals", "Cheats", "Paths", "Advanced", "Per-Game"],
+      "releaseSource": {"kind": "official-site", "project": "mGBA", "channel": "stable"}
+    },
+    {
+      "id": "shadps4",
+      "displayName": "shadPS4",
+      "configFormats": ["current-native-config", "command-line"],
+      "dynamicDiscovery": ["current global/game settings", "--help"],
+      "perGameMode": "game-specific config",
+      "settingsGroups": ["Emulator", "Graphics", "Presentation", "Audio", "Input", "Firmware Modules", "Game Install Folders", "DLC/Patches", "Logging", "Experimental Compatibility", "Per-Game"],
+      "releaseSource": {"kind": "github", "repository": "shadps4-emu/shadPS4", "channel": "stable"}
+    },
+    {
+      "id": "ares",
+      "displayName": "ares",
+      "configFormats": ["bml", "command-line"],
+      "configFiles": ["settings.bml"],
+      "dynamicDiscovery": ["current settings.bml", "core-specific settings", "--settings-file"],
+      "perGameMode": "Huymaier-managed alternate settings file/profile where backend has no dedicated override",
+      "settingsGroups": ["Core/System", "Region", "Video", "Shaders", "Audio", "Input", "Firmware", "Paths", "Advanced", "Per-Game Profile"],
+      "releaseSource": {"kind": "github", "repository": "ares-emulator/ares", "channel": "stable"}
+    },
+    {
+      "id": "flycast",
+      "displayName": "Flycast",
+      "configFormats": ["ini"],
+      "configFiles": ["emu.cfg"],
+      "dynamicDiscovery": ["current emu.cfg keys"],
+      "perGameMode": "game-specific configuration",
+      "settingsGroups": ["Dreamcast/Naomi System", "Video", "Renderer", "Widescreen", "Audio", "Input/Devices", "BIOS", "VMU", "Network", "Paths", "Advanced", "Per-Game"],
+      "releaseSource": {"kind": "github", "repository": "flyinghead/flycast", "channel": "stable"}
+    },
+    {
+      "id": "bigpemu",
+      "displayName": "BigPEmu",
+      "configFormats": ["native-config"],
+      "dynamicDiscovery": ["current application configuration and per-game profiles"],
+      "perGameMode": "native per-game profile",
+      "settingsGroups": ["Jaguar System/Clocks", "Blitter", "Video/HDR", "Post Processing", "Audio", "Input/Keypad", "Jaguar CD", "Network", "Scripting", "Paths", "Advanced", "Per-Game"],
+      "releaseSource": {"kind": "official-site", "project": "BigPEmu", "channel": "stable"}
+    },
+    {
+      "id": "kronos",
+      "displayName": "Kronos",
+      "configFormats": ["native-config"],
+      "perGameMode": "game-specific settings where supported",
+      "settingsGroups": ["Saturn System", "Video/Enhancements", "Audio", "Input", "BIOS", "CD", "Paths", "Advanced", "Per-Game"],
+      "releaseSource": {"kind": "github", "repository": "FCare/Kronos", "channel": "stable"}
+    },
+    {
+      "id": "ppsspp",
+      "displayName": "PPSSPP",
+      "configFormats": ["ini", "command-line"],
+      "configFiles": ["ppsspp.ini", "controls.ini"],
+      "dynamicDiscovery": ["documented Graphics/Audio/Controls/Networking/Tools/System/Hidden settings"],
+      "perGameMode": "native game settings override",
+      "settingsGroups": ["Graphics", "Display Layout/Effects", "Audio", "Controls", "Networking/Multiplayer", "Tools", "PSP System", "Cheats/Plugins", "Recording", "Hidden/Advanced", "Per-Game"],
+      "releaseSource": {"kind": "github", "repository": "hrydgard/ppsspp", "channel": "stable"}
+    },
+    {
+      "id": "vita3k",
+      "displayName": "Vita3K",
+      "configFormats": ["yaml"],
+      "configFiles": ["config.yml"],
+      "dynamicDiscovery": ["current config.yml and GUI setting vocabulary"],
+      "perGameMode": "title-specific configuration where supported",
+      "settingsGroups": ["Vita System", "Renderer", "Resolution/Filtering", "Audio", "Input", "Firmware/Modules", "Paths", "Network", "Advanced", "Per-Game"],
+      "releaseSource": {"kind": "github", "repository": "Vita3K/Vita3K", "channel": "continuous"}
+    }
+  ]
+}

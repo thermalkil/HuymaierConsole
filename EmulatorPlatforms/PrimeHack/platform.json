@@ -1,0 +1,18 @@
+{
+  "id": "primehack",
+  "displayName": "Metroid PrimeHack",
+  "primaryBackend": "PrimeHack",
+  "fallbackBackend": "",
+  "adapter": "primehack",
+  "interface": "Prime-series visor HUD interface for PrimeHack",
+  "version": "0.26.4-dev",
+  "enabled": true,
+  "gameExtensions": [
+    ".iso",
+    ".rvz",
+    ".wbfs",
+    ".gcm",
+    ".ciso"
+  ],
+  "dashboardStyle": "Prime Visor"
+}

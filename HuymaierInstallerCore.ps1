@@ -5,7 +5,7 @@
 Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
 
-$script:InstallVersion='0.26.2'
+$script:InstallVersion='0.30.6'
 $script:Destination=Join-Path $env:LOCALAPPDATA 'Huymaier Console'
 $script:InstallLogRoot=Join-Path $script:Destination 'Logs'
 New-Item -ItemType Directory -Force -Path $script:InstallLogRoot|Out-Null

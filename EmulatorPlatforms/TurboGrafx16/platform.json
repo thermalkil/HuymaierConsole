@@ -1,0 +1,18 @@
+{
+  "id": "turbografx16",
+  "displayName": "TurboGrafx-16",
+  "primaryBackend": "Mednafen",
+  "fallbackBackend": "",
+  "adapter": "mednafen",
+  "interface": "TurboGrafx-16 / PC Engine HuCard and CD interface",
+  "version": "0.26.4-dev",
+  "enabled": true,
+  "gameExtensions": [
+    ".pce",
+    ".sgx",
+    ".cue",
+    ".chd",
+    ".zip"
+  ],
+  "dashboardStyle": "TurboGrafx-16"
+}

@@ -4,6 +4,7 @@
 
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
+$script:HcStartupStopwatch=[Diagnostics.Stopwatch]::StartNew()
 
 Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName PresentationCore
@@ -11,7 +12,7 @@ Add-Type -AssemblyName WindowsBase
 Add-Type -AssemblyName System.Xaml
 try { Add-Type -AssemblyName System.Runtime.WindowsRuntime -ErrorAction SilentlyContinue } catch { }
 
-$script:AppVersion = '0.26.2'
+$script:AppVersion = '0.30.6'
 $script:AppName = 'Huymaier Console'
 $script:DataDir = Join-Path $env:LOCALAPPDATA 'Huymaier Console'
 $script:ConfigPath = Join-Path $script:DataDir 'config.json'
@@ -35,10 +36,20 @@ $script:Ps1LibraryWorkerPath = Join-Path $script:BaseDir 'HuymaierPs1LibraryWork
 $script:NativeConsoleLibraryWorkerPath = Join-Path $script:BaseDir 'HuymaierNativeConsoleLibraryWorker.ps1'
 $script:GameExperienceModulePath = Join-Path $script:BaseDir 'HuymaierGameExperience.ps1'
 $script:ShellRedesignModulePath = Join-Path $script:BaseDir 'HuymaierShellRedesign.ps1'
+$script:AppLibraryModulePath = Join-Path $script:BaseDir 'HuymaierAppLibrary.ps1'
+$script:StreamingControllerModulePath = Join-Path $script:BaseDir 'HuymaierStreamingController.ps1'
+$script:UnifiedCursorModulePath = Join-Path $script:BaseDir 'HuymaierUnifiedCursor.ps1'
 $script:EmulatorPlatformsModulePath = Join-Path $script:BaseDir 'HuymaierEmulatorPlatforms.ps1'
+$script:EmulatorSettingsModulePath = Join-Path $script:BaseDir 'HuymaierEmulatorSettings.ps1'
 $script:WebBrowserModulePath = Join-Path $script:BaseDir 'HuymaierWebBrowser.ps1'
 $script:GameBarModulePath = Join-Path $script:BaseDir 'HuymaierGameBar.ps1'
 $script:CustomizationModulePath = Join-Path $script:BaseDir 'HuymaierCustomization.ps1'
+$script:PlatformModelsModulePath = Join-Path $script:BaseDir 'HuymaierPlatformModels.ps1'
+$script:LivePlatformModelsModulePath = Join-Path $script:BaseDir 'HuymaierLivePlatformModels.ps1'
+$script:User3DModelsModulePath = Join-Path $script:BaseDir 'HuymaierUser3DModels.ps1'
+$script:GpuPlatformShelvesModulePath = Join-Path $script:BaseDir 'HuymaierGpuPlatformShelves.ps1'
+$script:ManualRecompsFinalModulePath = Join-Path $script:BaseDir 'HuymaierRecompsFinal.ps1'
+$script:ModelDefaultsModulePath = Join-Path $script:BaseDir 'HuymaierModelDefaults.ps1'
 $script:NavItems = @('Home','Games','Apps','Web','Downloads','Import','File Explorer','Settings','Power')
 $script:SelectedTab = 0
 $script:SelectedAction = 0
@@ -220,16 +231,16 @@ $script:BuiltInMusic = @{
 New-Item -ItemType Directory -Force -Path $script:DataDir, $script:LogDir, $script:StorefrontDownloadDir, $script:ProviderRoot, $script:ProviderToolRoot, $script:ProviderArtworkRoot, $script:ArtworkCacheRoot | Out-Null
 
 try {
-    if (Test-Path $script:NativeDisplayPath) { Add-Type -Path $script:NativeDisplayPath -ErrorAction Stop }
+    if (-not ('HuymaierConsole.Native.DisplayBridge' -as [type]) -and (Test-Path $script:NativeDisplayPath)) { Add-Type -Path $script:NativeDisplayPath -ErrorAction Stop }
 } catch { }
 try {
-    if (Test-Path $script:NativeAudioPath) { Add-Type -Path $script:NativeAudioPath -ErrorAction Stop }
+    if (-not ('HuymaierConsole.Native.AudioBridge' -as [type]) -and (Test-Path $script:NativeAudioPath)) { Add-Type -Path $script:NativeAudioPath -ErrorAction Stop }
 } catch { }
 try {
-    if (Test-Path $script:NativeInputPath) { Add-Type -Path $script:NativeInputPath -ErrorAction Stop }
+    if (-not ('HuymaierConsole.Native.LegacyJoystick' -as [type]) -and (Test-Path $script:NativeInputPath)) { Add-Type -Path $script:NativeInputPath -ErrorAction Stop }
 } catch { }
 try {
-    if (Test-Path $script:NativePerformancePath) { Add-Type -Path $script:NativePerformancePath -ReferencedAssemblies @('System.dll','System.Core.dll','WindowsBase.dll','PresentationCore.dll') -ErrorAction Stop }
+    if (-not ('HuymaierConsole.Native.FrameRateMonitor' -as [type]) -and (Test-Path $script:NativePerformancePath)) { Add-Type -Path $script:NativePerformancePath -ReferencedAssemblies @('System.dll','System.Core.dll','WindowsBase.dll','PresentationCore.dll') -ErrorAction Stop }
 } catch { }
 
 function Write-Log {
@@ -298,14 +309,23 @@ function New-DefaultConfig {
         StorefrontInstallOverrides = @()
         QuickMenuPosition = 'Bottom'
         GameBarScale = 100
+        # HUYMAIER_PLATFORM_3D_CONFIG_V2
+        PlatformVisualStyle = 'Icons'
+        PlatformIconScale = 100
+        PlatformModelScale = 100
         ProviderInstallRoots = @()
         LibraryScanCompleted = $false
         LibrarySchemaVersion = 1
         KeyboardTheme = 'Huymaier'
         ShowFpsCounter = $false
         OnlineArtworkEnabled = $true
+        SteamGridDbApiKey = ''
         PlatformBackgroundsEnabled = $true
         FavoriteGames = @()
+        # HUYMAIER_MANUAL_RECOMPS_CONFIG_V1
+        RecompGames = @()
+        # HUYMAIER_V0304_MODEL_DEFAULT_CONFIG_V1
+        PlatformModelDefaultViews = @()
     }
 }
 
@@ -314,7 +334,7 @@ function Load-Config {
     if ( -not (Test-Path $script:ConfigPath)) { return $defaults }
     try {
         $loaded = Get-Content -Raw -Path $script:ConfigPath | ConvertFrom-Json
-        foreach ($name in @('BrowserName','BrowserPath','BrowserMode','PromptOverride','StartWithWindows','CustomGames','CustomApps','MusicEnabled','MusicVolume','UiSoundVolume','DynamicBackground','ConsoleName','ShellBaseColor','AccentColor','AccentHighlightColor','DynamicThemePreset','DynamicPrimaryColor','DynamicSecondaryColor','DynamicTertiaryColor','UiSoundsEnabled','HapticsEnabled','MusicTheme','CustomMusicPath','ImportedGames','RecentGames','RecentApps','StorefrontRoots','StorefrontInstallOverrides','QuickMenuPosition','GameBarScale','ProviderInstallRoots','LibraryScanCompleted','LibrarySchemaVersion','KeyboardTheme','ShowFpsCounter','OnlineArtworkEnabled','PlatformBackgroundsEnabled','FavoriteGames')) {
+        foreach ($name in @('BrowserName','BrowserPath','BrowserMode','PromptOverride','StartWithWindows','CustomGames','CustomApps','MusicEnabled','MusicVolume','UiSoundVolume','DynamicBackground','ConsoleName','ShellBaseColor','AccentColor','AccentHighlightColor','DynamicThemePreset','DynamicPrimaryColor','DynamicSecondaryColor','DynamicTertiaryColor','UiSoundsEnabled','HapticsEnabled','MusicTheme','CustomMusicPath','ImportedGames','RecentGames','RecentApps','StorefrontRoots','StorefrontInstallOverrides','QuickMenuPosition','GameBarScale','PlatformVisualStyle','PlatformIconScale','PlatformModelScale','ProviderInstallRoots','LibraryScanCompleted','LibrarySchemaVersion','KeyboardTheme','ShowFpsCounter','OnlineArtworkEnabled','SteamGridDbApiKey','PlatformBackgroundsEnabled','FavoriteGames','RecompGames','PlatformModelDefaultViews')) {
             if ($null -ne $loaded.PSObject.Properties[$name]) {
                 $defaults.$name = $loaded.$name
             }
@@ -325,10 +345,13 @@ function Load-Config {
     # PowerShell can unwrap JSON/argument collections into $null or a scalar.
     # Keep every persisted list array-shaped so first-run, one-item, and many-item
     # machines take the same code paths under StrictMode.
-    foreach ($collectionName in @('CustomGames','CustomApps','ImportedGames','RecentGames','RecentApps','StorefrontRoots','StorefrontInstallOverrides','ProviderInstallRoots','FavoriteGames')) {
+    foreach ($collectionName in @('CustomGames','CustomApps','ImportedGames','RecentGames','RecentApps','StorefrontRoots','StorefrontInstallOverrides','ProviderInstallRoots','FavoriteGames','RecompGames','PlatformModelDefaultViews')) {
         $defaults.$collectionName = Convert-ToStableArray $defaults.$collectionName
     }
     try{$defaults.GameBarScale=[math]::Max(70,[math]::Min(140,[int]$defaults.GameBarScale))}catch{$defaults.GameBarScale=100}
+    try{$defaults.PlatformIconScale=[math]::Max(60,[math]::Min(180,[int]$defaults.PlatformIconScale))}catch{$defaults.PlatformIconScale=100}
+    try{$defaults.PlatformModelScale=[math]::Max(50,[math]::Min(200,[int]$defaults.PlatformModelScale))}catch{$defaults.PlatformModelScale=100}
+    if(@('Icons','3D Models') -notcontains [string]$defaults.PlatformVisualStyle){$defaults.PlatformVisualStyle='Icons'}
     try{$defaults.UiSoundVolume=[math]::Max(0,[math]::Min(100,[int]$defaults.UiSoundVolume))}catch{$defaults.UiSoundVolume=62}
     if([string]::IsNullOrWhiteSpace([string]$defaults.ConsoleName)){$defaults.ConsoleName='Huymaier Console'}
     return $defaults
@@ -2231,7 +2254,7 @@ function Get-FileBrowserItems {
                 [void]$items.Add([pscustomobject]@{ Type='Directory'; Name=$entry.Name; FullName=$entry.FullName; Description='Folder'; Extension=''; Length=0 })
             }
             $allowed = @()
-            if ($script:FileBrowserMode -eq 'PickExecutable') { $allowed=@('.exe','.lnk','.url') }
+            if ($script:FileBrowserMode -eq 'PickExecutable') { $allowed=$(if([string]::Equals([string]$script:FileBrowserEntryType,'RecompGame',[StringComparison]::OrdinalIgnoreCase)){@('.exe')}else{@('.exe','.lnk','.url')}) }
             elseif ($script:FileBrowserMode -eq 'PickAudio') { $allowed=@('.wav','.mp3','.wma','.m4a','.aac') }
             if ($script:FileBrowserMode -eq 'PickFolder') { return [object[]]$items.ToArray() }
             foreach ($entry in ($children | Where-Object { -not $_.PSIsContainer } | Sort-Object Name)) {
@@ -2277,6 +2300,7 @@ function Complete-NativeFolderSelection {
     if ([string]::IsNullOrWhiteSpace($script:FileBrowserPath) -or -not (Test-Path -LiteralPath $script:FileBrowserPath -PathType Container)) { return }
     $path=[string]$script:FileBrowserPath
     $store=[string]$script:FileBrowserStore
+    if($script:FileBrowserEntryType -eq 'EmulatorPlatform' -and (Get-Command Complete-HcEmulatorPlatformPicker -ErrorAction SilentlyContinue)){[void](Complete-HcEmulatorPlatformPicker $path);return}
     if($script:FileBrowserEntryType -eq 'ProviderInstall' -and (Get-Command Complete-ProviderFolderSelection -ErrorAction SilentlyContinue)){Complete-ProviderFolderSelection $path|Out-Null;return}
     if($script:FileBrowserEntryType -eq 'ProviderMove' -and (Get-Command Complete-ProviderMoveFolderSelection -ErrorAction SilentlyContinue)){Complete-ProviderMoveFolderSelection $path|Out-Null;return}
     if($script:FileBrowserEntryType -eq 'DriverPackage'){$script:SelectedTab=$script:FileBrowserReturnTab;$script:SubPage='Drivers';$script:SelectedAction=0;Start-DriverWorker 'InstallPackage' $path;Render-Page;Update-NavVisuals;return}
@@ -2302,6 +2326,7 @@ function Complete-NativeFileSelection {
     if ($null -eq $Entry -or [string](Get-EntryProperty $Entry 'Type') -ne 'File') { return }
     $path=[string](Get-EntryProperty $Entry 'FullName')
     if ( -not (Test-Path -LiteralPath $path -PathType Leaf)) { return }
+    if($script:FileBrowserEntryType -eq 'EmulatorPlatform' -and (Get-Command Complete-HcEmulatorPlatformPicker -ErrorAction SilentlyContinue)){[void](Complete-HcEmulatorPlatformPicker $path);return}
     if ($script:FileBrowserMode -eq 'PickExecutable') {
         $type=[string]$script:FileBrowserEntryType
         $entry=[pscustomobject]@{
@@ -2337,6 +2362,7 @@ function Complete-NativeFileSelection {
 }
 
 function Cancel-NativeFilePicker {
+    if($script:FileBrowserEntryType -eq 'EmulatorPlatform'){$script:EmulatorPlatformPickerRequest=$null}
     $script:SelectedTab=$script:FileBrowserReturnTab
     $script:SubPage=$script:FileBrowserReturnSubPage
     if($script:SubPage -eq 'FilePicker'){$script:SubPage=''}
@@ -2527,6 +2553,7 @@ function Invoke-Action {
         'platform-store' { $script:SubPage='ProviderStore';$script:SelectedAction=0;Render-Page }
         'platform-steam-bigpicture' { Start-SteamBigPicture }
         'fse-home-settings' { $script:SubPage='FSEHome';$script:SelectedAction=0;Render-Page }
+        'artwork-settings' { $script:SubPage='Artwork';$script:SelectedAction=0;Render-Page }
         'fse-register' { Start-FseRegistration $false }
         'fse-remove' { Start-FseRegistration $true }
         'fse-chooser' { Open-FseHomeChooser }
@@ -2552,6 +2579,7 @@ function Invoke-Action {
         'keyboard-theme' { Cycle-KeyboardTheme }
         'keyboard-preview' { Show-NativeKeyboard -Title 'Keyboard preview' -InitialText 'Huymaier Console' -Mode 'Preview' -Context $null }
         'fps-toggle' { Toggle-FpsCounter }
+        'steamgriddb-key' { Show-NativeKeyboard -Title 'SteamGridDB artwork key' -InitialText ([string]$script:Config.SteamGridDbApiKey) -Mode 'SteamGridDbApiKey' -Context $null }
         'online-artwork-toggle' { $script:Config.OnlineArtworkEnabled=-not [bool]$script:Config.OnlineArtworkEnabled;Save-Config;Render-Page }
         'artwork-refresh' { Start-OnlineArtworkScan -ResetCursor;Set-ConsoleNotice 'Missing box art is being refreshed in the background.' 'INFO';Render-Page }
         'platform-background-toggle' { $script:Config.PlatformBackgroundsEnabled=-not [bool]$script:Config.PlatformBackgroundsEnabled;Save-Config;Render-Page }
@@ -2734,8 +2762,24 @@ function Get-PageDefinition {
             if($script:SubPage -eq 'Audio'){Refresh-AudioState;$volume=Get-AudioVolume;$mute=Get-AudioMute;$default=if($script:AudioEndpoints.Count -gt 0){$script:AudioEndpoints[$script:AudioIndex].Name}else{'No output detected'};return [pscustomobject]@{Title='Audio';Subtitle='Native master volume, mute, and output controls.';Hero=$default.ToUpperInvariant();HeroText="Master volume: $volume%`nMuted: $(if($mute){'Yes'}else{'No'})`nOutputs: $($script:AudioEndpoints.Count)";Actions=@((New-Action 'audio-output' "Output: $default"),(New-SliderAction 'audio-volume-slider' 'Master volume' $volume 'Use Left/Right to adjust.'),(New-Action 'audio-mute' $(if($mute){'Unmute audio'}else{'Mute audio'})),(New-Action 'subpage-back' 'Back to Settings'))}}
             if($script:SubPage -eq 'Devices'){if((Get-Date)-$script:DeviceRefreshAt -gt [TimeSpan]::FromSeconds(10)){Refresh-DeviceState};$actions=New-Object System.Collections.Generic.List[object];$actions.Add((New-Action 'devices-refresh' 'Refresh devices' "$($script:BluetoothDevices.Count) device(s)."));$actions.Add((New-Action 'devices-add' 'Pair Bluetooth device' 'Windows owns the secure pairing surface; device status remains here.'));foreach($device in (@($script:BluetoothDevices)|Select-Object -First 30)){$actions.Add((New-Action 'noop' $device.Name "$($device.Class)  |  $($device.Status)"))};$actions.Add((New-Action 'subpage-back' 'Back to Settings'));return [pscustomobject]@{Title='Bluetooth & Devices';Subtitle='Connected controllers, audio, Bluetooth, keyboards, and mice.';Hero='DEVICE HUB';HeroText="$($script:BluetoothDevices.Count) device(s) shown natively.";Actions=([object[]]$actions.ToArray())}}
             if($script:SubPage -eq 'FSEHome'){$status=Get-FseHomeStatus;$actions=New-Object System.Collections.Generic.List[object];if($status.Registered){$actions.Add((New-Action 'fse-chooser' 'Choose Huymaier Console as home app' 'Opens the Windows Xbox Mode home-app chooser.'));$actions.Add((New-Action 'fse-remove' 'Remove Xbox Mode home-app registration'))}else{$actions.Add((New-Action 'fse-register' 'Register Huymaier Console as a home app' 'Requires administrator approval and Windows Developer Mode.'))};$actions.Add((New-Action 'subpage-back' 'Back to Settings'));return [pscustomobject]@{Title='Xbox Mode / FSE Home';Subtitle='Make Huymaier Console selectable alongside Xbox on supported Windows 11 builds.';Hero=$(if($status.Registered){'REGISTERED'}else{'NOT REGISTERED'});HeroText=$(if($status.Registered){'Huymaier Console is installed as a supported gaming home-app candidate. Use Choose home app in Windows Xbox Mode settings to select it.'}else{'Register the optional package identity, then select Huymaier Console under Settings > Gaming > Xbox mode > Choose home app.'});Actions=([object[]]$actions.ToArray())}}
+            if($script:SubPage -eq 'Artwork'){
+                $sgdbState=if([string]::IsNullOrWhiteSpace([string]$script:Config.SteamGridDbApiKey)){'NOT CONFIGURED'}else{'CONFIGURED'}
+                return [pscustomobject]@{
+                    Title='Artwork & Metadata'
+                    Subtitle='Box art sources and metadata matching for every storefront and console library.'
+                    Hero='ARTWORK SOURCES'
+                    HeroText="SteamGridDB: $sgdbState`nSteam games use their Steam AppID; other Windows storefronts use normalized title matching.`nLocal storefront/emulator artwork remains preferred before online fallbacks."
+                    Actions=@(
+                        (New-Action 'steamgriddb-key' $(if([string]::IsNullOrWhiteSpace([string]$script:Config.SteamGridDbApiKey)){'SteamGridDB API key: Add personal key'}else{'SteamGridDB API key: Configured'}) 'Opens the Huymaier native keyboard. Your personal key is stored locally in Huymaier Console config and is used only for SteamGridDB API requests.'),
+                        (New-Action 'online-artwork-toggle' $(if($script:Config.OnlineArtworkEnabled){'Online box art: On'}else{'Online box art: Off'}) 'Steam local/CDN and provider artwork are tried first; SteamGridDB is an optional cross-storefront fallback.'),
+                        (New-Action 'artwork-refresh' 'Refresh missing box art' 'Rescans entries that still do not have usable artwork.'),
+                        (New-Action 'platform-background-toggle' $(if($script:Config.PlatformBackgroundsEnabled){'Platform backgrounds: On'}else{'Platform backgrounds: Off'})),
+                        (New-Action 'subpage-back' 'Back to Settings')
+                    )
+                }
+            }
             $browserLabel=if($script:Config.BrowserName){$script:Config.BrowserName}else{'No browser detected'}
-            return [pscustomobject]@{Title='Settings';Subtitle='Personalize and manage the console.';Hero='SYSTEM SETTINGS';HeroText="Prompts: $($script:Config.PromptOverride)  |  Browser: $browserLabel";Actions=@((New-Action 'fse-home-settings' 'Xbox Mode / FSE Home' 'Choose Huymaier Console alongside Xbox on supported Windows 11 builds.'),(New-Action 'open-display-panel' 'Display & HDR'),(New-Action 'driver-settings' 'Drivers & Hardware' 'Graphics, chipset, audio, network, and other signed device drivers.'),(New-Action 'sound-settings' 'Audio'),(New-Action 'bluetooth-settings' 'Bluetooth & Devices'),(New-Action 'controller-diagnostics' 'Controllers'),(New-Action 'choose-browser' "Browser: $browserLabel"),(New-Action 'browser-mode' "Browser launch: $($script:Config.BrowserMode)"),(New-Action 'prompt-override' "Button prompts: $($script:Config.PromptOverride)"),(New-Action 'background-toggle' $(if($script:Config.DynamicBackground){'Dynamic background: On'}else{'Dynamic background: Off'})),(New-Action 'music-toggle' $(if($script:Config.MusicEnabled){'Console music: On'}else{'Console music: Off'})),(New-Action 'music-theme' "Music theme: $($script:Config.MusicTheme)"),(New-Action 'music-import' 'Import background music'),(New-SliderAction 'music-volume-slider' 'Music volume' ([int]$script:Config.MusicVolume) 'Use Left/Right to adjust.'),(New-Action 'ui-sounds-toggle' $(if($script:Config.UiSoundsEnabled){'Interface sounds: On'}else{'Interface sounds: Off'})),(New-Action 'haptics-toggle' $(if($script:Config.HapticsEnabled){'Controller haptics: On'}else{'Controller haptics: Off'})),(New-Action 'keyboard-theme' "Keyboard theme: $($script:Config.KeyboardTheme)"),(New-Action 'keyboard-preview' 'Preview native keyboard'),(New-Action 'fps-toggle' $(if($script:Config.ShowFpsCounter){'Performance counter: On'}else{'Performance counter: Off'}) 'Shows the live rendering FPS in the top-right corner.'),(New-Action 'platform-background-toggle' $(if($script:Config.PlatformBackgroundsEnabled){'Platform backgrounds: On'}else{'Platform backgrounds: Off'})),(New-Action 'online-artwork-toggle' $(if($script:Config.OnlineArtworkEnabled){'Online box art: On'}else{'Online box art: Off'})),(New-Action 'artwork-refresh' 'Refresh missing box art'),(New-Action 'startup-toggle' $(if($script:Config.StartWithWindows){'Start with Windows: On'}else{'Start with Windows: Off'})))}
+            return [pscustomobject]@{Title='Settings';Subtitle='Personalize and manage the console.';Hero='SYSTEM SETTINGS';HeroText="Prompts: $($script:Config.PromptOverride)  |  Browser: $browserLabel";Actions=@((New-Action 'fse-home-settings' 'Xbox Mode / FSE Home' 'Choose Huymaier Console alongside Xbox on supported Windows 11 builds.'),(New-Action 'artwork-settings' 'Artwork & Metadata' 'SteamGridDB key, provider artwork, online artwork, cache refresh and platform backgrounds.'),(New-Action 'open-display-panel' 'Display & HDR'),(New-Action 'driver-settings' 'Drivers & Hardware' 'Graphics, chipset, audio, network, and other signed device drivers.'),(New-Action 'sound-settings' 'Audio'),(New-Action 'bluetooth-settings' 'Bluetooth & Devices'),(New-Action 'controller-diagnostics' 'Controllers'),(New-Action 'choose-browser' "Browser: $browserLabel"),(New-Action 'browser-mode' "Browser launch: $($script:Config.BrowserMode)"),(New-Action 'prompt-override' "Button prompts: $($script:Config.PromptOverride)"),(New-Action 'background-toggle' $(if($script:Config.DynamicBackground){'Dynamic background: On'}else{'Dynamic background: Off'})),(New-Action 'music-toggle' $(if($script:Config.MusicEnabled){'Console music: On'}else{'Console music: Off'})),(New-Action 'music-theme' "Music theme: $($script:Config.MusicTheme)"),(New-Action 'music-import' 'Import background music'),(New-SliderAction 'music-volume-slider' 'Music volume' ([int]$script:Config.MusicVolume) 'Use Left/Right to adjust.'),(New-Action 'ui-sounds-toggle' $(if($script:Config.UiSoundsEnabled){'Interface sounds: On'}else{'Interface sounds: Off'})),(New-Action 'haptics-toggle' $(if($script:Config.HapticsEnabled){'Controller haptics: On'}else{'Controller haptics: Off'})),(New-Action 'keyboard-theme' "Keyboard theme: $($script:Config.KeyboardTheme)"),(New-Action 'keyboard-preview' 'Preview native keyboard'),(New-Action 'fps-toggle' $(if($script:Config.ShowFpsCounter){'Performance counter: On'}else{'Performance counter: Off'}) 'Shows the live rendering FPS in the top-right corner.'),(New-Action 'platform-background-toggle' $(if($script:Config.PlatformBackgroundsEnabled){'Platform backgrounds: On'}else{'Platform backgrounds: Off'})),(New-Action 'steamgriddb-key' $(if([string]::IsNullOrWhiteSpace([string]$script:Config.SteamGridDbApiKey)){'SteamGridDB artwork key: Not configured'}else{'SteamGridDB artwork key: Configured'}) 'Optional personal SteamGridDB API key. Steam uses AppID matching; other PC storefronts use title matching.'),(New-Action 'online-artwork-toggle' $(if($script:Config.OnlineArtworkEnabled){'Online box art: On'}else{'Online box art: Off'})),(New-Action 'artwork-refresh' 'Refresh missing box art'),(New-Action 'startup-toggle' $(if($script:Config.StartWithWindows){'Start with Windows: On'}else{'Start with Windows: Off'})))}
         }
         8 { return [pscustomobject]@{Title='Power';Subtitle='System and recovery controls.';Hero='POWER & RECOVERY';HeroText='Power confirmations stay inside Huymaier Console.';Actions=@((New-Action 'restart-shell' 'Restart Huymaier Console'),(New-Action 'sleep' 'Sleep'),(New-Action 'restart-pc' 'Restart PC'),(New-Action 'shutdown-pc' 'Shut down PC'),(New-Action 'exit-console' 'Exit to Windows'))} }
     }
@@ -3286,7 +3330,7 @@ function Start-NativeConsoleLibrarySummaryScan {
 function Get-PlatformCountSummary {
     param([string]$Platform)
     if([string]::Equals($Platform,'PS1',[StringComparison]::OrdinalIgnoreCase) -or [string]::Equals($Platform,'PlayStation 1',[StringComparison]::OrdinalIgnoreCase) -or [string]::Equals($Platform,'PlayStation',[StringComparison]::OrdinalIgnoreCase)){
-        Start-Ps1LibrarySummaryScan
+        # Count refresh is scheduled outside Render-Page.
         $summary=Read-Ps1LibrarySummary
         # v0.25.2: keep the previous count visible while a throttled background
         # refresh checks configured libraries for newly added or removed games.
@@ -3295,7 +3339,7 @@ function Get-PlatformCountSummary {
         return [pscustomobject]@{Installed=0;Owned=0;Pending=$false}
     }
     if([string]::Equals($Platform,'PS2',[StringComparison]::OrdinalIgnoreCase) -or [string]::Equals($Platform,'PlayStation 2',[StringComparison]::OrdinalIgnoreCase)){
-        Start-Ps2LibrarySummaryScan
+        # Count refresh is scheduled outside Render-Page.
         $summary=Read-Ps2LibrarySummary
         $summaryError=if($null -ne $summary){[string](Get-EntryProperty $summary 'Error' '')}else{''}
         if($null -ne $summary -and -not $summaryError){
@@ -3305,7 +3349,7 @@ function Get-PlatformCountSummary {
         return [pscustomobject]@{Installed=0;Owned=0;Pending=$false}
     }
     if([string]::Equals($Platform,'PS3',[StringComparison]::OrdinalIgnoreCase) -or [string]::Equals($Platform,'PlayStation 3',[StringComparison]::OrdinalIgnoreCase)){
-        Start-Ps3LibrarySummaryScan
+        # Count refresh is scheduled outside Render-Page.
         $summary=Read-Ps3LibrarySummary
         $summaryError=if($null -ne $summary){[string](Get-EntryProperty $summary 'Error' '')}else{''}
         if($null -ne $summary -and -not $summaryError){
@@ -3324,7 +3368,7 @@ function Get-PlatformCountSummary {
                 $nativeId=[string](Get-EntryProperty $nativeEntry 'id' '')
                 if($nativeId -and $nativeId -notin @('ps1','ps2','ps3')){
                     $id=$nativeId.ToUpperInvariant()
-                    Start-NativeConsoleLibrarySummaryScan $id
+                    # Count refresh is scheduled outside Render-Page.
                     $summary=Read-NativeConsoleLibrarySummary $id
                     $summaryError=if($null -ne $summary){[string](Get-EntryProperty $summary 'Error' '')}else{''}
                     if($null -ne $summary -and -not $summaryError){
@@ -4168,9 +4212,23 @@ if (Test-Path -LiteralPath $script:ShellRedesignModulePath) {
     try { . $script:ShellRedesignModulePath }
     catch { Write-Log "Shell redesign module load failed: $($_.Exception.Message)" 'ERROR' }
 }
+# HUYMAIER_CURATED_APP_LIBRARY_V1
+if (Test-Path -LiteralPath $script:AppLibraryModulePath) {
+    try { . $script:AppLibraryModulePath }
+    catch { Write-Log "App library module load failed: $($_.Exception.Message)" 'ERROR' }
+}
+# HUYMAIER_STREAMING_CONTROLLER_RUNTIME_V1
+if (Test-Path -LiteralPath $script:StreamingControllerModulePath) {
+    try { . $script:StreamingControllerModulePath }
+    catch { Write-Log "Streaming controller module load failed: $($_.Exception.Message)" 'ERROR' }
+}
 if (Test-Path -LiteralPath $script:EmulatorPlatformsModulePath) {
     try { . $script:EmulatorPlatformsModulePath }
     catch { Write-Log "Emulator platform module load failed: $($_.Exception.Message)" 'ERROR' }
+}
+if (Test-Path -LiteralPath $script:EmulatorSettingsModulePath) {
+    try { . $script:EmulatorSettingsModulePath }
+    catch { Write-Log "Emulator settings module load failed: $($_.Exception.Message)" 'ERROR' }
 }
 if (Test-Path -LiteralPath $script:WebBrowserModulePath) {
     try { . $script:WebBrowserModulePath }
@@ -4184,6 +4242,49 @@ if (Test-Path -LiteralPath $script:GameBarModulePath) {
 if (Test-Path -LiteralPath $script:CustomizationModulePath) {
     try { . $script:CustomizationModulePath }
     catch { Write-Log "Customization module load failed: $($_.Exception.Message)" 'ERROR' }
+}
+# HUYMAIER_PLATFORM_3D_MODELS_RUNTIME_V2
+# Capture the clean shell presentation contract, then load live GLB/viewer helpers.
+# No atlas/static-preview runtime participates in active presentation ownership.
+if (Test-Path -LiteralPath $script:PlatformModelsModulePath) {
+    try { . $script:PlatformModelsModulePath }
+    catch { Write-Log "Platform presentation base module load failed: $($_.Exception.Message)" 'ERROR' }
+}
+if (Test-Path -LiteralPath $script:LivePlatformModelsModulePath) {
+    try { . $script:LivePlatformModelsModulePath }
+    catch { Write-Log "Live platform 3D helper module load failed: $($_.Exception.Message)" 'ERROR' }
+}
+# HUYMAIER_USER_3D_MODELS_RUNTIME_LOAD_V1
+# Compatibility presentation/helpers. V7 GPU shelves load immediately after this.
+if (Test-Path -LiteralPath $script:User3DModelsModulePath) {
+    try { . $script:User3DModelsModulePath }
+    catch { Write-Log "User 3D Models compatibility module load failed: $($_.Exception.Message)" 'ERROR' }
+}
+# HUYMAIER_GPU_3D_SHELVES_RUNTIME_LOAD_V1
+# Final Games 3D owner: persistent HC3D caches + shared native D3D11 surfaces.
+if (Test-Path -LiteralPath $script:GpuPlatformShelvesModulePath) {
+    try { . $script:GpuPlatformShelvesModulePath }
+    catch { Write-Log "GPU platform shelves module load failed: $($_.Exception.Message)" 'ERROR' }
+}
+# HUYMAIER_MANUAL_RECOMPS_FINAL_LOAD_V1
+# V7 historically wrapped Recomps for folder scanning. Reclaim only those final
+# hooks so the explicit one-EXE-at-a-time library remains authoritative.
+if (Test-Path -LiteralPath $script:ManualRecompsFinalModulePath) {
+    try { . $script:ManualRecompsFinalModulePath }
+    catch { Write-Log "Final manual Recomps ownership load failed: $($_.Exception.Message)" 'ERROR' }
+}
+# HUYMAIER_V0304_MODEL_DEFAULT_RUNTIME_LOAD_V1
+# Final viewer/shelf orientation wrapper. It loads after GPU shelves and provider
+# ownership wrappers so model editing cannot disturb platform routing.
+if (Test-Path -LiteralPath $script:ModelDefaultsModulePath) {
+    try { . $script:ModelDefaultsModulePath }
+    catch { Write-Log "3D model default-orientation module load failed: $($_.Exception.Message)" 'ERROR' }
+}
+# HUYMAIER_UNIFIED_CURSOR_RUNTIME_V2
+# Load after WebBrowser + Customization so native Web cursor ownership is final.
+if (Test-Path -LiteralPath $script:UnifiedCursorModulePath) {
+    try { . $script:UnifiedCursorModulePath }
+    catch { Write-Log "Unified cursor module load failed: $($_.Exception.Message)" 'ERROR' }
 }
 
 $xaml = @'
@@ -4643,42 +4744,137 @@ try {
     $clockTimer.Start()
     $script:MainClockTimer=$clockTimer
 
+    # HUYMAIER_RUNTIME_HITCH_GUARD_V1
+    # State files are observed once through FileSystemWatcher. The WPF timer
+    # consumes queued changes instead of stat/read polling every JSON file once
+    # per second on the UI thread.
+    $script:HcRuntimeStateWatcher=$null
+    $script:HcRuntimeStateSubscriptions=@()
+    $script:HcRuntimeStateSource='Huymaier.RuntimeState.'+$PID
+    $script:HcRuntimeDirty=@{}
+    $script:HcDownloadHistoryDirty=$true
+    $script:HcCountRefreshOrder=@('PS1','PS2','PS3','N64','GAMECUBE','WII','WIIU','SWITCH','XBOX','XBOX360')
+    $script:HcCountRefreshIndex=0
+    $script:HcNextCountWorkerAt=[datetime]::MinValue
+
+    function Add-HcRuntimeDirtyPath {param([string]$Path);if($Path){try{$script:HcRuntimeDirty[[IO.Path]::GetFullPath($Path).ToLowerInvariant()]=$true}catch{$script:HcRuntimeDirty[$Path.ToLowerInvariant()]=$true}}}
+    function Test-HcRuntimePathDirty {param([string]$Path);if(-not $Path){return $false};$key=$Path.ToLowerInvariant();try{$key=[IO.Path]::GetFullPath($Path).ToLowerInvariant()}catch{};if($script:HcRuntimeDirty.ContainsKey($key)){$script:HcRuntimeDirty.Remove($key);return $true};return $false}
+    function Initialize-HcRuntimeStateWatcher {
+        foreach($path in @($script:LibraryStatePath,$script:LibraryResultPath,$script:ArtworkStatePath,$script:ArtworkResultPath,$script:Ps1SummaryPath,$script:Ps2SummaryPath,$script:Ps3SummaryPath,$script:StorefrontStatePath,$script:ProviderStatePath,$script:ProviderCatalogPath,$script:UpdateStatePath,$script:DriverStatePath)){Add-HcRuntimeDirtyPath $path}
+        try{
+            $watcher=New-Object IO.FileSystemWatcher $script:DataDir,'*'
+            $watcher.IncludeSubdirectories=$true;$watcher.NotifyFilter=[IO.NotifyFilters]::LastWrite -bor [IO.NotifyFilters]::Size -bor [IO.NotifyFilters]::FileName -bor [IO.NotifyFilters]::DirectoryName;$watcher.InternalBufferSize=32768
+            foreach($eventName in @('Changed','Created','Renamed','Deleted')){$id=$script:HcRuntimeStateSource+'.'+$eventName;[void](Register-ObjectEvent -InputObject $watcher -EventName $eventName -SourceIdentifier $id);$script:HcRuntimeStateSubscriptions+=$id}
+            $watcher.EnableRaisingEvents=$true;$script:HcRuntimeStateWatcher=$watcher
+        }catch{Write-Log "Runtime state watcher could not start: $($_.Exception.Message)" 'WARN'}
+    }
+    function Update-HcRuntimeStateEvents {
+        foreach($id in @($script:HcRuntimeStateSubscriptions)){
+            foreach($evt in @(Get-Event -SourceIdentifier $id -ErrorAction SilentlyContinue)){
+                try{
+                    $full=[string]$evt.SourceEventArgs.FullPath
+                    if($full){
+                        $lower=$full.ToLowerInvariant()
+                        if($lower -match '\\gameproviders\\transfers\\transfer-[^\\]+\.json$'){$script:HcDownloadHistoryDirty=$true}else{Add-HcRuntimeDirtyPath $full}
+                        # HUYMAIER_CONCURRENT_DOWNLOAD_REFRESH_V1
+                        # Aggregate transfer telemetry does not invalidate the Games library.
+                        if($lower.EndsWith('provider-state.json') -or $lower.EndsWith('storefront-state.json') -or $lower.EndsWith('provider-transfers.json')){$script:HcDownloadHistoryDirty=$true}
+                    }
+                }catch{}
+                try{Remove-Event -EventIdentifier $evt.EventIdentifier -ErrorAction SilentlyContinue}catch{}
+            }
+        }
+    }
+    function Stop-HcRuntimeStateWatcher {
+        try{if($null -ne $script:HcRuntimeStateWatcher){$script:HcRuntimeStateWatcher.EnableRaisingEvents=$false}}catch{}
+        foreach($id in @($script:HcRuntimeStateSubscriptions)){try{Unregister-Event -SourceIdentifier $id -ErrorAction SilentlyContinue}catch{};try{Get-Event -SourceIdentifier $id -ErrorAction SilentlyContinue|Remove-Event -ErrorAction SilentlyContinue}catch{}}
+        try{if($null -ne $script:HcRuntimeStateWatcher){$script:HcRuntimeStateWatcher.Dispose()}}catch{}
+        $script:HcRuntimeStateWatcher=$null;$script:HcRuntimeStateSubscriptions=@()
+    }
+    function Invoke-HcIncrementalConsoleCountRefresh {
+        if($script:SelectedTab -ne 1 -or $script:SubPage){return}
+        $now=Get-Date;if($now -lt $script:HcNextCountWorkerAt){return}
+        if($script:HcCountRefreshIndex -ge $script:HcCountRefreshOrder.Count){$script:HcCountRefreshIndex=0;$script:HcNextCountWorkerAt=$now.AddSeconds(120);return}
+        $id=[string]$script:HcCountRefreshOrder[$script:HcCountRefreshIndex];$script:HcCountRefreshIndex++
+        switch($id){'PS1'{Start-Ps1LibrarySummaryScan}'PS2'{Start-Ps2LibrarySummaryScan}'PS3'{Start-Ps3LibrarySummaryScan}default{Start-NativeConsoleLibrarySummaryScan $id}}
+        # One process start per interval avoids process-creation bursts on the UI thread.
+        $script:HcNextCountWorkerAt=$now.AddSeconds(5)
+    }
+    Initialize-HcRuntimeStateWatcher
+    # HUYMAIER_DOWNLOAD_LIBRARY_REFRESH_POLICY_V1
+    # Transfer progress is not a library mutation. Keep the current Games page
+    # fully usable while downloads/installations are active and coalesce the
+    # actual library rebuild until a successful terminal install/update event.
+    $script:HcDeferredLibraryRefreshAt=[datetime]::MinValue
+    $script:HcDeferredLibraryRefreshReason=''
+    $script:HcDeferredProviderCatalogDirty=$false
+
+    function Test-HcInstallOrUpdateMode {
+        param($State)
+        $mode=[string](Get-EntryProperty $State 'Mode' '')
+        return ($mode -in @('Install','Update'))
+    }
+    function Test-HcSuccessfulTransferTerminal {
+        param($State)
+        if($null -eq $State -or [bool](Get-EntryProperty $State 'Busy' $false)){return $false}
+        if(-not(Test-HcInstallOrUpdateMode $State)){return $false}
+        if([string](Get-EntryProperty $State 'Error' '')){return $false}
+        $phase=[string](Get-EntryProperty $State 'Phase' (Get-EntryProperty $State 'Status' ''))
+        $progress=[int](Get-EntryProperty $State 'Progress' -1)
+        return ($phase -in @('Complete','Completed','Ready') -or $progress -ge 100)
+    }
+    function Request-HcDeferredLibraryRefresh {
+        param([string]$Reason,[int]$DelayMs=850)
+        $script:HcDeferredLibraryRefreshAt=(Get-Date).AddMilliseconds([math]::Max(100,$DelayMs))
+        if($Reason){$script:HcDeferredLibraryRefreshReason=$Reason}
+    }
+    function Invoke-HcDeferredLibraryRefresh {
+        if($script:HcDeferredLibraryRefreshAt -eq [datetime]::MinValue -or (Get-Date) -lt $script:HcDeferredLibraryRefreshAt){return}
+        $script:HcDeferredLibraryRefreshAt=[datetime]::MinValue
+        $reason=$script:HcDeferredLibraryRefreshReason
+        $script:HcDeferredLibraryRefreshReason=''
+        if($script:HcDeferredProviderCatalogDirty){
+            $script:HcDeferredProviderCatalogDirty=$false
+            try{Clear-HcGameDataCache -DropPersistent}catch{Write-Log "Deferred provider library cache invalidation failed: $($_.Exception.Message)" 'WARN'}
+        }
+        if($script:SelectedTab -eq 1){
+            try{Render-Page}catch{Write-Log "Deferred library refresh failed ($reason): $($_.Exception.Message)" 'WARN'}
+        }
+    }
     $systemTimer = New-Object System.Windows.Threading.DispatcherTimer
     $systemTimer.Interval = [TimeSpan]::FromSeconds(1)
     $systemTimer.Add_Tick({
         try {
-            if (Test-Path $script:LibraryStatePath) {
+            Update-HcRuntimeStateEvents
+            Invoke-HcIncrementalConsoleCountRefresh
+            Invoke-HcDeferredLibraryRefresh
+            if ((Test-HcRuntimePathDirty $script:LibraryStatePath) -and (Test-Path $script:LibraryStatePath)) {
                 $libraryStateSignature=(Get-Item -LiteralPath $script:LibraryStatePath).LastWriteTimeUtc.Ticks.ToString()
                 if($libraryStateSignature -ne $script:LibraryStateSignature){$script:LibraryStateSignature=$libraryStateSignature;Read-LibraryState;if($script:SelectedTab -eq 5){Render-Page}}
             }
-            Apply-LibraryResult
-            Apply-OnlineArtworkResult
-            if(Test-Path -LiteralPath $script:Ps3SummaryPath -PathType Leaf){
+            if(Test-HcRuntimePathDirty $script:LibraryResultPath){Apply-LibraryResult}
+            if(Test-HcRuntimePathDirty $script:ArtworkResultPath){Apply-OnlineArtworkResult}
+            if((Test-HcRuntimePathDirty $script:Ps3SummaryPath) -and (Test-Path -LiteralPath $script:Ps3SummaryPath -PathType Leaf)){
                 $ps3SummarySignature=(Get-Item -LiteralPath $script:Ps3SummaryPath).LastWriteTimeUtc.Ticks.ToString()
                 if($ps3SummarySignature -ne $script:Ps3SummarySignature){
                     $script:Ps3SummarySignature=$ps3SummarySignature
                     if($script:SelectedTab -eq 1 -and -not $script:SubPage){Render-Page}
                 }
             }
-            if(Test-Path -LiteralPath $script:Ps1SummaryPath -PathType Leaf){
+            if((Test-HcRuntimePathDirty $script:Ps1SummaryPath) -and (Test-Path -LiteralPath $script:Ps1SummaryPath -PathType Leaf)){
                 $ps1SummarySignature=(Get-Item -LiteralPath $script:Ps1SummaryPath).LastWriteTimeUtc.Ticks.ToString()
                 if($ps1SummarySignature -ne $script:Ps1SummarySignature){$script:Ps1SummarySignature=$ps1SummarySignature;if($script:SelectedTab -eq 1 -and -not $script:SubPage){Render-Page}}
             }
-            if(Test-Path -LiteralPath $script:Ps2SummaryPath -PathType Leaf){
+            if((Test-HcRuntimePathDirty $script:Ps2SummaryPath) -and (Test-Path -LiteralPath $script:Ps2SummaryPath -PathType Leaf)){
                 $ps2SummarySignature=(Get-Item -LiteralPath $script:Ps2SummaryPath).LastWriteTimeUtc.Ticks.ToString()
                 if($ps2SummarySignature -ne $script:Ps2SummarySignature){
                     $script:Ps2SummarySignature=$ps2SummarySignature
                     if($script:SelectedTab -eq 1 -and -not $script:SubPage){Render-Page}
                 }
             }
-            if($script:SelectedTab -eq 1 -and -not $script:SubPage -and (Get-Date) -ge $script:NextConsoleCountRefreshAt){
-                $script:NextConsoleCountRefreshAt=(Get-Date).AddSeconds(30)
-                Start-Ps1LibrarySummaryScan;Start-Ps2LibrarySummaryScan;Start-Ps3LibrarySummaryScan
-                foreach($nativeId in @('N64','GAMECUBE','WII','WIIU','SWITCH','XBOX','XBOX360')){Start-NativeConsoleLibrarySummaryScan $nativeId}
-            }
             foreach($nativeId in @('N64','GAMECUBE','WII','WIIU','SWITCH','XBOX','XBOX360')){
                 $nativeSummaryPath=Join-Path $script:DataDir ("EmulatorPlatforms\"+$nativeId+"\library-summary.json")
-                if(Test-Path -LiteralPath $nativeSummaryPath -PathType Leaf){
+                if((Test-HcRuntimePathDirty $nativeSummaryPath) -and (Test-Path -LiteralPath $nativeSummaryPath -PathType Leaf)){
                     $sig=(Get-Item -LiteralPath $nativeSummaryPath).LastWriteTimeUtc.Ticks.ToString()
                     $oldSig=if($script:NativeConsoleSummarySignatures.ContainsKey($nativeId)){[string]$script:NativeConsoleSummarySignatures[$nativeId]}else{''}
                     if($sig -ne $oldSig){
@@ -4687,18 +4883,34 @@ try {
                     }
                 }
             }
-            if (Test-Path $script:StorefrontStatePath) {
+            if ((Test-HcRuntimePathDirty $script:StorefrontStatePath) -and (Test-Path $script:StorefrontStatePath)) {
                 $storefrontSignature=(Get-Item -LiteralPath $script:StorefrontStatePath).LastWriteTimeUtc.Ticks.ToString()
                 if($storefrontSignature -ne $script:StorefrontStateSignature){
+                    $previousStorefrontSignature=[string]$script:StorefrontStateSignature
                     $script:StorefrontStateSignature=$storefrontSignature
                     Read-StorefrontState
                     $script:StorefrontCatalogAt=[datetime]::MinValue
-                    if($script:SelectedTab -in @(1,4)){Render-Page}
+                    $transferBusy=[bool](Get-EntryProperty $script:StorefrontState 'Busy' $false) -and (Test-HcInstallOrUpdateMode $script:StorefrontState)
+                    if($transferBusy){
+                        # Never rebuild Games for progress. Downloads may update its
+                        # existing visual card in place; rebuild Downloads only when
+                        # the active-card set itself changed.
+                        if($script:SelectedTab -eq 4 -and -not $script:SubPage -and (Get-Command Update-HcActiveDownloadVisuals -ErrorAction SilentlyContinue)){
+                            if(-not(Update-HcActiveDownloadVisuals $script:StorefrontState)){Render-Page}
+                        }
+                    }elseif(Test-HcInstallOrUpdateMode $script:StorefrontState){
+                        if($previousStorefrontSignature -and (Test-HcSuccessfulTransferTerminal $script:StorefrontState)){
+                            Request-HcDeferredLibraryRefresh 'storefront-install-complete' 850
+                        }
+                        if($script:SelectedTab -eq 4){Render-Page}
+                    }elseif($script:SelectedTab -in @(1,4)){
+                        Render-Page
+                    }
                 }
-            }
-            if (Test-Path $script:ProviderStatePath) {
+            }            if ((Test-HcRuntimePathDirty $script:ProviderStatePath) -and (Test-Path $script:ProviderStatePath)) {
                 $providerStateSignature=(Get-Item -LiteralPath $script:ProviderStatePath).LastWriteTimeUtc.Ticks.ToString()
                 if($providerStateSignature -ne $script:ProviderStateSignature){
+                    $previousProviderStateSignature=[string]$script:ProviderStateSignature
                     $script:ProviderStateSignature=$providerStateSignature
                     $providerState=Read-GameProviderState
                     # Provider refresh is an explicit library mutation. Refresh only that
@@ -4716,30 +4928,42 @@ try {
                             Start-OnlineArtworkScan -ResetCursor -Force -Platform $provider
                         }
                     }catch{Write-Log "Provider-refresh artwork trigger failed: $($_.Exception.Message)" 'WARN'}
-                    if($script:SelectedTab -eq 4 -and -not $script:SubPage -and $busy -and [string]::Equals($mode,'Install',[StringComparison]::OrdinalIgnoreCase) -and (Get-Command Update-HcActiveDownloadVisuals -ErrorAction SilentlyContinue)){
-                        # v0.25.4: live transfer telemetry updates once per second. Update the
-                        # existing download card in place so controller focus/scroll position
-                        # is not reset by a full page rebuild every time Legendary reports data.
-                        if(-not (Update-HcActiveDownloadVisuals $providerState)){Render-Page}
-                    }elseif($script:SelectedTab -in @(1,4)){Render-Page}
+
+                    $transferBusy=$busy -and ($mode -in @('Install','Update'))
+                    if($transferBusy){
+                        # Provider telemetry may arrive several times per second. It is
+                        # progress only: do not rebuild Games or destroy selection/scroll.
+                        if($script:SelectedTab -eq 4 -and -not $script:SubPage -and (Get-Command Update-HcActiveDownloadVisuals -ErrorAction SilentlyContinue)){
+                            if(-not(Update-HcActiveDownloadVisuals $providerState)){Render-Page}
+                        }
+                    }elseif($mode -in @('Install','Update')){
+                        if($previousProviderStateSignature -and (Test-HcSuccessfulTransferTerminal $providerState)){
+                            Request-HcDeferredLibraryRefresh ('provider-'+$provider+'-'+$mode+'-complete') 850
+                        }
+                        if($script:SelectedTab -eq 4){Render-Page}
+                    }elseif($script:SelectedTab -in @(1,4)){
+                        Render-Page
+                    }
                 }
-            }
-            if (Test-Path $script:ProviderCatalogPath) {
+            }            if ((Test-HcRuntimePathDirty $script:ProviderCatalogPath) -and (Test-Path $script:ProviderCatalogPath)) {
                 $providerCatalogSignature=(Get-Item -LiteralPath $script:ProviderCatalogPath).LastWriteTimeUtc.Ticks.ToString()
                 if(-not $script:ProviderCatalogSignature){
-                    # First observation during startup is cache-only. It must not destroy
-                    # the persisted shelf/library index merely because the timer has now
-                    # seen the existing catalog file for the first time.
+                    # First observation during startup is cache-only.
                     $script:ProviderCatalogSignature=$providerCatalogSignature
                     Read-GameProviderCatalog|Out-Null
                 }elseif($providerCatalogSignature -ne $script:ProviderCatalogSignature){
                     $script:ProviderCatalogSignature=$providerCatalogSignature
                     Read-GameProviderCatalog|Out-Null
-                    try{Clear-HcGameDataCache -DropPersistent}catch{}
-                    if($script:SelectedTab -eq 1){Render-Page}
+                    $script:HcDeferredProviderCatalogDirty=$true
+                    $activeProviderTransfers=0
+                    try{if(Get-Command Get-GameProviderActiveTransfers -ErrorAction SilentlyContinue){$activeProviderTransfers=@(Get-GameProviderActiveTransfers).Count}}catch{}
+                    if($activeProviderTransfers -le 0){
+                        # Coalesce the catalog invalidation with a nearby terminal
+                        # provider-state event so one install completion = one refresh.
+                        Request-HcDeferredLibraryRefresh 'provider-catalog-changed' 850
+                    }
                 }
-            }
-            if (Test-Path $script:UpdateStatePath) {
+            }            if ((Test-HcRuntimePathDirty $script:UpdateStatePath) -and (Test-Path $script:UpdateStatePath)) {
                 $signature = (Get-Item $script:UpdateStatePath).LastWriteTimeUtc.Ticks.ToString()
                 if ($signature -ne $script:UpdateStateSignature) {
                     $script:UpdateStateSignature = $signature
@@ -4747,7 +4971,7 @@ try {
                     if (($script:SelectedTab -eq 7 -and $script:SubPage -eq 'WindowsUpdate') -or ($script:SelectedTab -eq 4 -and $script:SubPage -eq 'Updates')) { Render-Page }
                 }
             }
-            if (Test-Path $script:DriverStatePath) {
+            if ((Test-HcRuntimePathDirty $script:DriverStatePath) -and (Test-Path $script:DriverStatePath)) {
                 $driverSignature = (Get-Item $script:DriverStatePath).LastWriteTimeUtc.Ticks.ToString()
                 if ($driverSignature -ne $script:DriverStateSignature) {
                     $script:DriverStateSignature = $driverSignature
@@ -4762,7 +4986,7 @@ try {
                     if($hcUpdateSignature -ne $script:HcConsoleUpdateStateSignature){$script:HcConsoleUpdateStateSignature=$hcUpdateSignature;Read-HcConsoleUpdateState|Out-Null;if($script:SelectedTab -eq 7 -and $script:SubPage -eq 'ConsoleUpdate'){Render-Page}}
                 }catch{Write-Log "Huymaier Console update-state observer failed: $($_.Exception.Message)" 'WARN'}
             }
-            if(Get-Command Update-HcDownloadHistory -ErrorAction SilentlyContinue){try{Update-HcDownloadHistory}catch{Write-Log "Download history observer failed: $($_.Exception.Message)" 'WARN'}}
+            if($script:HcDownloadHistoryDirty -and (Get-Command Update-HcDownloadHistory -ErrorAction SilentlyContinue)){$script:HcDownloadHistoryDirty=$false;try{Update-HcDownloadHistory}catch{Write-Log "Download history observer failed: $($_.Exception.Message)" 'WARN'}}
             if([bool]$script:Config.ShowFpsCounter -and $null -ne $script:FpsText -and ('HuymaierConsole.Native.FrameRateMonitor' -as [type])){$script:FpsText.Text=('FPS {0:N0}' -f [HuymaierConsole.Native.FrameRateMonitor]::Fps)}
             if ($script:DisplayPendingConfirmation) {
                 if ((Get-Date) -ge $script:DisplayConfirmUntil) {
@@ -4789,23 +5013,37 @@ try {
         if(-not $script:AllowWindowClose -and (Get-Date) -lt $script:PreventAutoCloseUntil){$eventArgs.Cancel=$true;Write-Log 'Prevented unintended console close after external launch.' 'WARN';return}
         try{if(Get-Command Stop-HuymaierGameBar -ErrorAction SilentlyContinue){Stop-HuymaierGameBar};if('HuymaierConsole.NativeApp.NativeConsoleNavigation' -as [type]){[HuymaierConsole.NativeApp.NativeConsoleNavigation]::Shutdown()}}catch{}
         $script:IsClosing = $true
-        try { $clockTimer.Stop(); $systemTimer.Stop(); $gamepadTimer.Stop(); if(Get-Command Stop-HuymaierWebBrowser -ErrorAction SilentlyContinue){Stop-HuymaierWebBrowser}; if ($null -ne $script:InitialScanTimer) { $script:InitialScanTimer.Stop() };if($null -ne $script:ArtworkContinuationTimer){$script:ArtworkContinuationTimer.Stop()};Stop-PlatformBackgroundAnimations;if($script:FpsMonitorStarted -and ('HuymaierConsole.Native.FrameRateMonitor' -as [type])){[HuymaierConsole.Native.FrameRateMonitor]::Stop();$script:FpsMonitorStarted=$false};if($null -ne $script:RawInputSource -and $null -ne $script:RawInputHook){$script:RawInputSource.RemoveHook($script:RawInputHook)} } catch { }
+        try { $clockTimer.Stop(); $systemTimer.Stop(); $gamepadTimer.Stop(); Stop-HcRuntimeStateWatcher; if(Get-Command Stop-HuymaierWebBrowser -ErrorAction SilentlyContinue){Stop-HuymaierWebBrowser}; if ($null -ne $script:InitialScanTimer) { $script:InitialScanTimer.Stop() };if($null -ne $script:ArtworkContinuationTimer){$script:ArtworkContinuationTimer.Stop()};Stop-PlatformBackgroundAnimations;if($script:FpsMonitorStarted -and ('HuymaierConsole.Native.FrameRateMonitor' -as [type])){[HuymaierConsole.Native.FrameRateMonitor]::Stop();$script:FpsMonitorStarted=$false};if($null -ne $script:RawInputSource -and $null -ne $script:RawInputHook){$script:RawInputSource.RemoveHook($script:RawInputHook)} } catch { }
         try { if ($null -ne $script:MusicPlayer) { $script:MusicPlayer.Stop(); $script:MusicPlayer.Close() } } catch { }
         try { foreach ($player in $script:SfxPlayers.Values) { $player.Stop(); $player.Close() } } catch { }
         Save-Config
         Write-Log 'Huymaier Console closed.'
     })
 
-    Set-BackgroundAnimationState
-    Set-FpsCounterState
-    Initialize-UiFeedback
+    # Keep only first-frame-critical visual construction on the synchronous boot
+    # path. Animations, FPS hooks and MediaPlayer initialization are deferred
+    # until WPF has rendered once so Xbox/Home Experience becomes usable sooner.
     if(Get-Command Apply-HcCustomizationVisuals -ErrorAction SilentlyContinue){Apply-HcCustomizationVisuals}
-    Initialize-BackgroundMusic
     Update-NavVisuals
     Render-Page
+    $script:HcDeferredStartupInitialized=$false
+    $script:Window.Add_ContentRendered({
+        if($script:HcDeferredStartupInitialized){return}
+        $script:HcDeferredStartupInitialized=$true
+        try{Write-Log ("Startup timing: first rendered frame at {0} ms." -f $script:HcStartupStopwatch.ElapsedMilliseconds)}catch{}
+        $initializeDeferred=[Action]{
+            try{Set-BackgroundAnimationState}catch{Write-Log "Deferred background animation startup failed: $($_.Exception.Message)" 'WARN'}
+            try{Set-FpsCounterState}catch{Write-Log "Deferred FPS startup failed: $($_.Exception.Message)" 'WARN'}
+            try{Initialize-UiFeedback}catch{Write-Log "Deferred UI feedback startup failed: $($_.Exception.Message)" 'WARN'}
+            try{Initialize-BackgroundMusic}catch{Write-Log "Deferred background music startup failed: $($_.Exception.Message)" 'WARN'}
+            try{Write-Log ("Startup timing: deferred shell services ready at {0} ms." -f $script:HcStartupStopwatch.ElapsedMilliseconds)}catch{}
+        }
+        try{[void]$script:Window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background,$initializeDeferred)}
+        catch{& $initializeDeferred}
+    })
     if ( -not [bool]$script:Config.LibraryScanCompleted -or [int](Get-EntryProperty $script:Config 'LibrarySchemaVersion' 0) -lt 4) {
         $script:InitialScanTimer = New-Object System.Windows.Threading.DispatcherTimer
-        $script:InitialScanTimer.Interval = [TimeSpan]::FromMilliseconds(700)
+        $script:InitialScanTimer.Interval = [TimeSpan]::FromMilliseconds(1800)
         $script:InitialScanTimer.Add_Tick({
             try { $script:InitialScanTimer.Stop(); Start-LibraryScan }
             catch { Write-Log "Initial library scan failed: $($_.Exception.Message)" 'WARN' }
@@ -4816,6 +5054,7 @@ try {
     $script:ClockText.Text = (Get-Date -Format 'h:mm tt')
     Update-Footer
     Write-Log "Huymaier Console v$($script:AppVersion) started."
+    try{Write-Log ("Startup timing: entering ShowDialog at {0} ms." -f $script:HcStartupStopwatch.ElapsedMilliseconds)}catch{}
     $script:Window.ShowDialog() | Out-Null
 }
 catch {
@@ -4826,3 +5065,12 @@ catch {
     [System.Windows.MessageBox]::Show("Huymaier Console could not start.`n`n$($_.Exception.Message)`n`nA log was saved to:`n$script:LogDir", $script:AppName, 'OK', 'Error') | Out-Null
     exit 1
 }
+
+
+
+
+
+
+
+
+

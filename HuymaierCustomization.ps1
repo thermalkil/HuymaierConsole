@@ -14,6 +14,8 @@ $script:HcCustomizationBaseGetPlatformCountSummary=${function:Get-PlatformCountS
 $script:HcCustomizationBaseInitializeUiFeedback=${function:Initialize-UiFeedback}
 $script:HcCustomizationBaseSetConsoleNotice=${function:Set-ConsoleNotice}
 $script:HcCustomizationBaseMainMenuVisuals=$(if(Get-Command Update-HcMainMenuVisuals -ErrorAction SilentlyContinue){${function:Update-HcMainMenuVisuals}}else{$null})
+$script:HcBrightnessOverlay=$null
+# HUYMAIER_V0302_CONSOLE_BRIGHTNESS_V1
 
 function Add-HcCustomizationConfigProperty {
     param([string]$Name,$Value)
@@ -29,7 +31,18 @@ function Initialize-HcCustomizationConfig {
     Add-HcCustomizationConfigProperty 'DynamicSecondaryColor' '#4474C2'
     Add-HcCustomizationConfigProperty 'DynamicTertiaryColor' '#315F9D'
     Add-HcCustomizationConfigProperty 'UiSoundVolume' 62
+    if($null -eq $script:Config.PSObject.Properties['ConsoleBrightness']){
+        $persistedBrightness=$null
+        try{
+            if(Test-Path -LiteralPath $script:ConfigPath -PathType Leaf){
+                $persistedConfig=Get-Content -Raw -LiteralPath $script:ConfigPath -Encoding UTF8|ConvertFrom-Json
+                if($null -ne $persistedConfig.PSObject.Properties['ConsoleBrightness']){$persistedBrightness=[int]$persistedConfig.ConsoleBrightness}
+            }
+        }catch{}
+        Add-HcCustomizationConfigProperty 'ConsoleBrightness' $(if($null -eq $persistedBrightness){100}else{$persistedBrightness})
+    }
     try{$script:Config.UiSoundVolume=[math]::Max(0,[math]::Min(100,[int]$script:Config.UiSoundVolume))}catch{$script:Config.UiSoundVolume=62}
+    try{$script:Config.ConsoleBrightness=[math]::Max(0,[math]::Min(200,([int]([math]::Round(([int]$script:Config.ConsoleBrightness)/10.0)*10))))}catch{$script:Config.ConsoleBrightness=100}
     if([string]::IsNullOrWhiteSpace([string]$script:Config.ConsoleName)){$script:Config.ConsoleName='Huymaier Console'}
 }
 
@@ -62,10 +75,42 @@ function Convert-HcDisplayBrandText {
     return ([regex]::Replace($Value,'Huymaier Console',[System.Text.RegularExpressions.MatchEvaluator]{param($m)$name},[System.Text.RegularExpressions.RegexOptions]::IgnoreCase))
 }
 
-
 function Set-ConsoleNotice {
     param([string]$Message,[string]$Level='INFO')
     & $script:HcCustomizationBaseSetConsoleNotice (Convert-HcDisplayBrandText $Message) $Level
+}
+
+function Get-HcConsoleBrightness {
+    Initialize-HcCustomizationConfig
+    return [int](Get-EntryProperty $script:Config 'ConsoleBrightness' 100)
+}
+function Apply-HcConsoleBrightness {
+    Initialize-HcCustomizationConfig
+    if($null -eq $script:RootGrid){return}
+    try{
+        if($null -eq $script:HcBrightnessOverlay){
+            $overlay=New-Object System.Windows.Controls.Border
+            $overlay.Name='HcConsoleBrightnessOverlay'
+            $overlay.IsHitTestVisible=$false
+            $overlay.Focusable=$false
+            $overlay.HorizontalAlignment='Stretch';$overlay.VerticalAlignment='Stretch'
+            [System.Windows.Controls.Panel]::SetZIndex($overlay,2147483647)
+            [void]$script:RootGrid.Children.Add($overlay)
+            $script:HcBrightnessOverlay=$overlay
+        }
+        $value=Get-HcConsoleBrightness
+        if($value -eq 100){$script:HcBrightnessOverlay.Visibility='Collapsed';return}
+        $script:HcBrightnessOverlay.Visibility='Visible'
+        if($value -lt 100){
+            $alpha=(100-$value)/100.0
+            $script:HcBrightnessOverlay.Background=New-HcSolidBrush '#000000'
+            $script:HcBrightnessOverlay.Opacity=[math]::Max(0.0,[math]::Min(1.0,$alpha))
+        }else{
+            $alpha=(($value-100)/100.0)*0.50
+            $script:HcBrightnessOverlay.Background=New-HcSolidBrush '#FFFFFF'
+            $script:HcBrightnessOverlay.Opacity=[math]::Max(0.0,[math]::Min(0.50,$alpha))
+        }
+    }catch{Write-Log "Console brightness refresh recovered: $($_.Exception.Message)" 'WARN'}
 }
 
 function Set-HcGameBarBranding {
@@ -106,6 +151,7 @@ function Apply-HcCustomizationVisuals {
         foreach($star in @($script:StarOne,$script:StarThree,$script:StarFive,$script:StarSeven)){if($null -ne $star){$star.Fill=New-HcSolidBrush $primary}}
         foreach($star in @($script:StarTwo,$script:StarFour,$script:StarSix,$script:StarEight)){if($null -ne $star){$star.Fill=New-HcSolidBrush $secondary}}
         Set-HcGameBarBranding
+        Apply-HcConsoleBrightness
     }catch{Write-Log "Customization visual refresh recovered: $($_.Exception.Message)" 'WARN'}
 }
 
@@ -146,10 +192,11 @@ function Get-PageDefinition {
         Initialize-HcCustomizationConfig
         $name=Get-HcConsoleName;$preset=[string](Get-EntryProperty $script:Config 'DynamicThemePreset' 'Huymaier')
         return (Update-HcPageDisplayBrand ([pscustomobject]@{
-            Title='Customization';Subtitle='Console identity, interface colors, dynamic theme, music, and navigation sounds.';Hero=$name.ToUpperInvariant();HeroText="Color preset: $preset  |  Controller color wheel available";Actions=@(
+            Title='Customization';Subtitle='Console identity, overall brightness, interface colors, dynamic theme, music, and navigation sounds.';Hero=$name.ToUpperInvariant();HeroText="Color preset: $preset  |  Controller color wheel available";Actions=@(
                 (New-Action 'customization-console-name' "Console name: $name" 'Changes the display name throughout the shell and Game Bar. Product files and update identity stay Huymaier Console.'),
                 (New-Action 'customization-preset' "Color preset: $preset" 'Cycles coordinated interface and dynamic-theme palettes.'),
                 (New-Action 'customization-shell-base' 'Interface base color' 'Open the controller color wheel.'),
+                (New-SliderAction 'console-brightness-slider' 'Huymaier Console brightness' ([int](Get-EntryProperty $script:Config 'ConsoleBrightness' 100)) 'Adjust the entire Huymaier Console interface from 0% to 200% in 10% steps.' 0 200),
                 (New-Action 'customization-accent' 'Accent color' 'Open the controller color wheel.'),
                 (New-Action 'customization-highlight' 'Focus highlight color' 'Open the controller color wheel.'),
                 (New-Action 'background-toggle' $(if($script:Config.DynamicBackground){'Dynamic background: On'}else{'Dynamic background: Off'})),
@@ -171,7 +218,7 @@ function Get-PageDefinition {
     $page=& $script:HcCustomizationBaseGetPageDefinition $Index
     if($Index -eq 7 -and -not $script:SubPage -and $null -ne $page){
         $filtered=New-Object System.Collections.ArrayList
-        [void]$filtered.Add((New-Action 'customization-settings' 'Customization' 'Console name, colors, dynamic theme, music, navigation sounds, and keyboard appearance.'))
+        [void]$filtered.Add((New-Action 'customization-settings' 'Customization' 'Console name, overall brightness, colors, dynamic theme, music, navigation sounds, and keyboard appearance.'))
         $moved=@('background-toggle','music-toggle','music-theme','music-import','music-volume-slider','ui-sounds-toggle','keyboard-theme','keyboard-preview')
         foreach($action in @($page.Actions)){if($null -ne $action -and ([string](Get-EntryProperty $action 'Id' '')) -notin $moved){[void]$filtered.Add($action)}}
         $page.Actions=[object[]]$filtered.ToArray()
@@ -186,6 +233,7 @@ function Invoke-Action {
         'customization-console-name' {Open-HcCustomizationKeyboard 'ConsoleName' 'Console name' (Get-HcConsoleName);return}
         'customization-preset' {Cycle-HcDynamicThemePreset;return}
         'customization-shell-base' {Show-HcColorPicker 'ShellBaseColor' 'Interface base color' (Get-HcColor 'ShellBaseColor' '#09111E');return}
+        'console-brightness-slider' {Adjust-SelectedSlider 10;return}
         'customization-accent' {Show-HcColorPicker 'AccentColor' 'Accent color' (Get-HcAccentColor);return}
         'customization-highlight' {Show-HcColorPicker 'AccentHighlightColor' 'Focus highlight color' (Get-HcHighlightColor);return}
         'customization-dynamic-primary' {Show-HcColorPicker 'DynamicPrimaryColor' 'Dynamic primary color' (Get-HcColor 'DynamicPrimaryColor' '#D6B64F');return}
@@ -217,6 +265,16 @@ function Complete-NativeKeyboardInput {
 function Adjust-SelectedSlider {
     param([int]$Delta)
     $action=Get-SelectedActionObject
+    if($null -ne $action -and [string](Get-EntryProperty $action 'Id' '') -eq 'console-brightness-slider'){
+        $direction=$(if($Delta -lt 0){-10}elseif($Delta -gt 0){10}else{0})
+        $current=[int](Get-EntryProperty $script:Config 'ConsoleBrightness' 100)
+        $current=[int]([math]::Round($current/10.0)*10)
+        $value=[math]::Max(0,[math]::Min(200,$current+$direction));$script:Config.ConsoleBrightness=$value;Save-Config
+        Apply-HcConsoleBrightness
+        try{$action.Value=$value}catch{}
+        try{$control=$script:SliderControls['console-brightness-slider'];if($control){$control.Slider.Value=$value;$control.Text.Text=($value.ToString()+'%')}}catch{}
+        Invoke-UiFeedback 'Navigate';return $true
+    }
     if($null -ne $action -and [string](Get-EntryProperty $action 'Id' '') -eq 'ui-sound-volume-slider'){
         $value=[math]::Max(0,[math]::Min(100,([int](Get-EntryProperty $script:Config 'UiSoundVolume' 62))+$Delta));$script:Config.UiSoundVolume=$value;Save-Config
         foreach($player in @($script:SfxPlayers.Values)){try{$player.Volume=$value/100.0}catch{}}
@@ -290,3 +348,8 @@ function Initialize-HcCustomization {
 }
 
 Initialize-HcCustomizationConfig
+
+# Manual Recomps owns the final provider/file-picker behavior so the user can
+# add multiple native recomp games explicitly, one executable at a time.
+$script:HcManualRecompsModulePath=Join-Path $script:BaseDir 'HuymaierRecompsManual.ps1'
+if(Test-Path -LiteralPath $script:HcManualRecompsModulePath -PathType Leaf){. $script:HcManualRecompsModulePath}

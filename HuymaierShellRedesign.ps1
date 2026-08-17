@@ -779,3 +779,7 @@ function Invoke-Action {
     }
     & $script:Hc250BaseInvokeAction $Id
 }
+
+# HUYMAIER_PROVIDER_CONCURRENCY_UI_V1
+$concurrencyUi=Join-Path $script:BaseDir 'HuymaierProviderConcurrencyUi.ps1'
+if(Test-Path -LiteralPath $concurrencyUi -PathType Leaf){. $concurrencyUi}

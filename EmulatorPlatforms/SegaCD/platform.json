@@ -1,0 +1,17 @@
+{
+  "id": "segacd",
+  "displayName": "Sega CD",
+  "primaryBackend": "ares",
+  "fallbackBackend": "",
+  "adapter": "ares",
+  "interface": "Sega CD BIOS / CD-player inspired disc interface",
+  "version": "0.26.4-dev",
+  "enabled": true,
+  "gameExtensions": [
+    ".cue",
+    ".chd",
+    ".iso",
+    ".bin"
+  ],
+  "dashboardStyle": "Sega CD Model 1"
+}

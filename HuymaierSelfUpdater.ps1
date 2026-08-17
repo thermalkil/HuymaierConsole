@@ -1,7 +1,9 @@
 ﻿param(
     [Parameter(Mandatory=$true)][string]$PackagePath,
     [Parameter(Mandatory=$true)][int]$ParentProcessId,
-    [string]$InstallRoot=(Join-Path $env:LOCALAPPDATA 'Huymaier Console')
+    [string]$InstallRoot=(Join-Path $env:LOCALAPPDATA 'Huymaier Console'),
+    [switch]$FseManaged,
+    [string]$HandoffPath=''
 )
 Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
@@ -14,6 +16,8 @@ $mutex=$null
 $ownsMutex=$false
 $relaunch=''
 $success=$false
+$isFseManaged=([bool]$FseManaged -or [string]::Equals([Environment]::GetEnvironmentVariable('HUYMAIER_FSE_HOST'),'1',[StringComparison]::Ordinal))
+if($isFseManaged -and [string]::IsNullOrWhiteSpace($HandoffPath)){$HandoffPath=Join-Path $env:LOCALAPPDATA 'HuymaierConsoleFseUpdate.lock'}
 
 function Log([string]$Message,[string]$Level='INFO'){
     try{Add-Content -LiteralPath $log -Value ((Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff')+" [$Level] "+$Message) -Encoding UTF8}catch{}
@@ -48,6 +52,15 @@ function Assert-HcZipEntriesSafe {
 }
 
 try{
+    # HuymaierFSEHost marks its child Console with HUYMAIER_FSE_HOST=1. The
+    # updater inherits that environment through Start-Process, so it can arm the
+    # FSE gate itself without requiring a fragile shell-source rewrite. This file
+    # is written before waiting for the parent Console to exit.
+    if($isFseManaged){
+        [IO.File]::WriteAllText($HandoffPath,($ParentProcessId.ToString()+'|'+[DateTime]::UtcNow.ToString('o')),(New-Object Text.UTF8Encoding($false)))
+        Log "Windows FSE update handoff armed: $HandoffPath"
+    }
+
     $mutex=New-Object System.Threading.Mutex -ArgumentList $false,'Local\HuymaierConsole.Updater'
     try{
         $ownsMutex=[bool]$mutex.WaitOne(0,$false)
@@ -99,10 +112,15 @@ try{
     Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
     if($ownsMutex -and $null -ne $mutex){try{$mutex.ReleaseMutex()}catch{};$ownsMutex=$false}
     if($null -ne $mutex){try{$mutex.Dispose()}catch{};$mutex=$null}
+    if($isFseManaged -and -not [string]::IsNullOrWhiteSpace($HandoffPath)){
+        Remove-Item -LiteralPath $HandoffPath -Force -ErrorAction SilentlyContinue
+        Log 'Released Windows FSE update handoff gate.'
+    }
 }
 
-# Release the updater gate before launching the new verified host. This avoids a
-# relaunch race where the new process sees an update still in progress.
-if($relaunch){Start-Sleep -Milliseconds 250;Start-Process -FilePath $relaunch -WorkingDirectory $InstallRoot|Out-Null}
+# In Windows/Xbox FSE mode the long-lived FSE host owns the post-update relaunch.
+# Desktop launches keep the already-proven updater-owned relaunch behavior.
+if($relaunch -and -not $isFseManaged){Start-Sleep -Milliseconds 250;Start-Process -FilePath $relaunch -WorkingDirectory $InstallRoot|Out-Null}
+elseif($relaunch -and $isFseManaged){Log 'Windows FSE host owns post-update relaunch.'}
 if(-not $success){exit 1}
 exit 0

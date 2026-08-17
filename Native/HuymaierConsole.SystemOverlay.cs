@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -495,12 +495,15 @@ namespace HuymaierConsole.NativeApp
         private const uint SWP_NOSIZE = 0x0001;
         private const uint SWP_NOMOVE = 0x0002;
         private const uint SWP_SHOWWINDOW = 0x0040;
+        private const int GWLP_HWNDPARENT = -8;
         [DllImport("user32.dll", SetLastError = true)] private static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);
         [DllImport("user32.dll")] private static extern bool BringWindowToTop(IntPtr hWnd);
         [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);
         [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
         [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
         [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool attach);
+        [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)] private static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int index, IntPtr newValue);
+        [DllImport("user32.dll", EntryPoint = "SetWindowLongW", SetLastError = true)] private static extern int SetWindowLong32(IntPtr hWnd, int index, int newValue);
 
         private const int PageHome = 0;
         private const int PageSwitcher = 1;
@@ -532,6 +535,11 @@ namespace HuymaierConsole.NativeApp
         private bool closeConfirmation;
         private string lastStatus;
         private int scalePercent;
+        // HUYMAIER_EXTERNAL_GAMEBAR_OWNER_V1
+        // A native Store/UWP app can own foreground focus without giving an
+        // unrelated WPF topmost window reliable z-order. Temporarily make the
+        // Game Bar an owned top-level window of the foreground app while visible.
+        private IntPtr externalOwnerWindow;
 
         internal HuymaierGameBarWindow(Window mainConsoleWindow)
         {
@@ -642,6 +650,7 @@ namespace HuymaierConsole.NativeApp
                 IntPtr handle = new WindowInteropHelper(this).EnsureHandle();
                 if (handle != IntPtr.Zero)
                 {
+                    AttachExternalOwner(handle, targetWindow);
                     IntPtr foreground = SystemWindowCatalog.GetForegroundWindow();
                     uint foregroundPid;
                     uint foregroundThread = foreground == IntPtr.Zero ? 0 : GetWindowThreadProcessId(foreground, out foregroundPid);
@@ -666,6 +675,41 @@ namespace HuymaierConsole.NativeApp
                 if (content != null) System.Windows.Input.Keyboard.Focus(content);
             }
             catch { }
+        }
+
+        private static IntPtr SetWindowOwner(IntPtr handle, IntPtr owner)
+        {
+            if (IntPtr.Size == 8) return SetWindowLongPtr64(handle, GWLP_HWNDPARENT, owner);
+            int previous = SetWindowLong32(handle, GWLP_HWNDPARENT, owner.ToInt32());
+            return new IntPtr(previous);
+        }
+
+        private void AttachExternalOwner(IntPtr overlayHandle, IntPtr owner)
+        {
+            try
+            {
+                if (overlayHandle == IntPtr.Zero || owner == IntPtr.Zero || owner == overlayHandle) return;
+                IntPtr consoleHandle = IntPtr.Zero;
+                try { consoleHandle = new WindowInteropHelper(consoleWindow).Handle; } catch { }
+                if (owner == consoleHandle) { DetachExternalOwner(); return; }
+                if (externalOwnerWindow == owner) return;
+                if (externalOwnerWindow != IntPtr.Zero) DetachExternalOwner();
+                SetWindowOwner(overlayHandle, owner);
+                externalOwnerWindow = owner;
+            }
+            catch { externalOwnerWindow = IntPtr.Zero; }
+        }
+
+        private void DetachExternalOwner()
+        {
+            if (externalOwnerWindow == IntPtr.Zero) return;
+            try
+            {
+                IntPtr handle = new WindowInteropHelper(this).Handle;
+                if (handle != IntPtr.Zero) SetWindowOwner(handle, IntPtr.Zero);
+            }
+            catch { }
+            externalOwnerWindow = IntPtr.Zero;
         }
 
         internal void SetScalePercent(int value)
@@ -721,6 +765,7 @@ namespace HuymaierConsole.NativeApp
         internal void HideBar()
         {
             DisposeTaskPreviews(); telemetryTimer.Stop();
+            DetachExternalOwner();
             try { Hide(); } catch { }
             if (targetWindow != IntPtr.Zero) SystemWindowCatalog.Activate(targetWindow);
         }
@@ -1068,3 +1113,4 @@ namespace HuymaierConsole.NativeApp
         }
     }
 }
+

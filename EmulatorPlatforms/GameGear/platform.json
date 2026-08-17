@@ -1,0 +1,15 @@
+{
+  "id": "gamegear",
+  "displayName": "Sega Game Gear",
+  "primaryBackend": "Mesen Community Edition",
+  "fallbackBackend": "",
+  "adapter": "mesence",
+  "interface": "Game Gear handheld and cartridge interface",
+  "version": "0.26.4-dev",
+  "enabled": true,
+  "gameExtensions": [
+    ".gg",
+    ".zip"
+  ],
+  "dashboardStyle": "Game Gear"
+}

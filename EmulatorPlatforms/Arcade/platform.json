@@ -1,0 +1,16 @@
+{
+  "id": "arcade",
+  "displayName": "Arcade",
+  "primaryBackend": "MAME",
+  "fallbackBackend": "",
+  "adapter": "mame",
+  "interface": "Native arcade-cabinet library and operator interface",
+  "version": "0.26.4-dev",
+  "enabled": true,
+  "gameExtensions": [
+    ".zip",
+    ".7z",
+    ".chd"
+  ],
+  "dashboardStyle": "Arcade Cabinet"
+}

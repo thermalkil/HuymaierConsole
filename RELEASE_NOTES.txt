@@ -1,21 +1,24 @@
-Huymaier Console v0.25.6 — Settings Chooser + Windows Scale Stabilization
+Huymaier Console v0.26.3 RC3 — Authentic Console Interfaces, Emulator Setup & Artwork Reliability
 
 Changes
-- Fixes the centered choice-popup system under PowerShell StrictMode by explicitly initializing popup state before first use.
-- Quick Access location now reliably opens a centered Bottom / Top / Left / Right chooser.
-- Keyboard Theme now opens a centered Huymaier / Light / High Contrast chooser instead of calling the old cycle action.
-- Button Prompts now use a centered Auto / Xbox / PlayStation / Nintendo / Steam / Keyboard chooser.
-- Music Theme now uses a centered chooser and only offers Custom when a custom music file is configured.
-- Adds Display -> Scale as a percentage-based Windows setting with a centered chooser.
-- Display Scale writes the Windows account DPI scale setting from 100%-500% and reports when Windows sign-out is required for the selected value to apply fully.
-- When a new scale is pending, Display offers a controller-friendly Sign out to apply display scale action with confirmation.
-- Preserves the v0.25.5 fresh-PC empty-collection startup fix and richer fatal startup diagnostics.
-- Preserves Epic/Legendary live download telemetry, 7-day/20-entry download history, GitHub self-update, Windows Update, Driver Updates, Steam population, RPCS3 users, and shared Shelf/Library artwork.
+- Rebuilds Nintendo 64 around an original cartridge-console presentation inspired by the supplied classic-mini reference instead of inventing a generic BIOS/dashboard.
+- Replaces the flat GameCube approximation with a translucent animated 3D IPL-style cube. Game Play, Calendar, Memory Card, and Options are cube faces and navigation rotates the cube to the selected face.
+- Refines Wii and Wii U toward their real channel/software interfaces and keeps emulator/library/data management inside those visual languages rather than opening generic console settings pages.
+- Removes fake/nonfunctional service entries such as Wii/Switch news-style placeholders and keeps only functionality Huymaier Console can actually execute.
+- Keeps N64, GameCube, Wii, Wii U, Switch, Original Xbox, and Xbox 360 navigation spatial and local; LB/RB are not normal page/selection controls.
+- Routes emulator executable, data/cache, game-library folder, ambience, and supported save-export destinations through Huymaier Console's controller-first native file browser.
+- If an emulator is not attached, native console settings can locate an existing installation or install the latest supported upstream release.
+- Removes the previously assumed/default Dolphin Documents paths; Dolphin data is taken from the configured Huymaier data path or a portable User folder beside the selected executable.
+- Console cover art resolves emulator-provided/local cache art first, Huymaier cache second, and online console artwork only after those sources. User game/ROM files are never renamed or moved for artwork.
+- Steam installed and owned-library entries no longer intentionally carry a blank cover: local Steam library/grid artwork is preferred, then Steam-hosted portrait artwork is cached, then a deterministic cached fallback is generated if Steam artwork cannot be retrieved.
+- PS1, PS2, and PS3 visual/navigation implementations remain frozen from the v0.26.2 baseline; only emulator/data/library path and install handoff is integrated with the shared Huymaier picker.
+- Preserves the approved v0.26.2 Game Bar/Guide behavior and inherited release-blocking regression coverage.
 
 Testing focus
-1. Settings -> Huymaier Console -> Quick Access location: centered popup appears and all four locations are visible at once.
-2. Settings -> Huymaier Console -> Keyboard theme: centered popup appears; selection updates the native keyboard palette.
-3. Button Prompts and Music Theme use the same chooser behavior.
-4. Settings -> Display -> Scale: chooser opens, selected percentage is written, and the page reports current -> configured scale until Windows sign-out.
-5. Sign out action requires confirmation.
-6. Fresh/empty profile still boots without .Count failures.
+1. N64: verify cartridge carousel flow, utility/settings access, launch/return, and no generic tab UI.
+2. GameCube: verify the translucent 3D cube visibly rotates between all four faces and A/B navigation remains layered and predictable.
+3. Wii/Wii U/Switch/Xbox surfaces: verify only functional actions remain and settings look native to the current console.
+4. Every emulator: locate executable/data/game folders using Huymaier's file browser; test Install Latest on a platform with no configured emulator.
+5. Steam: refresh installed and owned library and confirm every title has a usable ArtworkPath even when local Steam library art is absent.
+6. Console art: confirm emulator-provided cover/cache files win over online artwork.
+7. Guide/Home and Huymaier Game Bar behavior must match the approved v0.26.2 release exactly.

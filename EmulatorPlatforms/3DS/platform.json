@@ -1,0 +1,31 @@
+{
+  "id": "3ds",
+  "displayName": "Nintendo 3DS",
+  "primaryBackend": "Azahar",
+  "fallbackBackend": "Azahar Nightly",
+  "adapter": "azahar",
+  "interface": "Native dual-screen Nintendo 3DS HOME Menu",
+  "version": "0.26.4-dev",
+  "enabled": true,
+  "gameExtensions": [
+    ".3ds",
+    ".cci",
+    ".cxi",
+    ".app",
+    ".zcci",
+    ".zcxi"
+  ],
+  "authenticSurfaces": [
+    "HOME Menu",
+    "Folders",
+    "Data Management",
+    "System Settings",
+    "Game Notes equivalent local metadata",
+    "Software Library"
+  ],
+  "deadServicesOmitted": [
+    "Nintendo eShop",
+    "Miiverse",
+    "SpotPass service tiles"
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "id": "nds",
+  "displayName": "Nintendo DS",
+  "primaryBackend": "melonDS",
+  "fallbackBackend": "melonDS Development",
+  "adapter": "melonds",
+  "interface": "Native Nintendo DS firmware menu",
+  "version": "0.26.4-dev",
+  "enabled": true,
+  "gameExtensions": [
+    ".nds",
+    ".srl",
+    ".zip"
+  ],
+  "authenticSurfaces": [
+    "Clock and calendar",
+    "DS Game",
+    "Settings",
+    "Download Play when locally functional",
+    "Save Data",
+    "Screen Layout"
+  ],
+  "deadServicesOmitted": [
+    "PictoChat when no local wireless chat bridge exists"
+  ]
+}

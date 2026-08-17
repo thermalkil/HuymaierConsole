@@ -36,5 +36,8 @@
   "musicAlbumCoverFromGame": true,
   "rawCdAudioPlaybackCache": true,
   "sameColumnGridNavigation": true,
-  "cdTrackEntriesHiddenFromGames": true
+  "cdTrackEntriesHiddenFromGames": true,
+  "adapter": "duckstation",
+  "primaryBackend": "DuckStation",
+  "nativeFullEmulatorSettings": true
 }

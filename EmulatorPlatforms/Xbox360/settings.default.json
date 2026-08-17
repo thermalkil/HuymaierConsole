@@ -1,7 +1,8 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "emulatorPath": "",
   "fallbackEmulatorPath": "",
+  "emulatorDataPath": "",
   "gameFolders": [],
   "startupEnabled": true,
   "startupVolume": 1.0,

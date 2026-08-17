@@ -1,0 +1,20 @@
+{
+  "id": "ps4",
+  "displayName": "PlayStation 4",
+  "primaryBackend": "shadPS4",
+  "fallbackBackend": "",
+  "adapter": "shadps4",
+  "interface": "Native PS4 Dynamic Menu-style interface",
+  "version": "0.26.4-dev",
+  "enabled": true,
+  "gameExtensions": [
+    ".pkg",
+    ".elf",
+    ".bin"
+  ],
+  "dashboardStyle": "Dynamic Menu",
+  "directoryGameDetection": [
+    "sce_sys/param.sfo",
+    "eboot.bin"
+  ]
+}

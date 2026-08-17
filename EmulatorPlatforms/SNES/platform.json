@@ -1,0 +1,18 @@
+{
+  "id": "snes",
+  "displayName": "Super Nintendo Entertainment System",
+  "primaryBackend": "Mesen Community Edition",
+  "fallbackBackend": "",
+  "adapter": "mesence",
+  "interface": "SNES control-deck and cartridge interface",
+  "version": "0.26.4-dev",
+  "enabled": true,
+  "gameExtensions": [
+    ".sfc",
+    ".smc",
+    ".fig",
+    ".swc",
+    ".zip"
+  ],
+  "dashboardStyle": "SNES Control Deck"
+}

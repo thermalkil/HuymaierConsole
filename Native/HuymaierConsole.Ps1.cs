@@ -1813,7 +1813,10 @@ namespace HuymaierConsole.NativeApp
             string biosStatus = Ps1Environment.GetBiosStatus(settings.dataRoot);
             AddActionButton(panel, "DuckStation", executableStatus, delegate { ChooseDuckStation(); });
             AddActionButton(panel, "DuckStation Data", String.IsNullOrWhiteSpace(settings.dataRoot) ? "Not detected" : settings.dataRoot, delegate { ChooseDataRoot(); });
-            AddActionButton(panel, "Install Managed DuckStation", "Install the official portable Windows build to an external folder", delegate { InstallManagedDuckStation(); });
+            AddActionButton(panel, "Install / Update DuckStation", "Install the latest supported DuckStation release through Huymaier Console", delegate { InstallManagedDuckStation(); });
+            // v0.26.4 PS1_FULL_BACKEND_SETTINGS_ACTION_BEGIN
+            AddActionButton(panel, "Full DuckStation Settings", "Every setting discovered from the installed DuckStation configuration", OpenFullDuckStationSettings);
+            // v0.26.4 PS1_FULL_BACKEND_SETTINGS_ACTION_END
             AddActionButton(panel, "BIOS", biosStatus, delegate { ImportBiosImage(); });
             AddActionButton(panel, "Open BIOS Folder", "Open DuckStation's BIOS directory", delegate { OpenBiosFolder(); });
             AddActionButton(panel, "Add Game Folder", settings.gameFolders.Count.ToString(CultureInfo.InvariantCulture) + " Huymaier folder(s) configured; DuckStation paths are also detected", delegate { AddGameFolder(); });
@@ -1860,45 +1863,20 @@ namespace HuymaierConsole.NativeApp
 
         private void ChooseDuckStation()
         {
-            OpenFileDialog dialog = new OpenFileDialog();
-            dialog.Title = "Select DuckStation";
-            dialog.Filter = "DuckStation executable (duckstation*.exe)|duckstation*.exe|Applications (*.exe)|*.exe";
-            if (dialog.ShowDialog(this) == true)
-            {
-                settings.duckStationPath = dialog.FileName;
-                if (File.Exists(Path.Combine(Path.GetDirectoryName(dialog.FileName), "portable.txt"))) settings.dataRoot = Path.GetDirectoryName(dialog.FileName);
-                else if (String.IsNullOrWhiteSpace(settings.dataRoot)) settings.dataRoot = Ps1Environment.FindDataRoot(dialog.FileName);
-                settings.Save(settingsPath);
-                RenderSettings();
-            }
+            string start = settings.duckStationPath;
+            try { if (File.Exists(start)) start = Path.GetDirectoryName(start); } catch { }
+            HuymaierNativePickerRequest.Request(this, "PS1", "PlayStation", "PrimaryEmulator", "DuckStation", start);
         }
 
         private void ChooseDataRoot()
         {
-            using (System.Windows.Forms.FolderBrowserDialog dialog = new System.Windows.Forms.FolderBrowserDialog())
-            {
-                dialog.Description = "Choose the DuckStation user data folder containing bios, covers, memcards and states";
-                if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                {
-                    settings.dataRoot = dialog.SelectedPath;
-                    settings.Save(settingsPath);
-                    RenderSettings();
-                }
-            }
+            HuymaierNativePickerRequest.Request(this, "PS1", "PlayStation", "DataRoot", "DuckStation", settings.dataRoot);
         }
 
         private void AddGameFolder()
         {
-            using (System.Windows.Forms.FolderBrowserDialog dialog = new System.Windows.Forms.FolderBrowserDialog())
-            {
-                dialog.Description = "Choose a PlayStation game folder";
-                if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                {
-                    if (!settings.gameFolders.Any(p => String.Equals(p, dialog.SelectedPath, StringComparison.OrdinalIgnoreCase))) settings.gameFolders.Add(dialog.SelectedPath);
-                    settings.Save(settingsPath);
-                    RenderSettings();
-                }
-            }
+            string start = settings.gameFolders.Count > 0 ? settings.gameFolders[settings.gameFolders.Count - 1] : settings.dataRoot;
+            HuymaierNativePickerRequest.Request(this, "PS1", "PlayStation", "GameFolder", "DuckStation", start);
         }
 
         private void ImportBiosImage()
@@ -1948,41 +1926,18 @@ namespace HuymaierConsole.NativeApp
             RenderSettings();
         }
 
+        // v0.26.4 PS1_FULL_BACKEND_SETTINGS_METHOD_BEGIN
+        private void OpenFullDuckStationSettings()
+        {
+            NativeBackendSettingsWindow.Show(this, consoleRoot, "PS1", "PlayStation", "DuckStation", settingsPath);
+            NativeConsoleNavigation.Reset();
+            RenderSettings();
+        }
+        // v0.26.4 PS1_FULL_BACKEND_SETTINGS_METHOD_END
+
         private void InstallManagedDuckStation()
         {
-            using (System.Windows.Forms.FolderBrowserDialog dialog = new System.Windows.Forms.FolderBrowserDialog())
-            {
-                dialog.Description = "Choose an external folder for DuckStation";
-                if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
-                string script = Path.Combine(consoleRoot, "Tools", "Install-Latest-DuckStation.ps1");
-                if (!File.Exists(script)) { ShowNotice("DuckStation installer helper is missing"); return; }
-                ShowNotice("Installing DuckStation…");
-                ThreadPool.QueueUserWorkItem(delegate
-                {
-                    try
-                    {
-                        ProcessStartInfo info = new ProcessStartInfo("powershell.exe", "-NoLogo -NoProfile -ExecutionPolicy Bypass -File \"" + script + "\" -DestinationRoot \"" + dialog.SelectedPath.Replace("\"", String.Empty) + "\"");
-                        info.UseShellExecute = false;
-                        info.CreateNoWindow = true;
-                        Process process = Process.Start(info);
-                        if (process != null) process.WaitForExit();
-                        string executable = Ps1Environment.FindDuckStationUnder(dialog.SelectedPath);
-                        Dispatcher.BeginInvoke(new Action(delegate
-                        {
-                            if (!String.IsNullOrWhiteSpace(executable))
-                            {
-                                settings.duckStationPath = executable;
-                                settings.dataRoot = Path.GetDirectoryName(executable);
-                                settings.Save(settingsPath);
-                                ShowNotice("DuckStation installed");
-                            }
-                            else ShowNotice("DuckStation was not found after installation");
-                            RenderSettings();
-                        }));
-                    }
-                    catch (Exception ex) { Dispatcher.BeginInvoke(new Action(delegate { ShowNotice("Install failed: " + ex.Message); })); }
-                });
-            }
+            HuymaierNativePickerRequest.Request(this, "PS1", "PlayStation", "InstallPrimaryEmulator", "DuckStation", settings.dataRoot);
         }
 
         private void OpenDuckStationBigPicture()

@@ -17,5 +17,8 @@
   "version": "0.25.0",
   "startupAsset": "Assets/Startup.mp4",
   "originalStartupVideo": true,
-  "startupAudioFromVideo": true
+  "startupAudioFromVideo": true,
+  "adapter": "rpcs3",
+  "primaryBackend": "RPCS3",
+  "nativeFullEmulatorSettings": true
 }

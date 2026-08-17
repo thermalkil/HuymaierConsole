@@ -22,6 +22,8 @@ New-Item -ItemType Directory -Force -Path $DataDir,$logDir,$ToolRoot,$ArtworkRoo
 $logPath=Join-Path $logDir "provider-$((Get-Date).ToString('yyyy-MM-dd')).log"
 $managedPath=Join-Path $DataDir 'GameProviders\managed-installs.json'
 $startedAt=(Get-Date).ToString('o')
+# HUYMAIER_PROVIDER_TRANSFER_STATE_V1
+$script:TransferId=([IO.Path]::GetFileNameWithoutExtension($StatePath) -replace '^transfer-','')
 # Live transfer telemetry. These fields are serialized with provider-state.json
 # so the full-screen Downloads page can render real byte counts, transfer rate
 # and ETA while provider tools are still running.
@@ -50,9 +52,9 @@ function Write-State{
     param([bool]$Busy,[string]$Phase,[string]$Message,[int]$Progress=-1,[string]$Error='',[switch]$Quiet)
     $state=[pscustomobject]@{
         Busy=$Busy;Provider=$Provider;Mode=$Mode;Phase=$Phase;Message=$Message;Progress=$Progress;Error=$Error;
-        GameId=$GameId;GameName=$GameName;WorkerPid=$PID;StartedAt=$startedAt;Updated=(Get-Date).ToString('o');
+        TransferId=$script:TransferId;StatePath=$StatePath;GameId=$GameId;GameName=$GameName;InstallPath=$InstallPath;WorkerPid=$PID;StartedAt=$startedAt;Updated=(Get-Date).ToString('o');
         DownloadedBytes=[int64]$script:TransferDownloadedBytes;TotalBytes=[int64]$script:TransferTotalBytes;
-        InstallSizeBytes=[int64]$script:TransferInstallSizeBytes;DownloadSpeedBytesPerSec=[double]$script:TransferSpeedBytesPerSec;
+        InstallSizeBytes=[int64]$script:TransferInstallSizeBytes;DownloadSpeedBytesPerSec=[double]$script:TransferSpeedBytesPerSec;TransferSpeedBytesPerSec=[double]$script:TransferSpeedBytesPerSec;
         EtaSeconds=[int64]$script:TransferEtaSeconds;TelemetryUpdated=[string]$script:TransferTelemetryUpdated
     }
     Write-AtomicJson $StatePath $state
@@ -61,10 +63,63 @@ function Write-State{
 function Get-Prop{param($Object,[string]$Name,$Default=$null);if($null -eq $Object){return $Default};try{$property=$Object.PSObject.Properties[$Name];if($null -ne $property -and $null -ne $property.Value){return $property.Value}}catch{};return $Default}
 function To-Array{param($Value);$list=New-Object System.Collections.ArrayList;if($null -ne $Value){try{foreach($item in $Value){[void]$list.Add($item)}}catch{[void]$list.Add($Value)}};return [object[]]$list.ToArray()}
 function Read-Catalog{if(Test-Path -LiteralPath $CatalogPath){try{return Get-Content -Raw -LiteralPath $CatalogPath|ConvertFrom-Json}catch{}};return [pscustomobject]@{Providers=@();Updated=''}}
-function Save-ProviderNode{param($Node);$catalog=Read-Catalog;$nodes=New-Object System.Collections.ArrayList;$done=$false;foreach($existing in @(Get-Prop $catalog 'Providers' @())){if([string]::Equals([string](Get-Prop $existing 'Id' ''),$Provider,[StringComparison]::OrdinalIgnoreCase)){[void]$nodes.Add($Node);$done=$true}else{[void]$nodes.Add($existing)}};if(-not $done){[void]$nodes.Add($Node)};Write-AtomicJson $CatalogPath ([pscustomobject]@{Providers=[object[]]$nodes.ToArray();Updated=(Get-Date).ToString('o')})}
+function Invoke-ProviderSharedStateLock{
+    param([scriptblock]$Action)
+    $mutex=$null
+    $acquired=$false
+    try{
+        $mutex=New-Object Threading.Mutex($false,'Local\HuymaierConsole.ProviderSharedState')
+        try{$acquired=$mutex.WaitOne(30000)}catch [Threading.AbandonedMutexException]{$acquired=$true}
+        if(-not $acquired){throw 'Timed out waiting for the provider state lock.'}
+        return & $Action
+    }finally{
+        if($acquired -and $null -ne $mutex){try{$mutex.ReleaseMutex()}catch{}}
+        if($null -ne $mutex){try{$mutex.Dispose()}catch{}}
+    }
+}
+function Save-ProviderNode{
+    param($Node)
+    Invoke-ProviderSharedStateLock {
+        $catalog=Read-Catalog
+        $nodes=New-Object System.Collections.ArrayList
+        $done=$false
+        foreach($existing in @(Get-Prop $catalog 'Providers' @())){
+            if([string]::Equals([string](Get-Prop $existing 'Id' ''),$Provider,[StringComparison]::OrdinalIgnoreCase)){
+                [void]$nodes.Add($Node)
+                $done=$true
+            }else{[void]$nodes.Add($existing)}
+        }
+        if(-not $done){[void]$nodes.Add($Node)}
+        Write-AtomicJson $CatalogPath ([pscustomobject]@{Providers=[object[]]$nodes.ToArray();Updated=(Get-Date).ToString('o')})
+    }|Out-Null
+}
 function Read-ManagedInstalls{if(Test-Path -LiteralPath $managedPath){try{return To-Array (Get-Content -Raw -LiteralPath $managedPath|ConvertFrom-Json)}catch{}};return @()}
-function Save-ManagedInstall{param([string]$Id,[string]$Name,[string]$Path);$items=New-Object System.Collections.ArrayList;$done=$false;foreach($item in @(Read-ManagedInstalls)){if([string](Get-Prop $item 'Provider' '') -eq $Provider -and [string](Get-Prop $item 'Id' '') -eq $Id){[void]$items.Add([pscustomobject]@{Provider=$Provider;Id=$Id;Name=$Name;Path=$Path;Updated=(Get-Date).ToString('o')});$done=$true}else{[void]$items.Add($item)}};if(-not $done){[void]$items.Add([pscustomobject]@{Provider=$Provider;Id=$Id;Name=$Name;Path=$Path;Updated=(Get-Date).ToString('o')})};Write-AtomicJson $managedPath ([object[]]$items.ToArray())}
-function Remove-ManagedInstall{param([string]$Id);$items=New-Object System.Collections.ArrayList;foreach($item in @(Read-ManagedInstalls)){if(-not ([string](Get-Prop $item 'Provider' '') -eq $Provider -and [string](Get-Prop $item 'Id' '') -eq $Id)){[void]$items.Add($item)}};Write-AtomicJson $managedPath ([object[]]$items.ToArray())}
+function Save-ManagedInstall{
+    param([string]$Id,[string]$Name,[string]$Path)
+    Invoke-ProviderSharedStateLock {
+        $items=New-Object System.Collections.ArrayList
+        $done=$false
+        foreach($item in @(Read-ManagedInstalls)){
+            if([string](Get-Prop $item 'Provider' '') -eq $Provider -and [string](Get-Prop $item 'Id' '') -eq $Id){
+                [void]$items.Add([pscustomobject]@{Provider=$Provider;Id=$Id;Name=$Name;Path=$Path;Updated=(Get-Date).ToString('o')})
+                $done=$true
+            }else{[void]$items.Add($item)}
+        }
+        if(-not $done){[void]$items.Add([pscustomobject]@{Provider=$Provider;Id=$Id;Name=$Name;Path=$Path;Updated=(Get-Date).ToString('o')})}
+        Write-AtomicJson $managedPath ([object[]]$items.ToArray())
+    }|Out-Null
+}
+function Remove-ManagedInstall{
+    param([string]$Id)
+    Invoke-ProviderSharedStateLock {
+        $items=New-Object System.Collections.ArrayList
+        foreach($item in @(Read-ManagedInstalls)){
+            $matches=([string](Get-Prop $item 'Provider' '') -eq $Provider -and [string](Get-Prop $item 'Id' '') -eq $Id)
+            if(-not $matches){[void]$items.Add($item)}
+        }
+        Write-AtomicJson $managedPath ([object[]]$items.ToArray())
+    }|Out-Null
+}
 function Get-ManagedInstall{param([string]$Id);foreach($item in @(Read-ManagedInstalls)){if([string](Get-Prop $item 'Provider' '') -eq $Provider -and [string](Get-Prop $item 'Id' '') -eq $Id){return $item}};return $null}
 
 
@@ -679,8 +734,8 @@ function Set-ProviderEnvironment{
 function Quote-ProcessArgument{param([string]$Value);if($null -eq $Value){return '""'};if($Value -notmatch '[\s"]'){return $Value};return '"'+($Value -replace '(\\*)"','$1$1\"' -replace '(\\+)$','$1$1')+'"'}
 function Invoke-Captured{
     param([string]$File,[string[]]$Arguments,[switch]$AllowFailure)
-    $outFile=Join-Path $env:TEMP ("huymaier-provider-out-"+[guid]::NewGuid().ToString('N')+'.txt')
-    $errFile=Join-Path $env:TEMP ("huymaier-provider-err-"+[guid]::NewGuid().ToString('N')+'.txt')
+    $captureId=([string]$script:TransferId -replace '[^A-Za-z0-9_-]','');if(-not $captureId){$captureId=[guid]::NewGuid().ToString('N')};$outFile=Join-Path $env:TEMP ("huymaier-provider-out-"+$captureId+'.txt')
+    $errFile=Join-Path $env:TEMP ("huymaier-provider-err-"+$captureId+'.txt')
     try{
         $quoted=@($Arguments|ForEach-Object{Quote-ProcessArgument ([string]$_)})
         $process=Start-Process -FilePath $File -ArgumentList $quoted -WindowStyle Hidden -Wait -PassThru -RedirectStandardOutput $outFile -RedirectStandardError $errFile
@@ -719,6 +774,22 @@ function Format-ProviderSpeedValue{
     if($BytesPerSecond -ge 1KB){return ('{0:N0} KB/s' -f ($BytesPerSecond/1KB))}
     return ('{0:N0} B/s' -f $BytesPerSecond)
 }
+function Format-ProviderEtaValue{
+    param([int64]$Seconds)
+    if($Seconds -lt 0){return 'Calculating ETAâ€¦'}
+    $span=[TimeSpan]::FromSeconds([math]::Max(0,$Seconds))
+    if($span.TotalHours -ge 1){return ('ETA {0}:{1:00}:{2:00}' -f [int]$span.TotalHours,$span.Minutes,$span.Seconds)}
+    return ('ETA {0}:{1:00}' -f [int]$span.TotalMinutes,$span.Seconds)
+}
+function Get-LegendaryTransferPhase{
+    param([string]$Text)
+    if([string]::IsNullOrWhiteSpace($Text)){return 'Downloading'}
+    $download=[regex]::Matches($Text,'(?im)\b(downloading|downloaded|download|fetching|transferring)\b')
+    $install=[regex]::Matches($Text,'(?im)\b(installing|extracting|unpacking|decompressing|applying|finalizing|finalising|writing files|installing prerequisites)\b')
+    $downloadIndex=if($download.Count -gt 0){$download[$download.Count-1].Index}else{-1}
+    $installIndex=if($install.Count -gt 0){$install[$install.Count-1].Index}else{-1}
+    return $(if($installIndex -gt $downloadIndex){'Installing'}else{'Downloading'})
+}
 function Update-LegendaryTransferTelemetry{
     param([string]$Text)
     if([string]::IsNullOrWhiteSpace($Text)){return $false}
@@ -747,7 +818,10 @@ function Update-LegendaryTransferTelemetry{
     if($changed -or $progress -ge 0){
         $amount=if($script:TransferTotalBytes -gt 0){"$(Format-ProviderByteValue $script:TransferDownloadedBytes) / $(Format-ProviderByteValue $script:TransferTotalBytes)"}elseif($script:TransferDownloadedBytes -gt 0){Format-ProviderByteValue $script:TransferDownloadedBytes}else{'Preparing download…'}
         $speed=if($script:TransferSpeedBytesPerSec -gt 0){Format-ProviderSpeedValue $script:TransferSpeedBytesPerSec}else{'Measuring speed…'}
-        Write-State $true 'Downloading' "$amount  •  $speed" $(if($progress -ge 0){$progress}else{5}) -Quiet
+        $phase=Get-LegendaryTransferPhase $Text
+        $visibleEta=if($phase -eq 'Installing'){-1}else{$script:TransferEtaSeconds}
+        $etaText=Format-ProviderEtaValue $visibleEta
+        Write-State $true $phase "$phase  â€¢  $amount  â€¢  $speed  â€¢  $etaText" $(if($progress -ge 0){$progress}else{5}) -Quiet
         return $true
     }
     return $false
@@ -1585,3 +1659,4 @@ try{
     Write-ProviderLog $_.Exception.ToString() 'ERROR'
     exit 1
 }
+

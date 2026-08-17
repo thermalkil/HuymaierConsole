@@ -1,8 +1,9 @@
-﻿{
+{
   "id": "switch",
   "displayName": "Nintendo Switch",
   "primaryBackend": "Eden",
   "fallbackBackend": "Ryubing",
   "version": "0.25.0",
-  "startupAsset": "Assets/Startup.mp4"
+  "startupAsset": "Assets/Startup.mp4",
+  "adapter": "eden"
 }

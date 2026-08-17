@@ -34,5 +34,8 @@
   "customBootAnimation": false,
   "startupAudioFromVideo": true,
   "defaultAmbienceVolume": 70,
-  "defaultNavigationVolume": 100
+  "defaultNavigationVolume": 100,
+  "adapter": "pcsx2",
+  "primaryBackend": "PCSX2",
+  "nativeFullEmulatorSettings": true
 }
