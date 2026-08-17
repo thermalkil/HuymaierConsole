@@ -49,7 +49,7 @@ function Get-Token {
 
 function Get-Headers {
     param([string]$Token,[string]$Accept='application/vnd.github+json')
-    $headers=@{'User-Agent'='HuymaierConsole/0.26.1';'Accept'=$Accept;'X-GitHub-Api-Version'='2022-11-28'}
+    $headers=@{'User-Agent'=('HuymaierConsole/'+$CurrentVersion);'Accept'=$Accept;'X-GitHub-Api-Version'='2022-11-28'}
     if($Token){$headers['Authorization']='Bearer '+$Token}
     return $headers
 }
@@ -59,6 +59,17 @@ function Parse-Version([string]$Text){
     $match=[regex]::Match($clean,'^\d+(?:\.\d+){1,3}')
     if(-not $match.Success){return [version]'0.0'}
     try{return [version]$match.Value}catch{return [version]'0.0'}
+}
+
+# Public v0.3.0 intentionally promoted the exact legacy v0.26.5 payload.  A
+# normal System.Version comparison considers 0.3.0 older than 0.26.x, which is
+# why pre-v0.3.0 installs could display the release while offering no Download
+# or Install action.  Treat v0.3.0 as the public alias of legacy v0.26.5 for
+# ordering only.  v0.30.1 and later use their real package version directly.
+function Get-HcComparableVersion([string]$Text){
+    $parsed=Parse-Version $Text
+    if($parsed.Major -eq 0 -and $parsed.Minor -eq 3 -and $parsed.Build -eq 0){return [version]'0.26.5'}
+    return $parsed
 }
 
 function Get-LatestRelease([string]$Token){
@@ -71,8 +82,13 @@ function Get-LatestRelease([string]$Token){
     }
 }
 
-function Select-PackageAsset($Release){
+function Select-PackageAsset($Release,[string]$VersionText){
     $assets=@($Release.assets)
+    $digits=([string]$VersionText).TrimStart('v','V').Replace('.','')
+    if($digits){
+        $expected='HC'+$digits+'.zip'
+        foreach($candidate in $assets){if([string]::Equals([string]$candidate.name,$expected,[StringComparison]::OrdinalIgnoreCase)){return $candidate}}
+    }
     $preferred=@($assets|Where-Object{[string]$_.name -match '(?i)^(HC|HuymaierConsole).+\.zip$'}|Sort-Object {[long]$_.size} -Descending)
     if($preferred.Count -gt 0){return $preferred[0]}
     $fallback=@($assets|Where-Object{[string]$_.name -match '(?i)\.zip$'}|Sort-Object {[long]$_.size} -Descending)
@@ -100,9 +116,9 @@ try{
     $release=Get-LatestRelease -Token $token
     $latestText=([string]$release.tag_name).Trim();if(-not $latestText){$latestText=([string]$release.name).Trim()}
     $latestVersionText=$latestText.TrimStart('v','V')
-    $current=Parse-Version $CurrentVersion
-    $latest=Parse-Version $latestVersionText
-    $asset=Select-PackageAsset $release
+    $current=Get-HcComparableVersion $CurrentVersion
+    $latest=Get-HcComparableVersion $latestVersionText
+    $asset=Select-PackageAsset -Release $release -VersionText $latestVersionText
     $sidecar=Find-SidecarAsset -Release $release -PackageAsset $asset
 
     if($null -eq $asset){
@@ -135,7 +151,7 @@ try{
     $handler=New-Object System.Net.Http.HttpClientHandler
     $handler.AllowAutoRedirect=$true
     $client=New-Object System.Net.Http.HttpClient($handler)
-    $client.DefaultRequestHeaders.UserAgent.ParseAdd('HuymaierConsole/0.26.1')
+    $client.DefaultRequestHeaders.UserAgent.ParseAdd('HuymaierConsole/'+$CurrentVersion)
     if($token){$client.DefaultRequestHeaders.Authorization=New-Object System.Net.Http.Headers.AuthenticationHeaderValue('Bearer',$token);$client.DefaultRequestHeaders.Accept.Clear();$client.DefaultRequestHeaders.Accept.Add((New-Object System.Net.Http.Headers.MediaTypeWithQualityHeaderValue('application/octet-stream')))}
     $downloadUri=if($token -and [string]$asset.url){[string]$asset.url}else{[string]$asset.browser_download_url}
     $response=$client.GetAsync($downloadUri,[System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
