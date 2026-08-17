@@ -31,4 +31,19 @@ if($nativeText -notmatch 'HUYMAIER_V0306_CONSOLE_MODEL_SCALE_CAPACITY_V1'){
     Set-Content -LiteralPath $nativePath -Value $nativeText -Encoding UTF8
 }
 
+# HUYMAIER_V0306_RESERVED_HOST_TOOLING_REPAIR_V1
+# Windows PowerShell exposes $Host as a read-only automatic variable. The full
+# console-presentation editor tooling was authored with a local $host path name;
+# normalize that standalone variable before the later transform/test executes.
+# This touches developer tooling only, never the installed runtime payload.
+foreach($toolPath in @(
+    (Join-Path $root '.build\Optimize-ConsoleModelPresentation.ps1'),
+    (Join-Path $root '.development\v0.30.6\Test-v0306-ConsoleModelPresentation.ps1')
+)){
+    if(-not(Test-Path -LiteralPath $toolPath -PathType Leaf)){continue}
+    $toolText=Get-Content -Raw -LiteralPath $toolPath -Encoding UTF8
+    $repaired=[regex]::Replace($toolText,'(?i)(?<![A-Za-z0-9_])\$host(?![A-Za-z0-9_])','$hostPath')
+    if($repaired-ne$toolText){Set-Content -LiteralPath $toolPath -Value $repaired -Encoding UTF8}
+}
+
 Write-Host 'Applied v0.30.6 console-only per-model scale renderer capacity (providers unchanged).'
