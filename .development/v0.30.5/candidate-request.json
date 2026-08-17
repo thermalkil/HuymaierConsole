@@ -1,0 +1,9 @@
+{
+  "candidate": "v0.30.5-rc1",
+  "version": "0.30.5",
+  "base_release": "v0.30.4",
+  "base_asset": "HC0304.zip",
+  "package_root": "HC0305",
+  "asset_name": "HC0305.zip",
+  "production_source": "3b93cf8357420ce4b65e0605f46349470f395ee9"
+}
