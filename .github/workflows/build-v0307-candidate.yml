@@ -138,10 +138,10 @@ jobs:
           & '.\.build\Optimize-ModelWinding.ps1'
           & '.\.build\Optimize-ConsoleModelScale.ps1'
           & '.\.build\Optimize-ConsoleModelPresentation.ps1'
+          & '.\.development\v0.30.6\Test-v0306-ConsoleModelPresentation.ps1'
           & '.\.build\Optimize-ConsoleStudioLight.ps1'
           & '.\.development\v0.30.5\Test-v0305-AdaptiveModelWinding.ps1'
           & '.\.development\v0.30.6\Test-v0306-ConsoleModelScale.ps1'
-          & '.\.development\v0.30.6\Test-v0306-ConsoleModelPresentation.ps1'
           & '.\.development\v0.30.7\Test-v0307-ConsoleStudioLight.ps1'
 
       - name: Build exact x64 FSE Home host
