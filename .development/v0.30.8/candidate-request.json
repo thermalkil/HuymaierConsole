@@ -5,7 +5,7 @@
   "base_asset": "HC0307.zip",
   "package_root": "HC0308",
   "asset_name": "HC0308.zip",
-  "production_source": "fed5b5499ff6964355cc70ad87a86535aeec88d2",
-  "attempt": 19,
+  "production_source": "491d9a8e977ed89a210ff5a88bb4482d717c04cd",
+  "attempt": 20,
   "notes": "Fixes the SteamGridDB and TheGamesDB settings-entry path so pasted values use the same masked buffer as typed values, first edits replace an existing masked value, and settings writes are atomically saved then read back before reporting success. Consolidates global keyboard completion to HuymaierStorefronts, leaves Customization with a domain handler, and removes settings persistence from BackgroundTasks. Adds dedicated input-authority and production-runtime audits, config backup recovery, and normalizes stale active User-Agent/runtime/default version strings to 0.30.8 while preserving audited live compatibility layers. Retains cover-art, background-task HUD, model auto-save, UI-authority, installer integrity, and native build-stamp work from prior candidates."
 }
