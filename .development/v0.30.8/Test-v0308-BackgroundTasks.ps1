@@ -33,7 +33,7 @@ Need ($tasks.Contains('function Get-HcBackgroundTasks')) 'common background task
 Need ($tasks.Contains('function Update-HcBackgroundTaskHud')) 'background task HUD renderer missing'
 Need ($tasks.Contains('System.Windows.Controls.ProgressBar')) 'task progress bar missing'
 Need ($tasks.Contains('$limit=[math]::Min(3,$tasks.Count)')) 'task stack is not capped at three visible jobs'
-Need ($tasks.Contains("more background task(s)")) 'overflow task count missing'
+Need ($tasks.Contains('more background task(s)')) 'overflow task count missing'
 Need ($tasks.Contains("Title='Artwork refresh'")) 'artwork task descriptor missing'
 Need ($tasks.Contains("'Library scan'")) 'library task descriptor missing'
 Need ($tasks.Contains("'Windows Update'")) 'Windows Update task descriptor missing'
@@ -45,16 +45,16 @@ Need ($tasks.Contains('Sequenced missing-artwork refresh started after library i
 Need ($tasks.Contains('$script:HcArtworkTaskScanned +=')) 'cumulative artwork scan accounting missing'
 Need ($tasks.Contains('$script:HcArtworkTaskResolved +=')) 'cumulative artwork resolved accounting missing'
 Need ($tasks.Contains('TheGamesDB key not configured')) 'HUD does not expose missing TGDB configuration'
-Need ($tasks.Contains("$Mode -in @('TheGamesDbApiKey','SteamGridDbApiKey')")) 'API key completion modes are not explicitly handled'
+Need ($tasks.Contains('$Mode -in @(''TheGamesDbApiKey'',''SteamGridDbApiKey'')')) 'API key completion modes are not explicitly handled'
 Need ($tasks.Contains('Save-Config')) 'API key completion does not persist config'
 
 Need ($shell.Contains('HUYMAIER_V0308_SEQUENCED_ARTWORK_REFRESH_V2')) 'active shell refresh sequencing marker missing'
 Need ($shell.Contains("'^storefront-manage-refresh:(.+)$' {Start-HcLibraryAndArtworkRefresh;return}")) 'active storefront refresh does not use sequenced coordinator'
-Need (-not ($shell.Contains("Start-LibraryScan;Start-OnlineArtworkScan -ResetCursor"))) 'active shell still races library scan and artwork scan'
+Need (-not ($shell.Contains('Start-LibraryScan;Start-OnlineArtworkScan -ResetCursor'))) 'active shell still races library scan and artwork scan'
 
 Need ($cursor.Contains('HUYMAIER_V0308_CURSOR_STATE_REPLACE_V2')) 'cursor state replacement fix missing'
 Need (-not ($cursor.Contains('[IO.File]::Replace($tmp,$script:HcUnifiedCursorStatePath,$null,$true)'))) 'invalid null-backup File.Replace remains'
-Need ($cursor.Contains("$backup=$script:HcUnifiedCursorStatePath+'.bak'")) 'cursor replacement does not use a valid sibling backup'
+Need ($cursor.Contains('$backup=$script:HcUnifiedCursorStatePath+''.bak''')) 'cursor replacement does not use a valid sibling backup'
 Need ($cursor.Contains('Move-Item -LiteralPath $tmp -Destination $script:HcUnifiedCursorStatePath -Force')) 'cursor replacement fallback missing'
 
 Need ($bootstrap.Contains('HuymaierBackgroundTasks.ps1')) 'startup preflight does not require background task module'
