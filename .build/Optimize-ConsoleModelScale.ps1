@@ -31,14 +31,14 @@ if($nativeText -notmatch 'HUYMAIER_V0306_CONSOLE_MODEL_SCALE_CAPACITY_V1'){
     Set-Content -LiteralPath $nativePath -Value $nativeText -Encoding UTF8
 }
 
-# HUYMAIER_V0306_RESERVED_HOST_TOOLING_REPAIR_V1
-# Windows PowerShell exposes $Host as a read-only automatic variable. The full
-# console-presentation editor tooling was authored with a local $host path name;
-# normalize that standalone variable before the later transform/test executes.
-# This touches developer tooling only, never the installed runtime payload.
+# HUYMAIER_V0306_RESERVED_HOST_TOOLING_REPAIR_V2
+# Windows PowerShell exposes $Host as a read-only automatic variable. Normalize
+# standalone developer-tool path variables before those scripts execute. This
+# never changes the installed runtime behavior or any user model/provider data.
 foreach($toolPath in @(
     (Join-Path $root '.build\Optimize-ConsoleModelPresentation.ps1'),
-    (Join-Path $root '.development\v0.30.6\Test-v0306-ConsoleModelPresentation.ps1')
+    (Join-Path $root '.development\v0.30.6\Test-v0306-ConsoleModelPresentation.ps1'),
+    (Join-Path $root '.build\Test-HuymaierV0306PresentationCandidate.ps1')
 )){
     if(-not(Test-Path -LiteralPath $toolPath -PathType Leaf)){continue}
     $toolText=Get-Content -Raw -LiteralPath $toolPath -Encoding UTF8
