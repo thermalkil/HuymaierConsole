@@ -19,8 +19,10 @@ if($end -lt 0){throw 'ConsoleSettings page boundary was not found.'}
 $block=$text.Substring($start,$end-$start)
 
 $required=@(
-    'HUYMAIER_V0308_SHELL_ARTWORK_UI_V1',
+    'HUYMAIER_V0308_SHELL_ARTWORK_UI_V2',
     "New-Action 'thegamesdb-key'",
+    "New-Action 'steamgriddb-key'",
+    "New-Action 'online-artwork-toggle'",
     "New-Action 'artwork-refresh' 'Refresh missing box art'",
     "New-Action 'artwork-retry-unresolved' 'Retry unresolved cover art'",
     "New-Action 'artwork-refresh-platform' 'Refresh current platform cover art'",
@@ -28,9 +30,11 @@ $required=@(
 )
 foreach($needle in $required){if(-not $block.Contains($needle)){throw "Active ConsoleSettings page is missing: $needle"}}
 
-$refreshPos=$block.IndexOf("New-Action 'artwork-refresh' 'Refresh missing box art'")
 $keyPos=$block.IndexOf("New-Action 'thegamesdb-key'")
+$sgdbPos=$block.IndexOf("New-Action 'steamgriddb-key'")
+$onlinePos=$block.IndexOf("New-Action 'online-artwork-toggle'")
+$refreshPos=$block.IndexOf("New-Action 'artwork-refresh' 'Refresh missing box art'")
 $retryPos=$block.IndexOf("New-Action 'artwork-retry-unresolved'")
-if($keyPos -lt 0 -or $refreshPos -lt 0 -or $retryPos -lt 0 -or -not($keyPos -lt $refreshPos -and $refreshPos -lt $retryPos)){throw 'Artwork settings controls are not ordered key -> refresh -> retry.'}
+if(-not($keyPos -lt $sgdbPos -and $sgdbPos -lt $onlinePos -and $onlinePos -lt $refreshPos -and $refreshPos -lt $retryPos)){throw 'Artwork settings controls are not ordered TGDB -> SGDB -> online -> refresh -> retry.'}
 
 Write-Host 'v0.30.8 active shell artwork UI validation passed.'
