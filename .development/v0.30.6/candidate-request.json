@@ -1,9 +1,9 @@
 {
-  "candidate": "v0.30.6-rc5",
+  "candidate": "v0.30.6-rc6",
   "version": "0.30.6",
   "base_release": "v0.30.4",
   "base_asset": "HC0304.zip",
   "package_root": "HC0306",
   "asset_name": "HC0306.zip",
-  "production_source": "9f0191ceedbdb95372a523cd1c49fd08ee2fe2d8"
+  "production_source": "1fd07939f8e86c9baba61f3cb527e47576ad4fac"
 }
