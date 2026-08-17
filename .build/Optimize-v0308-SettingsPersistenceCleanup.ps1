@@ -1,66 +1,35 @@
 param()
 Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
-# HUYMAIER_V0308_SETTINGS_PERSISTENCE_CLEANUP_TRANSFORM_V1
+# HUYMAIER_V0308_SETTINGS_PERSISTENCE_CLEANUP_TRANSFORM_V2
 $root=Split-Path -Parent $PSScriptRoot
 $lf="`n"
 function Read-Normalized([string]$Path){return ([IO.File]::ReadAllText($Path,[Text.Encoding]::UTF8).Replace("`r`n","`n"))}
 function Write-Normalized([string]$Path,[string]$Text){[IO.File]::WriteAllText($Path,$Text.Replace("`n","`r`n"),(New-Object Text.UTF8Encoding($true)))}
-function Replace-Required([string]$Text,[string]$Old,[string]$New,[string]$Label){if(-not $Text.Contains($Old)){throw "v0.30.8 settings/cleanup transform anchor missing: $Label"};return $Text.Replace($Old,$New)}
-function Replace-FunctionBlock([string]$Text,[string]$Name,[string]$Replacement){
-    $marker='function '+$Name+' {'
-    $start=$Text.IndexOf($marker,[StringComparison]::Ordinal)
-    if($start-lt0){throw "Function not found: $Name"}
-    $open=$Text.IndexOf('{',$start)
-    $depth=0;$end=-1;$quote=[char]0;$escape=$false
-    for($i=$open;$i-lt$Text.Length;$i++){
-        $ch=$Text[$i]
-        if($quote-ne[char]0){
-            if($escape){$escape=$false;continue}
-            if($ch-eq'`'){$escape=$true;continue}
-            if($ch-eq$quote){$quote=[char]0}
-            continue
-        }
-        if($ch-eq"'"-or$ch-eq'"'){$quote=$ch;continue}
-        if($ch-eq'{'){$depth++}
-        elseif($ch-eq'}'){$depth--;if($depth-eq0){$end=$i+1;break}}
-    }
-    if($end-lt0){throw "Could not locate end of function: $Name"}
-    while($end-lt$Text.Length-and($Text[$end]-eq"`r"-or$Text[$end]-eq"`n")){$end++}
+function Replace-Required([string]$Text,[string]$Old,[string]$New,[string]$Label){if(-not$Text.Contains($Old)){throw "v0.30.8 settings/cleanup transform anchor missing: $Label"};return $Text.Replace($Old,$New)}
+function Replace-Range([string]$Text,[string]$StartMarker,[string]$EndMarker,[string]$Replacement,[string]$Label){
+    $start=$Text.IndexOf($StartMarker,[StringComparison]::Ordinal);if($start-lt0){throw "Range start missing ($Label): $StartMarker"}
+    $end=$Text.IndexOf($EndMarker,$start+$StartMarker.Length,[StringComparison]::Ordinal);if($end-lt0){throw "Range end missing ($Label): $EndMarker"}
     return $Text.Remove($start,$end-$start).Insert($start,$Replacement.TrimEnd()+$lf+$lf)
 }
-function Remove-BraceBlock([string]$Text,[string]$Marker){
-    $start=$Text.IndexOf($Marker,[StringComparison]::Ordinal)
-    if($start-lt0){return $Text}
-    $open=$Text.IndexOf('{',$start);if($open-lt0){throw "Opening brace missing for $Marker"}
-    $depth=0;$end=-1;$quote=[char]0;$escape=$false
-    for($i=$open;$i-lt$Text.Length;$i++){
-        $ch=$Text[$i]
-        if($quote-ne[char]0){if($escape){$escape=$false;continue};if($ch-eq'`'){$escape=$true;continue};if($ch-eq$quote){$quote=[char]0};continue}
-        if($ch-eq"'"-or$ch-eq'"'){$quote=$ch;continue}
-        if($ch-eq'{'){$depth++}elseif($ch-eq'}'){$depth--;if($depth-eq0){$end=$i+1;break}}
-    }
-    if($end-lt0){throw "Closing brace missing for $Marker"}
-    while($end-lt$Text.Length-and($Text[$end]-eq"`r"-or$Text[$end]-eq"`n")){$end++}
-    return $Text.Remove($start,$end-$start)
-}
 
-# Core settings storage: one persistence owner, no property allowlist.
+# Core settings storage: one persistence owner, no hard-coded property allowlist.
 $corePath=Join-Path $root 'HuymaierConsole.ps1'
 $core=Read-Normalized $corePath
-if($core-notmatch'HUYMAIER_V0308_SETTINGS_STORE_CORE_V1'){
+if($core-notmatch'HUYMAIER_V0308_SETTINGS_STORE_CORE_V2'){
     $anchor='$script:BackgroundTasksModulePath = Join-Path $script:BaseDir ''HuymaierBackgroundTasks.ps1'' # HUYMAIER_V0308_BACKGROUND_TASK_CORE_V2'
-    $insert=@($anchor,'$script:SettingsStoreModulePath = Join-Path $script:BaseDir ''HuymaierSettingsStore.ps1'' # HUYMAIER_V0308_SETTINGS_STORE_CORE_V1')-join$lf
-    $core=Replace-Required $core $anchor $insert 'settings store path'
+    $core=Replace-Required $core $anchor (@($anchor,'$script:SettingsStoreModulePath = Join-Path $script:BaseDir ''HuymaierSettingsStore.ps1'' # HUYMAIER_V0308_SETTINGS_STORE_CORE_V2')-join$lf) 'settings store path'
     $anchor='function New-DefaultConfig {'
-    $insert=@('if (Test-Path -LiteralPath $script:SettingsStoreModulePath) {','    try { . $script:SettingsStoreModulePath; Repair-HcSettingsStoreArtifacts -Path $script:ConfigPath }','    catch { Write-Log "Settings store load failed: $($_.Exception.Message)" ''ERROR'' }','}',$anchor)-join$lf
-    $core=Replace-Required $core $anchor $insert 'settings store early load'
-    if($core-notmatch'ConfigSchemaVersion = 2'){
-        $core=Replace-Required $core "    [pscustomobject]@{`n        BrowserName = ''" "    [pscustomobject]@{`n        ConfigSchemaVersion = 2`n        BrowserName = ''" 'config schema default'
-    }
-    if($core-notmatch'ConsoleBrightness = 100'){
-        $core=Replace-Required $core '        UiSoundVolume = 62' "        UiSoundVolume = 62`n        ConsoleBrightness = 100" 'console brightness default'
-    }
+    $loadStore=@'
+if (Test-Path -LiteralPath $script:SettingsStoreModulePath) {
+    try { . $script:SettingsStoreModulePath; Repair-HcSettingsStoreArtifacts -Path $script:ConfigPath }
+    catch { Write-Log "Settings store load failed: $($_.Exception.Message)" 'ERROR' }
+}
+function New-DefaultConfig {
+'@
+    $core=Replace-Required $core $anchor $loadStore.TrimEnd() 'settings store early load'
+    if($core-notmatch'ConfigSchemaVersion = 2'){$core=Replace-Required $core "    [pscustomobject]@{`n        BrowserName = ''" "    [pscustomobject]@{`n        ConfigSchemaVersion = 2`n        BrowserName = ''" 'config schema default'}
+    if($core-notmatch'ConsoleBrightness = 100'){$core=Replace-Required $core '        UiSoundVolume = 62' "        UiSoundVolume = 62`n        ConsoleBrightness = 100" 'console brightness default'}
     $load=@'
 function Load-Config {
     $defaults=New-DefaultConfig
@@ -81,7 +50,7 @@ function Load-Config {
     return $defaults
 }
 '@
-    $core=Replace-FunctionBlock $core 'Load-Config' $load
+    $core=Replace-Range $core 'function Load-Config {' 'function Save-Config {' $load 'core config loader'
     $save=@'
 function Save-Config {
     try{
@@ -89,33 +58,40 @@ function Save-Config {
     }catch{Write-Log "Config save failed: $($_.Exception.Message)" 'ERROR'}
 }
 '@
-    $core=Replace-FunctionBlock $core 'Save-Config' $save
-    $anchor="        Save-Config`n        Write-Log 'Huymaier Console closed.'"
-    $insert="        try{if(Get-Command Flush-HcModelEditorAutoSave -ErrorAction SilentlyContinue){Flush-HcModelEditorAutoSave}}catch{Write-Log \"3D model settings flush on close failed: `$(`$_.Exception.Message)\" 'WARN'}`n        Save-Config`n        Write-Log 'Huymaier Console closed.'"
+    $core=Replace-Range $core 'function Save-Config {' '$script:Config = Load-Config' $save 'core config writer'
+    $anchor=@'
+        Save-Config
+        Write-Log 'Huymaier Console closed.'
+'@
+    $insert=@'
+        try{if(Get-Command Flush-HcModelEditorAutoSave -ErrorAction SilentlyContinue){Flush-HcModelEditorAutoSave}}catch{Write-Log "3D model settings flush on close failed: $($_.Exception.Message)" 'WARN'}
+        Save-Config
+        Write-Log 'Huymaier Console closed.'
+'@
     $core=Replace-Required $core $anchor $insert 'shutdown settings flush'
 }
 Write-Normalized $corePath $core
 
-# Remove the old ConsoleBrightness raw-config workaround. Dynamic merge now owns it.
+# Dynamic core merge makes the old ConsoleBrightness raw-file recovery obsolete.
 $customPath=Join-Path $root 'HuymaierCustomization.ps1'
 $custom=Read-Normalized $customPath
-if($custom-notmatch'HUYMAIER_V0308_SETTINGS_DYNAMIC_MERGE_V1'){
-    $marker="    if(`$null -eq `$script:Config.PSObject.Properties['ConsoleBrightness']){"
-    if($custom.Contains($marker)){$custom=Remove-BraceBlock $custom $marker}
+if($custom-notmatch'HUYMAIER_V0308_SETTINGS_DYNAMIC_MERGE_V2'){
+    $startMarker="    if(`$null -eq `$script:Config.PSObject.Properties['ConsoleBrightness']){"
+    $endMarker='    try{$script:Config.UiSoundVolume='
+    $start=$custom.IndexOf($startMarker,[StringComparison]::Ordinal)
+    if($start-ge0){$end=$custom.IndexOf($endMarker,$start,[StringComparison]::Ordinal);if($end-lt0){throw 'ConsoleBrightness workaround end anchor missing.'};$custom=$custom.Remove($start,$end-$start)}
     $anchor="    Add-HcCustomizationConfigProperty 'UiSoundVolume' 62"
-    $insert=@($anchor,"    Add-HcCustomizationConfigProperty 'ConsoleBrightness' 100 # HUYMAIER_V0308_SETTINGS_DYNAMIC_MERGE_V1")-join$lf
-    $custom=Replace-Required $custom $anchor $insert 'customization brightness default'
+    $custom=Replace-Required $custom $anchor (@($anchor,"    Add-HcCustomizationConfigProperty 'ConsoleBrightness' 100 # HUYMAIER_V0308_SETTINGS_DYNAMIC_MERGE_V2")-join$lf) 'customization brightness default'
 }
 Write-Normalized $customPath $custom
 
-# Model editor settings auto-save after a short idle period. Explicit Cancel still
-# restores and persists the original snapshot, so auto-save does not remove undo.
+# Advanced per-console 3D presentation auto-saves after 650 ms idle. Cancel is
+# still a real cancel: it restores and persists the original snapshot.
 $modelPath=Join-Path $root 'HuymaierConsoleModelPresentation.ps1'
 $model=Read-Normalized $modelPath
-if($model-notmatch'HUYMAIER_V0308_MODEL_SETTINGS_AUTOSAVE_V1'){
+if($model-notmatch'HUYMAIER_V0308_MODEL_SETTINGS_AUTOSAVE_V2'){
     $anchor='$script:HcModelEditorFanPercent=100'
-    $insert=@($anchor,'$script:HcModelEditorAutoSaveTimer=$null # HUYMAIER_V0308_MODEL_SETTINGS_AUTOSAVE_V1','$script:HcModelEditorAutoSaveDirty=$false')-join$lf
-    $model=Replace-Required $model $anchor $insert 'model autosave state'
+    $model=Replace-Required $model $anchor (@($anchor,'$script:HcModelEditorAutoSaveTimer=$null # HUYMAIER_V0308_MODEL_SETTINGS_AUTOSAVE_V2','$script:HcModelEditorAutoSaveDirty=$false')-join$lf) 'model autosave state'
     $anchor='function Get-HcModelEditorValueText {'
     $helpers=@'
 function Save-HcModelViewSnapshotToConfig {
@@ -130,18 +106,14 @@ function Initialize-HcModelEditorAutoSave {
     $timer.Add_Tick({
         try{
             $script:HcModelEditorAutoSaveTimer.Stop()
-            if($script:HcModelEditorAutoSaveDirty-and$script:HcModelEditorActive){
-                $script:HcModelEditorAutoSaveDirty=$false
-                [void](Save-HcModelViewSnapshotToConfig (Get-HcModelEditorCurrentView))
-            }
+            if($script:HcModelEditorAutoSaveDirty-and$script:HcModelEditorActive){$script:HcModelEditorAutoSaveDirty=$false;[void](Save-HcModelViewSnapshotToConfig (Get-HcModelEditorCurrentView))}
         }catch{try{Write-Log ('3D model auto-save recovered: '+$_.Exception.Message) 'WARN'}catch{}}
     })
     $script:HcModelEditorAutoSaveTimer=$timer
 }
 function Queue-HcModelEditorAutoSave {
     if(-not$script:HcModelEditorActive){return}
-    Initialize-HcModelEditorAutoSave
-    $script:HcModelEditorAutoSaveDirty=$true
+    Initialize-HcModelEditorAutoSave;$script:HcModelEditorAutoSaveDirty=$true
     $script:HcModelEditorAutoSaveTimer.Stop();$script:HcModelEditorAutoSaveTimer.Start()
 }
 function Stop-HcModelEditorAutoSave {
@@ -151,16 +123,11 @@ function Stop-HcModelEditorAutoSave {
 }
 function Flush-HcModelEditorAutoSave {
     if($null-ne$script:HcModelEditorAutoSaveTimer){$script:HcModelEditorAutoSaveTimer.Stop()}
-    if($script:HcModelEditorAutoSaveDirty-and$script:HcModelEditorActive){
-        $script:HcModelEditorAutoSaveDirty=$false
-        [void](Save-HcModelViewSnapshotToConfig (Get-HcModelEditorCurrentView))
-    }
+    if($script:HcModelEditorAutoSaveDirty-and$script:HcModelEditorActive){$script:HcModelEditorAutoSaveDirty=$false;[void](Save-HcModelViewSnapshotToConfig (Get-HcModelEditorCurrentView))}
 }
 
 '@
     $model=Replace-Required $model $anchor ($helpers+$anchor) 'model autosave helpers'
-    $model=$model.Replace('    $script:HcModelViewerSpin=$false;Update-HcGpuModelViewerItem;Update-HcModelEditorChrome'+$lf+'}', '    $script:HcModelViewerSpin=$false;Queue-HcModelEditorAutoSave;Update-HcGpuModelViewerItem;Update-HcModelEditorChrome'+$lf+'}')
-    if($model-notmatch'Queue-HcModelEditorAutoSave;Update-HcGpuModelViewerItem'){throw 'Model adjustment auto-save hook was not installed.'}
     $saveFn=@'
 function Save-HcModelOrientationEditor {
     if(-not$script:HcModelEditorActive){return}
@@ -170,7 +137,7 @@ function Save-HcModelOrientationEditor {
     $script:HcModelEditorOriginalView=Get-HcActiveModelDefaultView;$script:HcModelEditorActive=$false;$script:HcModelViewerSpin=([int]$script:HcModelEditorFanPercent-gt0);Update-HcGpuModelViewerItem;Update-HcModelEditorChrome;try{Update-HcGpuShelfLayout}catch{}
 }
 '@
-    $model=Replace-FunctionBlock $model 'Save-HcModelOrientationEditor' $saveFn
+    $model=Replace-Range $model 'function Save-HcModelOrientationEditor {' 'function Reset-HcModelOrientationEditor {' $saveFn 'model explicit save'
     $resetFn=@'
 function Reset-HcModelOrientationEditor {
     if(-not$script:HcModelViewerActive-or-not(Test-HcConsoleModelPresentationEditable ([string]$script:HcModelViewerPlatform))){return}
@@ -178,19 +145,51 @@ function Reset-HcModelOrientationEditor {
     Reset-HcModelDefaultView ([string]$script:HcModelViewerModelPath) ([string]$script:HcModelViewerPlatform);$defaults=Get-HcModelDefaultView ([string]$script:HcModelViewerModelPath) ([string]$script:HcModelViewerPlatform);Set-HcModelPresentationStateFromView $defaults;$script:HcModelEditorOriginalView=$defaults;$script:HcModelEditorActive=$false;$script:HcModelViewerSpin=$true;Update-HcGpuModelViewerItem;Update-HcModelEditorChrome;try{Update-HcGpuShelfLayout}catch{};try{Set-ConsoleNotice ('Reset 3D presentation for '+$script:HcModelViewerPlatform+'.') 'INFO'}catch{}
 }
 '@
-    $model=Replace-FunctionBlock $model 'Reset-HcModelOrientationEditor' $resetFn
+    $model=Replace-Range $model 'function Reset-HcModelOrientationEditor {' 'function Cancel-HcModelOrientationEditor {' $resetFn 'model reset'
     $cancelFn=@'
 function Cancel-HcModelOrientationEditor {
     if(-not$script:HcModelEditorActive){return}
     Stop-HcModelEditorAutoSave -Discard
-    if($script:HcModelEditorOriginalView){
-        Set-HcModelPresentationStateFromView $script:HcModelEditorOriginalView
-        [void](Save-HcModelViewSnapshotToConfig $script:HcModelEditorOriginalView)
-    }
+    if($script:HcModelEditorOriginalView){Set-HcModelPresentationStateFromView $script:HcModelEditorOriginalView;[void](Save-HcModelViewSnapshotToConfig $script:HcModelEditorOriginalView)}
     $script:HcModelEditorActive=$false;$script:HcModelViewerSpin=([int]$script:HcModelEditorFanPercent-gt0);Update-HcGpuModelViewerItem;Update-HcModelEditorChrome
 }
 '@
-    $model=Replace-FunctionBlock $model 'Cancel-HcModelOrientationEditor' $cancelFn
+    $model=Replace-Range $model 'function Cancel-HcModelOrientationEditor {' 'function Step-HcModelEditorField' $cancelFn 'model cancel'
+    $adjust=@'
+function Adjust-HcModelEditorField {
+    param([int]$Delta)
+    if($Delta-eq0){return};$field=[string]$script:HcModelEditorFields[[int]$script:HcModelEditorFieldIndex]
+    switch($field){
+        'Yaw'{$script:HcModelViewerYaw=Normalize-HcModelYaw ([double]$script:HcModelViewerYaw+5*$Delta)}
+        'Pitch'{$script:HcModelViewerPitch=[math]::Max(-80.0,[math]::Min(80.0,[double]$script:HcModelViewerPitch+5*$Delta))}
+        'Roll'{$script:HcModelEditorRoll=Normalize-HcModelRoll ([double]$script:HcModelEditorRoll+5*$Delta)}
+        'Scale'{Set-HcActiveConsoleModelViewerScale ([int]$script:HcModelEditorScalePercent+10*$Delta)}
+        'Position X'{$script:HcModelEditorOffsetX=Normalize-HcModelOffset ([int]$script:HcModelEditorOffsetX+5*$Delta)}
+        'Position Y'{$script:HcModelEditorOffsetY=Normalize-HcModelOffset ([int]$script:HcModelEditorOffsetY+5*$Delta)}
+        'Mirror X'{$script:HcModelEditorMirrorX=-not[bool]$script:HcModelEditorMirrorX}
+        'Mirror Y'{$script:HcModelEditorMirrorY=-not[bool]$script:HcModelEditorMirrorY}
+        'Mirror Z'{$script:HcModelEditorMirrorZ=-not[bool]$script:HcModelEditorMirrorZ}
+        'Faces'{if($Delta-gt0){$script:HcModelEditorFaceMode=$(switch($script:HcModelEditorFaceMode){'Normal'{'Reverse'}'Reverse'{'TwoSided'}default{'Normal'}})}else{$script:HcModelEditorFaceMode=$(switch($script:HcModelEditorFaceMode){'Normal'{'TwoSided'}'TwoSided'{'Reverse'}default{'Normal'}})}}
+        'Lighting'{$script:HcModelEditorLightPercent=Normalize-HcModelLightPercent ([int]$script:HcModelEditorLightPercent+10*$Delta)}
+        'Light brightness'{$script:HcModelEditorKeyLightPercent=Normalize-HcModelKeyLightPercent ([int]$script:HcModelEditorKeyLightPercent+10*$Delta)}
+        'Light azimuth'{$script:HcModelEditorLightAzimuth=Normalize-HcModelLightAzimuth ([int]$script:HcModelEditorLightAzimuth+$Delta)}
+        'Light elevation'{$script:HcModelEditorLightElevation=Normalize-HcModelLightElevation ([int]$script:HcModelEditorLightElevation+$Delta)}
+        'Light distance'{$script:HcModelEditorLightDistance=Normalize-HcModelLightDistance ([double]$script:HcModelEditorLightDistance+0.25*$Delta)}
+        'Light aim X'{$script:HcModelEditorLightAimXPercent=Normalize-HcModelLightAimPercent ([int]$script:HcModelEditorLightAimXPercent+5*$Delta)}
+        'Light aim Y'{$script:HcModelEditorLightAimYPercent=Normalize-HcModelLightAimPercent ([int]$script:HcModelEditorLightAimYPercent+5*$Delta)}
+        'Cone size'{$script:HcModelEditorConeDegrees=Normalize-HcModelConeDegrees ([int]$script:HcModelEditorConeDegrees+5*$Delta)}
+        'Cone softness'{$script:HcModelEditorConeSoftnessPercent=Normalize-HcModelConeSoftnessPercent ([int]$script:HcModelEditorConeSoftnessPercent+5*$Delta)}
+        'Light falloff'{$script:HcModelEditorFalloffPercent=Normalize-HcModelFalloffPercent ([int]$script:HcModelEditorFalloffPercent+10*$Delta)}
+        'Light temp'{$script:HcModelEditorLightTemperature=Normalize-HcModelLightTemperature ([int]$script:HcModelEditorLightTemperature+100*$Delta)}
+        'Ambient'{$script:HcModelEditorAmbientPercent=Normalize-HcModelAmbientPercent ([int]$script:HcModelEditorAmbientPercent+10*$Delta)}
+        'Specular'{$script:HcModelEditorSpecularPercent=Normalize-HcModelSpecularPercent ([int]$script:HcModelEditorSpecularPercent+10*$Delta)}
+        'Highlight size'{$script:HcModelEditorHighlightSizePercent=Normalize-HcModelHighlightSizePercent ([int]$script:HcModelEditorHighlightSizePercent+25*$Delta)}
+        'Fan motion'{$script:HcModelEditorFanPercent=Normalize-HcModelFanPercent ([int]$script:HcModelEditorFanPercent+10*$Delta)}
+    }
+    $script:HcModelViewerSpin=$false;Queue-HcModelEditorAutoSave;Update-HcGpuModelViewerItem;Update-HcModelEditorChrome
+}
+'@
+    $model=Replace-Range $model 'function Adjust-HcModelEditorField {' 'function Open-HcPlatformModelViewer {' $adjust 'model adjustment autosave'
     $closeFn=@'
 function Close-HcPlatformModelViewer {
     if($script:HcModelEditorActive){Flush-HcModelEditorAutoSave}
@@ -199,49 +198,44 @@ function Close-HcPlatformModelViewer {
     & $script:HcPresentationBaseCloseViewer
 }
 '@
-    $model=Replace-FunctionBlock $model 'Close-HcPlatformModelViewer' $closeFn
+    $model=Replace-Range $model 'function Close-HcPlatformModelViewer {' 'function Apply-ControllerNavigation {' $closeFn 'model viewer close flush'
 }
 Write-Normalized $modelPath $model
 
-# Bootstrap + installer know the settings store is a required production module.
+# Bootstrap + installer treat the settings store as mandatory production code.
 $bootstrapPath=Join-Path $root 'HuymaierBootstrap.ps1'
 $bootstrap=Read-Normalized $bootstrapPath
-if($bootstrap-notmatch'HUYMAIER_V0308_SETTINGS_STORE_PREFLIGHT_V1'){
+if($bootstrap-notmatch'HUYMAIER_V0308_SETTINGS_STORE_PREFLIGHT_V2'){
     $anchor='$backgroundTasksPath=Join-Path $baseDir ''HuymaierBackgroundTasks.ps1'' # HUYMAIER_V0308_BACKGROUND_TASK_PREFLIGHT_V2'
-    $insert=@($anchor,'$settingsStorePath=Join-Path $baseDir ''HuymaierSettingsStore.ps1'' # HUYMAIER_V0308_SETTINGS_STORE_PREFLIGHT_V1')-join$lf
-    $bootstrap=Replace-Required $bootstrap $anchor $insert 'settings preflight path'
+    $bootstrap=Replace-Required $bootstrap $anchor (@($anchor,'$settingsStorePath=Join-Path $baseDir ''HuymaierSettingsStore.ps1'' # HUYMAIER_V0308_SETTINGS_STORE_PREFLIGHT_V2')-join$lf) 'settings preflight path'
     $anchor="        [pscustomobject]@{Path=`$backgroundTasksPath;Label='Background task HUD and coordinator'},"
-    $insert=@($anchor,"        [pscustomobject]@{Path=`$settingsStorePath;Label='Central settings persistence store'},")-join$lf
-    $bootstrap=Replace-Required $bootstrap $anchor $insert 'settings preflight entry'
+    $bootstrap=Replace-Required $bootstrap $anchor (@($anchor,"        [pscustomobject]@{Path=`$settingsStorePath;Label='Central settings persistence store'},")-join$lf) 'settings preflight entry'
 }
 Write-Normalized $bootstrapPath $bootstrap
 
 $installerPath=Join-Path $root 'Install-HuymaierConsole.ps1'
 $installer=Read-Normalized $installerPath
-if($installer-notmatch'HUYMAIER_V0308_SETTINGS_STORE_INSTALLER_V1'){
+if($installer-notmatch'HUYMAIER_V0308_SETTINGS_STORE_INSTALLER_V2'){
     $anchor="            'HuymaierBackgroundTasks.ps1', # HUYMAIER_V0308_BACKGROUND_TASK_INSTALLER_V2"
-    $insert=@($anchor,"            'HuymaierSettingsStore.ps1', # HUYMAIER_V0308_SETTINGS_STORE_INSTALLER_V1")-join$lf
-    $installer=Replace-Required $installer $anchor $insert 'settings installer preflight cache'
+    $installer=Replace-Required $installer $anchor (@($anchor,"            'HuymaierSettingsStore.ps1', # HUYMAIER_V0308_SETTINGS_STORE_INSTALLER_V2")-join$lf) 'settings installer cache'
 }
 Write-Normalized $installerPath $installer
 
 $installerCorePath=Join-Path $root 'HuymaierInstallerCore.ps1'
 $installerCore=Read-Normalized $installerCorePath
-if($installerCore-notmatch'HUYMAIER_V0308_SETTINGS_STORE_REQUIRED_V1'){
+if($installerCore-notmatch'HUYMAIER_V0308_SETTINGS_STORE_REQUIRED_V2'){
     $anchor="'HuymaierArtworkSources.ps1','HuymaierArtworkSourcesTgdbSchema.ps1','HuymaierArtworkManagement.ps1','HuymaierBackgroundTasks.ps1','HuymaierGameBar.ps1', # HUYMAIER_V0308_ARTWORK_INSTALLER_REQUIRED_V2 HUYMAIER_V0308_BACKGROUND_TASK_REQUIRED_V2"
-    $insert="'HuymaierArtworkSources.ps1','HuymaierArtworkSourcesTgdbSchema.ps1','HuymaierArtworkManagement.ps1','HuymaierBackgroundTasks.ps1','HuymaierSettingsStore.ps1','HuymaierGameBar.ps1', # HUYMAIER_V0308_ARTWORK_INSTALLER_REQUIRED_V2 HUYMAIER_V0308_BACKGROUND_TASK_REQUIRED_V2 HUYMAIER_V0308_SETTINGS_STORE_REQUIRED_V1"
+    $insert="'HuymaierArtworkSources.ps1','HuymaierArtworkSourcesTgdbSchema.ps1','HuymaierArtworkManagement.ps1','HuymaierBackgroundTasks.ps1','HuymaierSettingsStore.ps1','HuymaierGameBar.ps1', # HUYMAIER_V0308_ARTWORK_INSTALLER_REQUIRED_V2 HUYMAIER_V0308_BACKGROUND_TASK_REQUIRED_V2 HUYMAIER_V0308_SETTINGS_STORE_REQUIRED_V2"
     $installerCore=Replace-Required $installerCore $anchor $insert 'settings required payload'
     $anchor="    'Native\\GuideBridge\\HuymaierGuideBridge.cpp'"
-    $insert=@($anchor,"    'HuymaierV0262Hardening.ps1',","    'HuymaierV0262ProviderRuntime.ps1',","    'HuymaierV0262Runtime.ps1'")-join$lf
-    $installerCore=Replace-Required $installerCore $anchor $insert 'retired runtime installer cleanup'
+    $installerCore=Replace-Required $installerCore $anchor (@($anchor+",","    'HuymaierV0262Hardening.ps1',","    'HuymaierV0262ProviderRuntime.ps1',","    'HuymaierV0262Runtime.ps1'")-join$lf) 'retired installed runtime cleanup'
 }
 Write-Normalized $installerCorePath $installerCore
 
-# Retire unreferenced v0.26.2 compatibility payload. Fail closed if any active
-# production source still names one of these files.
+# Retire only compatibility scripts proven to have no active production reference.
 $retired=@('HuymaierV0262Hardening.ps1','HuymaierV0262ProviderRuntime.ps1','HuymaierV0262Runtime.ps1')
 $productionFiles=@(Get-ChildItem -LiteralPath $root -Recurse -File -ErrorAction Stop|Where-Object{
-    $rel=$_.FullName.Substring($root.Length).TrimStart('\\','/').Replace('\\','/')
+    $rel=$_.FullName.Substring($root.Length).TrimStart([char[]]'\/').Replace('\','/')
     $rel-notmatch '^(\.git/|\.github/|\.development/|\.build/|\.release/|\.source/|Docs/)' -and $_.Extension -in @('.ps1','.psm1','.psd1','.cs','.cpp','.h','.json','.cmd')
 })
 foreach($name in $retired){
@@ -254,12 +248,13 @@ foreach($name in $retired){
     Remove-Item -LiteralPath (Join-Path $root $name) -Force -ErrorAction SilentlyContinue
 }
 
+# Immutable v0.30.7 staging may contain those retired files; strip them there too.
 $buildPath=Join-Path $root '.build/Build-HuymaierReleaseCandidate.ps1'
 $build=Read-Normalized $buildPath
-if($build-notmatch'HUYMAIER_V0308_RETIRED_RUNTIME_CLEANUP_V1'){
+if($build-notmatch'HUYMAIER_V0308_RETIRED_RUNTIME_CLEANUP_V2'){
     $anchor="    'Native\\GuideBridge'"
-    $insert=@($anchor+", # HUYMAIER_V0308_RETIRED_RUNTIME_CLEANUP_V1","    'HuymaierV0262Hardening.ps1',","    'HuymaierV0262ProviderRuntime.ps1',","    'HuymaierV0262Runtime.ps1'")-join$lf
-    $build=Replace-Required $build $anchor $insert 'candidate retired runtime strip list'
+    $first=$anchor+", # HUYMAIER_V0308_RETIRED_RUNTIME_CLEANUP_V2"
+    $build=Replace-Required $build $anchor (@($first,"    'HuymaierV0262Hardening.ps1',","    'HuymaierV0262ProviderRuntime.ps1',","    'HuymaierV0262Runtime.ps1'")-join$lf) 'candidate retired runtime strip list'
 }
 Write-Normalized $buildPath $build
 
