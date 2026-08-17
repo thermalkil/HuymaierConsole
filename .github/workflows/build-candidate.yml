@@ -1,15 +1,15 @@
-name: Build Huymaier Console Candidate
+name: Build and Publish Huymaier Console v0.30.2
 
 on:
   push:
-    branches: [feature/v0.30.1-brightness-fan-motion]
-    paths: ['.development/v0.30.1/candidate-request.json']
+    branches: [feature/v0.30.2-console-brightness]
+    paths: ['.development/v0.30.2/candidate-request.json']
 
 permissions:
   contents: write
 
 concurrency:
-  group: huymaier-console-v0301-candidate
+  group: huymaier-console-v0302-release
   cancel-in-progress: false
 
 jobs:
@@ -22,19 +22,19 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
 
-      - name: Read and validate candidate request
+      - name: Read and validate release request
         id: request
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
-          $path='.development\v0.30.1\candidate-request.json'
+          $path='.development\v0.30.2\candidate-request.json'
           $data=Get-Content -Raw -LiteralPath $path -Encoding UTF8|ConvertFrom-Json
           foreach($required in @('candidate','version','base_release','base_asset','package_root','asset_name','production_source')){
-            if([string]::IsNullOrWhiteSpace([string]$data.$required)){throw "Candidate request missing $required"}
+            if([string]::IsNullOrWhiteSpace([string]$data.$required)){throw "Release request missing $required"}
           }
-          if([string]$data.version -ne '0.30.1'){throw 'Candidate version must be 0.30.1.'}
-          if([string]$data.base_release -ne 'v0.3.0' -or [string]$data.base_asset -ne 'HC265.zip'){throw 'v0.30.1 must stage from the published v0.3.0 / HC265.zip baseline.'}
-          if([string]$data.package_root -ne 'HC0301' -or [string]$data.asset_name -ne 'HC0301.zip'){throw 'v0.30.1 package identity must be HC0301 / HC0301.zip.'}
+          if([string]$data.version -ne '0.30.2'){throw 'Release version must be 0.30.2.'}
+          if([string]$data.base_release -ne 'v0.3.0' -or [string]$data.base_asset -ne 'HC265.zip'){throw 'v0.30.2 must stage cumulatively from the published v0.3.0 / HC265.zip runtime baseline.'}
+          if([string]$data.package_root -ne 'HC0302' -or [string]$data.asset_name -ne 'HC0302.zip'){throw 'v0.30.2 package identity must be HC0302 / HC0302.zip.'}
           $parent=(& git rev-parse HEAD^).Trim()
           if([string]$data.production_source -ne $parent){throw "production_source $($data.production_source) is not the exact request parent $parent"}
           "path=$path"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
@@ -43,7 +43,7 @@ jobs:
           "package_root=$([string]$data.package_root)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
           "production_source=$([string]$data.production_source)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
-      - name: Parse release and v0.30.1 PowerShell
+      - name: Parse release and v0.30.2 PowerShell
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
@@ -51,13 +51,16 @@ jobs:
             '.\.build\Set-HuymaierCandidateVersion.ps1',
             '.\.build\Build-HuymaierReleaseCandidate.ps1',
             '.\.build\Build-HuymaierReleaseCandidate.Core.ps1',
+            '.\.build\Optimize-ConsoleBrightness.ps1',
             '.\.build\Test-HuymaierCandidate.ps1',
-            '.\.build\Test-HuymaierV0301Candidate.ps1',
+            '.\.build\Test-HuymaierV0302Candidate.ps1',
             '.\.development\v0.30.1\Test-v0301-Presentation.ps1',
             '.\.development\v0.30.1\Test-v0301-SelfUpdate.ps1',
+            '.\.development\v0.30.2\Test-v0302-ConsoleBrightness.ps1',
             '.\HuymaierConsoleUpdateWorker.ps1',
             '.\HuymaierSelfUpdater.ps1',
             '.\HuymaierShellRedesign.ps1',
+            '.\HuymaierCustomization.ps1',
             '.\HuymaierUser3DModels.ps1'
           )
           foreach($p in $paths){
@@ -66,12 +69,19 @@ jobs:
             if($errors.Count){$errors|ForEach-Object{Write-Host "$p : $($_.Message)"};throw "$p failed Windows PowerShell parse"}
           }
 
-      - name: Run v0.30.1 source gates
+      - name: Run v0.30.1 carry-forward source gates
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
           & '.\.development\v0.30.1\Test-v0301-Presentation.ps1'
           & '.\.development\v0.30.1\Test-v0301-SelfUpdate.ps1'
+
+      - name: Apply and test v0.30.2 console brightness
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          & '.\.build\Optimize-ConsoleBrightness.ps1' -CustomizationPath '.\HuymaierCustomization.ps1'
+          & '.\.development\v0.30.2\Test-v0302-ConsoleBrightness.ps1'
 
       - name: Run carry-forward stabilization gates
         shell: powershell
@@ -93,11 +103,6 @@ jobs:
           $ErrorActionPreference='Stop'
           try {
             & '.\.development\v0.26.5\Prepare-v0265-PlatformModelValidation.ps1'
-
-            # v0.30.1 intentionally advances only the managed shelf-host marker
-            # from V2 to V3 for bounded fan motion. Adapt legacy regression
-            # assertions in this ephemeral checkout; production source is not
-            # rewritten and the workspace is reset immediately after testing.
             Get-ChildItem '.\.development\v0.26.5' -Filter '*.ps1' -File -Recurse | ForEach-Object {
               $text=[IO.File]::ReadAllText($_.FullName,[Text.Encoding]::UTF8)
               if($text.Contains('HUYMAIER_D3D11_SHELF_HOST_V2')){
@@ -105,7 +110,6 @@ jobs:
                 [IO.File]::WriteAllText($_.FullName,$text,(New-Object Text.UTF8Encoding($false)))
               }
             }
-
             & '.\.development\v0.26.5\Test-v0265-PlatformModels.ps1'
             & '.\.development\v0.26.5\Test-v0265-User3DModels.ps1'
             & '.\.development\v0.26.5\Test-v0265-Live3DCardRender.ps1'
@@ -116,10 +120,20 @@ jobs:
             & '.\.development\v0.26.5\Test-v0265-ManualRecompsFinalOwnership.ps1'
           }
           finally {
-            & git reset --hard HEAD
-            if($LASTEXITCODE -ne 0){throw 'Could not restore exact source after platform-model validation.'}
+            # Keep the intentional v0.30.2 customization transform while removing
+            # ephemeral renderer-test rewrites.
+            & git checkout -- '.development/v0.26.5'
             & git clean -fd
           }
+
+      - name: Reapply v0.30.2 console brightness after renderer cleanup
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          if(-not((Get-Content -Raw '.\HuymaierCustomization.ps1') -match 'HUYMAIER_V0302_CONSOLE_BRIGHTNESS_V1')){
+            & '.\.build\Optimize-ConsoleBrightness.ps1' -CustomizationPath '.\HuymaierCustomization.ps1'
+          }
+          & '.\.development\v0.30.2\Test-v0302-ConsoleBrightness.ps1'
 
       - name: Build exact x64 FSE Home host
         shell: powershell
@@ -134,7 +148,7 @@ jobs:
           if($LASTEXITCODE -ne 0 -or -not(Test-Path $output)){throw 'x64 FSE Home host compilation failed'}
           git add -N -f FSEPackage/HuymaierFSEHost.exe
 
-      - name: Build release-shaped v0.30.1 candidate
+      - name: Build release-shaped v0.30.2 package
         shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
@@ -150,15 +164,15 @@ jobs:
           $validation=Join-Path $env:HC_CANDIDATE_OUTPUT 'candidate-validation.json'
           & '.\.build\Test-HuymaierCandidate.ps1' -StageRoot $stage -ValidationPath $validation
 
-      - name: Run v0.30.1 staged package gates
+      - name: Run v0.30.2 staged package gates
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
           $stage=Join-Path $env:RUNNER_TEMP ('hc-stage\${{ steps.request.outputs.package_root }}')
           $validation=Join-Path $env:HC_CANDIDATE_OUTPUT 'candidate-validation.json'
-          & '.\.build\Test-HuymaierV0301Candidate.ps1' -StageRoot $stage -ValidationPath $validation
+          & '.\.build\Test-HuymaierV0302Candidate.ps1' -StageRoot $stage -ValidationPath $validation
 
-      - name: Verify final candidate hash
+      - name: Verify final release hash
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
@@ -166,9 +180,9 @@ jobs:
           $zip=Join-Path $env:HC_CANDIDATE_OUTPUT '${{ steps.request.outputs.asset }}'
           $hash=(Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
           if($hash -ne [string]$validation.sha256){throw "Final ZIP hash $hash differs from validation $($validation.sha256)"}
-          Write-Host "Final HC0301 SHA-256: $hash"
+          Write-Host "Final HC0302 SHA-256: $hash"
 
-      - name: Upload exact candidate bytes
+      - name: Upload exact validated bytes as Actions artifact
         uses: actions/upload-artifact@v4
         with:
           name: '${{ steps.request.outputs.candidate }}'
@@ -179,7 +193,34 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Record candidate status
+      - name: Publish v0.30.2 to GitHub Releases for updater test
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference='Stop'
+          $tag='v0.30.2'
+          gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null
+          if($LASTEXITCODE -eq 0){throw "$tag already exists; refusing to overwrite a published stable release."}
+          $zip=Join-Path $env:HC_CANDIDATE_OUTPUT '${{ steps.request.outputs.asset }}'
+          $sidecar=$zip+'.sha256'
+          $notes=@'
+          Huymaier Console v0.30.2
+
+          - Adds one overall Huymaier Console brightness setting in Customization.
+          - Range: 0% to 200%.
+          - Controller/keyboard adjustment: exact 10% steps.
+          - The setting affects only the Huymaier Console interface; it does not change Windows display brightness or external applications.
+          - Carries forward the v0.30.1 in-console updater repair, 0-200% 3D-model brightness control, and bounded fan-style model motion.
+
+          This release is published normally through GitHub Releases specifically so installed v0.30.1 systems can test the repaired in-console update path end to end.
+          '@
+          $notePath=Join-Path $env:RUNNER_TEMP 'v0302-release-notes.txt'
+          [IO.File]::WriteAllText($notePath,$notes,(New-Object Text.UTF8Encoding($false)))
+          gh release create $tag $zip $sidecar --repo $env:GITHUB_REPOSITORY --target '${{ steps.request.outputs.production_source }}' --title 'Huymaier Console v0.30.2' --notes-file $notePath --latest
+          if($LASTEXITCODE -ne 0){throw 'Could not publish v0.30.2 GitHub Release.'}
+
+      - name: Record release status
         if: always()
         continue-on-error: true
         shell: powershell
@@ -189,18 +230,15 @@ jobs:
           PRODUCTION_SOURCE: '${{ steps.request.outputs.production_source }}'
         run: |
           $ErrorActionPreference='Stop'
-          # Release validation intentionally mutates the ephemeral checkout.
-          # Always return to the exact request commit before recording status so
-          # status publication cannot accidentally carry test/build mutations.
           & git reset --hard $env:GITHUB_SHA
           & git clean -fd
-          $status=[ordered]@{candidate=$env:CANDIDATE;result=$env:BUILD_RESULT;runId=$env:GITHUB_RUN_ID;runAttempt=$env:GITHUB_RUN_ATTEMPT;commit=$env:GITHUB_SHA;productionSource=$env:PRODUCTION_SOURCE;recordedAtUtc=[DateTime]::UtcNow.ToString('o')}
-          $status|ConvertTo-Json|Set-Content '.development\v0.30.1\candidate-status.json' -Encoding UTF8
+          $status=[ordered]@{candidate=$env:CANDIDATE;result=$env:BUILD_RESULT;runId=$env:GITHUB_RUN_ID;runAttempt=$env:GITHUB_RUN_ATTEMPT;commit=$env:GITHUB_SHA;productionSource=$env:PRODUCTION_SOURCE;release='v0.30.2';recordedAtUtc=[DateTime]::UtcNow.ToString('o')}
+          $status|ConvertTo-Json|Set-Content '.development\v0.30.2\candidate-status.json' -Encoding UTF8
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add '.development\v0.30.1\candidate-status.json'
+          git add '.development\v0.30.2\candidate-status.json'
           if(-not(git diff --cached --quiet)){
-            git commit -m "Record $env:CANDIDATE candidate status"
-            git pull --rebase origin feature/v0.30.1-brightness-fan-motion
-            git push origin HEAD:feature/v0.30.1-brightness-fan-motion
+            git commit -m "Record $env:CANDIDATE release status"
+            git pull --rebase origin feature/v0.30.2-console-brightness
+            git push origin HEAD:feature/v0.30.2-console-brightness
           }
