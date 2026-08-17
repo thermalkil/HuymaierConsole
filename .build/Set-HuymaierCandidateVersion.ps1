@@ -14,7 +14,7 @@ $ErrorActionPreference='Stop'
 $trigger=Get-Content -Raw -LiteralPath $TriggerPath -Encoding UTF8|ConvertFrom-Json
 $version=[string]$trigger.version
 if([string]::IsNullOrWhiteSpace($version)){throw 'Candidate version stamping requires trigger.version.'}
-if($version -ne '0.30.5'){throw "This v0.30.5 stamping transform refuses unexpected version '$version'."}
+if($version -ne '0.30.6'){throw "This v0.30.6 stamping transform refuses unexpected version '$version'."}
 
 function Replace-ExactlyOnce([string]$Path,[string]$Old,[string]$New,[string]$Label){
     $text=[IO.File]::ReadAllText($Path,[Text.Encoding]::UTF8)
@@ -34,16 +34,15 @@ $manifest=Get-Content -Raw -LiteralPath $ManifestPath -Encoding UTF8|ConvertFrom
 if([string]$manifest.version -ne '0.26.4'){throw "Expected source manifest version 0.26.4 before candidate stamping, found $($manifest.version)."}
 $manifest.version=$version
 $manifest.baseVersion='0.30.4'
-$manifest.build='adaptive-model-winding-rc1'
-$manifest.description='v0.30.5 repairs mirrored and inside-out console 3D model geometry by choosing triangle winding from transformed authored normals instead of blindly reversing every negative-determinant mesh.'
+$manifest.build='console-model-transform-scale-rc1'
+$manifest.description='v0.30.6 keeps provider/storefront models unchanged while improving console-model correction and adding saved per-console model scale to Edit Model mode.'
 $features=New-Object System.Collections.ArrayList
 foreach($feature in @($manifest.features)){[void]$features.Add([string]$feature)}
 foreach($feature in @(
-    'repairs mirrored and inside-out console model sections by comparing transformed triangle orientation with transformed authored normals before deciding whether a primitive needs winding reversal',
-    'avoids double-flipping GLB mesh copies whose local indices are already reversed under negative-determinant node transforms while retaining determinant fallback for meshes without reliable normal evidence',
-    'preserves reflected tangent handedness for normal maps independently from the triangle winding decision',
-    'automatically rebuilds affected HC3D model caches under a new winding-v2 cache namespace without modifying or deleting user GLB source files',
-    'carries forward the v0.30.4 Edit Model orientation workflow, v0.30.3 Windows/Xbox FSE updater handoff, overall console brightness, HC3D v4 COLOR_0 rendering, controller routing, Quick Access, Downloads, Recomps, GameCube, streaming and installer integrity'
+    'adds saved per-console model scale to Edit Model mode from 30 to 300 percent in 10 percent steps using LB/RB, alongside the existing saved yaw and pitch controls',
+    'applies each saved console scale to both the full-screen viewer and console shelf while leaving the top provider/storefront shelf scale path unchanged',
+    'carries forward adaptive negative-determinant winding correction for console GLBs and automatically refreshes corrected HC3D winding caches without modifying user source models',
+    'retains v0.30.4 saved model orientation, v0.30.3 Windows/Xbox FSE updater handoff, overall console brightness, HC3D v4 COLOR_0 rendering, controller routing, Quick Access, Downloads, Recomps, GameCube, streaming and installer integrity'
 )){
     if($features -notcontains $feature){[void]$features.Add($feature)}
 }
@@ -52,9 +51,9 @@ $manifest|ConvertTo-Json -Depth 20|Set-Content -LiteralPath $ManifestPath -Encod
 
 $appx=[IO.File]::ReadAllText($AppxManifestPath,[Text.Encoding]::UTF8)
 $oldAppx='Version="0.26.4.0"'
-$newAppx='Version="0.30.5.0"'
+$newAppx='Version="0.30.6.0"'
 if(([regex]::Matches($appx,[regex]::Escape($oldAppx))).Count -ne 1){throw 'Expected exactly one v0.26.4.0 AppX identity before candidate stamping.'}
 $appx=$appx.Replace($oldAppx,$newAppx)
 [IO.File]::WriteAllText($AppxManifestPath,$appx,(New-Object Text.UTF8Encoding($false)))
 
-Write-Host "Stamped shell, bootstrap, installer core/cache, native build stamp, manifest and AppX as Huymaier Console v$version / adaptive-model-winding-rc1."
+Write-Host "Stamped shell, bootstrap, installer core/cache, native build stamp, manifest and AppX as Huymaier Console v$version / console-model-transform-scale-rc1."
