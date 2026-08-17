@@ -1,0 +1,10 @@
+﻿{
+    "candidate":  "v0.30.2-release1",
+    "result":  "failure",
+    "runId":  "32015114510",
+    "runAttempt":  "1",
+    "commit":  "3e25fe3cc52e5fd97b3e1614bbda10deb2eb24a3",
+    "productionSource":  "7657d21ccc80c259ca01e89d7627687c03de9b1b",
+    "release":  "v0.30.2",
+    "recordedAtUtc":  "2026-08-17T09:25:34.4857859Z"
+}
