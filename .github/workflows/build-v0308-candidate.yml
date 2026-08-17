@@ -38,7 +38,13 @@ jobs:
       - name: Parse transforms and tests before execution
         shell: powershell
         run: |
-          $files=@('.build/Optimize-CoverArtFallback.ps1','.build/Optimize-v0308-InstallerVersion.ps1','.development/v0.30.8/Test-v0308-CoverArtFallback.ps1')
+          $files=@(
+            '.build/Optimize-CoverArtFallback.ps1',
+            '.build/Optimize-v0308-TgdbSchema.ps1',
+            '.build/Optimize-v0308-InstallerVersion.ps1',
+            '.development/v0.30.8/Test-v0308-CoverArtFallback.ps1',
+            '.development/v0.30.8/Test-v0308-TgdbSchema.ps1'
+          )
           foreach($file in $files){
             $tokens=$null;$errors=$null;[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file),[ref]$tokens,[ref]$errors)
             if($errors.Count){$errors|ForEach-Object{Write-Host ('{0}:{1}:{2} {3}' -f $file,$_.Extent.StartLineNumber,$_.Extent.StartColumnNumber,$_.Message)};throw "$file failed Windows PowerShell parsing."}
@@ -48,11 +54,14 @@ jobs:
         shell: powershell
         run: |
           ./.build/Optimize-CoverArtFallback.ps1
+          ./.build/Optimize-v0308-TgdbSchema.ps1
           ./.build/Optimize-v0308-InstallerVersion.ps1
 
       - name: Validate transformed source
         shell: powershell
-        run: ./.development/v0.30.8/Test-v0308-CoverArtFallback.ps1 -StageRoot .
+        run: |
+          ./.development/v0.30.8/Test-v0308-CoverArtFallback.ps1 -StageRoot .
+          ./.development/v0.30.8/Test-v0308-TgdbSchema.ps1 -StageRoot .
 
       - name: Build release-shaped candidate from HC0307.zip
         shell: powershell
@@ -64,6 +73,7 @@ jobs:
           $stage=Join-Path $env:RUNNER_TEMP 'hc-stage\HC0308'
           if(-not(Test-Path -LiteralPath $stage -PathType Container)){throw "Candidate stage is missing: $stage"}
           ./.development/v0.30.8/Test-v0308-CoverArtFallback.ps1 -StageRoot $stage
+          ./.development/v0.30.8/Test-v0308-TgdbSchema.ps1 -StageRoot $stage
 
       - name: Run installer and integrity regression suite
         shell: powershell
