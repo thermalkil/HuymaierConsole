@@ -51,7 +51,6 @@ jobs:
             '.\.build\Build-HuymaierReleaseCandidate.ps1',
             '.\.build\Build-HuymaierReleaseCandidate.Core.ps1',
             '.\.build\Optimize-ConsoleBrightness.ps1',
-            '.\.build\Optimize-FseUpdaterHandoff.ps1',
             '.\.build\Test-HuymaierCandidate.ps1',
             '.\.build\Test-HuymaierV0303Candidate.ps1',
             '.\.development\v0.30.1\Test-v0301-Presentation.ps1',
@@ -69,12 +68,11 @@ jobs:
             if($errors.Count){$errors|ForEach-Object{Write-Host "$p : $($_.Message)"};throw "$p failed Windows PowerShell 5.1 parse"}
           }
 
-      - name: Apply v0.30.2 brightness carry-forward and v0.30.3 FSE handoff
+      - name: Apply v0.30.2 brightness carry-forward and test v0.30.3 FSE handoff
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
           & '.\.build\Optimize-ConsoleBrightness.ps1' -CustomizationPath '.\HuymaierCustomization.ps1'
-          & '.\.build\Optimize-FseUpdaterHandoff.ps1' -ShellRedesignPath '.\HuymaierShellRedesign.ps1'
           & '.\.development\v0.30.2\Test-v0302-ConsoleBrightness.ps1'
           & '.\.development\v0.30.3\Test-v0303-FseUpdaterHandoff.ps1'
           & '.\.development\v0.30.1\Test-v0301-Presentation.ps1'
@@ -121,12 +119,11 @@ jobs:
             & git clean -fd
           }
 
-      - name: Reassert v0.30.2 and v0.30.3 transforms
+      - name: Reassert v0.30.2 brightness and v0.30.3 updater gates
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
           if(-not((Get-Content -Raw '.\HuymaierCustomization.ps1') -match 'HUYMAIER_V0302_CONSOLE_BRIGHTNESS_V1')){& '.\.build\Optimize-ConsoleBrightness.ps1' -CustomizationPath '.\HuymaierCustomization.ps1'}
-          if(-not((Get-Content -Raw '.\HuymaierShellRedesign.ps1') -match 'HUYMAIER_V0303_FSE_UPDATE_HANDOFF_V1')){& '.\.build\Optimize-FseUpdaterHandoff.ps1' -ShellRedesignPath '.\HuymaierShellRedesign.ps1'}
           & '.\.development\v0.30.2\Test-v0302-ConsoleBrightness.ps1'
           & '.\.development\v0.30.3\Test-v0303-FseUpdaterHandoff.ps1'
 
