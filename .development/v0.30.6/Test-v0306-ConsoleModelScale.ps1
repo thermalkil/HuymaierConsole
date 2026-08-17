@@ -2,9 +2,9 @@ Set-StrictMode -Version 2.0
 $ErrorActionPreference='Stop'
 $root=(Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $defaults=Join-Path $root 'HuymaierModelDefaults.ps1'
-$host=Join-Path $root 'Native\HuymaierD3D11ShelfHost.cs'
-$native=Join-Path $root 'Native\HuymaierD3D11ShelfRuntime.cpp'
-foreach($p in @($defaults,$host,$native)){if(-not(Test-Path -LiteralPath $p -PathType Leaf)){throw "v0.30.6 scale test source missing: $p"}}
+$hostPath=Join-Path $root 'Native\HuymaierD3D11ShelfHost.cs'
+$nativePath=Join-Path $root 'Native\HuymaierD3D11ShelfRuntime.cpp'
+foreach($p in @($defaults,$hostPath,$nativePath)){if(-not(Test-Path -LiteralPath $p -PathType Leaf)){throw "v0.30.6 scale test source missing: $p"}}
 
 $text=Get-Content -Raw -LiteralPath $defaults -Encoding UTF8
 foreach($needle in @(
@@ -28,8 +28,8 @@ Write-Host 'consoleModelScaleControllerGate: success'
 Write-Host 'consoleModelScaleProviderIsolationGate: success'
 
 & (Join-Path $root '.build\Optimize-ConsoleModelScale.ps1')
-$hostText=Get-Content -Raw -LiteralPath $host -Encoding UTF8
-$nativeText=Get-Content -Raw -LiteralPath $native -Encoding UTF8
+$hostText=Get-Content -Raw -LiteralPath $hostPath -Encoding UTF8
+$nativeText=Get-Content -Raw -LiteralPath $nativePath -Encoding UTF8
 foreach($needle in @('HUYMAIER_V0306_CONSOLE_MODEL_SCALE_CAPACITY_V1','Math.Max(.12f, Math.Min(2.50f, (float)scale))')){if($hostText.IndexOf($needle,[StringComparison]::Ordinal)-lt0){throw "Managed scale capacity missing: $needle"}}
 foreach($needle in @('HUYMAIER_V0306_CONSOLE_MODEL_SCALE_CAPACITY_V1','std::max(.12f,std::min(2.50f,item.modelScale))')){if($nativeText.IndexOf($needle,[StringComparison]::Ordinal)-lt0){throw "Native scale capacity missing: $needle"}}
 Write-Host 'consoleModelScaleManagedCapacityGate: success'
