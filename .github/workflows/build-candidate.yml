@@ -91,9 +91,21 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
-          $restore=@('HuymaierConsole.ps1','HuymaierBootstrap.ps1','Install-HuymaierConsole.ps1','.build/Build-HuymaierReleaseCandidate.Core.ps1')
           try {
             & '.\.development\v0.26.5\Prepare-v0265-PlatformModelValidation.ps1'
+
+            # v0.30.1 intentionally advances only the managed shelf-host marker
+            # from V2 to V3 for bounded fan motion. Adapt legacy regression
+            # assertions in this ephemeral checkout; production source is not
+            # rewritten and the workspace is reset immediately after testing.
+            Get-ChildItem '.\.development\v0.26.5' -Filter '*.ps1' -File -Recurse | ForEach-Object {
+              $text=[IO.File]::ReadAllText($_.FullName,[Text.Encoding]::UTF8)
+              if($text.Contains('HUYMAIER_D3D11_SHELF_HOST_V2')){
+                $text=$text.Replace('HUYMAIER_D3D11_SHELF_HOST_V2','HUYMAIER_D3D11_SHELF_HOST_V3_BOUNDED_FAN_MOTION')
+                [IO.File]::WriteAllText($_.FullName,$text,(New-Object Text.UTF8Encoding($false)))
+              }
+            }
+
             & '.\.development\v0.26.5\Test-v0265-PlatformModels.ps1'
             & '.\.development\v0.26.5\Test-v0265-User3DModels.ps1'
             & '.\.development\v0.26.5\Test-v0265-Live3DCardRender.ps1'
@@ -104,8 +116,9 @@ jobs:
             & '.\.development\v0.26.5\Test-v0265-ManualRecompsFinalOwnership.ps1'
           }
           finally {
-            & git checkout -- @restore
+            & git reset --hard HEAD
             if($LASTEXITCODE -ne 0){throw 'Could not restore exact source after platform-model validation.'}
+            & git clean -fd
           }
 
       - name: Build exact x64 FSE Home host
@@ -176,7 +189,11 @@ jobs:
           PRODUCTION_SOURCE: '${{ steps.request.outputs.production_source }}'
         run: |
           $ErrorActionPreference='Stop'
-          git reset -- FSEPackage/HuymaierFSEHost.exe 2>$null
+          # Release validation intentionally mutates the ephemeral checkout.
+          # Always return to the exact request commit before recording status so
+          # status publication cannot accidentally carry test/build mutations.
+          & git reset --hard $env:GITHUB_SHA
+          & git clean -fd
           $status=[ordered]@{candidate=$env:CANDIDATE;result=$env:BUILD_RESULT;runId=$env:GITHUB_RUN_ID;runAttempt=$env:GITHUB_RUN_ATTEMPT;commit=$env:GITHUB_SHA;productionSource=$env:PRODUCTION_SOURCE;recordedAtUtc=[DateTime]::UtcNow.ToString('o')}
           $status|ConvertTo-Json|Set-Content '.development\v0.30.1\candidate-status.json' -Encoding UTF8
           git config user.name 'github-actions[bot]'
