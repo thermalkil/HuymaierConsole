@@ -1,0 +1,123 @@
+name: Publish Validated Huymaier Console v0.30.2
+
+on:
+  push:
+    branches: [feature/v0.30.2-console-brightness]
+    paths: ['.development/v0.30.2/publish-request.json']
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: huymaier-console-v0302-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - name: Check out publisher source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Read locked publish request
+        id: request
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $r=Get-Content -Raw '.development\v0.30.2\publish-request.json' -Encoding UTF8|ConvertFrom-Json
+          foreach($name in @('tag','run_id','artifact_name','asset_name','sha256','target')){
+            if([string]::IsNullOrWhiteSpace([string]$r.$name)){throw "Publish request missing $name"}
+          }
+          if([string]$r.tag -ne 'v0.30.2'){throw 'Only v0.30.2 may be published by this workflow.'}
+          if([string]$r.run_id -ne '32015865109'){throw 'Publish request is not locked to validated release run 32015865109.'}
+          if([string]$r.artifact_name -ne 'v0.30.2-release6'){throw 'Publish request artifact identity mismatch.'}
+          if([string]$r.asset_name -ne 'HC0302.zip'){throw 'Publish request asset identity mismatch.'}
+          if([string]$r.sha256 -ne '32c845bd6178779a39877e92ab444b22bca6674093bbea949d3aee4b1fd6b26f'){throw 'Publish request SHA-256 does not match the validated package.'}
+          "tag=$([string]$r.tag)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "run_id=$([string]$r.run_id)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "artifact=$([string]$r.artifact_name)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "asset=$([string]$r.asset_name)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "sha=$([string]$r.sha256)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "target=$([string]$r.target)"|Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Download exact validated Actions artifact
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference='Stop'
+          $out=Join-Path $env:RUNNER_TEMP 'v0302-publish'
+          New-Item -ItemType Directory -Force -Path $out|Out-Null
+          gh run download '${{ steps.request.outputs.run_id }}' --repo $env:GITHUB_REPOSITORY --name '${{ steps.request.outputs.artifact }}' --dir $out
+          if($LASTEXITCODE -ne 0){throw 'Could not download the locked validated Actions artifact.'}
+          "HC_PUBLISH_DIR=$out"|Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Verify locked v0.30.2 bytes
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $zip=Join-Path $env:HC_PUBLISH_DIR '${{ steps.request.outputs.asset }}'
+          $sidecar=$zip+'.sha256'
+          $validation=Join-Path $env:HC_PUBLISH_DIR 'candidate-validation.json'
+          foreach($p in @($zip,$sidecar,$validation)){if(-not(Test-Path -LiteralPath $p -PathType Leaf)){throw "Validated publish payload missing: $p"}}
+          $hash=(Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if($hash -ne '${{ steps.request.outputs.sha }}'){throw "Validated package hash changed: $hash"}
+          $v=Get-Content -Raw -LiteralPath $validation -Encoding UTF8|ConvertFrom-Json
+          if([string]$v.version -ne '0.30.2' -or [string]$v.asset -ne 'HC0302.zip' -or [string]$v.sha256 -ne $hash){throw 'candidate-validation.json does not describe the locked publish bytes.'}
+          $sidecarText=(Get-Content -Raw -LiteralPath $sidecar -Encoding ASCII).Trim()
+          if($sidecarText -ne ($hash+'  HC0302.zip')){throw 'SHA-256 sidecar does not match the locked package.'}
+          Write-Host "Locked v0.30.2 SHA-256 verified: $hash"
+
+      - name: Create public v0.30.2 release and upload validated assets
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference='Stop'
+          $tag='${{ steps.request.outputs.tag }}'
+          $zip=Join-Path $env:HC_PUBLISH_DIR '${{ steps.request.outputs.asset }}'
+          $sidecar=$zip+'.sha256'
+          $notes=Join-Path $env:RUNNER_TEMP 'v0302-notes.txt'
+          @'
+          Huymaier Console v0.30.2
+
+          - Adds an overall Huymaier Console brightness setting under Customization.
+          - Range: 0% to 200%, adjusted in exact 10% intervals.
+          - This affects the Huymaier Console interface only, not Windows display brightness or external applications.
+          - Carries forward the v0.30.1 updater repair, 0-200% 3D-model brightness control, bounded fan-style model motion, and all validated platform/controller/download behavior.
+
+          v0.30.2 is published as a normal GitHub Release so installed v0.30.1 systems can test the repaired in-console updater end to end.
+          '@ | Set-Content -LiteralPath $notes -Encoding UTF8
+
+          gh release view $tag --repo $env:GITHUB_REPOSITORY --json tagName 2>$null | Out-Null
+          $exists=($LASTEXITCODE -eq 0)
+          if(-not $exists){
+            gh release create $tag --repo $env:GITHUB_REPOSITORY --target '${{ steps.request.outputs.target }}' --title 'Huymaier Console v0.30.2' --notes-file $notes
+            if($LASTEXITCODE -ne 0){throw 'GitHub Release creation failed.'}
+          }
+
+          $release=gh release view $tag --repo $env:GITHUB_REPOSITORY --json tagName,targetCommitish,isDraft,isPrerelease,assets | ConvertFrom-Json
+          if([string]$release.tagName -ne 'v0.30.2' -or [bool]$release.isDraft -or [bool]$release.isPrerelease){throw 'v0.30.2 release exists but is not a normal public stable release.'}
+          $names=@($release.assets|ForEach-Object{[string]$_.name})
+          if($names -notcontains 'HC0302.zip' -or $names -notcontains 'HC0302.zip.sha256'){
+            gh release upload $tag $zip $sidecar --repo $env:GITHUB_REPOSITORY
+            if($LASTEXITCODE -ne 0){throw 'Validated v0.30.2 release asset upload failed.'}
+          }
+          gh release edit $tag --repo $env:GITHUB_REPOSITORY --latest
+          if($LASTEXITCODE -ne 0){throw 'Could not mark v0.30.2 as the latest release.'}
+
+      - name: Verify public updater endpoint
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference='Stop'
+          $r=gh release view v0.30.2 --repo $env:GITHUB_REPOSITORY --json tagName,isDraft,isPrerelease,assets,url | ConvertFrom-Json
+          if([string]$r.tagName -ne 'v0.30.2' -or [bool]$r.isDraft -or [bool]$r.isPrerelease){throw 'Public updater endpoint does not expose v0.30.2 as stable.'}
+          $names=@($r.assets|ForEach-Object{[string]$_.name})
+          foreach($required in @('HC0302.zip','HC0302.zip.sha256')){if($names -notcontains $required){throw "Public release missing updater asset: $required"}}
+          Write-Host "v0302PublicUpdaterReleaseGate: success"
+          Write-Host "Release URL: $($r.url)"
