@@ -1,11 +1,11 @@
 {
-  "candidate": "v0.30.8-rc1",
+  "candidate": "v0.30.8-rc2",
   "version": "0.30.8",
   "base_release": "v0.30.7",
   "base_asset": "HC0307.zip",
   "package_root": "HC0308",
   "asset_name": "HC0308.zip",
-  "production_source": "84d5606b5d5c79f4cd250f37d47c53accb328ea8",
-  "attempt": 5,
-  "notes": "TheGamesDB-first platform-aware missing-cover fallback aligned to the current keyed platform/include schema, with durable provenance/failure cache, curated The Cover Project mappings, and per-game artwork management."
+  "production_source": "8ef1dc26b399ba2d95a296f655a9f828414a769f",
+  "attempt": 6,
+  "notes": "TheGamesDB-first platform-aware missing-cover fallback plus corrected 0.30.8/x64 native host build stamp and a compiled-host regression gate that rejects mixed native/script candidates before artifact upload."
 }
