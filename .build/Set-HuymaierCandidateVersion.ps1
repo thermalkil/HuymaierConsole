@@ -34,13 +34,15 @@ $manifest=Get-Content -Raw -LiteralPath $ManifestPath -Encoding UTF8|ConvertFrom
 if([string]$manifest.version -ne '0.26.4'){throw "Expected source manifest version 0.26.4 before candidate stamping, found $($manifest.version)."}
 $manifest.version=$version
 $manifest.baseVersion='0.3.0'
-$manifest.build='brightness-fan-motion-rc1'
-$manifest.description='v0.30.1 follows the public v0.3.0 baseline with a 0-200% 3D-model brightness control and a bounded fan-style presentation motion in place of continuous 360-degree shelf rotation, while preserving the validated HC3D v4 vertex-color renderer and prior console functionality.'
+$manifest.build='brightness-fan-motion-self-update-rc1'
+$manifest.description='v0.30.1 follows the public v0.3.0 baseline with a 0-200% 3D-model brightness control, bounded fan-style presentation motion instead of continuous 360-degree rotation, and a repaired in-console update path that carries legacy v0.26.x installs directly into the new public version line while preserving verified transactional installation.'
 $features=New-Object System.Collections.ArrayList
 foreach($feature in @($manifest.features)){[void]$features.Add([string]$feature)}
 foreach($feature in @(
     'expands 3D model brightness customization to a true 0-200 percent range with zero supported as the minimum and 200 percent as the maximum',
     'replaces continuous 360-degree 3D shelf turntable rotation with a bounded smooth fan-style idle presentation that returns through center between left and upper-right poses',
+    'repairs Huymaier Console self-update version ordering across the public v0.3.0 reset and guarantees legacy v0.26.x installs recognize v0.30.1 as a direct upgrade target',
+    'keeps release ZIP plus SHA-256 verification, parent-process handoff, transactional silent installation and automatic relaunch in the in-console updater',
     'preserves HC3D v4 COLOR_0 vertex colors, balanced material response, textured and textureless models, controller routing, Quick Access, Downloads, Recomps, GameCube, streaming and installer integrity from the validated public v0.3.0 baseline'
 )){
     if($features -notcontains $feature){[void]$features.Add($feature)}
@@ -55,4 +57,4 @@ if(([regex]::Matches($appx,[regex]::Escape($oldAppx))).Count -ne 1){throw 'Expec
 $appx=$appx.Replace($oldAppx,$newAppx)
 [IO.File]::WriteAllText($AppxManifestPath,$appx,(New-Object Text.UTF8Encoding($false)))
 
-Write-Host "Stamped shell, bootstrap, installer core/cache, native build stamp, manifest and AppX as Huymaier Console v$version / brightness-fan-motion-rc1."
+Write-Host "Stamped shell, bootstrap, installer core/cache, native build stamp, manifest and AppX as Huymaier Console v$version / brightness-fan-motion-self-update-rc1."
