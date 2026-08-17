@@ -41,7 +41,7 @@ jobs:
           $files=@('.build/Optimize-CoverArtFallback.ps1','.development/v0.30.8/Test-v0308-CoverArtFallback.ps1')
           foreach($file in $files){
             $tokens=$null;$errors=$null;[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file),[ref]$tokens,[ref]$errors)
-            if($errors.Count){$errors|ForEach-Object{Write-Host "$file:$($_.Extent.StartLineNumber):$($_.Extent.StartColumnNumber) $($_.Message)"};throw "$file failed Windows PowerShell parsing."}
+            if($errors.Count){$errors|ForEach-Object{Write-Host ('{0}:{1}:{2} {3}' -f $file,$_.Extent.StartLineNumber,$_.Extent.StartColumnNumber,$_.Message)};throw "$file failed Windows PowerShell parsing."}
           }
 
       - name: Apply v0.30.8 cover-art transform
