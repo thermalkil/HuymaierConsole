@@ -1,9 +1,9 @@
 {
-  "candidate": "v0.30.2-release5",
+  "candidate": "v0.30.2-release6",
   "version": "0.30.2",
   "base_release": "v0.3.0",
   "base_asset": "HC265.zip",
   "package_root": "HC0302",
   "asset_name": "HC0302.zip",
-  "production_source": "97d15744b2cba05ff77aa1f1a8b37008ed530dd1"
+  "production_source": "3772cfadad890c79c92296b22a215dff65f4c7b3"
 }
