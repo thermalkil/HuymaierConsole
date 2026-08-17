@@ -1,0 +1,249 @@
+﻿# Huymaier Console v0.30.8 unified background-task presentation/coordinator.
+# Workers remain authoritative for work and progress state. This module owns the
+# single top-right task presentation and sequencing of library -> artwork scans.
+Set-StrictMode -Version 2.0
+
+$script:HcArtworkRefreshAfterLibrary=$false
+$script:HcArtworkTaskScanned=0
+$script:HcArtworkTaskResolved=0
+$script:HcArtworkTaskDownloaded=0
+$script:HcArtworkTaskRemaining=-1
+$script:HcArtworkTaskResultToken=''
+$script:HcBackgroundArtworkState=$null
+$script:HcBackgroundHudSignature=''
+try{$script:HcBackgroundArtworkState=Read-ArtworkState}catch{}
+
+function Get-HcBackgroundTaskUpdatedAt {
+    param($State)
+    if($null -eq $State){return [datetime]::MinValue}
+    $raw=[string](Get-EntryProperty $State 'Updated' (Get-EntryProperty $State 'UpdatedAt' ''))
+    if(-not $raw){return [datetime]::MinValue}
+    try{return [datetime]::Parse($raw)}catch{return [datetime]::MinValue}
+}
+
+function Add-HcBackgroundTaskFromState {
+    param([System.Collections.ArrayList]$List,[string]$Title,$State,[switch]$ShowTerminal)
+    if($null -eq $State){return}
+    $busy=[bool](Get-EntryProperty $State 'Busy' $false)
+    $error=[string](Get-EntryProperty $State 'Error' '')
+    $phase=[string](Get-EntryProperty $State 'Phase' '')
+    $updated=Get-HcBackgroundTaskUpdatedAt $State
+    $age=if($updated -eq [datetime]::MinValue){999999.0}else{((Get-Date)-$updated).TotalSeconds}
+    $terminalPhase=$phase -in @('Complete','Completed','Failed','Error','Ready')
+    $show=$busy -or ($error -and $age -le 20) -or ($ShowTerminal -and $terminalPhase -and $age -le 8)
+    if(-not $show){return}
+    $progress=[int](Get-EntryProperty $State 'Progress' -1)
+    if(-not $busy -and -not $error -and $progress -lt 0){$progress=100}
+    $message=[string](Get-EntryProperty $State 'Message' $(if($phase){$phase}else{$Title}))
+    [void]$List.Add([pscustomobject]@{Title=$Title;Detail=$message;Busy=$busy;Error=$error;Progress=$progress;Updated=$updated})
+}
+
+function Get-HcBackgroundTasks {
+    $tasks=New-Object System.Collections.ArrayList
+
+    if($script:HcArtworkRefreshAfterLibrary){
+        [void]$tasks.Add([pscustomobject]@{Title='Artwork refresh';Detail='Queued - waiting for the library scan to finish.';Busy=$true;Error='';Progress=-1;Updated=Get-Date})
+    }
+
+    $art=$script:HcBackgroundArtworkState
+    if($null -ne $art){
+        $busy=[bool](Get-EntryProperty $art 'Busy' $false)
+        $error=[string](Get-EntryProperty $art 'Error' '')
+        $updated=Get-HcBackgroundTaskUpdatedAt $art
+        $age=if($updated -eq [datetime]::MinValue){999999.0}else{((Get-Date)-$updated).TotalSeconds}
+        if($busy -or ($error -and $age -le 20) -or ((-not $busy) -and -not $error -and $age -le 8)){
+            $progress=[int](Get-EntryProperty $art 'Progress' -1)
+            $detail=[string](Get-EntryProperty $art 'Message' 'Artwork worker is running.')
+            if(-not $busy -and -not $error -and $script:HcArtworkTaskScanned -gt 0){
+                $remaining=$(if($script:HcArtworkTaskRemaining -ge 0){" - $($script:HcArtworkTaskRemaining) remaining"}else{''})
+                $detail="Complete - $($script:HcArtworkTaskResolved) cover(s) resolved - $($script:HcArtworkTaskScanned) scanned$remaining"
+                $progress=100
+            }elseif($script:HcArtworkTaskScanned -gt 0){
+                $detail += " - $($script:HcArtworkTaskResolved) resolved / $($script:HcArtworkTaskScanned) scanned"
+            }
+            if([string]::IsNullOrWhiteSpace([string](Get-EntryProperty $script:Config 'TheGamesDbApiKey' ''))){$detail += ' - TheGamesDB key not configured'}
+            [void]$tasks.Add([pscustomobject]@{Title='Artwork refresh';Detail=$detail;Busy=$busy;Error=$error;Progress=$progress;Updated=$updated})
+        }
+    }
+
+    Add-HcBackgroundTaskFromState $tasks 'Library scan' $script:LibraryState -ShowTerminal
+
+    $providerTitle='Game provider'
+    try{$providerName=[string](Get-EntryProperty $script:ProviderState 'Provider' '');if($providerName){$providerTitle+=' - '+$providerName}}catch{}
+    Add-HcBackgroundTaskFromState $tasks $providerTitle $script:ProviderState -ShowTerminal
+
+    $storeTitle='Storefront task'
+    try{$storeName=[string](Get-EntryProperty $script:StorefrontState 'Store' (Get-EntryProperty $script:StorefrontState 'Provider' ''));if($storeName){$storeTitle+=' - '+$storeName}}catch{}
+    Add-HcBackgroundTaskFromState $tasks $storeTitle $script:StorefrontState -ShowTerminal
+
+    Add-HcBackgroundTaskFromState $tasks 'Windows Update' $script:UpdateState -ShowTerminal
+    Add-HcBackgroundTaskFromState $tasks 'Driver task' $script:DriverState -ShowTerminal
+    return [object[]]$tasks.ToArray()
+}
+
+function New-HcBackgroundTaskRow {
+    param($Task)
+    $wrap=New-Object System.Windows.Controls.StackPanel
+    $wrap.Margin='0,0,0,7'
+
+    $top=New-Object System.Windows.Controls.Grid
+    $top.ColumnDefinitions.Add((New-Object System.Windows.Controls.ColumnDefinition -Property @{Width='*'}))
+    $top.ColumnDefinitions.Add((New-Object System.Windows.Controls.ColumnDefinition -Property @{Width='Auto'}))
+
+    $title=New-Object System.Windows.Controls.TextBlock
+    $title.Text=[string]$Task.Title
+    $title.FontSize=12
+    $title.FontWeight='Bold'
+    $title.Foreground='#F5F7FB'
+    $top.Children.Add($title)|Out-Null
+
+    $pct=New-Object System.Windows.Controls.TextBlock
+    $pct.FontSize=11
+    $pct.Foreground='#E7C45E'
+    $pct.Margin='10,0,0,0'
+    $pct.HorizontalAlignment='Right'
+    [System.Windows.Controls.Grid]::SetColumn($pct,1)
+    if([string]$Task.Error){$pct.Text='FAILED'}elseif([int]$Task.Progress -ge 0){$pct.Text=([math]::Max(0,[math]::Min(100,[int]$Task.Progress))).ToString()+'%'}else{$pct.Text='WORKING'}
+    $top.Children.Add($pct)|Out-Null
+    $wrap.Children.Add($top)|Out-Null
+
+    $detail=New-Object System.Windows.Controls.TextBlock
+    $detail.Text=$(if([string]$Task.Error){[string]$Task.Error}else{[string]$Task.Detail})
+    $detail.FontSize=11
+    $detail.Foreground=$(if([string]$Task.Error){'#FFB3B3'}else{'#AEBBD0'})
+    $detail.TextWrapping='Wrap'
+    $detail.MaxWidth=380
+    $detail.Margin='0,2,0,4'
+    $wrap.Children.Add($detail)|Out-Null
+
+    $bar=New-Object System.Windows.Controls.ProgressBar
+    $bar.Height=5
+    $bar.Minimum=0
+    $bar.Maximum=100
+    $bar.Background='#26354A'
+    try{$bar.Foreground=New-HcSolidBrush (Get-HcAccentColor)}catch{$bar.Foreground='#E7C45E'}
+    $bar.BorderThickness=0
+    if([bool]$Task.Busy -and [int]$Task.Progress -lt 0){$bar.IsIndeterminate=$true}else{$bar.Value=[math]::Max(0,[math]::Min(100,[int]$Task.Progress))}
+    $wrap.Children.Add($bar)|Out-Null
+    return $wrap
+}
+
+function Update-HcBackgroundTaskHud {
+    if($null -eq $script:BackgroundTaskHud -or $null -eq $script:BackgroundTaskPanel){return}
+
+    # A failed library scan must not leave a phantom queued artwork job forever.
+    if($script:HcArtworkRefreshAfterLibrary -and $script:LibraryState){
+        $libraryBusy=[bool](Get-EntryProperty $script:LibraryState 'Busy' $false)
+        $libraryError=[string](Get-EntryProperty $script:LibraryState 'Error' '')
+        if(-not $libraryBusy -and $libraryError){$script:HcArtworkRefreshAfterLibrary=$false}
+    }
+
+    $tasks=@(Get-HcBackgroundTasks)
+    $signature=''
+    try{$signature=($tasks|Select-Object Title,Detail,Busy,Error,Progress|ConvertTo-Json -Depth 4 -Compress)}catch{$signature=[string]$tasks.Count}
+    if([string]::Equals($signature,$script:HcBackgroundHudSignature,[StringComparison]::Ordinal)){return}
+    $script:HcBackgroundHudSignature=$signature
+    $script:BackgroundTaskPanel.Children.Clear()
+    if($tasks.Count -eq 0){$script:BackgroundTaskHud.Visibility='Collapsed';return}
+
+    $heading=New-Object System.Windows.Controls.TextBlock
+    $heading.Text='BACKGROUND TASKS'
+    $heading.FontSize=10
+    $heading.FontWeight='Bold'
+    $heading.Foreground='#8798B1'
+    $heading.Margin='0,0,0,6'
+    $script:BackgroundTaskPanel.Children.Add($heading)|Out-Null
+
+    $limit=[math]::Min(3,$tasks.Count)
+    for($i=0;$i -lt $limit;$i++){$script:BackgroundTaskPanel.Children.Add((New-HcBackgroundTaskRow $tasks[$i]))|Out-Null}
+    if($tasks.Count -gt $limit){
+        $more=New-Object System.Windows.Controls.TextBlock
+        $more.Text=('+'+($tasks.Count-$limit)+' more background task(s)')
+        $more.FontSize=10
+        $more.Foreground='#8798B1'
+        $script:BackgroundTaskPanel.Children.Add($more)|Out-Null
+    }
+    $script:BackgroundTaskHud.Visibility='Visible'
+}
+
+# Track artwork totals across the worker's continuation batches. The final
+# worker state only describes the last batch, so this prevents a misleading
+# "0 added" final card after earlier batches successfully resolved covers.
+$script:HcBackgroundBaseStartArtwork=${function:Start-OnlineArtworkScan}
+function Start-OnlineArtworkScan {
+    param([switch]$ResetCursor,[switch]$Force,[string]$Platform='',[string]$GameId='',[string]$GameName='')
+    if($ResetCursor){
+        $script:HcArtworkTaskScanned=0
+        $script:HcArtworkTaskResolved=0
+        $script:HcArtworkTaskDownloaded=0
+        $script:HcArtworkTaskRemaining=-1
+        $script:HcArtworkTaskResultToken=''
+    }
+    & $script:HcBackgroundBaseStartArtwork -ResetCursor:$ResetCursor -Force:$Force -Platform $Platform -GameId $GameId -GameName $GameName
+    $script:HcBackgroundHudSignature=''
+}
+
+$script:HcBackgroundBaseApplyArtwork=${function:Apply-OnlineArtworkResult}
+function Apply-OnlineArtworkResult {
+    & $script:HcBackgroundBaseApplyArtwork
+    try{
+        if(-not(Test-Path -LiteralPath $script:ArtworkResultPath -PathType Leaf)){return}
+        $result=Get-Content -Raw -LiteralPath $script:ArtworkResultPath -Encoding UTF8|ConvertFrom-Json
+        $token=[string](Get-EntryProperty $result 'Updated' '')
+        if(-not $token){$token=(Get-Item -LiteralPath $script:ArtworkResultPath).LastWriteTimeUtc.Ticks.ToString()}
+        if($token -eq $script:HcArtworkTaskResultToken){return}
+        $script:HcArtworkTaskResultToken=$token
+        $script:HcArtworkTaskScanned += [int](Get-EntryProperty $result 'Scanned' 0)
+        $script:HcArtworkTaskResolved += @(Get-EntryProperty $result 'Items' @()).Count
+        $script:HcArtworkTaskDownloaded += [int](Get-EntryProperty $result 'Downloaded' 0)
+        $script:HcArtworkTaskRemaining=[int](Get-EntryProperty $result 'Remaining' -1)
+        $script:HcBackgroundHudSignature=''
+    }catch{Write-Log "Background-task artwork accounting recovered: $($_.Exception.Message)" 'WARN'}
+}
+
+function Start-HcLibraryAndArtworkRefresh {
+    $script:HcArtworkRefreshAfterLibrary=$true
+    try{if(Get-Command Clear-HcGameDataCache -ErrorAction SilentlyContinue){Clear-HcGameDataCache}}catch{}
+    Start-LibraryScan
+    Read-LibraryState
+    if($script:LibraryState -and [bool](Get-EntryProperty $script:LibraryState 'Busy' $false)){
+        Set-ConsoleNotice 'Library scan started. Missing artwork will begin automatically when the fresh library is ready.' 'INFO'
+        Write-Log 'Sequenced library -> missing-artwork refresh requested.'
+    }else{
+        $script:HcArtworkRefreshAfterLibrary=$false
+        Start-OnlineArtworkScan -ResetCursor -Force
+        Set-ConsoleNotice 'Library scan was unavailable; missing artwork scan started using the current library.' 'WARN'
+        Write-Log 'Library refresh could not enter Busy state; artwork refresh started from current library.' 'WARN'
+    }
+    $script:HcBackgroundHudSignature=''
+    Render-Page
+}
+
+$script:HcBackgroundBaseApplyLibrary=${function:Apply-LibraryResult}
+function Apply-LibraryResult {
+    & $script:HcBackgroundBaseApplyLibrary
+    if($script:HcArtworkRefreshAfterLibrary){
+        $script:HcArtworkRefreshAfterLibrary=$false
+        Start-OnlineArtworkScan -ResetCursor -Force
+        Set-ConsoleNotice 'Library scan complete. Missing artwork scan started.' 'INFO'
+        Write-Log 'Sequenced missing-artwork refresh started after library import.'
+        $script:HcBackgroundHudSignature=''
+    }
+}
+
+# Guarantee that both displayed API-key controls persist the value they accepted.
+# This final wrapper sits after the existing customization keyboard wrapper.
+$script:HcBackgroundBaseCompleteKeyboard=${function:Complete-NativeKeyboardInput}
+function Complete-NativeKeyboardInput {
+    param([string]$Mode,[string]$Value,$Context)
+    if($Mode -in @('TheGamesDbApiKey','SteamGridDbApiKey')){
+        $key=([string]$Value).Trim()
+        if($null -eq $script:Config.PSObject.Properties[$Mode]){$script:Config|Add-Member -NotePropertyName $Mode -NotePropertyValue $key -Force}else{$script:Config.$Mode=$key}
+        Save-Config
+        $label=$(if($Mode -eq 'TheGamesDbApiKey'){'TheGamesDB'}else{'SteamGridDB'})
+        Set-ConsoleNotice $(if($key){"$label API key saved."}else{"$label API key cleared."}) 'INFO'
+        Render-Page
+        return
+    }
+    & $script:HcBackgroundBaseCompleteKeyboard $Mode $Value $Context
+}
