@@ -17,7 +17,9 @@ if($matches.Count -ne 1){throw "Expected exactly one self-update launch block, f
 
 $new=@'
         # HUYMAIER_V0303_FSE_UPDATE_HANDOFF_V1
-        $helper='"'+$script:HcSelfUpdaterPath+'"';$pkg='"'+$package.Replace('"','\"')+'"';$install='"'+$script:BaseDir.Replace('"','\"')+'"'
+        $helper='"'+$script:HcSelfUpdaterPath+'"'
+        $pkg='"'+$package.Replace('"','\"')+'"'
+        $install='"'+$script:BaseDir.Replace('"','\"')+'"'
         $fseManaged=[string]::Equals([Environment]::GetEnvironmentVariable('HUYMAIER_FSE_HOST'),'1',[StringComparison]::Ordinal)
         $handoff=''
         if($fseManaged){
@@ -25,14 +27,18 @@ $new=@'
             [IO.File]::WriteAllText($handoff,($PID.ToString()+'|'+[DateTime]::UtcNow.ToString('o')),(New-Object Text.UTF8Encoding($false)))
         }
         $arguments="-NoLogo -NoProfile -ExecutionPolicy Bypass -File $helper -PackagePath $pkg -ParentProcessId $PID -InstallRoot $install"
-        if($fseManaged){$arguments+=' -FseManaged -HandoffPath "'+$handoff.Replace('"','\"')+'"'}
+        if($fseManaged){
+            $handoffArg='"'+$handoff.Replace('"','\"')+'"'
+            $arguments="$arguments -FseManaged -HandoffPath $handoffArg"
+        }
         try{
             Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList $arguments -WindowStyle Hidden|Out-Null
         }catch{
             if($fseManaged -and $handoff){Remove-Item -LiteralPath $handoff -Force -ErrorAction SilentlyContinue}
             throw
         }
-        $script:AllowWindowClose=$true;$script:Window.Close()
+        $script:AllowWindowClose=$true
+        $script:Window.Close()
 '@
 $text=$text.Substring(0,$matches[0].Index)+$new+$text.Substring($matches[0].Index+$matches[0].Length)
 [IO.File]::WriteAllText($ShellRedesignPath,$text,(New-Object Text.UTF8Encoding($false)))
