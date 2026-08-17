@@ -1,0 +1,9 @@
+﻿{
+    "candidate":  "v0.30.1-rc1",
+    "result":  "failure",
+    "runId":  "32011647757",
+    "runAttempt":  "1",
+    "commit":  "6f9e93eb913523358ae4eef6a4c411d830b20451",
+    "productionSource":  "a80a688cc56a8a3a23bc91d6683f91460812b5f2",
+    "recordedAtUtc":  "2026-08-17T08:42:53.2746146Z"
+}
