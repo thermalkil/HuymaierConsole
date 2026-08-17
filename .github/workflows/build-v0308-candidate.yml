@@ -43,7 +43,8 @@ jobs:
             '.build/Optimize-v0308-TgdbSchema.ps1',
             '.build/Optimize-v0308-InstallerVersion.ps1',
             '.development/v0.30.8/Test-v0308-CoverArtFallback.ps1',
-            '.development/v0.30.8/Test-v0308-TgdbSchema.ps1'
+            '.development/v0.30.8/Test-v0308-TgdbSchema.ps1',
+            '.development/v0.30.8/Test-v0308-NativeBuildStamp.ps1'
           )
           foreach($file in $files){
             $tokens=$null;$errors=$null;[void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file),[ref]$tokens,[ref]$errors)
@@ -62,10 +63,17 @@ jobs:
         run: |
           ./.development/v0.30.8/Test-v0308-CoverArtFallback.ps1 -StageRoot .
           ./.development/v0.30.8/Test-v0308-TgdbSchema.ps1 -StageRoot .
+          ./.development/v0.30.8/Test-v0308-NativeBuildStamp.ps1 -StageRoot .
 
       - name: Build release-shaped candidate from HC0307.zip
         shell: powershell
         run: ./.build/Build-HuymaierReleaseCandidate.ps1 -TriggerPath '.development/v0.30.8/candidate-request.json'
+
+      - name: Verify compiled native host build stamp
+        shell: powershell
+        run: |
+          $stage=Join-Path $env:RUNNER_TEMP 'hc-stage\HC0308'
+          ./.development/v0.30.8/Test-v0308-NativeBuildStamp.ps1 -StageRoot $stage -VerifyCompiledHost
 
       - name: Validate staged candidate artwork layer
         shell: powershell
@@ -97,7 +105,7 @@ jobs:
       - name: Upload full testable candidate
         uses: actions/upload-artifact@v4
         with:
-          name: v0.30.8-rc1
+          name: v0.30.8-rc2
           path: ${{ env.HC_CANDIDATE_OUTPUT }}\*
           if-no-files-found: error
           retention-days: 14
