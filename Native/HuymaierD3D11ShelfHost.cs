@@ -9,10 +9,10 @@ using System.Windows.Media;
 
 namespace HuymaierConsole.Modeling
 {
-    // HUYMAIER_D3D11_SHELF_HOST_V2
+    // HUYMAIER_D3D11_SHELF_HOST_V3_BOUNDED_FAN_MOTION
     // HUYMAIER_D3D11_DPI_AWARE_SHELF_V1
     // WPF owns navigation and chrome. The persistent shelf surface, asset cache,
-    // turntable animation and model rendering are owned by native D3D11.
+    // bounded presentation animation and model rendering are owned by native D3D11.
     internal static class D3D11ShelfNative
     {
         private const string DllName = "HuymaierD3D11ShelfRenderer.dll";
@@ -76,6 +76,13 @@ namespace HuymaierConsole.Modeling
         private double dpiScaleX = 1.0;
         private double dpiScaleY = 1.0;
         private double brightnessPercent = 135.0;
+
+        // One complete center -> left -> center -> right -> center presentation
+        // sweep takes eight seconds. Native rendering still owns the actual yaw;
+        // supplying a bounded phase keeps its existing framing/material path while
+        // preventing continuous 360-degree turntable rotation.
+        private const double FanPeriodSeconds = 8.0;
+        private const float FanPhaseAmplitude = 0.75f;
 
         public bool NativeReady { get { return nativeHandle != IntPtr.Zero && nativeSurface != IntPtr.Zero; } }
         public int PixelWidth { get { return pixelWidth; } }
@@ -196,7 +203,7 @@ namespace HuymaierConsole.Modeling
         }
         public void SetBrightnessPercent(double percent)
         {
-            brightnessPercent = Math.Max(50.0, Math.Min(250.0, percent));
+            brightnessPercent = Math.Max(0.0, Math.Min(200.0, percent));
             if (!NativeReady) return;
             try { D3D11ShelfNative.HC_GPU_SetShelfBrightness(nativeHandle, (float)(brightnessPercent / 100.0)); } catch { }
         }
@@ -297,7 +304,11 @@ namespace HuymaierConsole.Modeling
                     if (!NativeReady) return;
                 }
             }
-            float phase = (float)renderClock.Elapsed.TotalSeconds;
+            double seconds = renderClock.Elapsed.TotalSeconds;
+            // Starts centered, moves left first, comes back through center, then
+            // moves right and returns. The bounded phase can never accumulate a
+            // full revolution, so the shelf reads as a subtle fan presentation.
+            float phase = -FanPhaseAmplitude * (float)Math.Sin(seconds * (Math.PI * 2.0 / FanPeriodSeconds));
             int rendered;
             try { rendered = D3D11ShelfNative.HC_GPU_RenderShelfSurface(nativeHandle, phase); }
             catch { return; }
