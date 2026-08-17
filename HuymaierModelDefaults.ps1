@@ -181,7 +181,7 @@ function Enter-HcModelOrientationEditor {
 
 function Save-HcModelOrientationEditor {
     if(-not$script:HcModelEditorActive){return}
-    $saveScale=$(if(Test-HcConsoleModelScaleEditable ([string]$script:HcModelViewerPlatform){[int]$script:HcModelEditorScalePercent}else{100})
+    $saveScale=$(if(Test-HcConsoleModelScaleEditable ([string]$script:HcModelViewerPlatform)){[int]$script:HcModelEditorScalePercent}else{100})
     if(Set-HcModelDefaultView ([string]$script:HcModelViewerModelPath) ([string]$script:HcModelViewerPlatform) ([double]$script:HcModelViewerYaw) ([double]$script:HcModelViewerPitch) $saveScale){
         $script:HcModelEditorOriginalYaw=[double]$script:HcModelViewerYaw;$script:HcModelEditorOriginalPitch=[double]$script:HcModelViewerPitch;$script:HcModelEditorOriginalScalePercent=[int]$saveScale
         try{Set-ConsoleNotice ('Saved default 3D presentation for '+$script:HcModelViewerPlatform+'.') 'INFO'}catch{}
@@ -239,8 +239,6 @@ function Update-HcGpuShelfLayoutForGroup {
         try{
             $view=Get-HcModelDefaultView ([string]$card.Path) ([string]$card.Platform)
             [void]$Group.Surface.SetItemView([int]$card.ActionIndex,[double]$view.Yaw,[double]$view.Pitch,$true)
-            # Provider shelf is intentionally untouched. Only console cards get a
-            # per-model scale multiplier on top of the existing global model scale.
             if($isConsoleGroup -and $Group.Surface.PSObject.Methods['SetItem']){
                 $point=$card.VisualHost.TranslatePoint((New-Object System.Windows.Point 0,0),$Group.Container)
                 $w=[double]$card.VisualHost.ActualWidth;if($w-le1){$w=[double]$card.Button.Width-12}
