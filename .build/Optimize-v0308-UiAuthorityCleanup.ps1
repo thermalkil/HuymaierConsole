@@ -47,7 +47,7 @@ if($text -notmatch 'HUYMAIER_V0308_UI_AUTHORITY_CLEANUP_V1'){
         $text=$text.Replace($legacy,'')
     }
 
-    $anchor="$script:AppName = 'Huymaier Console'"
+    $anchor='$script:AppName = ''Huymaier Console'''
     if(-not $text.Contains($anchor)){throw 'Core authority marker anchor missing.'}
     $text=$text.Replace($anchor,"# HUYMAIER_V0308_UI_AUTHORITY_CLEANUP_V1 - HuymaierShellRedesign owns Settings presentation`n$anchor")
     Write-HcText $corePath $text
