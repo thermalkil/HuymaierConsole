@@ -34,15 +34,16 @@ $manifest=Get-Content -Raw -LiteralPath $ManifestPath -Encoding UTF8|ConvertFrom
 if([string]$manifest.version -ne '0.26.4'){throw "Expected source manifest version 0.26.4 before candidate stamping, found $($manifest.version)."}
 $manifest.version=$version
 $manifest.baseVersion='0.30.4'
-$manifest.build='console-model-transform-scale-rc1'
-$manifest.description='v0.30.6 keeps provider/storefront models unchanged while improving console-model correction and adding saved per-console model scale to Edit Model mode.'
+$manifest.build='console-model-presentation-editor-rc1'
+$manifest.description='v0.30.6 adds a complete per-console 3D presentation editor for orientation, size, position, mirroring, face handling, lighting and fan motion while leaving provider/storefront models unchanged.'
 $features=New-Object System.Collections.ArrayList
 foreach($feature in @($manifest.features)){[void]$features.Add([string]$feature)}
 foreach($feature in @(
-    'adds saved per-console model scale to Edit Model mode from 30 to 300 percent in 10 percent steps using LB/RB, alongside the existing saved yaw and pitch controls',
-    'applies each saved console scale to both the full-screen viewer and console shelf while leaving the top provider/storefront shelf scale path unchanged',
-    'carries forward adaptive negative-determinant winding correction for console GLBs and automatically refreshes corrected HC3D winding caches without modifying user source models',
-    'retains v0.30.4 saved model orientation, v0.30.3 Windows/Xbox FSE updater handoff, overall console brightness, HC3D v4 COLOR_0 rendering, controller routing, Quick Access, Downloads, Recomps, GameCube, streaming and installer integrity'
+    'expands Edit Model into a console-only presentation editor with saved yaw, pitch, roll, 30-300 percent scale, X/Y framing position, X/Y/Z mirroring, face mode, per-model lighting and fan-motion strength',
+    'adds Normal, Reverse and TwoSided face handling plus mirror-aware D3D11 culling and tangent handedness so backwards or inside-out console assets can be corrected without editing the source GLB',
+    'applies every saved console presentation setting to both the full-screen viewer and the Consoles shelf while explicitly leaving the top Providers shelf presentation unchanged',
+    'carries forward adaptive negative-determinant winding correction and automatically refreshes corrected HC3D winding caches without modifying user source models',
+    'retains v0.30.3 Windows/Xbox FSE updater handoff, overall console brightness, HC3D v4 COLOR_0 rendering, controller routing, Quick Access, Downloads, Recomps, GameCube, streaming and installer integrity'
 )){
     if($features -notcontains $feature){[void]$features.Add($feature)}
 }
@@ -56,4 +57,4 @@ if(([regex]::Matches($appx,[regex]::Escape($oldAppx))).Count -ne 1){throw 'Expec
 $appx=$appx.Replace($oldAppx,$newAppx)
 [IO.File]::WriteAllText($AppxManifestPath,$appx,(New-Object Text.UTF8Encoding($false)))
 
-Write-Host "Stamped shell, bootstrap, installer core/cache, native build stamp, manifest and AppX as Huymaier Console v$version / console-model-transform-scale-rc1."
+Write-Host "Stamped shell, bootstrap, installer core/cache, native build stamp, manifest and AppX as Huymaier Console v$version / console-model-presentation-editor-rc1."
