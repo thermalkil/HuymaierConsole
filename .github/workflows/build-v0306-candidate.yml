@@ -54,14 +54,18 @@ jobs:
             '.\.build\Optimize-ModelDefaultViews.ps1',
             '.\.build\Optimize-ModelWinding.ps1',
             '.\.build\Optimize-ConsoleModelScale.ps1',
+            '.\.build\Optimize-ConsoleModelPresentation.ps1',
             '.\.build\Test-HuymaierCandidate.ps1',
             '.\.build\Test-HuymaierV0306Candidate.ps1',
+            '.\.build\Test-HuymaierV0306PresentationCandidate.ps1',
             '.\.development\v0.30.2\Test-v0302-ConsoleBrightness.ps1',
             '.\.development\v0.30.3\Test-v0303-FseUpdaterHandoff.ps1',
             '.\.development\v0.30.4\Test-v0304-ModelDefaultViews.ps1',
             '.\.development\v0.30.5\Test-v0305-AdaptiveModelWinding.ps1',
             '.\.development\v0.30.6\Test-v0306-ConsoleModelScale.ps1',
-            '.\HuymaierModelDefaults.ps1'
+            '.\.development\v0.30.6\Test-v0306-ConsoleModelPresentation.ps1',
+            '.\HuymaierModelDefaults.ps1',
+            '.\HuymaierConsoleModelPresentation.ps1'
           )
           foreach($p in $paths){
             $tokens=$null;$errors=$null
@@ -125,15 +129,17 @@ jobs:
             & git clean -fd
           }
 
-      - name: Reassert focused v0.30.6 gates
+      - name: Reassert full v0.30.6 console presentation gates
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
           if(-not((Get-Content -Raw '.\HuymaierCustomization.ps1') -match 'HUYMAIER_V0302_CONSOLE_BRIGHTNESS_V1')){& '.\.build\Optimize-ConsoleBrightness.ps1' -CustomizationPath '.\HuymaierCustomization.ps1'}
           & '.\.build\Optimize-ModelWinding.ps1'
           & '.\.build\Optimize-ConsoleModelScale.ps1'
+          & '.\.build\Optimize-ConsoleModelPresentation.ps1'
           & '.\.development\v0.30.5\Test-v0305-AdaptiveModelWinding.ps1'
           & '.\.development\v0.30.6\Test-v0306-ConsoleModelScale.ps1'
+          & '.\.development\v0.30.6\Test-v0306-ConsoleModelPresentation.ps1'
 
       - name: Build exact x64 FSE Home host
         shell: powershell
@@ -171,6 +177,7 @@ jobs:
           $stage=Join-Path $env:RUNNER_TEMP ('hc-stage\${{ steps.request.outputs.package_root }}')
           $validation=Join-Path $env:HC_CANDIDATE_OUTPUT 'candidate-validation.json'
           & '.\.build\Test-HuymaierV0306Candidate.ps1' -StageRoot $stage -ValidationPath $validation
+          & '.\.build\Test-HuymaierV0306PresentationCandidate.ps1' -StageRoot $stage -ValidationPath $validation
 
       - name: Verify final release hash
         shell: powershell
