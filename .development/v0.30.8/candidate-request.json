@@ -5,7 +5,7 @@
   "base_asset": "HC0307.zip",
   "package_root": "HC0308",
   "asset_name": "HC0308.zip",
-  "production_source": "5ebed181b8fb10e1c939b8c637e92f49c5523555",
-  "attempt": 2,
+  "production_source": "ed4f902e316c90247d79890b2ffef7192e6ea607",
+  "attempt": 3,
   "notes": "TheGamesDB-first platform-aware missing-cover fallback with durable provenance/failure cache, curated The Cover Project mappings, and per-game artwork management."
 }
