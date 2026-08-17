@@ -69,15 +69,6 @@ function Set-HcApiKeyFromKeyboard {
 function Complete-NativeKeyboardInput {
 '@
     $storefront=Replace-Required $storefront $dispatcher $helper.TrimEnd() 'single keyboard dispatcher helper'
-    $old=@'
-        'SteamGridDbApiKey' {
-            $key=([string]$Value).Trim()
-            $script:Config.SteamGridDbApiKey=$key
-            Save-Config
-            Set-ConsoleNotice $(if($key){'SteamGridDB artwork key saved. Refresh missing box art to use it.'}else{'SteamGridDB artwork key cleared.'}) 'INFO'
-            Render-Page
-        }
-'@
     $new=@'
         'SteamGridDbApiKey' {
             Set-HcApiKeyFromKeyboard 'SteamGridDbApiKey' $Value 'SteamGridDB'
@@ -90,7 +81,7 @@ function Complete-NativeKeyboardInput {
             else{Set-ConsoleNotice 'Customization input handler is unavailable.' 'ERROR';Render-Page}
         }
 '@
-    $storefront=Replace-Required $storefront $old.TrimEnd() $new.TrimEnd() 'API key and customization dispatch cases'
+    $storefront=Replace-Range $storefront "        'SteamGridDbApiKey' {" "        'CreateFolder' {" $new 'API key and customization dispatch cases'
     $old=@'
 function Get-NativeKeyboardBuffer {
     if($script:KeyboardSecure){return [string]$script:KeyboardSecureBuffer}
