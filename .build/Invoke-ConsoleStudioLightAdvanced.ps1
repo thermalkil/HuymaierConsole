@@ -15,7 +15,9 @@ $new=@'
 $count=([regex]::Matches($text,[regex]::Escape($old))).Count
 if($count-ne1){throw "Expected one ambiguous advanced replay patch line, found $count."}
 $text=$text.Replace($old,$new)
-$temp=Join-Path ([IO.Path]::GetTempPath()) ('hc-advanced-light-'+[guid]::NewGuid().ToString('N')+'.ps1')
+# Keep the temporary script beside the real transform so its $PSScriptRoot is
+# still .build and the transform resolves the repository root correctly.
+$temp=Join-Path $PSScriptRoot ('.tmp-advanced-light-'+[guid]::NewGuid().ToString('N')+'.ps1')
 try{
     [IO.File]::WriteAllText($temp,$text,(New-Object Text.UTF8Encoding($false)))
     & $temp
