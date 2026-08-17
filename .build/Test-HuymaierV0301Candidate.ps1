@@ -46,14 +46,14 @@ $userModels=Require-Text 'HuymaierUser3DModels.ps1' @(
 )
 if($userModels -match "platform-model-brightness-slider'.*50 250"){throw 'Legacy 50-250 3D-model brightness range survived staging.'}
 
-$host=Require-Text 'Native\HuymaierD3D11ShelfHost.cs' @(
+$hostSource=Require-Text 'Native\HuymaierD3D11ShelfHost.cs' @(
     'HUYMAIER_D3D11_SHELF_HOST_V3_BOUNDED_FAN_MOTION',
     'FanPeriodSeconds = 8.0',
     'FanPhaseAmplitude = 0.75f',
     '-FanPhaseAmplitude * (float)Math.Sin',
     'Math.Max(0.0, Math.Min(200.0, percent))'
 )
-if($host.Contains('float phase = (float)renderClock.Elapsed.TotalSeconds;')){throw 'Legacy continuous 360-degree turntable phase survived staging.'}
+if($hostSource.Contains('float phase = (float)renderClock.Elapsed.TotalSeconds;')){throw 'Legacy continuous 360-degree turntable phase survived staging.'}
 
 $worker=Require-Text 'HuymaierConsoleUpdateWorker.ps1' @(
     'function Get-HcComparableVersion',
