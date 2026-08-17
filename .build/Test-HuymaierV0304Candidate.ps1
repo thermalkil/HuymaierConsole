@@ -33,10 +33,12 @@ Write-Host 'v0304ModelPersistenceStageGate: success'
 Write-Host 'v0304StableYawStageGate: success'
 
 $updater=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierSelfUpdater.ps1') -Encoding UTF8
-$worker=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierConsoleUpdateWorker.ps1') -Encoding UTF8
 $fseHostSource=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierFSEHost.cs') -Encoding UTF8
-foreach($needle in @('HUYMAIER_FSE_UPDATE_HANDOFF_V1','HUYMAIER_FSE_UPDATE_HANDOFF')){
-    if(($updater+$worker+$fseHostSource) -notmatch [regex]::Escape($needle)){throw "Staged v0.30.3 updater handoff marker missing: $needle"}
+foreach($needle in @('HUYMAIER_FSE_HOST','HuymaierConsoleFseUpdate.lock','WaitForUpdateHandoffToStart','WaitForUpdateHandoff(handoffPath)')){
+    if($fseHostSource.IndexOf($needle,[StringComparison]::Ordinal) -lt 0){throw "Staged v0.30.3 FSE host handoff contract missing: $needle"}
+}
+foreach($needle in @("GetEnvironmentVariable('HUYMAIER_FSE_HOST')",'HuymaierConsoleFseUpdate.lock','if($relaunch -and -not $isFseManaged)','Windows FSE host owns post-update relaunch.')){
+    if($updater.IndexOf($needle,[StringComparison]::Ordinal) -lt 0){throw "Staged v0.30.3 self-updater handoff contract missing: $needle"}
 }
 Write-Host 'v0304FseUpdaterCarryForwardGate: success'
 
