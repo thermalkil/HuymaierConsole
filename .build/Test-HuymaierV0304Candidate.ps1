@@ -43,8 +43,17 @@ foreach($needle in @("GetEnvironmentVariable('HUYMAIER_FSE_HOST')",'HuymaierCons
 Write-Host 'v0304FseUpdaterCarryForwardGate: success'
 
 $customization=Get-Content -Raw -LiteralPath (Join-Path $StageRoot 'HuymaierCustomization.ps1') -Encoding UTF8
-if($customization -notmatch 'HUYMAIER_V0302_CONSOLE_BRIGHTNESS_V1'){throw 'Overall console brightness carry-forward marker is missing.'}
-if($customization -notmatch 'Maximum=200' -or $customization -notmatch 'TickFrequency=10'){throw 'Overall console brightness 0-200 / 10-step contract is missing.'}
+foreach($needle in @(
+    'HUYMAIER_V0302_CONSOLE_BRIGHTNESS_V1',
+    "Add-HcCustomizationConfigProperty 'ConsoleBrightness'",
+    "New-SliderAction 'console-brightness-slider' 'Huymaier Console brightness'",
+    "'Adjust the entire Huymaier Console interface from 0% to 200% in 10% steps.' 0 200",
+    "`$direction=`$(if(`$Delta -lt 0){-10}elseif(`$Delta -gt 0){10}else{0})",
+    'function Apply-HcConsoleBrightness',
+    "`$persistedConfig.PSObject.Properties['ConsoleBrightness']"
+)){
+    if($customization.IndexOf($needle,[StringComparison]::Ordinal) -lt 0){throw "Staged v0.30.2 brightness contract missing: $needle"}
+}
 Write-Host 'v0304ConsoleBrightnessCarryForwardGate: success'
 
 $tokens=$null;$errors=$null
