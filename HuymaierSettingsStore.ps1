@@ -63,6 +63,28 @@ function Write-HcConfigAtomic {
     }
 }
 
+# HUYMAIER_V0308_SETTINGS_VERIFIED_VALUE_V1
+function Set-HcPersistedConfigValue {
+    param(
+        [Parameter(Mandatory=$true)][string]$Path,
+        [Parameter(Mandatory=$true)]$Config,
+        [Parameter(Mandatory=$true)][string]$Name,
+        $Value,
+        [int]$Depth=16
+    )
+    if([string]::IsNullOrWhiteSpace($Name)){return $false}
+    try{
+        if($null -eq $Config.PSObject.Properties[$Name]){$Config|Add-Member -NotePropertyName $Name -NotePropertyValue $Value -Force}else{$Config.$Name=$Value}
+        if(-not(Write-HcConfigAtomic -Path $Path -Config $Config -Depth $Depth)){return $false}
+        $verify=Read-HcPersistedConfig -Path $Path
+        if($null -eq $verify -or $null -eq $verify.PSObject.Properties[$Name]){return $false}
+        if($Value -is [string] -or $verify.$Name -is [string]){return ([string]$verify.$Name -ceq [string]$Value)}
+        $expected=$Value|ConvertTo-Json -Depth ([math]::Max(8,[math]::Min(64,$Depth))) -Compress
+        $actual=$verify.$Name|ConvertTo-Json -Depth ([math]::Max(8,[math]::Min(64,$Depth))) -Compress
+        return ([string]$actual -ceq [string]$expected)
+    }catch{return $false}
+}
+
 function Repair-HcSettingsStoreArtifacts {
     param([Parameter(Mandatory=$true)][string]$Path)
     try{
@@ -73,6 +95,14 @@ function Repair-HcSettingsStoreArtifacts {
             if($file.LastWriteTimeUtc -lt [DateTime]::UtcNow.AddMinutes(-5)){Remove-Item -LiteralPath $file.FullName -Force -ErrorAction SilentlyContinue}
         }
         $backup=$Path+'.replace-backup'
-        if(Test-Path -LiteralPath $backup -PathType Leaf){Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue}
+        $mainValid=$false
+        if(Test-Path -LiteralPath $Path -PathType Leaf){try{$null=Read-HcPersistedConfig -Path $Path;$mainValid=$true}catch{$mainValid=$false}}
+        if(-not $mainValid -and (Test-Path -LiteralPath $backup -PathType Leaf)){
+            try{
+                $backupConfig=Read-HcPersistedConfig -Path $backup
+                if($null -ne $backupConfig){Copy-Item -LiteralPath $backup -Destination $Path -Force;$mainValid=$true}
+            }catch{$mainValid=$false}
+        }
+        if($mainValid -and (Test-Path -LiteralPath $backup -PathType Leaf)){Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue}
     }catch{}
 }
