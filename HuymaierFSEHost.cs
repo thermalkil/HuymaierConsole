@@ -8,6 +8,18 @@ internal static class HuymaierFSEHost
     private const string FseEnvironmentVariable = "HUYMAIER_FSE_HOST";
     private const string UpdateHandoffFileName = "HuymaierConsoleFseUpdate.lock";
 
+    private static bool WaitForUpdateHandoffToStart(string handoffPath)
+    {
+        if (File.Exists(handoffPath)) return true;
+        DateTime deadline = DateTime.UtcNow.AddSeconds(2);
+        while (DateTime.UtcNow < deadline)
+        {
+            Thread.Sleep(100);
+            if (File.Exists(handoffPath)) return true;
+        }
+        return false;
+    }
+
     private static void WaitForUpdateHandoff(string handoffPath)
     {
         while (File.Exists(handoffPath))
@@ -55,12 +67,12 @@ internal static class HuymaierFSEHost
                     process.WaitForExit();
                     int exitCode = process.ExitCode;
 
-                    // A self-update intentionally closes Huymaier Console. Keep the
-                    // Windows FSE home host alive while the external updater replaces
-                    // the runtime, then launch the newly installed executable from
-                    // this same host instead of letting Xbox/FSE mode immediately
-                    // relaunch the old runtime and race the installer.
-                    if (File.Exists(handoffPath))
+                    // The updater is a child of Huymaier Console, so there is a tiny
+                    // scheduling window between Console exiting and the updater writing
+                    // its handoff file. Give that child two seconds to arm the gate.
+                    // When armed, keep this FSE home process alive until installation
+                    // finishes, then launch the newly installed Console ourselves.
+                    if (WaitForUpdateHandoffToStart(handoffPath))
                     {
                         WaitForUpdateHandoff(handoffPath);
                         continue;
