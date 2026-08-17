@@ -8,8 +8,6 @@ function Write-Normalized([string]$Path,[string]$Text){[IO.File]::WriteAllText($
 function Replace-Required([string]$Text,[string]$Old,[string]$New,[string]$Label){if(-not $Text.Contains($Old)){throw "v0.30.8 background-task transform anchor missing: $Label"};return $Text.Replace($Old,$New)}
 $lf="`n"
 
-# Core owns the shell visual tree/runtime watcher. BackgroundTasks owns only the
-# task model/presentation behavior and is loaded after Customization.
 $corePath=Join-Path $root 'HuymaierConsole.ps1'
 $core=Read-Normalized $corePath
 if($core -notmatch 'HUYMAIER_V0308_BACKGROUND_TASK_CORE_V2'){
@@ -17,49 +15,23 @@ if($core -notmatch 'HUYMAIER_V0308_BACKGROUND_TASK_CORE_V2'){
     $insert=@($anchor,'$script:BackgroundTasksModulePath = Join-Path $script:BaseDir ''HuymaierBackgroundTasks.ps1'' # HUYMAIER_V0308_BACKGROUND_TASK_CORE_V2') -join $lf
     $core=Replace-Required $core $anchor $insert 'background task module path'
 
-    # The platform-model marker is the stable boundary immediately after the
-    # Customization module load; insert the background-task owner at that boundary.
     $anchor='# HUYMAIER_PLATFORM_3D_MODELS_RUNTIME_V2'
     $insert=@('if (Test-Path -LiteralPath $script:BackgroundTasksModulePath) {','    try { . $script:BackgroundTasksModulePath }','    catch { Write-Log "Background task module load failed: $($_.Exception.Message)" ''ERROR'' }','}',$anchor) -join $lf
     $core=Replace-Required $core $anchor $insert 'background task module load'
 
-    $anchor=@'
-                <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <TextBlock x:Name="ClockText" Text="--:--" FontSize="25" FontWeight="SemiBold" HorizontalAlignment="Right"/>
-                    <TextBlock x:Name="ControllerText" Text="Keyboard / Mouse" FontSize="12" Foreground="#AAB8CC" HorizontalAlignment="Right"/>
-                    <TextBlock x:Name="FpsText" Text="FPS --" Visibility="Collapsed" FontSize="12" FontWeight="SemiBold" Foreground="#E7C45E" HorizontalAlignment="Right" Margin="0,3,0,0"/>
-                </StackPanel>
-'@
-    $insert=@'
-                <!-- HUYMAIER_V0308_BACKGROUND_TASK_HUD_V2 -->
-                <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Top" Panel.ZIndex="1700">
-                    <TextBlock x:Name="ClockText" Text="--:--" FontSize="25" FontWeight="SemiBold" HorizontalAlignment="Right"/>
-                    <TextBlock x:Name="ControllerText" Text="Keyboard / Mouse" FontSize="12" Foreground="#AAB8CC" HorizontalAlignment="Right"/>
-                    <TextBlock x:Name="FpsText" Text="FPS --" Visibility="Collapsed" FontSize="12" FontWeight="SemiBold" Foreground="#E7C45E" HorizontalAlignment="Right" Margin="0,3,0,0"/>
-                    <Border x:Name="BackgroundTaskHud" Visibility="Collapsed" IsHitTestVisible="False" Width="410" HorizontalAlignment="Right" Margin="0,8,0,0" Padding="12,9" Background="#EE0A101A" BorderBrush="#506077" BorderThickness="1" CornerRadius="10">
-                        <StackPanel x:Name="BackgroundTaskPanel"/>
-                    </Border>
-                </StackPanel>
-'@
+    # Keep the header structure intact and add the task card directly after the
+    # unique FPS line. Single-line anchors are resilient to unrelated shell edits.
+    $anchor='                <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">'
+    $insert='                <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Top" Panel.ZIndex="1700">'
+    $core=Replace-Required $core $anchor $insert 'top-right task stack'
+    $anchor='                    <TextBlock x:Name="FpsText" Text="FPS --" Visibility="Collapsed" FontSize="12" FontWeight="SemiBold" Foreground="#E7C45E" HorizontalAlignment="Right" Margin="0,3,0,0"/>'
+    $insert=@($anchor,'                    <!-- HUYMAIER_V0308_BACKGROUND_TASK_HUD_V2 -->','                    <Border x:Name="BackgroundTaskHud" Visibility="Collapsed" IsHitTestVisible="False" Width="410" HorizontalAlignment="Right" Margin="0,8,0,0" Padding="12,9" Background="#EE0A101A" BorderBrush="#506077" BorderThickness="1" CornerRadius="10">','                        <StackPanel x:Name="BackgroundTaskPanel"/>','                    </Border>') -join $lf
     $core=Replace-Required $core $anchor $insert 'top-right task HUD XAML'
 
     $core=Replace-Required $core "'ClockText','ControllerText','FpsText','NavPanel'" "'ClockText','ControllerText','FpsText','BackgroundTaskHud','BackgroundTaskPanel','NavPanel'" 'task HUD named controls'
 
-    $anchor=@'
-            Update-HcRuntimeStateEvents
-            Invoke-HcIncrementalConsoleCountRefresh
-'@
-    $insert=@'
-            Update-HcRuntimeStateEvents
-            # HUYMAIER_V0308_BACKGROUND_TASK_WATCHER_V2
-            # Artwork state is consumed from the existing FileSystemWatcher dirty
-            # map. The HUD never adds a second JSON polling loop to the UI thread.
-            if(Test-HcRuntimePathDirty $script:ArtworkStatePath){
-                try{$script:HcBackgroundArtworkState=Read-ArtworkState}catch{$script:HcBackgroundArtworkState=$null}
-            }
-            if(Get-Command Update-HcBackgroundTaskHud -ErrorAction SilentlyContinue){Update-HcBackgroundTaskHud}
-            Invoke-HcIncrementalConsoleCountRefresh
-'@
+    $anchor='            Invoke-HcIncrementalConsoleCountRefresh'
+    $insert=@('            # HUYMAIER_V0308_BACKGROUND_TASK_WATCHER_V2','            # Consume artwork progress from the existing FileSystemWatcher dirty map.','            if(Test-HcRuntimePathDirty $script:ArtworkStatePath){','                try{$script:HcBackgroundArtworkState=Read-ArtworkState}catch{$script:HcBackgroundArtworkState=$null}','            }','            if(Get-Command Update-HcBackgroundTaskHud -ErrorAction SilentlyContinue){Update-HcBackgroundTaskHud}',$anchor) -join $lf
     $core=Replace-Required $core $anchor $insert 'task state watcher integration'
 
     $anchor="        'artwork-refresh' { Start-OnlineArtworkScan -ResetCursor;Set-ConsoleNotice 'Missing box art is being refreshed in the background.' 'INFO';Render-Page }"
@@ -68,8 +40,6 @@ if($core -notmatch 'HUYMAIER_V0308_BACKGROUND_TASK_CORE_V2'){
 }
 Write-Normalized $corePath $core
 
-# The active Storefront Manage refresh had been launching library import and art
-# discovery at the same instant. Route it through the same sequenced coordinator.
 $shellPath=Join-Path $root 'HuymaierShellRedesign.ps1'
 $shell=Read-Normalized $shellPath
 if($shell -notmatch 'HUYMAIER_V0308_SEQUENCED_ARTWORK_REFRESH_V2'){
@@ -79,7 +49,6 @@ if($shell -notmatch 'HUYMAIER_V0308_SEQUENCED_ARTWORK_REFRESH_V2'){
 }
 Write-Normalized $shellPath $shell
 
-# Preflight the new production module so a partial install fails closed before UI.
 $bootstrapPath=Join-Path $root 'HuymaierBootstrap.ps1'
 $bootstrap=Read-Normalized $bootstrapPath
 if($bootstrap -notmatch 'HUYMAIER_V0308_BACKGROUND_TASK_PREFLIGHT_V2'){
@@ -92,7 +61,6 @@ if($bootstrap -notmatch 'HUYMAIER_V0308_BACKGROUND_TASK_PREFLIGHT_V2'){
 }
 Write-Normalized $bootstrapPath $bootstrap
 
-# Installer cache/preflight and required-payload gates must know about the module.
 $installerPath=Join-Path $root 'Install-HuymaierConsole.ps1'
 $installer=Read-Normalized $installerPath
 if($installer -notmatch 'HUYMAIER_V0308_BACKGROUND_TASK_INSTALLER_V2'){
@@ -111,8 +79,6 @@ if($installerCore -notmatch 'HUYMAIER_V0308_BACKGROUND_TASK_REQUIRED_V2'){
 }
 Write-Normalized $installerCorePath $installerCore
 
-# RC4's log exposed a noisy .NET Framework File.Replace call with a null backup
-# path. Use a real sibling backup and retain an atomic move fallback.
 $cursorPath=Join-Path $root 'HuymaierUnifiedCursor.ps1'
 $cursor=Read-Normalized $cursorPath
 if($cursor -notmatch 'HUYMAIER_V0308_CURSOR_STATE_REPLACE_V2'){
